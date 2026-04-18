@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Server, Network as NetworkIcon } from "lucide-react";
+import { Search, Server, Network as NetworkIcon, Workflow } from "lucide-react";
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 
 const statusColor: Record<string, string> = {
   online: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
@@ -49,7 +51,15 @@ export default function Network() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Network Reference</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Network Reference</h1>
+        <Link href="/network/visualize">
+          <Button variant="outline" size="sm">
+            <Workflow className="h-4 w-4 mr-2" />
+            Visualizer
+          </Button>
+        </Link>
+      </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

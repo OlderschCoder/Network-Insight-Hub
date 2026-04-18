@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { QuoteOfDay } from "@/components/QuoteOfDay";
 
 export default function Dashboard() {
   const { data: summary } = useGetDashboardSummary();
@@ -22,6 +23,8 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <QuoteOfDay />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
