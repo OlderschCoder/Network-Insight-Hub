@@ -26,3 +26,9 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+ZENDESK_SUBDOMAIN = "sccc"
+ZENDESK_EMAIL = "admin@sccc.edu"
