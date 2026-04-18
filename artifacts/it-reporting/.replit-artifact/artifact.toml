@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SCCC IT Department Reporting"
+version = "1.0.0"
+id = "artifacts/it-reporting"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21840
+
+[services.development]
+run = "pnpm --filter @workspace/it-reporting run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/it-reporting", "run", "build" ]
+publicDir = "artifacts/it-reporting/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21840"
+BASE_PATH = "/"

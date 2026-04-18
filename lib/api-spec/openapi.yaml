@@ -3,20 +3,37 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SCCC IT Department Reporting Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: entries
+    description: Daily log entries
+  - name: reports
+    description: Weekly reports
+  - name: risks
+    description: Risks and issues
+  - name: network
+    description: Network reference data
+  - name: after-action
+    description: After-action reports
+  - name: export
+    description: Export and integrations
+  - name: dashboard
+    description: Dashboard and aggregation
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,775 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  # USERS
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (CIO only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # DAILY ENTRIES
+  /entries:
+    get:
+      operationId: listEntries
+      tags: [entries]
+      summary: List entries (CIO sees all, others see own)
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: weekOf
+          in: query
+          schema:
+            type: string
+            description: ISO date of the week start (Monday)
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entry"
+    post:
+      operationId: createEntry
+      tags: [entries]
+      summary: Create a daily log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+  /entries/{id}:
+    get:
+      operationId: getEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+    put:
+      operationId: updateEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+    delete:
+      operationId: deleteEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # WEEKLY REPORTS
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List weekly reports
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, finalized]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Create/finalize a weekly report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    patch:
+      operationId: updateReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReportBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /reports/{id}/finalize:
+    post:
+      operationId: finalizeReport
+      tags: [reports]
+      summary: Finalize and aggregate a weekly report (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /reports/aggregate:
+    get:
+      operationId: getAggregateReport
+      tags: [reports]
+      summary: Get aggregated report data for a week
+      parameters:
+        - name: weekOf
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AggregateReport"
+
+  # RISKS AND ISSUES
+  /risks:
+    get:
+      operationId: listRisks
+      tags: [risks]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, mitigated, closed]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [risk, issue, suggestion]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Risk"
+    post:
+      operationId: createRisk
+      tags: [risks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRiskBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+  /risks/{id}:
+    get:
+      operationId: getRisk
+      tags: [risks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+    patch:
+      operationId: updateRisk
+      tags: [risks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiskBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+
+  # NETWORK REFERENCE
+  /network/switches:
+    get:
+      operationId: listSwitches
+      tags: [network]
+      summary: List network switches with search
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search by name, building, or IP
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [online, offline, unknown]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetworkSwitch"
+    post:
+      operationId: createSwitch
+      tags: [network]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}:
+    get:
+      operationId: getSwitch
+      tags: [network]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+    patch:
+      operationId: updateSwitch
+      tags: [network]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+  /network/vlans:
+    get:
+      operationId: listVlans
+      tags: [network]
+      summary: List VLANs with search
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [data, voice, ospf, management, security, other]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vlan"
+    post:
+      operationId: createVlan
+      tags: [network]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVlanBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+
+  # AFTER-ACTION REPORTS
+  /after-action:
+    get:
+      operationId: listAfterActionReports
+      tags: [after-action]
+      parameters:
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: deviceType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AfterActionReport"
+    post:
+      operationId: createAfterActionReport
+      tags: [after-action]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAfterActionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+  /after-action/{id}:
+    get:
+      operationId: getAfterActionReport
+      tags: [after-action]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+    patch:
+      operationId: updateAfterActionReport
+      tags: [after-action]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAfterActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+
+  # EXPORT & INTEGRATIONS
+  /export/report/{id}/docx:
+    get:
+      operationId: exportReportDocx
+      tags: [export]
+      summary: Download report as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /export/report/{id}/xlsx:
+    get:
+      operationId: exportReportXlsx
+      tags: [export]
+      summary: Download report as Excel spreadsheet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: XLSX file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /export/report/{id}/zendesk:
+    post:
+      operationId: sendReportToZendesk
+      tags: [export]
+      summary: Create a Zendesk ticket from this report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZendeskTicketBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZendeskTicketResponse"
+  /export/entry/{id}/zendesk:
+    post:
+      operationId: sendEntryToZendesk
+      tags: [export]
+      summary: Create a Zendesk ticket from a specific entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZendeskTicketBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZendeskTicketResponse"
+
+  # DASHBOARD
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+  /dashboard/week-status:
+    get:
+      operationId: getWeekStatus
+      tags: [dashboard]
+      summary: Get current week submission status per user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeekStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +817,651 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [cio, helpdesk, network, security]
+        department:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, email, name, role]
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [cio, helpdesk, network, security]
+        department:
+          type: string
+      required: [email, password, name, role]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required: [user, token]
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [cio, helpdesk, network, security]
+        department:
+          type: string
+
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        category:
+          type: string
+          enum: [helpdesk, network, security, general]
+        title:
+          type: string
+        description:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        supportNeeded:
+          type: string
+        ticketCount:
+          type: integer
+        weekOf:
+          type: string
+          description: ISO date string of week start
+        entryDate:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+        isSubmitted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, category, title, description, weekOf, isSubmitted, createdAt]
+
+    CreateEntryBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [helpdesk, network, security, general]
+        title:
+          type: string
+        description:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        supportNeeded:
+          type: string
+        ticketCount:
+          type: integer
+        weekOf:
+          type: string
+        entryDate:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        isSubmitted:
+          type: boolean
+      required: [category, title, description, weekOf]
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        weekOf:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, finalized]
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+        metrics:
+          type: object
+          additionalProperties: true
+        contributorCount:
+          type: integer
+        entryCount:
+          type: integer
+        createdBy:
+          type: integer
+        createdByName:
+          type: string
+        finalizedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, weekOf, status, createdAt]
+
+    CreateReportBody:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+      required: [weekOf]
+
+    UpdateReportBody:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+        status:
+          type: string
+          enum: [draft, finalized]
+
+    AggregateReport:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        totalEntries:
+          type: integer
+        contributorCount:
+          type: integer
+        byRole:
+          type: object
+          additionalProperties:
+            type: integer
+        byCategory:
+          type: object
+          additionalProperties:
+            type: integer
+        totalTickets:
+          type: integer
+        openRisks:
+          type: integer
+        entrySummaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+      required: [weekOf, totalEntries, contributorCount]
+
+    Risk:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [open, mitigated, closed]
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, type, severity, status, title, description, createdAt]
+
+    CreateRiskBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+      required: [type, severity, title, description]
+
+    UpdateRiskBody:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [open, mitigated, closed]
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+
+    NetworkSwitch:
+      type: object
+      properties:
+        id:
+          type: integer
+        hostname:
+          type: string
+        building:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, unknown]
+        configFile:
+          type: string
+        notes:
+          type: string
+        location:
+          type: string
+        lastSeen:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, hostname, building, ipAddress, status]
+
+    CreateSwitchBody:
+      type: object
+      properties:
+        hostname:
+          type: string
+        building:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, unknown]
+        configFile:
+          type: string
+        notes:
+          type: string
+        location:
+          type: string
+      required: [hostname, building, ipAddress]
+
+    Vlan:
+      type: object
+      properties:
+        id:
+          type: integer
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        building:
+          type: string
+        type:
+          type: string
+          enum: [data, voice, ospf, management, security, other]
+        subnet:
+          type: string
+        gateway:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, vlanId, name, building, type]
+
+    CreateVlanBody:
+      type: object
+      properties:
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        building:
+          type: string
+        type:
+          type: string
+          enum: [data, voice, ospf, management, security, other]
+        subnet:
+          type: string
+        gateway:
+          type: string
+        notes:
+          type: string
+      required: [vlanId, name, building, type]
+
+    AfterActionReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        title:
+          type: string
+        incident:
+          type: string
+        building:
+          type: string
+        deviceType:
+          type: string
+        affectedSystems:
+          type: string
+        timeline:
+          type: string
+        rootCause:
+          type: string
+        resolution:
+          type: string
+        lessonsLearned:
+          type: string
+        preventionMeasures:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        incidentDate:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, title, incident, status, severity, createdAt]
+
+    CreateAfterActionBody:
+      type: object
+      properties:
+        title:
+          type: string
+        incident:
+          type: string
+        building:
+          type: string
+        deviceType:
+          type: string
+        affectedSystems:
+          type: string
+        timeline:
+          type: string
+        rootCause:
+          type: string
+        resolution:
+          type: string
+        lessonsLearned:
+          type: string
+        preventionMeasures:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        incidentDate:
+          type: string
+          format: date-time
+      required: [title, incident, status, severity]
+
+    ZendeskTicketBody:
+      type: object
+      properties:
+        subject:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        requesterEmail:
+          type: string
+        additionalNotes:
+          type: string
+      required: [subject, priority]
+
+    ZendeskTicketResponse:
+      type: object
+      properties:
+        ticketId:
+          type: integer
+        ticketUrl:
+          type: string
+        status:
+          type: string
+      required: [ticketId, status]
+
+    DashboardSummary:
+      type: object
+      properties:
+        thisWeekEntries:
+          type: integer
+        thisWeekContributors:
+          type: integer
+        openRisks:
+          type: integer
+        criticalRisks:
+          type: integer
+        openAfterActions:
+          type: integer
+        totalSwitches:
+          type: integer
+        onlineSwitches:
+          type: integer
+        offlineSwitches:
+          type: integer
+        totalReports:
+          type: integer
+        pendingSubmissions:
+          type: integer
+        totalTickets:
+          type: integer
+      required: [thisWeekEntries, thisWeekContributors, openRisks, totalSwitches]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [entry, report, risk, after-action]
+        action:
+          type: string
+        title:
+          type: string
+        userName:
+          type: string
+        userRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        entityId:
+          type: integer
+      required: [id, type, action, title, userName, createdAt]
+
+    WeekStatus:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        deadline:
+          type: string
+          format: date-time
+        isFinalized:
+          type: boolean
+        submissions:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              userName:
+                type: string
+              userRole:
+                type: string
+              entryCount:
+                type: integer
+              isSubmitted:
+                type: boolean
+            required: [userId, userName, userRole, entryCount, isSubmitted]
+      required: [weekOf, isFinalized, submissions]
