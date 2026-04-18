@@ -9,6 +9,7 @@ import networkRouter from "./network";
 import afterActionRouter from "./after_action";
 import dashboardRouter from "./dashboard";
 import exportRouter from "./export";
+import statusReportRouter from "./status_report";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/network", networkRouter);
 router.use("/after-action", afterActionRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/export", exportRouter);
+router.use("/status-report", statusReportRouter);
 
 export default router;

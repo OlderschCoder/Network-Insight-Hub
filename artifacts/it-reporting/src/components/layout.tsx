@@ -23,6 +23,7 @@ import {
   Network, 
   Activity,
   Users,
+  Sparkles,
   LogOut
 } from "lucide-react";
 
@@ -96,6 +97,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/after-action">
                         <Activity className="mr-2" />
                         After Action
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/ai-report")}>
+                      <Link href="/ai-report">
+                        <Sparkles className="mr-2" />
+                        AI Reports
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

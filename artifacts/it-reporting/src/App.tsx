@@ -22,6 +22,7 @@ import AfterAction from "@/pages/after-action/index";
 import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
 import Admin from "@/pages/admin/index";
+import AIReport from "@/pages/ai-report/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +84,8 @@ function Router() {
       <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />
       <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />
       
+      <Route path="/ai-report" component={() => <ProtectedRoute component={AIReport} />} />
+
       <Route path="/admin" component={() => <ProtectedRoute component={Admin} adminOnly={true} />} />
 
       <Route component={NotFound} />
