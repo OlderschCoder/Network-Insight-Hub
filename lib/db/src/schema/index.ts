@@ -7,3 +7,4 @@ export * from "./network_switches";
 export * from "./vlans";
 export * from "./after_action";
 export * from "./quotes";
+export * from "./processes";

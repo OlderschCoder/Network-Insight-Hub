@@ -508,6 +508,90 @@ export const UpdateRiskResponse = zod.object({
   updatedAt: zod.coerce.date().optional(),
 });
 
+export const ListProcessesQueryParams = zod.object({
+  category: zod.coerce.string().optional(),
+  q: zod.coerce.string().optional(),
+});
+
+export const ListProcessesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  category: zod.string(),
+  summary: zod.string().nullish(),
+  content: zod.string(),
+  tags: zod.array(zod.string()).optional(),
+  createdBy: zod.number(),
+  createdByName: zod.string().nullish(),
+  updatedBy: zod.number().nullish(),
+  updatedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListProcessesResponse = zod.array(ListProcessesResponseItem);
+
+export const CreateProcessBody = zod.object({
+  title: zod.string(),
+  category: zod.string().optional(),
+  summary: zod.string().optional(),
+  content: zod.string().optional(),
+  tags: zod.array(zod.string()).optional(),
+  slug: zod.string().optional(),
+});
+
+export const GetProcessParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProcessResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  category: zod.string(),
+  summary: zod.string().nullish(),
+  content: zod.string(),
+  tags: zod.array(zod.string()).optional(),
+  createdBy: zod.number(),
+  createdByName: zod.string().nullish(),
+  updatedBy: zod.number().nullish(),
+  updatedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdateProcessParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateProcessBody = zod.object({
+  title: zod.string().optional(),
+  category: zod.string().optional(),
+  summary: zod.string().nullish(),
+  content: zod.string().optional(),
+  tags: zod.array(zod.string()).optional(),
+  slug: zod.string().optional(),
+});
+
+export const UpdateProcessResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  slug: zod.string(),
+  category: zod.string(),
+  summary: zod.string().nullish(),
+  content: zod.string(),
+  tags: zod.array(zod.string()).optional(),
+  createdBy: zod.number(),
+  createdByName: zod.string().nullish(),
+  updatedBy: zod.number().nullish(),
+  updatedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteProcessParams = zod.object({
+  id: zod.coerce.number(),
+});
+
 export const ListLogItemsQueryParams = zod.object({
   weekOf: zod.coerce.string().optional(),
   userId: zod.coerce.number().optional(),

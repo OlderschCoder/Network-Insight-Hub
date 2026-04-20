@@ -25,6 +25,7 @@ import {
   Activity,
   Users,
   Sparkles,
+  BookOpen,
   LogOut
 } from "lucide-react";
 
@@ -98,6 +99,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/network">
                         <Network className="mr-2" />
                         Network Ref
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/processes")}>
+                      <Link href="/processes">
+                        <BookOpen className="mr-2" />
+                        Process Library
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

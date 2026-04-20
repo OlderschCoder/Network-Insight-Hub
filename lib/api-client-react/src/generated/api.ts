@@ -24,6 +24,7 @@ import type {
   CreateAfterActionBody,
   CreateEntryBody,
   CreateLogItemBody,
+  CreateProcessBody,
   CreateReportBody,
   CreateRiskBody,
   CreateSwitchBody,
@@ -37,6 +38,7 @@ import type {
   ListAfterActionReportsParams,
   ListEntriesParams,
   ListLogItemsParams,
+  ListProcessesParams,
   ListReportsParams,
   ListRisksParams,
   ListSwitchesParams,
@@ -44,10 +46,12 @@ import type {
   LogItem,
   LoginBody,
   NetworkSwitch,
+  Process,
   RegisterBody,
   Report,
   Risk,
   UpdateLogItemBody,
+  UpdateProcessBody,
   UpdateReportBody,
   UpdateRiskBody,
   UpdateUserBody,
@@ -1925,6 +1929,412 @@ export const useUpdateRisk = <
   TContext
 > => {
   return useMutation(getUpdateRiskMutationOptions(options));
+};
+
+export const getListProcessesUrl = (params?: ListProcessesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/processes?${stringifiedParams}`
+    : `/api/processes`;
+};
+
+export const listProcesses = async (
+  params?: ListProcessesParams,
+  options?: RequestInit,
+): Promise<Process[]> => {
+  return customFetch<Process[]>(getListProcessesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProcessesQueryKey = (params?: ListProcessesParams) => {
+  return [`/api/processes`, ...(params ? [params] : [])] as const;
+};
+
+export const getListProcessesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProcesses>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListProcessesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProcesses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProcessesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listProcesses>>> = ({
+    signal,
+  }) => listProcesses(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProcesses>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProcessesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProcesses>>
+>;
+export type ListProcessesQueryError = ErrorType<unknown>;
+
+export function useListProcesses<
+  TData = Awaited<ReturnType<typeof listProcesses>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListProcessesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProcesses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProcessesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreateProcessUrl = () => {
+  return `/api/processes`;
+};
+
+export const createProcess = async (
+  createProcessBody: CreateProcessBody,
+  options?: RequestInit,
+): Promise<Process> => {
+  return customFetch<Process>(getCreateProcessUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProcessBody),
+  });
+};
+
+export const getCreateProcessMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProcess>>,
+    TError,
+    { data: BodyType<CreateProcessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProcess>>,
+  TError,
+  { data: BodyType<CreateProcessBody> },
+  TContext
+> => {
+  const mutationKey = ["createProcess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProcess>>,
+    { data: BodyType<CreateProcessBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createProcess(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProcessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProcess>>
+>;
+export type CreateProcessMutationBody = BodyType<CreateProcessBody>;
+export type CreateProcessMutationError = ErrorType<unknown>;
+
+export const useCreateProcess = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProcess>>,
+    TError,
+    { data: BodyType<CreateProcessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createProcess>>,
+  TError,
+  { data: BodyType<CreateProcessBody> },
+  TContext
+> => {
+  return useMutation(getCreateProcessMutationOptions(options));
+};
+
+export const getGetProcessUrl = (id: number) => {
+  return `/api/processes/${id}`;
+};
+
+export const getProcess = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Process> => {
+  return customFetch<Process>(getGetProcessUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProcessQueryKey = (id: number) => {
+  return [`/api/processes/${id}`] as const;
+};
+
+export const getGetProcessQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProcess>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProcess>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetProcessQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getProcess>>> = ({
+    signal,
+  }) => getProcess(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProcess>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProcessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProcess>>
+>;
+export type GetProcessQueryError = ErrorType<unknown>;
+
+export function useGetProcess<
+  TData = Awaited<ReturnType<typeof getProcess>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProcess>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProcessQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateProcessUrl = (id: number) => {
+  return `/api/processes/${id}`;
+};
+
+export const updateProcess = async (
+  id: number,
+  updateProcessBody: UpdateProcessBody,
+  options?: RequestInit,
+): Promise<Process> => {
+  return customFetch<Process>(getUpdateProcessUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateProcessBody),
+  });
+};
+
+export const getUpdateProcessMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProcess>>,
+    TError,
+    { id: number; data: BodyType<UpdateProcessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateProcess>>,
+  TError,
+  { id: number; data: BodyType<UpdateProcessBody> },
+  TContext
+> => {
+  const mutationKey = ["updateProcess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateProcess>>,
+    { id: number; data: BodyType<UpdateProcessBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateProcess(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateProcessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateProcess>>
+>;
+export type UpdateProcessMutationBody = BodyType<UpdateProcessBody>;
+export type UpdateProcessMutationError = ErrorType<unknown>;
+
+export const useUpdateProcess = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateProcess>>,
+    TError,
+    { id: number; data: BodyType<UpdateProcessBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateProcess>>,
+  TError,
+  { id: number; data: BodyType<UpdateProcessBody> },
+  TContext
+> => {
+  return useMutation(getUpdateProcessMutationOptions(options));
+};
+
+export const getDeleteProcessUrl = (id: number) => {
+  return `/api/processes/${id}`;
+};
+
+export const deleteProcess = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteProcessUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProcessMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProcess>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProcess>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteProcess"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProcess>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteProcess(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProcessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProcess>>
+>;
+
+export type DeleteProcessMutationError = ErrorType<unknown>;
+
+export const useDeleteProcess = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProcess>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProcess>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteProcessMutationOptions(options));
 };
 
 export const getListLogItemsUrl = (params?: ListLogItemsParams) => {

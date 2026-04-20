@@ -354,6 +354,40 @@ export interface UpdateRiskBody {
   sharedWith?: string[];
 }
 
+export interface Process {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  summary?: string | null;
+  content: string;
+  tags?: string[];
+  createdBy: number;
+  createdByName?: string | null;
+  updatedBy?: number | null;
+  updatedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProcessBody {
+  title: string;
+  category?: string;
+  summary?: string;
+  content?: string;
+  tags?: string[];
+  slug?: string;
+}
+
+export interface UpdateProcessBody {
+  title?: string;
+  category?: string;
+  summary?: string | null;
+  content?: string;
+  tags?: string[];
+  slug?: string;
+}
+
 export interface LogItem {
   id: number;
   userId: number;
@@ -680,6 +714,11 @@ export const ListRisksType = {
   issue: "issue",
   suggestion: "suggestion",
 } as const;
+
+export type ListProcessesParams = {
+  category?: string;
+  q?: string;
+};
 
 export type ListLogItemsParams = {
   weekOf?: string;

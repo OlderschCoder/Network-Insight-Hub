@@ -467,6 +467,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/Risk"
 
+  # PROCESSES (standard operating procedures library)
+  /processes:
+    get:
+      operationId: listProcesses
+      tags: [processes]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Process"
+    post:
+      operationId: createProcess
+      tags: [processes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProcessBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+  /processes/{id}:
+    get:
+      operationId: getProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+    patch:
+      operationId: updateProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProcessBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+    delete:
+      operationId: deleteProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # LOG ITEMS (standalone daily items that roll up into a weekly log)
   /log-items:
     get:
@@ -1292,6 +1383,83 @@ components:
           type: array
           items:
             type: string
+
+    Process:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: integer
+        createdByName:
+          type: string
+          nullable: true
+        updatedBy:
+          type: integer
+          nullable: true
+        updatedByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, title, slug, category, content, createdBy, createdAt, updatedAt]
+
+    CreateProcessBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        slug:
+          type: string
+      required: [title]
+
+    UpdateProcessBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        slug:
+          type: string
 
     LogItem:
       type: object

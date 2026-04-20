@@ -27,6 +27,9 @@ import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
 import Admin from "@/pages/admin/index";
 import AIReport from "@/pages/ai-report/index";
+import ProcessesIndex from "@/pages/processes/index";
+import NewProcess from "@/pages/processes/new";
+import ProcessDetail from "@/pages/processes/[id]";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +96,10 @@ function Router() {
       <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />
       
       <Route path="/ai-report" component={() => <ProtectedRoute component={AIReport} />} />
+
+      <Route path="/processes" component={() => <ProtectedRoute component={ProcessesIndex} />} />
+      <Route path="/processes/new" component={() => <ProtectedRoute component={NewProcess} />} />
+      <Route path="/processes/:id" component={() => <ProtectedRoute component={ProcessDetail} />} />
 
       <Route path="/admin" component={() => <ProtectedRoute component={Admin} adminOnly={true} />} />
 

@@ -13,6 +13,7 @@ import exportRouter from "./export";
 import statusReportRouter from "./status_report";
 import quotesRouter from "./quotes";
 import zendeskRouter from "./zendesk";
+import processesRouter from "./processes";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use("/export", exportRouter);
 router.use("/status-report", statusReportRouter);
 router.use("/quotes", quotesRouter);
 router.use("/zendesk", zendeskRouter);
+router.use("/processes", processesRouter);
 
 export default router;
