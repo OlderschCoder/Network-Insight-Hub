@@ -9,6 +9,7 @@ export const usersTable = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull(),
   role: varchar("role", { length: 50 }).notNull().default("helpdesk"),
   department: varchar("department", { length: 255 }),
+  zendeskEmail: varchar("zendesk_email", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -84,7 +84,7 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
     const group = process.env.ZENDESK_GROUP || "Onsite_it";
     let nextUrl: string | null =
       `search.json?query=${encodeURIComponent(
-        `type:ticket status:solved solved>${since} group:"${group}"`
+        `type:ticket solved>${since} group:"${group}"`
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
@@ -145,9 +145,15 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
       const z = userMap.get(zid);
       const zLocal = localPart(z?.email);
       const zLast = lastName(z?.name ?? "");
-      const teamMatch = teamUsers.find(
-        (u) => localPart(u.email) === zLocal || lastName(u.name) === zLast
-      );
+      const teamMatch = teamUsers.find((u) => {
+        // Strongest signal: explicit zendeskEmail override on the user record
+        if (u.zendeskEmail && z?.email &&
+            u.zendeskEmail.toLowerCase() === z.email.toLowerCase()) return true;
+        // Then normalized email local-part match
+        if (localPart(u.email) === zLocal) return true;
+        // Last fallback: surname match (only used if no email match)
+        return lastName(u.name) === zLast;
+      });
       if (teamMatch) matchedTeamIds.add(teamMatch.id);
       rows.push({
         zendeskUserId: zid,
@@ -202,10 +208,12 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
     return res.status(400).json({ error: "Invalid date format, use YYYY-MM-DD" });
   }
   const me = req.user;
-  // Strict email-local-part match only (no last-name fallback) — last-name
-  // matching could attribute another user's tickets to a same-surname user.
+  // Strict email match: prefer the explicit zendeskEmail override if set,
+  // otherwise normalized email local-part. No surname fallback (would risk
+  // attributing another user's tickets to a same-surname user).
   const myLocal = (me.email || "").toLowerCase().split("@")[0].replace(/[._]/g, "");
-  if (!myLocal) return res.json({ date, count: 0, tickets: [] });
+  const myZendeskEmail = (me.zendeskEmail || "").toLowerCase();
+  if (!myLocal && !myZendeskEmail) return res.json({ date, count: 0, tickets: [] });
 
   try {
     const group = process.env.ZENDESK_GROUP || "Onsite_it";
@@ -216,7 +224,7 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
     const allResults: ZendeskTicket[] = [];
     let nextUrl: string | null =
       `search.json?query=${encodeURIComponent(
-        `type:ticket status:solved solved>${dayBefore} group:"${group}"`
+        `type:ticket solved>${dayBefore} group:"${group}"`
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
@@ -250,13 +258,15 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
       for (const u of data.users) userMap.set(u.id, u);
     }
 
-    // Match assignee strictly by normalized email local-part
+    // Match assignee by zendeskEmail override or normalized email local-part
     const mine = onDate.filter((t) => {
       if (!t.assignee_id) return false;
       const u = userMap.get(t.assignee_id);
       if (!u || !u.email) return false;
-      const uLocal = u.email.toLowerCase().split("@")[0].replace(/[._]/g, "");
-      return uLocal === myLocal;
+      const uEmail = u.email.toLowerCase();
+      if (myZendeskEmail && uEmail === myZendeskEmail) return true;
+      const uLocal = uEmail.split("@")[0].replace(/[._]/g, "");
+      return !!myLocal && uLocal === myLocal;
     });
 
     return res.json({

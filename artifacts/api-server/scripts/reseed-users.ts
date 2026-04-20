@@ -5,13 +5,13 @@ import bcrypt from "bcrypt";
 const PASSWORD = "Seward#1";
 
 const targets = [
-  { email: "mark.bojeun@sccc.edu", name: "Mark Bojeun", role: "cio", department: "IT Leadership" },
-  { email: "tracy.compaan@sccc.edu", name: "Tracy Compaan", role: "helpdesk", department: "Help Desk" },
-  { email: "cecil.stoll@sccc.edu", name: "Cecil Stoll", role: "network_engineer", department: "Network" },
-  { email: "craig.dusek@sccc.edu", name: "Craig Dusek", role: "helpdesk", department: "Help Desk" },
-  { email: "matt_song@oculusit.com", name: "Matt Song", role: "staff", department: "Project Management" },
-  { email: "illia.ivanov@sccc.edu", name: "Illia Ivanov", role: "helpdesk", department: "Help Desk" },
-  { email: "lucas.gonzalezram81@sccc.edu", name: "Lucas Gonzales", role: "security_engineer", department: "Network Security" },
+  { email: "mark.bojeun@sccc.edu", name: "Mark Bojeun", role: "cio", department: "IT Leadership", zendeskEmail: null as string | null },
+  { email: "tracy.compaan@sccc.edu", name: "Tracy Compaan", role: "helpdesk", department: "Help Desk", zendeskEmail: null },
+  { email: "cecil.stoll@sccc.edu", name: "Cecil Stoll", role: "network_engineer", department: "Network", zendeskEmail: null },
+  { email: "craig.dusek@sccc.edu", name: "Craig Dusek", role: "helpdesk", department: "Help Desk", zendeskEmail: null },
+  { email: "matt.song@sccc.edu", name: "Matt Song", role: "staff", department: "Project Management", zendeskEmail: "matt_song@oculusit.com" },
+  { email: "illia.ivanov@sccc.edu", name: "Illia Ivanov", role: "helpdesk", department: "Help Desk", zendeskEmail: null },
+  { email: "lucas.gonzalezram81@sccc.edu", name: "Lucas Gonzales", role: "security_engineer", department: "Network Security", zendeskEmail: "lucas.gonzalezram81@g.sccc.edu" },
 ];
 
 const hash = await bcrypt.hash(PASSWORD, 10);
@@ -32,6 +32,7 @@ if (legacyCio && !byEmail.has(markTarget.email)) {
       name: markTarget.name,
       role: markTarget.role,
       department: markTarget.department,
+      zendeskEmail: markTarget.zendeskEmail,
       passwordHash: hash,
       updatedAt: new Date(),
     })
@@ -50,11 +51,12 @@ for (const t of targets) {
         name: t.name,
         role: t.role,
         department: t.department,
+        zendeskEmail: t.zendeskEmail,
         passwordHash: hash,
         updatedAt: new Date(),
       })
       .where(eq(usersTable.id, found.id));
-    console.log(`  ~ updated ${t.email} (${t.role})`);
+    console.log(`  ~ updated ${t.email} (${t.role})${t.zendeskEmail ? ` zendesk=${t.zendeskEmail}` : ""}`);
   } else {
     await db.insert(usersTable).values({ ...t, passwordHash: hash });
     console.log(`  + inserted ${t.email} (${t.role})`);
