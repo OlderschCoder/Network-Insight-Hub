@@ -47,6 +47,12 @@ router.post("/", requireAuth, async (req: any, res) => {
     entryDate: z.string().optional(),
     tags: z.array(z.string()).optional(),
     isSubmitted: z.boolean().optional(),
+    completedItems: z.array(z.object({
+      title: z.string().min(1),
+      notes: z.string().optional(),
+      category: z.string().optional(),
+    })).optional(),
+    zendeskTicketIds: z.array(z.number()).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", message: parsed.error.message });
@@ -54,6 +60,9 @@ router.post("/", requireAuth, async (req: any, res) => {
     ...parsed.data,
     userId: req.user.id,
     tags: parsed.data.tags ?? [],
+    completedItems: parsed.data.completedItems ?? [],
+    zendeskTicketIds: parsed.data.zendeskTicketIds ?? [],
+    ticketCount: parsed.data.zendeskTicketIds?.length ?? parsed.data.ticketCount ?? 0,
   }).returning();
   const result = await entryWithUser(entry, entry.userId);
   return res.status(201).json(result);
@@ -89,10 +98,21 @@ router.put("/:id", requireAuth, async (req: any, res) => {
     entryDate: z.string().optional(),
     tags: z.array(z.string()).optional(),
     isSubmitted: z.boolean().optional(),
+    completedItems: z.array(z.object({
+      title: z.string().min(1),
+      notes: z.string().optional(),
+      category: z.string().optional(),
+    })).optional(),
+    zendeskTicketIds: z.array(z.number()).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-  const [entry] = await db.update(entriesTable).set({ ...parsed.data, updatedAt: new Date() })
+  const updates: any = { ...parsed.data, updatedAt: new Date() };
+  // Keep ticketCount in sync with zendeskTicketIds when ids are provided
+  if (parsed.data.zendeskTicketIds !== undefined && parsed.data.ticketCount === undefined) {
+    updates.ticketCount = parsed.data.zendeskTicketIds.length;
+  }
+  const [entry] = await db.update(entriesTable).set(updates)
     .where(eq(entriesTable.id, id)).returning();
   const result = await entryWithUser(entry, entry.userId);
   return res.json(result);

@@ -190,4 +190,89 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
   }
 });
 
+// Tickets resolved by the current logged-in user on a given date (YYYY-MM-DD).
+// Matches by email local-part or by last name (handles Zendesk vs SCCC email differences).
+router.get("/my-tickets", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) {
+    return res.status(503).json({ error: "Zendesk not configured" });
+  }
+  const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: "Invalid date format, use YYYY-MM-DD" });
+  }
+  const me = req.user;
+  // Strict email-local-part match only (no last-name fallback) — last-name
+  // matching could attribute another user's tickets to a same-surname user.
+  const myLocal = (me.email || "").toLowerCase().split("@")[0].replace(/[._]/g, "");
+  if (!myLocal) return res.json({ date, count: 0, tickets: [] });
+
+  try {
+    const group = process.env.ZENDESK_GROUP || "Onsite_it";
+    // Fetch a 2-day window starting the day before, paginate fully, then filter
+    // to tickets solved on the requested date.
+    const dayBefore = new Date(new Date(date).getTime() - 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+    const allResults: ZendeskTicket[] = [];
+    let nextUrl: string | null =
+      `search.json?query=${encodeURIComponent(
+        `type:ticket status:solved solved>${dayBefore} group:"${group}"`
+      )}&per_page=100`;
+    let pages = 0;
+    while (nextUrl && pages < 10) {
+      const data = await zget<{
+        results: ZendeskTicket[];
+        next_page: string | null;
+      }>(cfg, nextUrl);
+      allResults.push(...data.results);
+      pages++;
+      nextUrl = data.next_page
+        ? data.next_page.replace(`https://${cfg.subdomain}.zendesk.com/api/v2/`, "")
+        : null;
+    }
+
+    // Filter to tickets last-updated on the requested date. For solved tickets
+    // updated_at corresponds to when the ticket was solved (subsequent edits
+    // would re-open or move it out of "solved" status).
+    const onDate = allResults.filter((t) =>
+      (t.updated_at || "").slice(0, 10) === date
+    );
+
+    const candidateIds = Array.from(
+      new Set(onDate.map((t) => t.assignee_id).filter((x): x is number => !!x))
+    );
+    const userMap = new Map<number, ZendeskUser>();
+    if (candidateIds.length > 0) {
+      const data = await zget<{ users: ZendeskUser[] }>(
+        cfg,
+        `users/show_many.json?ids=${candidateIds.join(",")}`
+      );
+      for (const u of data.users) userMap.set(u.id, u);
+    }
+
+    // Match assignee strictly by normalized email local-part
+    const mine = onDate.filter((t) => {
+      if (!t.assignee_id) return false;
+      const u = userMap.get(t.assignee_id);
+      if (!u || !u.email) return false;
+      const uLocal = u.email.toLowerCase().split("@")[0].replace(/[._]/g, "");
+      return uLocal === myLocal;
+    });
+
+    return res.json({
+      date,
+      count: mine.length,
+      tickets: mine.map((t) => ({
+        id: t.id,
+        subject: t.subject,
+        status: t.status,
+        url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
+        updatedAt: t.updated_at,
+      })),
+    });
+  } catch (e: any) {
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
 export default router;

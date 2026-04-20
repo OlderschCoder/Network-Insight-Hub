@@ -16,6 +16,8 @@ export const entriesTable = pgTable("entries", {
   weekOf: varchar("week_of", { length: 20 }).notNull(),
   entryDate: varchar("entry_date", { length: 30 }),
   tags: json("tags").$type<string[]>().default([]),
+  completedItems: json("completed_items").$type<{ title: string; notes?: string; category?: string }[]>().default([]),
+  zendeskTicketIds: json("zendesk_ticket_ids").$type<number[]>().default([]),
   isSubmitted: boolean("is_submitted").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
