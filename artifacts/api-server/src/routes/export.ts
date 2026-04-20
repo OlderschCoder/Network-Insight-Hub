@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, reportsTable, entriesTable, risksTable, usersTable, afterActionReportsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 
 const router = Router();
@@ -129,7 +129,7 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
   }
 });
 
-router.post("/report/:id/zendesk", requireAuth, async (req: any, res) => {
+router.post("/report/:id/zendesk", requireAuth, requireCIO, async (req: any, res) => {
   const id = parseInt(req.params.id);
   const schema = z.object({
     subject: z.string(),
