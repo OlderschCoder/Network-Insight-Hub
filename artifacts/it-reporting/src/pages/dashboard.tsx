@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
+import { ZendeskResolved } from "@/components/ZendeskResolved";
 
 export default function Dashboard() {
   const { data: summary } = useGetDashboardSummary();
@@ -79,6 +80,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ZendeskResolved />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="col-span-1">

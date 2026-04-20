@@ -35,7 +35,7 @@ externalPort = 3000
 
 [userenv.shared]
 ZENDESK_SUBDOMAIN = "sccc"
-ZENDESK_EMAIL = "admin@sccc.edu"
+ZENDESK_EMAIL = "mark.bojeun@sccc.edu"
 
 [nix]
 channel = "stable-25_05"
