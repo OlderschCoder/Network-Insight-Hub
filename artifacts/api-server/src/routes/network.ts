@@ -3,8 +3,35 @@ import { db, networkSwitchesTable, vlansTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
+import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
 
 const router = Router();
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+let cachedMapDataUrl: string | null = null;
+function getCampusMapDataUrl(): string | null {
+  if (cachedMapDataUrl) return cachedMapDataUrl;
+  const candidates = [
+    path.resolve(process.cwd(), "attached_assets/image_1776715156641.png"),
+    path.resolve(process.cwd(), "../../attached_assets/image_1776715156641.png"),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const buf = fs.readFileSync(p);
+        cachedMapDataUrl = `data:image/png;base64,${buf.toString("base64")}`;
+        return cachedMapDataUrl;
+      }
+    } catch {}
+  }
+  return null;
+}
 
 router.get("/switches", requireAuth, async (req: any, res) => {
   const { q, building, status } = req.query;
@@ -111,6 +138,117 @@ router.post("/vlans", requireAuth, async (req: any, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [vlan] = await db.insert(vlansTable).values(parsed.data).returning();
   return res.status(201).json(vlan);
+});
+
+// ----- AI Network Engineer chat -----
+
+router.post("/ai-chat", requireAuth, async (req: any, res) => {
+  const schema = z.object({
+    messages: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string().min(1).max(8000),
+    })).min(1).max(40),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid messages payload" });
+  }
+
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY || !process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+    return res.status(503).json({ error: "AI service is not configured." });
+  }
+
+  try {
+    const switches = await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
+    const vlans = await db.select().from(vlansTable).orderBy(vlansTable.vlanId);
+
+    const buildingsMap = new Map<string, { switches: any[]; vlans: any[] }>();
+    for (const s of switches) {
+      const b = s.building || "Unassigned";
+      if (!buildingsMap.has(b)) buildingsMap.set(b, { switches: [], vlans: [] });
+      buildingsMap.get(b)!.switches.push(s);
+    }
+    for (const v of vlans) {
+      const b = v.building || "Unassigned";
+      if (!buildingsMap.has(b)) buildingsMap.set(b, { switches: [], vlans: [] });
+      buildingsMap.get(b)!.vlans.push(v);
+    }
+
+    let inventoryText = "";
+    const buildings = Array.from(buildingsMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+    for (const [name, { switches: sws, vlans: vls }] of buildings) {
+      inventoryText += `\n## ${name}\n`;
+      if (sws.length) {
+        inventoryText += "Switches:\n";
+        for (const s of sws) {
+          inventoryText += `  - ${s.hostname} (${s.ipAddress})${s.model ? ` [${s.model}]` : ""}${s.status ? ` status=${s.status}` : ""}${s.location ? ` loc=${s.location}` : ""}${s.notes ? ` — ${s.notes}` : ""}\n`;
+        }
+      }
+      if (vls.length) {
+        inventoryText += "VLANs:\n";
+        for (const v of vls) {
+          inventoryText += `  - VLAN ${v.vlanId} ${v.name} [${v.type}]${v.subnet ? ` ${v.subnet}` : ""}${v.gateway ? ` gw=${v.gateway}` : ""}${v.description ? ` — ${v.description}` : ""}\n`;
+        }
+      }
+    }
+    if (!inventoryText.trim()) {
+      inventoryText = "(No switches or VLANs have been entered yet.)";
+    }
+
+    const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.
+
+You have direct knowledge of the SCCC campus map (provided as an image in the first user turn). Key context:
+- Main campus is laid out around Circle Drive. The Hobble Academic Building (codes A and AA) houses IT and the network core.
+- Other main-campus buildings: Humanities (H), Student Union complex (SU/SA/SW), Calvin Allied Health (CAH), Cosmetology (COS), Student Life Center (SLC), Agriculture (V), Industrial Technology campus (T/TA/TB/TD/TT) to the northwest, Sharp Family Champion Center (SFCC), Student Health Center (SHC), Mansions, plus athletic fields (French/softball, Brent Gould/baseball, tennis).
+- The network core lives in Hobble: Nexus pair sw-aa144-a48 (192.168.2.70) and sw-aa144-a24 (192.168.2.71), VPC peer-linked. They distribute via OSPF /30 transit links (VLAN 611–628) to building access switches. VLAN 611 reaches the legacy 6509 core; 612 reaches the Industrial Tech Nexus; the rest land at building edge switches.
+- Edge platforms are mostly Aruba (CX 6100/6300 family) with a FortiGate handling internet edge (ports 35/36 on the Nexus pair to IDEATEK and United ISP). Two Aruba 7205 wireless controllers terminate on a48 ports 43/44.
+- Remote sites (NOT on the campus map): **Epworth** (VLAN 773, 192.168.2.24, fiber/OSPF) and **West** (172.25.x, FortiGate West_FGT, VLAN 910).
+
+Below is the **live network reference data** currently entered in this app (single source of truth — prefer this over your prior knowledge when they conflict):
+${inventoryText}
+
+Guidelines for your answers:
+- Be concise, technical, and direct — you are talking to other IT staff.
+- When asked about a building, look it up in the inventory above and identify the building's switches, VLANs, and likely uplink path back to the AA144 Nexus pair.
+- When the user asks about the map, refer to the building codes (e.g. "AA144 in Hobble", "TA107 in the Industrial Tech campus").
+- When you make assumptions, call them out so the user can correct the underlying data.
+- If the data doesn't contain what's needed, say so plainly and suggest what to add to the network reference.
+- Use Markdown for structure (headings, bullet lists, fenced code blocks for IPs/CLI).`;
+
+    const userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    const mapUrl = getCampusMapDataUrl();
+    if (mapUrl) {
+      userMessages.push({
+        role: "user",
+        content: [
+          { type: "text", text: "For reference throughout this conversation, here is the SCCC main-campus map. Use it to orient any building question." },
+          { type: "image_url", image_url: { url: mapUrl } },
+        ],
+      });
+      userMessages.push({
+        role: "assistant",
+        content: "Got it — I have the SCCC campus map and the live network inventory loaded. Ask me anything about the network.",
+      });
+    }
+    for (const m of parsed.data.messages) {
+      userMessages.push({ role: m.role, content: m.content });
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 2048,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...userMessages,
+      ],
+    });
+
+    const reply = completion.choices[0]?.message?.content?.trim() || "(no response)";
+    return res.json({ reply });
+  } catch (err: any) {
+    console.error("[network ai-chat]", err);
+    return res.status(500).json({ error: err?.message || "AI request failed" });
+  }
 });
 
 export default router;
