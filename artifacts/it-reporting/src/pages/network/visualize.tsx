@@ -62,132 +62,185 @@ export default function NetworkVisualize() {
     const selSwitches = switches.filter((s) => selectedSwitchIds.has(s.id));
     const selVlans = vlans.filter((v) => selectedVlanIds.has(v.id));
 
-    // Group switches by building → produce a building hub for each unique building
-    const buildings = Array.from(
-      new Set([
-        ...selSwitches.map((s) => s.building ?? "Unknown"),
-        ...selVlans.map((v) => v.building ?? "Unknown"),
-      ])
-    );
-
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
-
-    const buildingY = 40;
-    const buildingSpacing = 280;
-    buildings.forEach((b, i) => {
-      nodes.push({
-        id: `b-${b}`,
-        position: { x: i * buildingSpacing + 60, y: buildingY },
-        data: { label: b },
-        style: {
-          background: "#1e293b",
-          color: "#f8fafc",
-          border: "2px solid #475569",
-          borderRadius: 8,
-          padding: 12,
-          fontWeight: 600,
-          width: 200,
-          textAlign: "center" as const,
-        },
-        draggable: true,
-      });
-    });
-
-    // Switches grouped under buildings
+    // Group selected items by building
     const switchesByBuilding: Record<string, typeof selSwitches> = {};
     for (const s of selSwitches) {
       const b = s.building ?? "Unknown";
       (switchesByBuilding[b] ||= []).push(s);
     }
-
-    Object.entries(switchesByBuilding).forEach(([b, list]) => {
-      const bIdx = buildings.indexOf(b);
-      list.forEach((s, j) => {
-        const id = `s-${s.id}`;
-        nodes.push({
-          id,
-          position: {
-            x: bIdx * buildingSpacing + 30 + (j % 2) * 120,
-            y: 180 + Math.floor(j / 2) * 110,
-          },
-          data: {
-            label: (
-              <div style={{ fontSize: 11, lineHeight: 1.3 }}>
-                <div style={{ fontWeight: 600 }}>{s.hostname}</div>
-                <div style={{ opacity: 0.8, fontFamily: "monospace" }}>{s.ipAddress}</div>
-                {s.model && <div style={{ opacity: 0.6, fontSize: 10 }}>{s.model}</div>}
-              </div>
-            ),
-          },
-          style: {
-            background: "#0f172a",
-            color: "#f8fafc",
-            border: `2px solid ${statusFill[s.status ?? "unknown"]}`,
-            borderRadius: 6,
-            padding: 8,
-            width: 170,
-          },
-          draggable: true,
-        });
-        edges.push({
-          id: `e-${b}-${s.id}`,
-          source: `b-${b}`,
-          target: id,
-          style: { stroke: "#64748b" },
-          animated: false,
-        });
-      });
-    });
-
-    // VLANs grouped under buildings
     const vlansByBuilding: Record<string, typeof selVlans> = {};
     for (const v of selVlans) {
       const b = v.building ?? "Unknown";
       (vlansByBuilding[b] ||= []).push(v);
     }
 
-    Object.entries(vlansByBuilding).forEach(([b, list]) => {
-      const bIdx = buildings.indexOf(b);
-      const offsetRows = Math.ceil((switchesByBuilding[b]?.length ?? 0) / 2);
-      list.forEach((v, j) => {
-        const id = `v-${v.id}`;
+    const buildings = Array.from(
+      new Set([
+        ...Object.keys(switchesByBuilding),
+        ...Object.keys(vlansByBuilding),
+      ])
+    ).sort();
+
+    // Layout constants
+    const NODE_W = 180;
+    const NODE_H = 70;
+    const COL_GAP = 18;
+    const ROW_GAP = 16;
+    const COLS = 2;
+    const PADDING_X = 18;
+    const PADDING_TOP = 44;
+    const PADDING_BOTTOM = 18;
+    const SECTION_GAP = 24;
+    const BUILDING_GAP = 48;
+
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
+
+    let cursorX = 0;
+    buildings.forEach((b) => {
+      const sws = switchesByBuilding[b] ?? [];
+      const vls = vlansByBuilding[b] ?? [];
+
+      const swRows = Math.ceil(sws.length / COLS) || 0;
+      const vlRows = Math.ceil(vls.length / COLS) || 0;
+      const swHeight = swRows ? swRows * NODE_H + (swRows - 1) * ROW_GAP : 0;
+      const vlHeight = vlRows ? vlRows * NODE_H + (vlRows - 1) * ROW_GAP : 0;
+
+      const innerColCount = Math.min(COLS, Math.max(sws.length, vls.length, 1));
+      const innerWidth = innerColCount * NODE_W + (innerColCount - 1) * COL_GAP;
+      const buildingW = innerWidth + PADDING_X * 2;
+      const buildingH =
+        PADDING_TOP +
+        swHeight +
+        (swHeight && vlHeight ? SECTION_GAP : 0) +
+        vlHeight +
+        PADDING_BOTTOM;
+
+      const buildingId = `b-${b}`;
+      nodes.push({
+        id: buildingId,
+        position: { x: cursorX, y: 0 },
+        data: { label: b },
+        style: {
+          width: buildingW,
+          height: buildingH,
+          background: "rgba(30,41,59,0.55)",
+          border: "2px solid #475569",
+          borderRadius: 12,
+          color: "#f8fafc",
+          fontWeight: 600,
+          fontSize: 13,
+          padding: 0,
+        },
+        // Use group type so children render inside.
+        type: "group",
+        draggable: true,
+        selectable: true,
+      });
+
+      // Building label sits inside the group, top-left.
+      nodes.push({
+        id: `${buildingId}-label`,
+        position: { x: PADDING_X - 6, y: 8 },
+        parentNode: buildingId,
+        extent: "parent",
+        draggable: false,
+        selectable: false,
+        data: {
+          label: (
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", letterSpacing: 0.3 }}>
+              {b.toUpperCase()}
+            </div>
+          ),
+        },
+        style: {
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          width: buildingW - PADDING_X * 2,
+        },
+      });
+
+      // Switches grid
+      sws.forEach((s, idx) => {
+        const col = idx % COLS;
+        const row = Math.floor(idx / COLS);
         nodes.push({
-          id,
+          id: `s-${s.id}`,
+          parentNode: buildingId,
+          extent: "parent",
           position: {
-            x: bIdx * buildingSpacing + 30 + (j % 2) * 120,
-            y: 180 + offsetRows * 110 + 40 + Math.floor(j / 2) * 90,
+            x: PADDING_X + col * (NODE_W + COL_GAP),
+            y: PADDING_TOP + row * (NODE_H + ROW_GAP),
           },
           data: {
             label: (
-              <div style={{ fontSize: 11, lineHeight: 1.3 }}>
-                <div style={{ fontWeight: 600 }}>VLAN {v.vlanId}</div>
-                <div style={{ opacity: 0.85 }}>{v.name}</div>
+              <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
+                <div style={{ fontWeight: 600 }}>{s.hostname}</div>
+                <div style={{ opacity: 0.85, fontFamily: "monospace" }}>{s.ipAddress}</div>
+                {s.model && <div style={{ opacity: 0.6, fontSize: 10 }}>{s.model}</div>}
+              </div>
+            ),
+          },
+          style: {
+            width: NODE_W,
+            height: NODE_H,
+            background: "#0f172a",
+            color: "#f8fafc",
+            border: `2px solid ${statusFill[s.status ?? "unknown"]}`,
+            borderRadius: 8,
+            padding: 8,
+          },
+          draggable: true,
+        });
+      });
+
+      // VLANs grid (below switches inside the same container)
+      const vlanYStart = PADDING_TOP + swHeight + (swHeight ? SECTION_GAP : 0);
+      vls.forEach((v, idx) => {
+        const col = idx % COLS;
+        const row = Math.floor(idx / COLS);
+        nodes.push({
+          id: `v-${v.id}`,
+          parentNode: buildingId,
+          extent: "parent",
+          position: {
+            x: PADDING_X + col * (NODE_W + COL_GAP),
+            y: vlanYStart + row * (NODE_H + ROW_GAP),
+          },
+          data: {
+            label: (
+              <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
+                <div style={{ fontWeight: 600 }}>
+                  VLAN {v.vlanId} · <span style={{ opacity: 0.9 }}>{v.name}</span>
+                </div>
                 {v.subnet && (
-                  <div style={{ opacity: 0.7, fontFamily: "monospace", fontSize: 10 }}>
+                  <div style={{ opacity: 0.75, fontFamily: "monospace", fontSize: 10 }}>
                     {v.subnet}
+                  </div>
+                )}
+                {v.type && (
+                  <div style={{ opacity: 0.6, fontSize: 10, textTransform: "uppercase" }}>
+                    {v.type}
                   </div>
                 )}
               </div>
             ),
           },
           style: {
+            width: NODE_W,
+            height: NODE_H,
             background: "#1e1b4b",
             color: "#e0e7ff",
             border: "2px dashed #6366f1",
-            borderRadius: 6,
+            borderRadius: 8,
             padding: 8,
-            width: 170,
           },
           draggable: true,
         });
-        edges.push({
-          id: `e-${b}-v-${v.id}`,
-          source: `b-${b}`,
-          target: id,
-          style: { stroke: "#6366f1", strokeDasharray: "4 4" },
-        });
       });
+
+      cursorX += buildingW + BUILDING_GAP;
     });
 
     return { nodes, edges };
@@ -354,11 +407,13 @@ export default function NetworkVisualize() {
                   <Controls />
                   <MiniMap
                     nodeColor={(n) =>
-                      n.id.startsWith("b-")
+                      n.id.startsWith("b-") && !n.id.endsWith("-label")
                         ? "#475569"
                         : n.id.startsWith("v-")
                         ? "#6366f1"
-                        : "#10b981"
+                        : n.id.startsWith("s-")
+                        ? "#10b981"
+                        : "transparent"
                     }
                     maskColor="rgba(15,23,42,0.7)"
                   />
