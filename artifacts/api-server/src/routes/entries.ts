@@ -68,6 +68,69 @@ router.post("/", requireAuth, async (req: any, res) => {
   return res.status(201).json(result);
 });
 
+// Quick-add a single completed item to the user's daily log for a date.
+// Creates the entry if one doesn't exist for that date, otherwise appends.
+router.post("/quick-item", requireAuth, async (req: any, res) => {
+  const schema = z.object({
+    title: z.string().min(1),
+    notes: z.string().optional(),
+    category: z.string().optional(),
+    entryDate: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", message: parsed.error.message });
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const date = parsed.data.entryDate || today;
+  // ISO week start (Monday) for the date
+  const d = new Date(date + "T00:00:00Z");
+  const dow = d.getUTCDay() || 7; // Sunday=7
+  const weekStart = new Date(d.getTime() - (dow - 1) * 86400000)
+    .toISOString().slice(0, 10);
+
+  // Find an existing log for this user/date
+  const existing = await db
+    .select()
+    .from(entriesTable)
+    .where(and(eq(entriesTable.userId, req.user.id), eq(entriesTable.entryDate, date)));
+
+  const newItem = {
+    title: parsed.data.title,
+    notes: parsed.data.notes,
+    category: parsed.data.category,
+  };
+
+  if (existing.length > 0) {
+    const target = existing[0];
+    const items = [...(target.completedItems ?? []), newItem];
+    const [updated] = await db
+      .update(entriesTable)
+      .set({ completedItems: items, updatedAt: new Date() })
+      .where(eq(entriesTable.id, target.id))
+      .returning();
+    return res.json(await entryWithUser(updated, updated.userId));
+  }
+
+  // No log yet — create a stub log for the date with this single item
+  const [created] = await db
+    .insert(entriesTable)
+    .values({
+      userId: req.user.id,
+      category: "general",
+      title: `Daily Log – ${date}`,
+      description: "(Quick-added items)",
+      weekOf: weekStart,
+      entryDate: date,
+      completedItems: [newItem],
+      zendeskTicketIds: [],
+      tags: [],
+      ticketCount: 0,
+    })
+    .returning();
+  return res.status(201).json(await entryWithUser(created, created.userId));
+});
+
 router.get("/:id", requireAuth, async (req: any, res) => {
   const id = parseInt(req.params.id);
   const [entry] = await db.select().from(entriesTable).where(eq(entriesTable.id, id));

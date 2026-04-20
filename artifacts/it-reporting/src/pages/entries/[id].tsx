@@ -1,10 +1,15 @@
 import { useParams, Link } from "wouter";
 import { useGetEntry } from "@workspace/api-client-react";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil, ArrowUpRight } from "lucide-react";
+import { ITEM_TYPES } from "@/components/EntryForm";
+
+const itemLabel = (val?: string) =>
+  ITEM_TYPES.find((t) => t.value === val)?.label || val || "Other";
 
 const categoryColor: Record<string, string> = {
   helpdesk: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -26,6 +31,7 @@ function Section({ title, content }: { title: string; content?: string | null })
 export default function EntryDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
+  const { user } = useAuth();
 
   const { data: entry, isLoading } = useGetEntry(id);
 
@@ -45,6 +51,15 @@ export default function EntryDetail() {
   }
 
   const e = entry as any;
+  const canEdit = user?.role === "cio" || e.userId === user?.id;
+  const completedItems: { title: string; notes?: string; category?: string }[] =
+    e.completedItems ?? [];
+  const ticketIds: number[] = e.zendeskTicketIds ?? [];
+  const cleanDescription =
+    e.description === "(See completed items list)" ||
+    e.description === "(Quick-added items)"
+      ? null
+      : e.description;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -60,11 +75,18 @@ export default function EntryDetail() {
             {e.category}
           </Badge>
         )}
+        {canEdit && (
+          <Link href={`/entries/${e.id}/edit`}>
+            <Button variant="outline" size="sm">
+              <Pencil className="h-3 w-3 mr-1" /> Edit
+            </Button>
+          </Link>
+        )}
       </div>
 
       <Card>
         <CardContent className="pt-6 space-y-5">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
             <span>
               {e.entryDate ? format(new Date(e.entryDate), "MMMM d, yyyy") : `Week of ${e.weekOf}`}
             </span>
@@ -74,7 +96,60 @@ export default function EntryDetail() {
             )}
           </div>
 
-          <Section title="Description" content={e.description} />
+          <Section title="Summary" content={cleanDescription} />
+
+          {ticketIds.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground mb-2">
+                Zendesk Tickets ({ticketIds.length})
+              </p>
+              <ul className="space-y-1">
+                {ticketIds.map((tid) => (
+                  <li key={tid}>
+                    <a
+                      href={`https://sccc.zendesk.com/agent/tickets/${tid}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      Ticket #{tid} <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {completedItems.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground mb-2">
+                Items Completed ({completedItems.length})
+              </p>
+              <ul className="space-y-2">
+                {completedItems.map((it, i) => (
+                  <li
+                    key={i}
+                    className="p-2 rounded border bg-muted/30 text-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{it.title}</span>
+                      {it.category && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                          {itemLabel(it.category)}
+                        </Badge>
+                      )}
+                    </div>
+                    {it.notes && (
+                      <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">
+                        {it.notes}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <Section title="Accomplishments" content={e.accomplishments} />
           <Section title="Challenges" content={e.challenges} />
           <Section title="Support Needed" content={e.supportNeeded} />

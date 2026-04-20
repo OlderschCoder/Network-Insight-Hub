@@ -13,6 +13,7 @@ import Dashboard from "@/pages/dashboard";
 import Entries from "@/pages/entries/index";
 import NewEntry from "@/pages/entries/new";
 import EntryDetail from "@/pages/entries/[id]";
+import EditEntry from "@/pages/entries/edit";
 import Reports from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/[id]";
 import Risks from "@/pages/risks/index";
@@ -71,6 +72,7 @@ function Router() {
       
       <Route path="/entries" component={() => <ProtectedRoute component={Entries} />} />
       <Route path="/entries/new" component={() => <ProtectedRoute component={NewEntry} />} />
+      <Route path="/entries/:id/edit" component={() => <ProtectedRoute component={EditEntry} />} />
       <Route path="/entries/:id" component={() => <ProtectedRoute component={EntryDetail} />} />
       
       <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />

@@ -5,6 +5,7 @@ import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText }
 import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
 import { ZendeskResolved } from "@/components/ZendeskResolved";
+import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 
 export default function Dashboard() {
   const { data: summary } = useGetDashboardSummary();
@@ -15,14 +16,17 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        {weekStatus && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Week of {format(new Date(weekStatus.weekOf), 'MMM d, yyyy')}</span>
-            <Badge variant={weekStatus.isFinalized ? "default" : "secondary"}>
-              {weekStatus.isFinalized ? "Finalized" : "Draft"}
-            </Badge>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <QuickAddItemDialog />
+          {weekStatus && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Week of {format(new Date(weekStatus.weekOf), 'MMM d, yyyy')}</span>
+              <Badge variant={weekStatus.isFinalized ? "default" : "secondary"}>
+                {weekStatus.isFinalized ? "Finalized" : "Draft"}
+              </Badge>
+            </div>
+          )}
+        </div>
       </div>
 
       <QuoteOfDay />

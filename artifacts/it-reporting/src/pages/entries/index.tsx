@@ -6,9 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { Plus, Search, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Trash2, Eye, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 
 const categoryColor: Record<string, string> = {
   helpdesk: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -43,12 +44,15 @@ export default function Entries() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Log Entries</h1>
-        <Link href="/entries/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Entry
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <QuickAddItemDialog />
+          <Link href="/entries/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Entry
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="relative">
@@ -106,15 +110,22 @@ export default function Entries() {
                       </Button>
                     </Link>
                     {(user?.role === "cio" || entry.userId === user?.id) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Delete"
-                        onClick={() => handleDelete(entry.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <>
+                        <Link href={`/entries/${entry.id}/edit`}>
+                          <Button variant="ghost" size="icon" title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Delete"
+                          onClick={() => handleDelete(entry.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
