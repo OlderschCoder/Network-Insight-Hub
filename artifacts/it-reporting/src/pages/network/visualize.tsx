@@ -62,15 +62,23 @@ export default function NetworkVisualize() {
     const selSwitches = switches.filter((s) => selectedSwitchIds.has(s.id));
     const selVlans = vlans.filter((v) => selectedVlanIds.has(v.id));
 
-    // Group selected items by building
+    // Normalize building names so e.g. "Hobble (A Building)", "Hobble (AA-158)",
+    // and "Hobble (AA105)" all collapse into a single "Hobble" container.
+    const normalizeBuilding = (raw?: string | null) => {
+      if (!raw) return "Unknown";
+      // Strip a trailing parenthetical room/code like " (AA-158)" or " (A Building)".
+      return raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+    };
+
+    // Group selected items by normalized building
     const switchesByBuilding: Record<string, typeof selSwitches> = {};
     for (const s of selSwitches) {
-      const b = s.building ?? "Unknown";
+      const b = normalizeBuilding(s.building);
       (switchesByBuilding[b] ||= []).push(s);
     }
     const vlansByBuilding: Record<string, typeof selVlans> = {};
     for (const v of selVlans) {
-      const b = v.building ?? "Unknown";
+      const b = normalizeBuilding(v.building);
       (vlansByBuilding[b] ||= []).push(v);
     }
 
