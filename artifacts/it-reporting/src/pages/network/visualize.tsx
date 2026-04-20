@@ -70,16 +70,24 @@ export default function NetworkVisualize() {
       return raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
     };
 
-    // Group selected items by normalized building
+    // Campus-level buckets float above buildings (e.g. VLAN 1 Mgmt, Camera VLAN).
+    const CAMPUS_KEYS = new Set(["Campus-wide", "Core"]);
+
+    // Group selected items by normalized building (excluding campus-level VLANs).
     const switchesByBuilding: Record<string, typeof selSwitches> = {};
     for (const s of selSwitches) {
       const b = normalizeBuilding(s.building);
       (switchesByBuilding[b] ||= []).push(s);
     }
     const vlansByBuilding: Record<string, typeof selVlans> = {};
+    const campusVlans: typeof selVlans = [];
     for (const v of selVlans) {
       const b = normalizeBuilding(v.building);
-      (vlansByBuilding[b] ||= []).push(v);
+      if (CAMPUS_KEYS.has(b)) {
+        campusVlans.push(v);
+      } else {
+        (vlansByBuilding[b] ||= []).push(v);
+      }
     }
 
     const buildings = Array.from(
@@ -106,12 +114,22 @@ export default function NetworkVisualize() {
     const SECTION_GAP = 24;
     const BUILDING_GAP = 48;
 
-    // Spine layout (Internet → FortiGate → Hobble Cisco 9K core)
+    // Spine layout (Internet → FortiGate → Hobble Cisco 9K core → campus VLAN row → buildings)
     const SPINE_X_W = 240;
     const INTERNET_Y = 0;
     const FORTIGATE_Y = 110;
     const CORE_Y = 220;
-    const BUILDINGS_Y = 360;
+    const CAMPUS_VLAN_Y = 330;
+    const CAMPUS_VLAN_W = 200;
+    const CAMPUS_VLAN_GAP = 16;
+    const BUILDINGS_Y = campusVlans.length > 0 ? 460 : 360;
+
+    // Live FortiGate switch record (for status badge on the spine node).
+    const fortigateRecord = switches.find((s) =>
+      (s.hostname ?? "").toLowerCase().includes("fortigate")
+    );
+    const fortigateStatus = (fortigateRecord?.status ?? "unknown") as keyof typeof statusFill;
+    const fortigateBorder = statusFill[fortigateStatus] ?? statusFill.unknown;
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -173,8 +191,33 @@ export default function NetworkVisualize() {
       data: {
         label: (
           <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
-            <div style={{ fontWeight: 700 }}>🛡 FortiGate Edge Firewall</div>
-            <div style={{ opacity: 0.85, fontSize: 10 }}>Hobble · AA-158</div>
+            <div
+              style={{
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              🛡 FortiGate Edge Firewall
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: fortigateBorder,
+                  boxShadow: `0 0 6px ${fortigateBorder}`,
+                }}
+                title={`status: ${fortigateStatus}`}
+              />
+            </div>
+            <div style={{ opacity: 0.85, fontSize: 10 }}>
+              {fortigateRecord
+                ? `${fortigateRecord.ipAddress ?? ""} · ${fortigateStatus}`.trim()
+                : "Hobble · AA-158"}
+            </div>
           </div>
         ),
       },
@@ -182,7 +225,7 @@ export default function NetworkVisualize() {
         width: SPINE_X_W,
         background: "#7f1d1d",
         color: "#fee2e2",
-        border: "2px solid #dc2626",
+        border: `2px solid ${fortigateBorder}`,
         borderRadius: 8,
         padding: 10,
       },
@@ -233,6 +276,67 @@ export default function NetworkVisualize() {
       labelBgStyle: { fill: "#020617" },
     });
 
+    // --- Campus-wide VLAN row (floats above buildings, fans out to each) ---
+    const campusVlanRowWidth =
+      campusVlans.length > 0
+        ? campusVlans.length * CAMPUS_VLAN_W +
+          (campusVlans.length - 1) * CAMPUS_VLAN_GAP
+        : 0;
+    let campusVlanX = spineCenterX - campusVlanRowWidth / 2;
+    const campusVlanIds: string[] = [];
+    campusVlans.forEach((v) => {
+      const id = `cv-${v.id}`;
+      campusVlanIds.push(id);
+      nodes.push({
+        id,
+        position: { x: campusVlanX, y: CAMPUS_VLAN_Y },
+        data: {
+          label: (
+            <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
+              <div style={{ fontWeight: 700 }}>
+                VLAN {v.vlanId} · {v.name}
+              </div>
+              {v.subnet && (
+                <div style={{ opacity: 0.75, fontFamily: "monospace", fontSize: 10 }}>
+                  {v.subnet}
+                </div>
+              )}
+              <div
+                style={{
+                  opacity: 0.85,
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.4,
+                }}
+              >
+                campus-wide · {v.type}
+              </div>
+            </div>
+          ),
+        },
+        style: {
+          width: CAMPUS_VLAN_W,
+          background: "#312e81",
+          color: "#e0e7ff",
+          border: "2px solid #818cf8",
+          borderRadius: 8,
+          padding: 8,
+        },
+        draggable: true,
+      });
+
+      // Tie campus VLAN up to the core spine
+      edges.push({
+        id: `e-core-${id}`,
+        source: coreId,
+        target: id,
+        animated: true,
+        style: { stroke: "#818cf8", strokeWidth: 1.5, strokeDasharray: "3 3" },
+      });
+
+      campusVlanX += CAMPUS_VLAN_W + CAMPUS_VLAN_GAP;
+    });
+
     // --- Building containers ---
     let cursorX = spineCenterX - totalBuildingsWidth / 2;
     buildings.forEach((b) => {
@@ -276,6 +380,17 @@ export default function NetworkVisualize() {
         label: b === "Hobble" ? "local" : "OSPF uplink",
         labelStyle: { fill: "#94a3b8", fontSize: 10 },
         labelBgStyle: { fill: "#020617" },
+      });
+
+      // Campus-wide VLANs fan out to every building container too.
+      campusVlanIds.forEach((cvId) => {
+        edges.push({
+          id: `e-${cvId}-${b}`,
+          source: cvId,
+          target: buildingId,
+          animated: false,
+          style: { stroke: "#818cf8", strokeWidth: 1, strokeDasharray: "2 4", opacity: 0.7 },
+        });
       });
 
       // Building label sits inside the box, top-left.
