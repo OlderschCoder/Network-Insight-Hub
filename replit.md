@@ -40,7 +40,8 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ## DB Schema Tables
 
 - `users` — id, name, email, passwordHash, role (cio/helpdesk/network/security/network_engineer/security_engineer/staff), department, isActive
-- `entries` — id, userId, category, title, description, accomplishments, challenges, supportNeeded, ticketCount, weekOf, entryDate, tags, isSubmitted
+- `entries` — id, userId, category, title, description, accomplishments, challenges, supportNeeded, ticketCount, weekOf, entryDate, tags, isSubmitted (one weekly log per user per week, enforced by unique `(user_id, week_of)`; POST /api/entries upserts on this key)
+- `log_items` — id, userId, itemDate, weekOf, title, category, notes, weeklyEntryId (nullable). Standalone items added throughout the week; rolled into the weekly log when the user generates one. After saving a weekly log, all matching items for that user+week are stamped with `weekly_entry_id` so historical logs stay stable when items are later edited.
 - `reports` — id, weekOf, isFinalized, summary, finalizedAt, finalizedBy
 - `risks` — id, userId, type (risk/issue/design), severity, status, title, description, mitigation
 - `network_switches` — id, hostname, building, ipAddress, model, status, configFile, notes

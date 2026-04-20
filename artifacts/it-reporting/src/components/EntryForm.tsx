@@ -15,15 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Plus, Trash2, Ticket } from "lucide-react";
+import { useListLogItems } from "@workspace/api-client-react";
+import { ArrowLeft, ArrowUpRight, Ticket, ExternalLink } from "lucide-react";
 import { format, startOfISOWeek, addDays } from "date-fns";
+import { todayCentral } from "@/lib/dates";
 
-export type CompletedItem = {
-  title: string;
-  notes?: string;
-  category?: string;
-  itemDate?: string;
-};
 type ZTicket = { id: number; subject: string; status: string; url: string };
 
 type FormData = {
@@ -50,8 +46,9 @@ export const ITEM_TYPES: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-import { todayCentral as _today } from "@/lib/dates";
-const todayISO = () => _today();
+const itemLabel = (val?: string | null) =>
+  ITEM_TYPES.find((t) => t.value === val)?.label || val || "Other";
+
 const weekStartFor = (dateStr: string) =>
   format(startOfISOWeek(new Date(dateStr + "T00:00:00")), "yyyy-MM-dd");
 
@@ -65,12 +62,17 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  const initialWeek = entry?.weekOf || weekStartFor(todayISO());
-  const initialItems: CompletedItem[] =
-    entry?.completedItems && entry.completedItems.length > 0
-      ? entry.completedItems
-      : [];
-  const [items, setItems] = useState<CompletedItem[]>(initialItems);
+  // Allow ?weekOf=YYYY-MM-DD when arriving from Items page
+  const urlParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const rawUrlWeekOf = urlParams?.get("weekOf") ?? undefined;
+  const urlWeekOf = rawUrlWeekOf && /^\d{4}-\d{2}-\d{2}$/.test(rawUrlWeekOf)
+    ? rawUrlWeekOf
+    : undefined;
+
+  const initialWeek =
+    entry?.weekOf || (urlWeekOf ? weekStartFor(urlWeekOf) : weekStartFor(todayCentral()));
   const [tickets, setTickets] = useState<ZTicket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
@@ -99,6 +101,17 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
   const category = watch("category");
   const weekOf = watch("weekOf");
 
+  // Pull this week's standalone log items
+  const { data: weekItems } = useListLogItems({ weekOf });
+  const items = weekItems ?? [];
+
+  const groupedItems = items.reduce<Record<string, typeof items>>((acc, it) => {
+    const k = it.itemDate || "Undated";
+    (acc[k] ||= []).push(it);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(groupedItems).sort();
+
   useEffect(() => {
     if (!weekOf) return;
     setTicketsLoading(true);
@@ -121,35 +134,12 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
       .finally(() => setTicketsLoading(false));
   }, [weekOf]);
 
-  const updateItem = (i: number, patch: Partial<CompletedItem>) =>
-    setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-  const addItem = () =>
-    setItems([
-      ...items,
-      { title: "", notes: "", category: "task", itemDate: todayISO() },
-    ]);
-  const removeItem = (i: number) =>
-    setItems(items.filter((_, idx) => idx !== i));
-
-  // Group items by date for display
-  const groupedItems = items.reduce<Record<string, { item: CompletedItem; idx: number }[]>>(
-    (acc, item, idx) => {
-      const d = item.itemDate || "Undated";
-      if (!acc[d]) acc[d] = [];
-      acc[d].push({ item, idx });
-      return acc;
-    },
-    {}
-  );
-  const sortedDates = Object.keys(groupedItems).sort();
-
   const weekDays = Array.from({ length: 7 }, (_, i) =>
     weekOf ? format(addDays(new Date(weekOf + "T00:00:00"), i), "yyyy-MM-dd") : ""
   );
 
   const onSubmit = async (data: FormData) => {
     setSubmitting(true);
-    const cleanItems = items.filter((it) => it.title.trim());
     const token = localStorage.getItem("auth_token");
     try {
       const url =
@@ -171,7 +161,6 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           entryDate: data.weekOf,
           challenges: data.challenges || undefined,
           supportNeeded: data.supportNeeded || undefined,
-          completedItems: cleanItems,
           zendeskTicketIds: tickets.map((t) => t.id),
         }),
       });
@@ -179,8 +168,9 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
         const body = await r.json().catch(() => ({}));
         throw new Error(body.message || body.error || "Failed to save");
       }
+      const saved = await r.json();
       queryClient.invalidateQueries({ queryKey: ["/api/entries"] });
-      setLocation(mode === "edit" ? `/entries/${entry.id}` : "/entries");
+      setLocation(mode === "edit" ? `/entries/${entry.id}` : `/entries/${saved.id}`);
     } catch (e: any) {
       alert(`Save failed: ${e.message}`);
     } finally {
@@ -199,7 +189,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           </Button>
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">
-          {mode === "edit" ? "Edit Weekly Log" : "New Weekly Log"}
+          {mode === "edit" ? "Edit Weekly Log" : "Generate Weekly Log"}
         </h1>
       </div>
 
@@ -214,7 +204,6 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
                   type="date"
                   {...register("weekOf", { required: "Week is required" })}
                   onChange={(e) => {
-                    // Snap to ISO week start
                     if (e.target.value) {
                       setValue("weekOf", weekStartFor(e.target.value));
                     }
@@ -253,6 +242,61 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
                 {...register("title")}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Items Completed This Week</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pulled automatically from your Items log for this week.
+              </p>
+            </div>
+            <Link href="/items">
+              <Button type="button" variant="outline" size="sm">
+                Manage items <ExternalLink className="ml-1 h-3 w-3" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No items logged for this week yet. Use “Quick Add Item” or visit the
+                Items page.
+              </p>
+            )}
+            {sortedDates.map((dateKey) => (
+              <div key={dateKey} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {dateKey === "Undated"
+                    ? "Undated"
+                    : format(new Date(dateKey + "T00:00:00"), "EEEE, MMM d")}
+                </p>
+                <ul className="space-y-1.5">
+                  {groupedItems[dateKey].map((it) => (
+                    <li
+                      key={it.id}
+                      className="p-2 rounded border bg-muted/30 text-sm"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{it.title}</span>
+                        {it.category && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                            {itemLabel(it.category)}
+                          </Badge>
+                        )}
+                      </div>
+                      {it.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">
+                          {it.notes}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -309,84 +353,6 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
             <p className="text-xs text-muted-foreground mt-3">
               Auto-attached to this weekly log.
             </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Items Completed This Week</CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Items added throughout the week (via Quick Add or below) — grouped by day.
-              </p>
-            </div>
-            <Button type="button" size="sm" variant="outline" onClick={addItem}>
-              <Plus className="h-3 w-3 mr-1" /> Add item
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No items yet. Use "Quick Add Item" from the dashboard during the week,
-                or add items below.
-              </p>
-            )}
-            {sortedDates.map((dateKey) => (
-              <div key={dateKey} className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {dateKey === "Undated"
-                    ? "Undated"
-                    : format(new Date(dateKey + "T00:00:00"), "EEEE, MMM d")}
-                </p>
-                {groupedItems[dateKey].map(({ item: it, idx: i }) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    <div className="flex-1 space-y-2">
-                      <div className="grid grid-cols-[1fr_150px_140px] gap-2">
-                        <Input
-                          placeholder="What did you do?"
-                          value={it.title}
-                          onChange={(e) => updateItem(i, { title: e.target.value })}
-                        />
-                        <Select
-                          value={it.category || "task"}
-                          onValueChange={(v) => updateItem(i, { category: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ITEM_TYPES.map((t) => (
-                              <SelectItem key={t.value} value={t.value}>
-                                {t.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="date"
-                          value={it.itemDate || ""}
-                          onChange={(e) => updateItem(i, { itemDate: e.target.value })}
-                        />
-                      </div>
-                      <Input
-                        placeholder="Notes (optional)"
-                        value={it.notes ?? ""}
-                        onChange={(e) => updateItem(i, { notes: e.target.value })}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => removeItem(i)}
-                      title="Remove"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ))}
           </CardContent>
         </Card>
 

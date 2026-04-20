@@ -1,5 +1,6 @@
 export * from "./users";
 export * from "./entries";
+export * from "./log_items";
 export * from "./reports";
 export * from "./risks";
 export * from "./network_switches";

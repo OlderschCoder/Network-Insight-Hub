@@ -508,6 +508,85 @@ export const UpdateRiskResponse = zod.object({
   updatedAt: zod.coerce.date().optional(),
 });
 
+export const ListLogItemsQueryParams = zod.object({
+  weekOf: zod.coerce.string().optional(),
+  userId: zod.coerce.number().optional(),
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const ListLogItemsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  userName: zod.string().optional(),
+  userRole: zod.string().optional(),
+  title: zod.string(),
+  category: zod.string().optional(),
+  notes: zod.string().nullish(),
+  itemDate: zod.string(),
+  weekOf: zod.string(),
+  weeklyEntryId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+});
+export const ListLogItemsResponse = zod.array(ListLogItemsResponseItem);
+
+export const CreateLogItemBody = zod.object({
+  title: zod.string(),
+  category: zod.string().optional(),
+  notes: zod.string().optional(),
+  itemDate: zod.string().optional(),
+});
+
+export const GetLogItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetLogItemResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  userName: zod.string().optional(),
+  userRole: zod.string().optional(),
+  title: zod.string(),
+  category: zod.string().optional(),
+  notes: zod.string().nullish(),
+  itemDate: zod.string(),
+  weekOf: zod.string(),
+  weeklyEntryId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+export const UpdateLogItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLogItemBody = zod.object({
+  title: zod.string().optional(),
+  category: zod.string().optional(),
+  notes: zod.string().nullish(),
+  itemDate: zod.string().optional(),
+});
+
+export const UpdateLogItemResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  userName: zod.string().optional(),
+  userRole: zod.string().optional(),
+  title: zod.string(),
+  category: zod.string().optional(),
+  notes: zod.string().nullish(),
+  itemDate: zod.string(),
+  weekOf: zod.string(),
+  weeklyEntryId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+export const DeleteLogItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
 /**
  * @summary List network switches with search
  */

@@ -19,6 +19,7 @@ import {
   LayoutDashboard, 
   FileText, 
   Files, 
+  ListChecks,
   ShieldAlert, 
   Network, 
   Activity,
@@ -61,10 +62,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/items")}>
+                      <Link href="/items">
+                        <ListChecks className="mr-2" />
+                        My Items
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location.startsWith("/entries")}>
                       <Link href="/entries">
                         <FileText className="mr-2" />
-                        My Entries
+                        Weekly Logs
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

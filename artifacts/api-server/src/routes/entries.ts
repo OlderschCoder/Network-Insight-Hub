@@ -77,14 +77,46 @@ router.post("/", requireAuth, async (req: any, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", message: parsed.error.message });
-  const [entry] = await db.insert(entriesTable).values({
+  // Upsert on (user_id, week_of) so re-saving a weekly log overwrites it
+  // instead of failing on the unique index.
+  const values = {
     ...parsed.data,
     userId: req.user.id,
     tags: parsed.data.tags ?? [],
     completedItems: parsed.data.completedItems ?? [],
     zendeskTicketIds: parsed.data.zendeskTicketIds ?? [],
     ticketCount: parsed.data.zendeskTicketIds?.length ?? parsed.data.ticketCount ?? 0,
-  }).returning();
+  };
+  const [entry] = await db
+    .insert(entriesTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [entriesTable.userId, entriesTable.weekOf],
+      set: {
+        category: values.category,
+        title: values.title,
+        description: values.description,
+        accomplishments: values.accomplishments,
+        challenges: values.challenges,
+        supportNeeded: values.supportNeeded,
+        entryDate: values.entryDate,
+        tags: values.tags,
+        completedItems: values.completedItems,
+        zendeskTicketIds: values.zendeskTicketIds,
+        ticketCount: values.ticketCount,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  // Stably link this user's items for the same week to this weekly log,
+  // so future item edits don't retroactively change historical logs.
+  await db.execute(sql`
+    UPDATE log_items
+       SET weekly_entry_id = ${entry.id}
+     WHERE user_id = ${entry.userId}
+       AND week_of = ${entry.weekOf}
+       AND weekly_entry_id IS NULL
+  `);
   const result = await entryWithUser(entry, entry.userId);
   return res.status(201).json(result);
 });
@@ -205,6 +237,14 @@ router.put("/:id", requireAuth, async (req: any, res) => {
   }
   const [entry] = await db.update(entriesTable).set(updates)
     .where(eq(entriesTable.id, id)).returning();
+  // Re-link items for the (possibly changed) week to this entry.
+  await db.execute(sql`
+    UPDATE log_items
+       SET weekly_entry_id = ${entry.id}
+     WHERE user_id = ${entry.userId}
+       AND week_of = ${entry.weekOf}
+       AND (weekly_entry_id IS NULL OR weekly_entry_id = ${entry.id})
+  `);
   const result = await entryWithUser(entry, entry.userId);
   return res.json(result);
 });

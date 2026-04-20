@@ -467,6 +467,105 @@ paths:
               schema:
                 $ref: "#/components/schemas/Risk"
 
+  # LOG ITEMS (standalone daily items that roll up into a weekly log)
+  /log-items:
+    get:
+      operationId: listLogItems
+      tags: [log-items]
+      parameters:
+        - name: weekOf
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogItem"
+    post:
+      operationId: createLogItem
+      tags: [log-items]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLogItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+  /log-items/{id}:
+    get:
+      operationId: getLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+    patch:
+      operationId: updateLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLogItemBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+    delete:
+      operationId: deleteLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # NETWORK REFERENCE
   /network/switches:
     get:
@@ -1193,6 +1292,65 @@ components:
           type: array
           items:
             type: string
+
+    LogItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        itemDate:
+          type: string
+        weekOf:
+          type: string
+        weeklyEntryId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, title, itemDate, weekOf, createdAt]
+
+    CreateLogItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+        itemDate:
+          type: string
+      required: [title]
+
+    UpdateLogItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        itemDate:
+          type: string
 
     NetworkSwitch:
       type: object

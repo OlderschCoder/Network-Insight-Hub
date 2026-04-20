@@ -57,7 +57,7 @@ export default function QuickAddItemDialog({ trigger }: Props) {
     const token = localStorage.getItem("auth_token");
     try {
       const r = await fetch(
-        `${import.meta.env.BASE_URL}api/entries/quick-item`,
+        `${import.meta.env.BASE_URL}api/log-items`,
         {
           method: "POST",
           headers: {
@@ -76,6 +76,7 @@ export default function QuickAddItemDialog({ trigger }: Props) {
         const body = await r.json().catch(() => ({}));
         throw new Error(body.message || body.error || "Failed to save");
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/log-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entries"] });
       reset();
       setOpen(false);
@@ -101,9 +102,8 @@ export default function QuickAddItemDialog({ trigger }: Props) {
           <DialogHeader>
             <DialogTitle>Quick Add Completed Item</DialogTitle>
             <DialogDescription>
-              Adds a single item to your weekly log. Creates the week's log if
-              one doesn't exist yet. You can add as many items as you like
-              throughout the day.
+              Log a single thing you got done. Items pile up all week and roll
+              into your weekly summary at the end of the week.
             </DialogDescription>
           </DialogHeader>
 

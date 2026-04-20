@@ -354,6 +354,35 @@ export interface UpdateRiskBody {
   sharedWith?: string[];
 }
 
+export interface LogItem {
+  id: number;
+  userId: number;
+  userName?: string;
+  userRole?: string;
+  title: string;
+  category?: string;
+  notes?: string | null;
+  itemDate: string;
+  weekOf: string;
+  weeklyEntryId?: number | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateLogItemBody {
+  title: string;
+  category?: string;
+  notes?: string;
+  itemDate?: string;
+}
+
+export interface UpdateLogItemBody {
+  title?: string;
+  category?: string;
+  notes?: string | null;
+  itemDate?: string;
+}
+
 export type NetworkSwitchStatus =
   (typeof NetworkSwitchStatus)[keyof typeof NetworkSwitchStatus];
 
@@ -651,6 +680,13 @@ export const ListRisksType = {
   issue: "issue",
   suggestion: "suggestion",
 } as const;
+
+export type ListLogItemsParams = {
+  weekOf?: string;
+  userId?: number;
+  from?: string;
+  to?: string;
+};
 
 export type ListSwitchesParams = {
   /**

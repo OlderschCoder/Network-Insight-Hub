@@ -23,6 +23,7 @@ import type {
   AuthResponse,
   CreateAfterActionBody,
   CreateEntryBody,
+  CreateLogItemBody,
   CreateReportBody,
   CreateRiskBody,
   CreateSwitchBody,
@@ -35,15 +36,18 @@ import type {
   HealthStatus,
   ListAfterActionReportsParams,
   ListEntriesParams,
+  ListLogItemsParams,
   ListReportsParams,
   ListRisksParams,
   ListSwitchesParams,
   ListVlansParams,
+  LogItem,
   LoginBody,
   NetworkSwitch,
   RegisterBody,
   Report,
   Risk,
+  UpdateLogItemBody,
   UpdateReportBody,
   UpdateRiskBody,
   UpdateUserBody,
@@ -1921,6 +1925,412 @@ export const useUpdateRisk = <
   TContext
 > => {
   return useMutation(getUpdateRiskMutationOptions(options));
+};
+
+export const getListLogItemsUrl = (params?: ListLogItemsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/log-items?${stringifiedParams}`
+    : `/api/log-items`;
+};
+
+export const listLogItems = async (
+  params?: ListLogItemsParams,
+  options?: RequestInit,
+): Promise<LogItem[]> => {
+  return customFetch<LogItem[]>(getListLogItemsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLogItemsQueryKey = (params?: ListLogItemsParams) => {
+  return [`/api/log-items`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLogItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLogItems>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLogItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLogItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListLogItemsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listLogItems>>> = ({
+    signal,
+  }) => listLogItems(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLogItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLogItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLogItems>>
+>;
+export type ListLogItemsQueryError = ErrorType<unknown>;
+
+export function useListLogItems<
+  TData = Awaited<ReturnType<typeof listLogItems>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLogItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLogItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLogItemsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreateLogItemUrl = () => {
+  return `/api/log-items`;
+};
+
+export const createLogItem = async (
+  createLogItemBody: CreateLogItemBody,
+  options?: RequestInit,
+): Promise<LogItem> => {
+  return customFetch<LogItem>(getCreateLogItemUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLogItemBody),
+  });
+};
+
+export const getCreateLogItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLogItem>>,
+    TError,
+    { data: BodyType<CreateLogItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLogItem>>,
+  TError,
+  { data: BodyType<CreateLogItemBody> },
+  TContext
+> => {
+  const mutationKey = ["createLogItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLogItem>>,
+    { data: BodyType<CreateLogItemBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLogItem(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLogItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLogItem>>
+>;
+export type CreateLogItemMutationBody = BodyType<CreateLogItemBody>;
+export type CreateLogItemMutationError = ErrorType<unknown>;
+
+export const useCreateLogItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLogItem>>,
+    TError,
+    { data: BodyType<CreateLogItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLogItem>>,
+  TError,
+  { data: BodyType<CreateLogItemBody> },
+  TContext
+> => {
+  return useMutation(getCreateLogItemMutationOptions(options));
+};
+
+export const getGetLogItemUrl = (id: number) => {
+  return `/api/log-items/${id}`;
+};
+
+export const getLogItem = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LogItem> => {
+  return customFetch<LogItem>(getGetLogItemUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLogItemQueryKey = (id: number) => {
+  return [`/api/log-items/${id}`] as const;
+};
+
+export const getGetLogItemQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLogItem>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLogItem>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLogItemQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLogItem>>> = ({
+    signal,
+  }) => getLogItem(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLogItem>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLogItemQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLogItem>>
+>;
+export type GetLogItemQueryError = ErrorType<unknown>;
+
+export function useGetLogItem<
+  TData = Awaited<ReturnType<typeof getLogItem>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLogItem>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLogItemQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateLogItemUrl = (id: number) => {
+  return `/api/log-items/${id}`;
+};
+
+export const updateLogItem = async (
+  id: number,
+  updateLogItemBody: UpdateLogItemBody,
+  options?: RequestInit,
+): Promise<LogItem> => {
+  return customFetch<LogItem>(getUpdateLogItemUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateLogItemBody),
+  });
+};
+
+export const getUpdateLogItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLogItem>>,
+    TError,
+    { id: number; data: BodyType<UpdateLogItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLogItem>>,
+  TError,
+  { id: number; data: BodyType<UpdateLogItemBody> },
+  TContext
+> => {
+  const mutationKey = ["updateLogItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLogItem>>,
+    { id: number; data: BodyType<UpdateLogItemBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateLogItem(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLogItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLogItem>>
+>;
+export type UpdateLogItemMutationBody = BodyType<UpdateLogItemBody>;
+export type UpdateLogItemMutationError = ErrorType<unknown>;
+
+export const useUpdateLogItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLogItem>>,
+    TError,
+    { id: number; data: BodyType<UpdateLogItemBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLogItem>>,
+  TError,
+  { id: number; data: BodyType<UpdateLogItemBody> },
+  TContext
+> => {
+  return useMutation(getUpdateLogItemMutationOptions(options));
+};
+
+export const getDeleteLogItemUrl = (id: number) => {
+  return `/api/log-items/${id}`;
+};
+
+export const deleteLogItem = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLogItemUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLogItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLogItem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLogItem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteLogItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLogItem>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLogItem(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLogItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLogItem>>
+>;
+
+export type DeleteLogItemMutationError = ErrorType<unknown>;
+
+export const useDeleteLogItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLogItem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLogItem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteLogItemMutationOptions(options));
 };
 
 /**

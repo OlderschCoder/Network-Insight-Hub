@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter";
-import { useGetEntry } from "@workspace/api-client-react";
+import { useGetEntry, useListLogItems } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,12 @@ export default function EntryDetail() {
   const { user } = useAuth();
 
   const { data: entry, isLoading } = useGetEntry(id);
+  const e = entry as any;
+  // Hooks must run on every render — gate the fetch via React Query's `enabled`.
+  const { data: weekItems } = useListLogItems(
+    { weekOf: e?.weekOf ?? "" },
+    { query: { enabled: !!e?.weekOf } } as any,
+  );
 
   if (isLoading) {
     return <div className="text-center text-muted-foreground py-8">Loading...</div>;
@@ -50,11 +56,13 @@ export default function EntryDetail() {
     );
   }
 
-  const e = entry as any;
+  // `e` already aliased above (before the early returns) so hooks fire reliably.
   const canEdit = user?.role === "cio" || e.userId === user?.id;
-  const completedItems: { title: string; notes?: string; category?: string }[] =
-    e.completedItems ?? [];
   const ticketIds: number[] = e.zendeskTicketIds ?? [];
+  // Prefer items stably linked to this weekly log; fall back to weekOf+userId.
+  const allItems = (weekItems ?? []).filter((it: any) => it.userId === e.userId);
+  const linked = allItems.filter((it: any) => it.weeklyEntryId === e.id);
+  const completedItems = linked.length > 0 ? linked : allItems;
   const cleanDescription =
     e.description === "(See completed items list)" ||
     e.description === "(Quick-added items)"
