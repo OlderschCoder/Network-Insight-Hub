@@ -87,7 +87,12 @@ export default function NetworkVisualize() {
         ...Object.keys(switchesByBuilding),
         ...Object.keys(vlansByBuilding),
       ])
-    ).sort();
+    ).sort((a, b) => {
+      // Hobble first so the core sits visually near it
+      if (a === "Hobble") return -1;
+      if (b === "Hobble") return 1;
+      return a.localeCompare(b);
+    });
 
     // Layout constants
     const NODE_W = 180;
@@ -101,52 +106,179 @@ export default function NetworkVisualize() {
     const SECTION_GAP = 24;
     const BUILDING_GAP = 48;
 
+    // Spine layout (Internet → FortiGate → Hobble Cisco 9K core)
+    const SPINE_X_W = 240;
+    const INTERNET_Y = 0;
+    const FORTIGATE_Y = 110;
+    const CORE_Y = 220;
+    const BUILDINGS_Y = 360;
+
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
-    let cursorX = 0;
+    // First pass: compute building widths so we can center the spine over them.
+    const buildingDims: Record<string, { w: number; h: number }> = {};
     buildings.forEach((b) => {
       const sws = switchesByBuilding[b] ?? [];
       const vls = vlansByBuilding[b] ?? [];
-
       const swRows = Math.ceil(sws.length / COLS) || 0;
       const vlRows = Math.ceil(vls.length / COLS) || 0;
       const swHeight = swRows ? swRows * NODE_H + (swRows - 1) * ROW_GAP : 0;
       const vlHeight = vlRows ? vlRows * NODE_H + (vlRows - 1) * ROW_GAP : 0;
-
       const innerColCount = Math.min(COLS, Math.max(sws.length, vls.length, 1));
       const innerWidth = innerColCount * NODE_W + (innerColCount - 1) * COL_GAP;
-      const buildingW = innerWidth + PADDING_X * 2;
-      const buildingH =
+      const w = innerWidth + PADDING_X * 2;
+      const h =
         PADDING_TOP +
         swHeight +
         (swHeight && vlHeight ? SECTION_GAP : 0) +
         vlHeight +
         PADDING_BOTTOM;
+      buildingDims[b] = { w, h };
+    });
+
+    const totalBuildingsWidth = buildings.reduce(
+      (acc, b, i) => acc + buildingDims[b].w + (i > 0 ? BUILDING_GAP : 0),
+      0
+    );
+    const spineCenterX = Math.max(SPINE_X_W / 2, totalBuildingsWidth / 2);
+
+    // --- Spine: Internet, FortiGate, Hobble Cisco 9K core ---
+    const internetId = "spine-internet";
+    nodes.push({
+      id: internetId,
+      position: { x: spineCenterX - SPINE_X_W / 2, y: INTERNET_Y },
+      data: {
+        label: (
+          <div style={{ fontSize: 12, fontWeight: 700, textAlign: "center" }}>
+            🌐 Internet / WAN
+          </div>
+        ),
+      },
+      style: {
+        width: SPINE_X_W,
+        background: "#0c4a6e",
+        color: "#e0f2fe",
+        border: "2px solid #0284c7",
+        borderRadius: 999,
+        padding: 10,
+      },
+      draggable: true,
+    });
+
+    const fortigateId = "spine-fortigate";
+    nodes.push({
+      id: fortigateId,
+      position: { x: spineCenterX - SPINE_X_W / 2, y: FORTIGATE_Y },
+      data: {
+        label: (
+          <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
+            <div style={{ fontWeight: 700 }}>🛡 FortiGate Edge Firewall</div>
+            <div style={{ opacity: 0.85, fontSize: 10 }}>Hobble · AA-158</div>
+          </div>
+        ),
+      },
+      style: {
+        width: SPINE_X_W,
+        background: "#7f1d1d",
+        color: "#fee2e2",
+        border: "2px solid #dc2626",
+        borderRadius: 8,
+        padding: 10,
+      },
+      draggable: true,
+    });
+
+    const coreId = "spine-core";
+    nodes.push({
+      id: coreId,
+      position: { x: spineCenterX - SPINE_X_W / 2, y: CORE_Y },
+      data: {
+        label: (
+          <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
+            <div style={{ fontWeight: 700 }}>⚡ Cisco 9500 Core</div>
+            <div style={{ opacity: 0.85, fontSize: 10 }}>Hobble · OSPF Area 0</div>
+          </div>
+        ),
+      },
+      style: {
+        width: SPINE_X_W,
+        background: "#1e3a8a",
+        color: "#dbeafe",
+        border: "2px solid #3b82f6",
+        borderRadius: 8,
+        padding: 10,
+      },
+      draggable: true,
+    });
+
+    edges.push({
+      id: "e-internet-fortigate",
+      source: internetId,
+      target: fortigateId,
+      animated: true,
+      style: { stroke: "#38bdf8", strokeWidth: 2 },
+      label: "WAN",
+      labelStyle: { fill: "#94a3b8", fontSize: 10 },
+      labelBgStyle: { fill: "#020617" },
+    });
+    edges.push({
+      id: "e-fortigate-core",
+      source: fortigateId,
+      target: coreId,
+      animated: true,
+      style: { stroke: "#f87171", strokeWidth: 2 },
+      label: "inside",
+      labelStyle: { fill: "#94a3b8", fontSize: 10 },
+      labelBgStyle: { fill: "#020617" },
+    });
+
+    // --- Building containers ---
+    let cursorX = spineCenterX - totalBuildingsWidth / 2;
+    buildings.forEach((b) => {
+      const sws = switchesByBuilding[b] ?? [];
+      const vls = vlansByBuilding[b] ?? [];
+      const { w: buildingW, h: buildingH } = buildingDims[b];
+      const swRows = Math.ceil(sws.length / COLS) || 0;
+      const swHeight = swRows ? swRows * NODE_H + (swRows - 1) * ROW_GAP : 0;
 
       const buildingId = `b-${b}`;
       nodes.push({
         id: buildingId,
-        position: { x: cursorX, y: 0 },
-        data: { label: b },
+        position: { x: cursorX, y: BUILDINGS_Y },
+        data: { label: "" },
         style: {
           width: buildingW,
           height: buildingH,
           background: "rgba(30,41,59,0.55)",
-          border: "2px solid #475569",
+          border: b === "Hobble" ? "2px solid #3b82f6" : "2px solid #475569",
           borderRadius: 12,
           color: "#f8fafc",
           fontWeight: 600,
           fontSize: 13,
           padding: 0,
         },
-        // Use group type so children render inside.
-        type: "group",
         draggable: true,
         selectable: true,
       });
 
-      // Building label sits inside the group, top-left.
+      // Spine → building edge (campus uplink to Cisco 9K core)
+      edges.push({
+        id: `e-core-${b}`,
+        source: coreId,
+        target: buildingId,
+        animated: false,
+        style: {
+          stroke: b === "Hobble" ? "#3b82f6" : "#64748b",
+          strokeWidth: 1.5,
+          strokeDasharray: b === "Hobble" ? undefined : "6 4",
+        },
+        label: b === "Hobble" ? "local" : "OSPF uplink",
+        labelStyle: { fill: "#94a3b8", fontSize: 10 },
+        labelBgStyle: { fill: "#020617" },
+      });
+
+      // Building label sits inside the box, top-left.
       nodes.push({
         id: `${buildingId}-label`,
         position: { x: PADDING_X - 6, y: 8 },
