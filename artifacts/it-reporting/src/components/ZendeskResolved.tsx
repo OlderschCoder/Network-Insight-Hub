@@ -5,10 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Ticket } from "lucide-react";
 
 interface Row {
-  zendeskUserId: number;
+  zendeskUserId: number | null;
   name: string;
   email: string | null;
   resolvedCount: number;
+  isTeamMember: boolean;
+  teamRole?: string | null;
 }
 
 interface Resp {
@@ -17,6 +19,16 @@ interface Resp {
   totalResolved: number;
   breakdown: Row[];
 }
+
+const roleLabel: Record<string, string> = {
+  cio: "CIO",
+  helpdesk: "Help Desk",
+  network_engineer: "Network Engineer",
+  security_engineer: "Security Engineer",
+  network: "Network",
+  security: "Security",
+  staff: "Staff",
+};
 
 export function ZendeskResolved() {
   const [data, setData] = useState<Resp | null>(null);
@@ -29,8 +41,8 @@ export function ZendeskResolved() {
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("auth_token");
-    fetch(`/api/zendesk/resolved-by-user?days=${days}`, {
-      headers: { Authorization: `Bearer ${token}` },
+    fetch(`${import.meta.env.BASE_URL}api/zendesk/resolved-by-user?days=${days}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(async (r) => {
         const body = await r.json();
@@ -61,7 +73,7 @@ export function ZendeskResolved() {
           </CardTitle>
           {data && (
             <p className="text-xs text-muted-foreground mt-1">
-              {data.totalResolved} total since {data.sinceDate}
+              {data.totalResolved} total in Onsite_it group since {data.sinceDate}
             </p>
           )}
         </div>
@@ -79,11 +91,7 @@ export function ZendeskResolved() {
       </CardHeader>
       <CardContent>
         {loading && <div className="text-sm text-muted-foreground py-4">Loading from Zendesk...</div>}
-        {error && (
-          <div className="text-sm text-red-500 py-2">
-            {error}
-          </div>
-        )}
+        {error && <div className="text-sm text-red-500 py-2">{error}</div>}
         {data && data.breakdown.length === 0 && !loading && (
           <div className="text-sm text-muted-foreground py-4 text-center">
             No resolved tickets in this period.
@@ -91,20 +99,36 @@ export function ZendeskResolved() {
         )}
         {data && data.breakdown.length > 0 && (
           <div className="space-y-3">
-            {data.breakdown.map((row) => (
-              <div key={row.zendeskUserId} className="space-y-1">
+            {data.breakdown.map((row, i) => (
+              <div key={`${row.zendeskUserId ?? "team"}-${i}`} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex flex-col min-w-0 flex-1">
-                    <span className="font-medium truncate">{row.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{row.name}</span>
+                      {row.isTeamMember && row.teamRole && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                          {roleLabel[row.teamRole] ?? row.teamRole}
+                        </Badge>
+                      )}
+                      {!row.isTeamMember && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-muted-foreground">
+                          External
+                        </Badge>
+                      )}
+                    </div>
                     {row.email && (
                       <span className="text-xs text-muted-foreground truncate">{row.email}</span>
                     )}
                   </div>
-                  <Badge variant="secondary" className="ml-2">{row.resolvedCount}</Badge>
+                  <Badge variant={row.resolvedCount > 0 ? "secondary" : "outline"} className="ml-2">
+                    {row.resolvedCount}
+                  </Badge>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 transition-all"
+                    className={`h-full transition-all ${
+                      row.isTeamMember ? "bg-emerald-500" : "bg-slate-400"
+                    }`}
                     style={{ width: `${(row.resolvedCount / max) * 100}%` }}
                   />
                 </div>

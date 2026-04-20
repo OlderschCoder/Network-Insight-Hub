@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "./auth";
 
 const router = Router();
@@ -121,14 +122,62 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
       }
     }
 
-    const breakdown = Array.from(counts.entries())
-      .map(([id, count]) => ({
-        zendeskUserId: id,
-        name: userMap.get(id)?.name ?? `User ${id}`,
-        email: userMap.get(id)?.email ?? null,
+    // Pull SCCC reporting team so we can include teammates with zero resolved
+    const teamUsers = await db.select().from(usersTable);
+    const localPart = (e: string | null | undefined) =>
+      (e ?? "").toLowerCase().split("@")[0].replace(/[._]/g, "");
+    const lastName = (n: string) =>
+      (n ?? "").toLowerCase().trim().split(/\s+/).pop() ?? "";
+
+    type Row = {
+      zendeskUserId: number | null;
+      name: string;
+      email: string | null;
+      resolvedCount: number;
+      isTeamMember: boolean;
+      teamRole?: string | null;
+    };
+
+    const matchedTeamIds = new Set<number>();
+    const rows: Row[] = [];
+
+    for (const [zid, count] of counts.entries()) {
+      const z = userMap.get(zid);
+      const zLocal = localPart(z?.email);
+      const zLast = lastName(z?.name ?? "");
+      const teamMatch = teamUsers.find(
+        (u) => localPart(u.email) === zLocal || lastName(u.name) === zLast
+      );
+      if (teamMatch) matchedTeamIds.add(teamMatch.id);
+      rows.push({
+        zendeskUserId: zid,
+        name: teamMatch?.name ?? z?.name ?? `User ${zid}`,
+        email: teamMatch?.email ?? z?.email ?? null,
         resolvedCount: count,
-      }))
-      .sort((a, b) => b.resolvedCount - a.resolvedCount);
+        isTeamMember: !!teamMatch,
+        teamRole: teamMatch?.role ?? null,
+      });
+    }
+
+    // Add any team members who had zero resolved tickets in this window
+    for (const u of teamUsers) {
+      if (matchedTeamIds.has(u.id)) continue;
+      // Only show users likely to handle tickets (not CIO/Project Manager/staff)
+      if (u.role === "cio" || u.role === "staff") continue;
+      rows.push({
+        zendeskUserId: null,
+        name: u.name,
+        email: u.email,
+        resolvedCount: 0,
+        isTeamMember: true,
+        teamRole: u.role,
+      });
+    }
+
+    const breakdown = rows.sort((a, b) => {
+      if (a.isTeamMember !== b.isTeamMember) return a.isTeamMember ? -1 : 1;
+      return b.resolvedCount - a.resolvedCount;
+    });
 
     return res.json({
       sinceDate: since,
