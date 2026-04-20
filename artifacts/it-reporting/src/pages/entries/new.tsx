@@ -266,11 +266,17 @@ export default function NewEntry() {
                         <SelectValue placeholder="Type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="project">Project</SelectItem>
+                        <SelectItem value="task">Task</SelectItem>
+                        <SelectItem value="configuration">Configuration</SelectItem>
+                        <SelectItem value="research_issue">Research Issue</SelectItem>
+                        <SelectItem value="network_switch">Network Switch</SelectItem>
+                        <SelectItem value="network_config">Network Config</SelectItem>
+                        <SelectItem value="security_review">Security Review</SelectItem>
+                        <SelectItem value="documentation">Documentation</SelectItem>
+                        <SelectItem value="project_work">Project Work</SelectItem>
                         <SelectItem value="meeting">Meeting</SelectItem>
-                        <SelectItem value="config">Config / Change</SelectItem>
-                        <SelectItem value="research">Research</SelectItem>
                         <SelectItem value="training">Training</SelectItem>
+                        <SelectItem value="vendor_coordination">Vendor Coordination</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
