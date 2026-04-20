@@ -80,9 +80,10 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
     // Use Zendesk Search API for solved tickets, paginate
     const counts = new Map<number, number>();
     const totals = { solved: 0, scanned: 0 };
+    const group = process.env.ZENDESK_GROUP || "Onsite_it";
     let nextUrl: string | null =
       `search.json?query=${encodeURIComponent(
-        `type:ticket status:solved solved>${since}`
+        `type:ticket status:solved solved>${since} group:"${group}"`
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
