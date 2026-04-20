@@ -16,13 +16,18 @@ import {
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpRight, Plus, Trash2, Ticket } from "lucide-react";
-import { format, startOfISOWeek } from "date-fns";
+import { format, startOfISOWeek, addDays } from "date-fns";
 
-export type CompletedItem = { title: string; notes?: string; category?: string };
+export type CompletedItem = {
+  title: string;
+  notes?: string;
+  category?: string;
+  itemDate?: string;
+};
 type ZTicket = { id: number; subject: string; status: string; url: string };
 
 type FormData = {
-  entryDate: string;
+  weekOf: string;
   category: string;
   title: string;
   description: string;
@@ -45,6 +50,11 @@ export const ITEM_TYPES: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
+import { todayCentral as _today } from "@/lib/dates";
+const todayISO = () => _today();
+const weekStartFor = (dateStr: string) =>
+  format(startOfISOWeek(new Date(dateStr + "T00:00:00")), "yyyy-MM-dd");
+
 export type EntryFormProps = {
   mode: "new" | "edit";
   entry?: any;
@@ -55,12 +65,11 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  const initialDate =
-    entry?.entryDate || new Date().toISOString().slice(0, 10);
+  const initialWeek = entry?.weekOf || weekStartFor(todayISO());
   const initialItems: CompletedItem[] =
     entry?.completedItems && entry.completedItems.length > 0
       ? entry.completedItems
-      : [{ title: "", notes: "", category: "" }];
+      : [];
   const [items, setItems] = useState<CompletedItem[]>(initialItems);
   const [tickets, setTickets] = useState<ZTicket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
@@ -74,26 +83,31 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      entryDate: initialDate,
-      category: entry?.category || "helpdesk",
-      title: entry?.title || "",
-      description: entry?.description === "(See completed items list)" || entry?.description === "(Quick-added items)" ? "" : (entry?.description || ""),
+      weekOf: initialWeek,
+      category: entry?.category || "general",
+      title: entry?.title?.startsWith("Weekly Log") ? "" : (entry?.title || ""),
+      description:
+        entry?.description === "(See completed items list)" ||
+        entry?.description === "(Quick-added items)"
+          ? ""
+          : entry?.description || "",
       challenges: entry?.challenges || "",
       supportNeeded: entry?.supportNeeded || "",
     },
   });
 
   const category = watch("category");
-  const entryDate = watch("entryDate");
+  const weekOf = watch("weekOf");
 
   useEffect(() => {
-    if (!entryDate) return;
+    if (!weekOf) return;
     setTicketsLoading(true);
     setTicketsError(null);
     const token = localStorage.getItem("auth_token");
-    fetch(`${import.meta.env.BASE_URL}api/zendesk/my-tickets?date=${entryDate}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch(
+      `${import.meta.env.BASE_URL}api/zendesk/my-tickets?weekOf=${weekOf}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    )
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) {
@@ -105,17 +119,37 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
       })
       .catch((e) => setTicketsError(e.message))
       .finally(() => setTicketsLoading(false));
-  }, [entryDate]);
+  }, [weekOf]);
 
   const updateItem = (i: number, patch: Partial<CompletedItem>) =>
     setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-  const addItem = () => setItems([...items, { title: "", notes: "", category: "" }]);
-  const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
+  const addItem = () =>
+    setItems([
+      ...items,
+      { title: "", notes: "", category: "task", itemDate: todayISO() },
+    ]);
+  const removeItem = (i: number) =>
+    setItems(items.filter((_, idx) => idx !== i));
+
+  // Group items by date for display
+  const groupedItems = items.reduce<Record<string, { item: CompletedItem; idx: number }[]>>(
+    (acc, item, idx) => {
+      const d = item.itemDate || "Undated";
+      if (!acc[d]) acc[d] = [];
+      acc[d].push({ item, idx });
+      return acc;
+    },
+    {}
+  );
+  const sortedDates = Object.keys(groupedItems).sort();
+
+  const weekDays = Array.from({ length: 7 }, (_, i) =>
+    weekOf ? format(addDays(new Date(weekOf + "T00:00:00"), i), "yyyy-MM-dd") : ""
+  );
 
   const onSubmit = async (data: FormData) => {
     setSubmitting(true);
     const cleanItems = items.filter((it) => it.title.trim());
-    const weekOf = format(startOfISOWeek(new Date(data.entryDate)), "yyyy-MM-dd");
     const token = localStorage.getItem("auth_token");
     try {
       const url =
@@ -131,10 +165,10 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
         },
         body: JSON.stringify({
           category: data.category,
-          title: data.title,
+          title: data.title || `Weekly Log – week of ${data.weekOf}`,
           description: data.description || "(See completed items list)",
-          weekOf,
-          entryDate: data.entryDate,
+          weekOf: data.weekOf,
+          entryDate: data.weekOf,
           challenges: data.challenges || undefined,
           supportNeeded: data.supportNeeded || undefined,
           completedItems: cleanItems,
@@ -165,7 +199,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           </Button>
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">
-          {mode === "edit" ? "Edit Daily Log" : "New Daily Log"}
+          {mode === "edit" ? "Edit Weekly Log" : "New Weekly Log"}
         </h1>
       </div>
 
@@ -174,15 +208,25 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           <CardContent className="pt-6 space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="entryDate">Date</Label>
+                <Label htmlFor="weekOf">Week of (Monday)</Label>
                 <Input
-                  id="entryDate"
+                  id="weekOf"
                   type="date"
-                  {...register("entryDate", { required: "Date is required" })}
+                  {...register("weekOf", { required: "Week is required" })}
+                  onChange={(e) => {
+                    // Snap to ISO week start
+                    if (e.target.value) {
+                      setValue("weekOf", weekStartFor(e.target.value));
+                    }
+                  }}
                 />
-                {errors.entryDate && (
-                  <p className="text-xs text-destructive">{errors.entryDate.message}</p>
+                {errors.weekOf && (
+                  <p className="text-xs text-destructive">{errors.weekOf.message}</p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  {weekOf && weekDays[0] && weekDays[6] &&
+                    `${format(new Date(weekDays[0] + "T00:00:00"), "MMM d")} – ${format(new Date(weekDays[6] + "T00:00:00"), "MMM d, yyyy")}`}
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -202,15 +246,12 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="title">Headline</Label>
+              <Label htmlFor="title">Weekly Headline</Label>
               <Input
                 id="title"
-                placeholder="One-line summary of the day"
-                {...register("title", { required: "Headline is required" })}
+                placeholder="One-line summary of the week"
+                {...register("title")}
               />
-              {errors.title && (
-                <p className="text-xs text-destructive">{errors.title.message}</p>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -219,7 +260,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Ticket className="h-4 w-4" />
-              Zendesk Tickets You Resolved on {entryDate}
+              Zendesk Tickets You Resolved This Week
               {tickets.length > 0 && (
                 <Badge variant="secondary" className="ml-1">{tickets.length}</Badge>
               )}
@@ -234,11 +275,11 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
             )}
             {!ticketsLoading && !ticketsError && tickets.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No tickets resolved by you on this date in the Onsite_it group.
+                No tickets resolved by you this week in the Onsite_it group.
               </p>
             )}
             {tickets.length > 0 && (
-              <ul className="space-y-2">
+              <ul className="space-y-2 max-h-64 overflow-auto">
                 {tickets.map((t) => (
                   <li
                     key={t.id}
@@ -266,64 +307,84 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
               </ul>
             )}
             <p className="text-xs text-muted-foreground mt-3">
-              These tickets are auto-attached to this log — no need to repeat them below.
+              Auto-attached to this weekly log.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Other Items Completed Today</CardTitle>
+            <div>
+              <CardTitle className="text-base">Items Completed This Week</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Items added throughout the week (via Quick Add or below) — grouped by day.
+              </p>
+            </div>
             <Button type="button" size="sm" variant="outline" onClick={addItem}>
               <Plus className="h-3 w-3 mr-1" /> Add item
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {items.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Add projects, meetings, configuration changes, etc. that aren't tickets.
+                No items yet. Use "Quick Add Item" from the dashboard during the week,
+                or add items below.
               </p>
             )}
-            {items.map((it, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <div className="flex-1 space-y-2">
-                  <div className="grid grid-cols-[1fr_180px] gap-2">
-                    <Input
-                      placeholder="What did you do?"
-                      value={it.title}
-                      onChange={(e) => updateItem(i, { title: e.target.value })}
-                    />
-                    <Select
-                      value={it.category || ""}
-                      onValueChange={(v) => updateItem(i, { category: v })}
+            {sortedDates.map((dateKey) => (
+              <div key={dateKey} className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {dateKey === "Undated"
+                    ? "Undated"
+                    : format(new Date(dateKey + "T00:00:00"), "EEEE, MMM d")}
+                </p>
+                {groupedItems[dateKey].map(({ item: it, idx: i }) => (
+                  <div key={i} className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-2">
+                      <div className="grid grid-cols-[1fr_150px_140px] gap-2">
+                        <Input
+                          placeholder="What did you do?"
+                          value={it.title}
+                          onChange={(e) => updateItem(i, { title: e.target.value })}
+                        />
+                        <Select
+                          value={it.category || "task"}
+                          onValueChange={(v) => updateItem(i, { category: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ITEM_TYPES.map((t) => (
+                              <SelectItem key={t.value} value={t.value}>
+                                {t.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="date"
+                          value={it.itemDate || ""}
+                          onChange={(e) => updateItem(i, { itemDate: e.target.value })}
+                        />
+                      </div>
+                      <Input
+                        placeholder="Notes (optional)"
+                        value={it.notes ?? ""}
+                        onChange={(e) => updateItem(i, { notes: e.target.value })}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeItem(i)}
+                      title="Remove"
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ITEM_TYPES.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>
-                            {t.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
-                  <Input
-                    placeholder="Notes (optional)"
-                    value={it.notes ?? ""}
-                    onChange={(e) => updateItem(i, { notes: e.target.value })}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => removeItem(i)}
-                  title="Remove"
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                ))}
               </div>
             ))}
           </CardContent>
@@ -332,11 +393,11 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
         <Card>
           <CardContent className="pt-6 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="description">Brief Summary (optional)</Label>
+              <Label htmlFor="description">Weekly Summary (optional)</Label>
               <Textarea
                 id="description"
-                rows={2}
-                placeholder="One or two sentences about the day overall..."
+                rows={3}
+                placeholder="Brief overview of the week..."
                 {...register("description")}
               />
             </div>
@@ -345,8 +406,8 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
               <Label htmlFor="challenges">Challenges / Blockers</Label>
               <Textarea
                 id="challenges"
-                rows={2}
-                placeholder="Any obstacles encountered today..."
+                rows={3}
+                placeholder="Any obstacles encountered this week..."
                 {...register("challenges")}
               />
             </div>
@@ -355,7 +416,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
               <Label htmlFor="supportNeeded">Support Needed</Label>
               <Textarea
                 id="supportNeeded"
-                rows={2}
+                rows={3}
                 placeholder="Anything you need from the team or CIO..."
                 {...register("supportNeeded")}
               />
@@ -365,7 +426,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
 
         <div className="flex gap-3">
           <Button type="submit" disabled={submitting} className="flex-1">
-            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Daily Log"}
+            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Weekly Log"}
           </Button>
           <Link href={backHref}>
             <Button variant="outline" type="button">

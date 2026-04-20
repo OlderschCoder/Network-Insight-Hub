@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { todayCentral } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,14 +35,14 @@ export default function QuickAddItemDialog({ trigger }: Props) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("task");
   const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayCentral());
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
     setTitle("");
     setCategory("task");
     setNotes("");
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(todayCentral());
     setError(null);
   };
 
@@ -67,7 +68,7 @@ export default function QuickAddItemDialog({ trigger }: Props) {
             title: title.trim(),
             category,
             notes: notes.trim() || undefined,
-            entryDate: date,
+            itemDate: date,
           }),
         }
       );
@@ -100,8 +101,9 @@ export default function QuickAddItemDialog({ trigger }: Props) {
           <DialogHeader>
             <DialogTitle>Quick Add Completed Item</DialogTitle>
             <DialogDescription>
-              Logs a single item to your daily log. Creates the day's log if
-              one doesn't exist yet.
+              Adds a single item to your weekly log. Creates the week's log if
+              one doesn't exist yet. You can add as many items as you like
+              throughout the day.
             </DialogDescription>
           </DialogHeader>
 

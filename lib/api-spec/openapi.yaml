@@ -1096,6 +1096,11 @@ components:
         severity:
           type: string
           enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
         status:
           type: string
           enum: [open, mitigated, closed]
@@ -1132,6 +1137,11 @@ components:
         severity:
           type: string
           enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
         title:
           type: string
         description:
@@ -1153,9 +1163,17 @@ components:
     UpdateRiskBody:
       type: object
       properties:
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
         severity:
           type: string
           enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
         status:
           type: string
           enum: [open, mitigated, closed]

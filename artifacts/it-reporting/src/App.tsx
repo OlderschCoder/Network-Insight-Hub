@@ -18,6 +18,7 @@ import Reports from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/[id]";
 import Risks from "@/pages/risks/index";
 import NewRisk from "@/pages/risks/new";
+import EditRisk from "@/pages/risks/edit";
 import Network from "@/pages/network/index";
 import NetworkVisualize from "@/pages/network/visualize";
 import AfterAction from "@/pages/after-action/index";
@@ -80,6 +81,7 @@ function Router() {
       
       <Route path="/risks" component={() => <ProtectedRoute component={Risks} />} />
       <Route path="/risks/new" component={() => <ProtectedRoute component={NewRisk} />} />
+      <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />
       
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />

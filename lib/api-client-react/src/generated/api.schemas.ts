@@ -208,6 +208,16 @@ export const RiskSeverity = {
   critical: "critical",
 } as const;
 
+export type RiskProbability =
+  (typeof RiskProbability)[keyof typeof RiskProbability];
+
+export const RiskProbability = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
 export type RiskStatus = (typeof RiskStatus)[keyof typeof RiskStatus];
 
 export const RiskStatus = {
@@ -222,6 +232,8 @@ export interface Risk {
   userName?: string;
   type: RiskType;
   severity: RiskSeverity;
+  probability?: RiskProbability;
+  category?: string;
   status: RiskStatus;
   title: string;
   description: string;
@@ -265,9 +277,21 @@ export const CreateRiskBodySeverity = {
   critical: "critical",
 } as const;
 
+export type CreateRiskBodyProbability =
+  (typeof CreateRiskBodyProbability)[keyof typeof CreateRiskBodyProbability];
+
+export const CreateRiskBodyProbability = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
 export interface CreateRiskBody {
   type: CreateRiskBodyType;
   severity: CreateRiskBodySeverity;
+  probability?: CreateRiskBodyProbability;
+  category?: string;
   title: string;
   description: string;
   impact?: string;
@@ -277,10 +301,29 @@ export interface CreateRiskBody {
   sharedWith?: string[];
 }
 
+export type UpdateRiskBodyType =
+  (typeof UpdateRiskBodyType)[keyof typeof UpdateRiskBodyType];
+
+export const UpdateRiskBodyType = {
+  risk: "risk",
+  issue: "issue",
+  suggestion: "suggestion",
+} as const;
+
 export type UpdateRiskBodySeverity =
   (typeof UpdateRiskBodySeverity)[keyof typeof UpdateRiskBodySeverity];
 
 export const UpdateRiskBodySeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
+
+export type UpdateRiskBodyProbability =
+  (typeof UpdateRiskBodyProbability)[keyof typeof UpdateRiskBodyProbability];
+
+export const UpdateRiskBodyProbability = {
   low: "low",
   medium: "medium",
   high: "high",
@@ -297,7 +340,10 @@ export const UpdateRiskBodyStatus = {
 } as const;
 
 export interface UpdateRiskBody {
+  type?: UpdateRiskBodyType;
   severity?: UpdateRiskBodySeverity;
+  probability?: UpdateRiskBodyProbability;
+  category?: string;
   status?: UpdateRiskBodyStatus;
   title?: string;
   description?: string;

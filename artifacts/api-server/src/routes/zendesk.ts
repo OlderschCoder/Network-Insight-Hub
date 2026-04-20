@@ -204,8 +204,23 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
     return res.status(503).json({ error: "Zendesk not configured" });
   }
   const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  const weekOf = req.query.weekOf as string | undefined;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: "Invalid date format, use YYYY-MM-DD" });
+  }
+  if (weekOf && !/^\d{4}-\d{2}-\d{2}$/.test(weekOf)) {
+    return res.status(400).json({ error: "Invalid weekOf format, use YYYY-MM-DD" });
+  }
+  // Build the date set we're filtering by — single day or all 7 days of the week
+  const dateSet = new Set<string>();
+  if (weekOf) {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekOf + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + i);
+      dateSet.add(d.toISOString().slice(0, 10));
+    }
+  } else {
+    dateSet.add(date);
   }
   const me = req.user;
   // Strict email match: prefer the explicit zendeskEmail override if set,
@@ -217,9 +232,10 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
 
   try {
     const group = process.env.ZENDESK_GROUP || "Onsite_it";
-    // Fetch a 2-day window starting the day before, paginate fully, then filter
-    // to tickets solved on the requested date.
-    const dayBefore = new Date(new Date(date).getTime() - 24 * 60 * 60 * 1000)
+    // Pick the earliest date we care about, then fetch from the day before that
+    // and paginate fully. This works for both single-day and weekly queries.
+    const earliest = Array.from(dateSet).sort()[0];
+    const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
       .toISOString().slice(0, 10);
     const allResults: ZendeskTicket[] = [];
     let nextUrl: string | null =
@@ -239,11 +255,10 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
         : null;
     }
 
-    // Filter to tickets last-updated on the requested date. For solved tickets
-    // updated_at corresponds to when the ticket was solved (subsequent edits
-    // would re-open or move it out of "solved" status).
+    // Filter to tickets last-updated within the date set. For solved tickets
+    // updated_at corresponds to when the ticket was solved.
     const onDate = allResults.filter((t) =>
-      (t.updated_at || "").slice(0, 10) === date
+      dateSet.has((t.updated_at || "").slice(0, 10))
     );
 
     const candidateIds = Array.from(

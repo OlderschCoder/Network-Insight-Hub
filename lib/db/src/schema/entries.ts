@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, varchar, timestamp, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, timestamp, boolean, json, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -16,12 +16,14 @@ export const entriesTable = pgTable("entries", {
   weekOf: varchar("week_of", { length: 20 }).notNull(),
   entryDate: varchar("entry_date", { length: 30 }),
   tags: json("tags").$type<string[]>().default([]),
-  completedItems: json("completed_items").$type<{ title: string; notes?: string; category?: string }[]>().default([]),
+  completedItems: json("completed_items").$type<{ title: string; notes?: string; category?: string; itemDate?: string }[]>().default([]),
   zendeskTicketIds: json("zendesk_ticket_ids").$type<number[]>().default([]),
   isSubmitted: boolean("is_submitted").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  userWeekUnique: uniqueIndex("entries_user_week_unique").on(table.userId, table.weekOf),
+}));
 
 export const insertEntrySchema = createInsertSchema(entriesTable).omit({
   id: true,

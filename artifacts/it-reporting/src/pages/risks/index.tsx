@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Pencil } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { RISK_CATEGORIES } from "@/components/RiskForm";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,8 +24,19 @@ const typeColor: Record<string, string> = {
   design: "bg-blue-500/10 text-blue-400 border-blue-400/20",
 };
 
+const probabilityColor: Record<string, string> = {
+  critical: "bg-purple-600/20 text-purple-300 border-purple-500/30",
+  high: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
+  medium: "bg-sky-500/20 text-sky-300 border-sky-500/30",
+  low: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+};
+
+const catLabel = (val?: string) =>
+  RISK_CATEGORIES.find((c) => c.value === val)?.label || val || "Other";
+
 export default function Risks() {
   const [search, setSearch] = useState("");
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: risks, isLoading } = useListRisks({});
   const updateMutation = useUpdateRisk();
@@ -37,7 +50,7 @@ export default function Risks() {
   });
 
   const handleStatusToggle = async (id: number, currentStatus: string) => {
-    const nextStatus = currentStatus === "open" ? "resolved" : "open";
+    const nextStatus = currentStatus === "open" ? "mitigated" : "open";
     await updateMutation.mutateAsync({ id, data: { status: nextStatus as any } });
     queryClient.invalidateQueries({ queryKey: ["/api/risks"] });
   };
@@ -82,12 +95,23 @@ export default function Risks() {
                       <Badge variant="outline" className={typeColor[risk.type ?? "risk"] ?? ""}>
                         {risk.type ?? "risk"}
                       </Badge>
+                      {(risk as any).category && (
+                        <Badge variant="outline">{catLabel((risk as any).category)}</Badge>
+                      )}
                       {risk.severity && (
                         <Badge variant="outline" className={severityColor[risk.severity] ?? ""}>
-                          {risk.severity}
+                          impact: {risk.severity}
                         </Badge>
                       )}
-                      <Badge variant={risk.status === "resolved" ? "secondary" : "outline"}>
+                      {(risk as any).probability && (
+                        <Badge
+                          variant="outline"
+                          className={probabilityColor[(risk as any).probability] ?? ""}
+                        >
+                          prob: {(risk as any).probability}
+                        </Badge>
+                      )}
+                      <Badge variant={risk.status === "closed" || risk.status === "mitigated" ? "secondary" : "outline"}>
                         {risk.status}
                       </Badge>
                     </div>
@@ -101,14 +125,23 @@ export default function Risks() {
                       {format(new Date(risk.createdAt), "MMM d, yyyy")}
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleStatusToggle(risk.id, risk.status ?? "open")}
-                    disabled={updateMutation.isPending}
-                  >
-                    {risk.status === "open" ? "Resolve" : "Reopen"}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {(user?.role === "cio" || (risk as any).userId === user?.id) && (
+                      <Link href={`/risks/${risk.id}/edit`}>
+                        <Button variant="ghost" size="icon" title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStatusToggle(risk.id, risk.status ?? "open")}
+                      disabled={updateMutation.isPending}
+                    >
+                      {risk.status === "open" ? "Mitigate" : "Reopen"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

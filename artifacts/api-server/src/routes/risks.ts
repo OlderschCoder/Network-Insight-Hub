@@ -30,6 +30,8 @@ router.post("/", requireAuth, async (req: any, res) => {
   const schema = z.object({
     type: z.enum(["risk", "issue", "suggestion"]),
     severity: z.enum(["low", "medium", "high", "critical"]),
+    probability: z.enum(["low", "medium", "high", "critical"]).optional(),
+    category: z.string().optional(),
     title: z.string().min(1),
     description: z.string().min(1),
     impact: z.string().optional(),
@@ -64,7 +66,10 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const schema = z.object({
+    type: z.enum(["risk", "issue", "suggestion"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+    probability: z.enum(["low", "medium", "high", "critical"]).optional(),
+    category: z.string().optional(),
     status: z.enum(["open", "mitigated", "closed"]).optional(),
     title: z.string().optional(),
     description: z.string().optional(),

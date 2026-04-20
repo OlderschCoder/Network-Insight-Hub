@@ -8,6 +8,8 @@ export const risksTable = pgTable("risks", {
   userId: integer("user_id").notNull().references(() => usersTable.id),
   type: varchar("type", { length: 20 }).notNull(),
   severity: varchar("severity", { length: 20 }).notNull(),
+  probability: varchar("probability", { length: 20 }).default("medium"),
+  category: varchar("category", { length: 30 }).default("other"),
   status: varchar("status", { length: 20 }).notNull().default("open"),
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description").notNull(),

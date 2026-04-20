@@ -1,8 +1,28 @@
 import { Router } from "express";
 import { db, entriesTable, usersTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
+
+// Compute ISO Monday for a YYYY-MM-DD date string in America/Chicago.
+function isoWeekStartCentral(dateStr: string): string {
+  // Treat the input as a Central-time calendar date (no time component).
+  // We can do the math purely on the calendar: parse Y-M-D, build a UTC date,
+  // and shift back by (dow - 1) days. This is timezone-stable for date-only inputs.
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = dt.getUTCDay() || 7; // Mon=1..Sun=7
+  const monday = new Date(dt.getTime() - (dow - 1) * 86400000);
+  return monday.toISOString().slice(0, 10);
+}
+
+function todayInCentral(): string {
+  // en-CA gives YYYY-MM-DD format
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
 
 const router = Router();
 
@@ -51,6 +71,7 @@ router.post("/", requireAuth, async (req: any, res) => {
       title: z.string().min(1),
       notes: z.string().optional(),
       category: z.string().optional(),
+      itemDate: z.string().optional(),
     })).optional(),
     zendeskTicketIds: z.array(z.number()).optional(),
   });
@@ -75,60 +96,66 @@ router.post("/quick-item", requireAuth, async (req: any, res) => {
     title: z.string().min(1),
     notes: z.string().optional(),
     category: z.string().optional(),
-    entryDate: z.string().optional(),
+    itemDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", message: parsed.error.message });
   }
-  const today = new Date().toISOString().slice(0, 10);
-  const date = parsed.data.entryDate || today;
-  // ISO week start (Monday) for the date
-  const d = new Date(date + "T00:00:00Z");
-  const dow = d.getUTCDay() || 7; // Sunday=7
-  const weekStart = new Date(d.getTime() - (dow - 1) * 86400000)
-    .toISOString().slice(0, 10);
-
-  // Find an existing log for this user/date
-  const existing = await db
-    .select()
-    .from(entriesTable)
-    .where(and(eq(entriesTable.userId, req.user.id), eq(entriesTable.entryDate, date)));
+  const itemDate = parsed.data.itemDate || todayInCentral();
+  const weekStart = isoWeekStartCentral(itemDate);
 
   const newItem = {
     title: parsed.data.title,
     notes: parsed.data.notes,
     category: parsed.data.category,
+    itemDate,
   };
 
-  if (existing.length > 0) {
-    const target = existing[0];
-    const items = [...(target.completedItems ?? []), newItem];
-    const [updated] = await db
-      .update(entriesTable)
-      .set({ completedItems: items, updatedAt: new Date() })
-      .where(eq(entriesTable.id, target.id))
-      .returning();
-    return res.json(await entryWithUser(updated, updated.userId));
-  }
-
-  // No log yet — create a stub log for the date with this single item
-  const [created] = await db
-    .insert(entriesTable)
-    .values({
-      userId: req.user.id,
-      category: "general",
-      title: `Daily Log – ${date}`,
-      description: "(Quick-added items)",
-      weekOf: weekStart,
-      entryDate: date,
-      completedItems: [newItem],
-      zendeskTicketIds: [],
-      tags: [],
-      ticketCount: 0,
-    })
-    .returning();
-  return res.status(201).json(await entryWithUser(created, created.userId));
+  // Atomic upsert: relies on unique (user_id, week_of) index.
+  // On conflict, append the new item to the existing JSON array in a single statement.
+  const result: any = await db.execute(sql`
+    INSERT INTO entries
+      (user_id, category, title, description, week_of, entry_date, completed_items, zendesk_ticket_ids, tags, ticket_count)
+    VALUES
+      (${req.user.id}, 'general',
+       ${'Weekly Log – week of ' + weekStart},
+       '(Quick-added items)',
+       ${weekStart}, ${itemDate},
+       ${JSON.stringify([newItem])}::json,
+       '[]'::json, '[]'::json, 0)
+    ON CONFLICT (user_id, week_of) DO UPDATE
+      SET completed_items =
+            (COALESCE(entries.completed_items::jsonb, '[]'::jsonb) ||
+             ${JSON.stringify(newItem)}::jsonb)::json,
+          updated_at = NOW()
+    RETURNING *, (xmax = 0) AS inserted;
+  `);
+  const row: any = Array.isArray(result) ? result[0] : result.rows?.[0];
+  if (!row) return res.status(500).json({ error: "Upsert failed" });
+  const inserted = !!row.inserted;
+  const entry = {
+    id: row.id,
+    userId: row.user_id,
+    category: row.category,
+    title: row.title,
+    description: row.description,
+    weekOf: row.week_of,
+    entryDate: row.entry_date,
+    headline: row.headline,
+    accomplishments: row.accomplishments,
+    challenges: row.challenges,
+    supportNeeded: row.support_needed,
+    ticketCount: row.ticket_count,
+    tags: row.tags,
+    completedItems: row.completed_items,
+    zendeskTicketIds: row.zendesk_ticket_ids,
+    isSubmitted: row.is_submitted,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  const enriched = await entryWithUser(entry, entry.userId);
+  return res.status(inserted ? 201 : 200).json(enriched);
 });
 
 router.get("/:id", requireAuth, async (req: any, res) => {
@@ -165,6 +192,7 @@ router.put("/:id", requireAuth, async (req: any, res) => {
       title: z.string().min(1),
       notes: z.string().optional(),
       category: z.string().optional(),
+      itemDate: z.string().optional(),
     })).optional(),
     zendeskTicketIds: z.array(z.number()).optional(),
   });
