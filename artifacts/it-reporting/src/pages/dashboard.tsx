@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
 import { ZendeskResolved } from "@/components/ZendeskResolved";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
+import { HowToUse } from "@/components/HowToUse";
 
 export default function Dashboard() {
   const { data: summary } = useGetDashboardSummary();
@@ -28,6 +29,8 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      <HowToUse />
 
       <QuoteOfDay />
 

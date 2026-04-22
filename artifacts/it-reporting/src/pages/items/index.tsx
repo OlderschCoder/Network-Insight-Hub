@@ -85,9 +85,12 @@ export default function ItemsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Items</h1>
-          <p className="text-sm text-muted-foreground">
-            All your completed items. Add items throughout the week, then write your
-            weekly summary on Friday.
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            <strong>Step 1 of the weekly workflow.</strong> Log every completed
+            ticket, project task, install, or piece of research as you finish
+            it — title + category + a quick note. Resolved Zendesk tickets pull
+            in automatically. On Friday, click <em>Generate Weekly Log</em> to
+            roll all of these into your weekly report.
           </p>
         </div>
         <div className="flex items-center gap-2">
