@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Server, Network as NetIcon, Search, X } from "lucide-react";
+import { Server, Network as NetIcon, Search, X, Building2 } from "lucide-react";
 import { Link } from "wouter";
 
 const statusFill: Record<string, string> = {
@@ -92,11 +92,13 @@ export default function NetworkVisualize() {
 
     const buildings = Array.from(
       new Set([
+        // Hobble is always rendered: it carries the FortiGate + Cisco 9500 core.
+        "Hobble",
         ...Object.keys(switchesByBuilding),
         ...Object.keys(vlansByBuilding),
       ])
     ).sort((a, b) => {
-      // Hobble first so the core sits visually near it
+      // Hobble first so the rest of campus radiates out from it
       if (a === "Hobble") return -1;
       if (b === "Hobble") return 1;
       return a.localeCompare(b);
@@ -114,15 +116,14 @@ export default function NetworkVisualize() {
     const SECTION_GAP = 24;
     const BUILDING_GAP = 48;
 
-    // Spine layout (Internet → FortiGate → Hobble Cisco 9K core → campus VLAN row → buildings)
+    // Spine layout (Internet up top, then optional campus VLAN row, then buildings;
+    // the FortiGate and Cisco 9500 core live INSIDE the Hobble container as the first row).
     const SPINE_X_W = 240;
     const INTERNET_Y = 0;
-    const FORTIGATE_Y = 110;
-    const CORE_Y = 220;
-    const CAMPUS_VLAN_Y = 330;
+    const CAMPUS_VLAN_Y = 110;
     const CAMPUS_VLAN_W = 200;
     const CAMPUS_VLAN_GAP = 16;
-    const BUILDINGS_Y = campusVlans.length > 0 ? 460 : 360;
+    const BUILDINGS_Y = campusVlans.length > 0 ? 230 : 130;
 
     // Live FortiGate switch record (for status badge on the spine node).
     const fortigateRecord = switches.find((s) =>
@@ -134,6 +135,11 @@ export default function NetworkVisualize() {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
+    // Inside the Hobble container we always render an "infrastructure" row
+    // with the FortiGate and the Cisco 9500 core as the first two tiles.
+    const HOBBLE_INFRA_COUNT = 2;
+    const HOBBLE_INFRA_HEIGHT = NODE_H;
+
     // First pass: compute building widths so we can center the spine over them.
     const buildingDims: Record<string, { w: number; h: number }> = {};
     buildings.forEach((b) => {
@@ -143,11 +149,19 @@ export default function NetworkVisualize() {
       const vlRows = Math.ceil(vls.length / COLS) || 0;
       const swHeight = swRows ? swRows * NODE_H + (swRows - 1) * ROW_GAP : 0;
       const vlHeight = vlRows ? vlRows * NODE_H + (vlRows - 1) * ROW_GAP : 0;
-      const innerColCount = Math.min(COLS, Math.max(sws.length, vls.length, 1));
+
+      const isHobble = b === "Hobble";
+      const minInnerCols = isHobble ? HOBBLE_INFRA_COUNT : 1;
+      const innerColCount = Math.min(
+        COLS,
+        Math.max(minInnerCols, sws.length, vls.length, 1)
+      );
       const innerWidth = innerColCount * NODE_W + (innerColCount - 1) * COL_GAP;
       const w = innerWidth + PADDING_X * 2;
+      const infraHeight = isHobble ? HOBBLE_INFRA_HEIGHT + SECTION_GAP : 0;
       const h =
         PADDING_TOP +
+        infraHeight +
         swHeight +
         (swHeight && vlHeight ? SECTION_GAP : 0) +
         vlHeight +
@@ -184,81 +198,16 @@ export default function NetworkVisualize() {
       draggable: true,
     });
 
-    const fortigateId = "spine-fortigate";
-    nodes.push({
-      id: fortigateId,
-      position: { x: spineCenterX - SPINE_X_W / 2, y: FORTIGATE_Y },
-      data: {
-        label: (
-          <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
-            <div
-              style={{
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
-              🛡 FortiGate Edge Firewall
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: fortigateBorder,
-                  boxShadow: `0 0 6px ${fortigateBorder}`,
-                }}
-                title={`status: ${fortigateStatus}`}
-              />
-            </div>
-            <div style={{ opacity: 0.85, fontSize: 10 }}>
-              {fortigateRecord
-                ? `${fortigateRecord.ipAddress ?? ""} · ${fortigateStatus}`.trim()
-                : "Hobble · AA-158"}
-            </div>
-          </div>
-        ),
-      },
-      style: {
-        width: SPINE_X_W,
-        background: "#7f1d1d",
-        color: "#fee2e2",
-        border: `2px solid ${fortigateBorder}`,
-        borderRadius: 8,
-        padding: 10,
-      },
-      draggable: true,
-    });
-
-    const coreId = "spine-core";
-    nodes.push({
-      id: coreId,
-      position: { x: spineCenterX - SPINE_X_W / 2, y: CORE_Y },
-      data: {
-        label: (
-          <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
-            <div style={{ fontWeight: 700 }}>⚡ Cisco 9500 Core</div>
-            <div style={{ opacity: 0.85, fontSize: 10 }}>Hobble · OSPF Area 0</div>
-          </div>
-        ),
-      },
-      style: {
-        width: SPINE_X_W,
-        background: "#1e3a8a",
-        color: "#dbeafe",
-        border: "2px solid #3b82f6",
-        borderRadius: 8,
-        padding: 10,
-      },
-      draggable: true,
-    });
+    // FortiGate and Cisco 9500 core are children of the Hobble container
+    // (rendered later in the building loop). We expose their child-node ids
+    // here so spine + cross-building edges can target them directly.
+    const fortigateChildId = "hobble-fortigate";
+    const coreChildId = "hobble-core";
 
     edges.push({
       id: "e-internet-fortigate",
       source: internetId,
-      target: fortigateId,
+      target: fortigateChildId,
       animated: true,
       style: { stroke: "#38bdf8", strokeWidth: 2 },
       label: "WAN",
@@ -267,8 +216,8 @@ export default function NetworkVisualize() {
     });
     edges.push({
       id: "e-fortigate-core",
-      source: fortigateId,
-      target: coreId,
+      source: fortigateChildId,
+      target: coreChildId,
       animated: true,
       style: { stroke: "#f87171", strokeWidth: 2 },
       label: "inside",
@@ -366,21 +315,20 @@ export default function NetworkVisualize() {
         selectable: true,
       });
 
-      // Spine → building edge (campus uplink to Cisco 9K core)
-      edges.push({
-        id: `e-core-${b}`,
-        source: coreId,
-        target: buildingId,
-        animated: false,
-        style: {
-          stroke: b === "Hobble" ? "#3b82f6" : "#64748b",
-          strokeWidth: 1.5,
-          strokeDasharray: b === "Hobble" ? undefined : "6 4",
-        },
-        label: b === "Hobble" ? "local" : "OSPF uplink",
-        labelStyle: { fill: "#94a3b8", fontSize: 10 },
-        labelBgStyle: { fill: "#020617" },
-      });
+      // Cisco 9500 core → building edge. Hobble doesn't need an external uplink
+      // (the core IS inside Hobble), so only draw it for other buildings.
+      if (b !== "Hobble") {
+        edges.push({
+          id: `e-core-${b}`,
+          source: coreChildId,
+          target: buildingId,
+          animated: false,
+          style: { stroke: "#64748b", strokeWidth: 1.5, strokeDasharray: "6 4" },
+          label: "OSPF uplink",
+          labelStyle: { fill: "#94a3b8", fontSize: 10 },
+          labelBgStyle: { fill: "#020617" },
+        });
+      }
 
       // Campus-wide VLANs fan out to every building container too.
       campusVlanIds.forEach((cvId) => {
@@ -416,6 +364,86 @@ export default function NetworkVisualize() {
         },
       });
 
+      // For Hobble: render the FortiGate and Cisco 9500 core as the first
+      // infrastructure row inside the container.
+      const isHobble = b === "Hobble";
+      const infraOffset = isHobble ? HOBBLE_INFRA_HEIGHT + SECTION_GAP : 0;
+
+      if (isHobble) {
+        nodes.push({
+          id: fortigateChildId,
+          parentNode: buildingId,
+          extent: "parent",
+          position: { x: PADDING_X, y: PADDING_TOP },
+          data: {
+            label: (
+              <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  🛡 FortiGate Edge
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: fortigateBorder,
+                      boxShadow: `0 0 6px ${fortigateBorder}`,
+                    }}
+                    title={`status: ${fortigateStatus}`}
+                  />
+                </div>
+                <div style={{ opacity: 0.85, fontSize: 10 }}>
+                  {fortigateRecord?.ipAddress ?? "—"} · {fortigateStatus}
+                </div>
+                <div style={{ opacity: 0.6, fontSize: 10 }}>Hobble · AA-158</div>
+              </div>
+            ),
+          },
+          style: {
+            width: NODE_W,
+            height: NODE_H,
+            background: "#7f1d1d",
+            color: "#fee2e2",
+            border: `2px solid ${fortigateBorder}`,
+            borderRadius: 8,
+            padding: 8,
+          },
+          draggable: true,
+        });
+        nodes.push({
+          id: coreChildId,
+          parentNode: buildingId,
+          extent: "parent",
+          position: { x: PADDING_X + NODE_W + COL_GAP, y: PADDING_TOP },
+          data: {
+            label: (
+              <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
+                <div style={{ fontWeight: 700 }}>⚡ Cisco 9500 Core</div>
+                <div style={{ opacity: 0.85, fontSize: 10 }}>OSPF Area 0</div>
+                <div style={{ opacity: 0.6, fontSize: 10 }}>Distribution to all buildings</div>
+              </div>
+            ),
+          },
+          style: {
+            width: NODE_W,
+            height: NODE_H,
+            background: "#1e3a8a",
+            color: "#dbeafe",
+            border: "2px solid #3b82f6",
+            borderRadius: 8,
+            padding: 8,
+          },
+          draggable: true,
+        });
+      }
+
       // Switches grid
       sws.forEach((s, idx) => {
         const col = idx % COLS;
@@ -426,7 +454,7 @@ export default function NetworkVisualize() {
           extent: "parent",
           position: {
             x: PADDING_X + col * (NODE_W + COL_GAP),
-            y: PADDING_TOP + row * (NODE_H + ROW_GAP),
+            y: PADDING_TOP + infraOffset + row * (NODE_H + ROW_GAP),
           },
           data: {
             label: (
@@ -451,7 +479,8 @@ export default function NetworkVisualize() {
       });
 
       // VLANs grid (below switches inside the same container)
-      const vlanYStart = PADDING_TOP + swHeight + (swHeight ? SECTION_GAP : 0);
+      const vlanYStart =
+        PADDING_TOP + infraOffset + swHeight + (swHeight ? SECTION_GAP : 0);
       vls.forEach((v, idx) => {
         const col = idx % COLS;
         const row = Math.floor(idx / COLS);
@@ -503,6 +532,55 @@ export default function NetworkVisualize() {
 
   const totalSelected = selectedSwitchIds.size + selectedVlanIds.size;
 
+  // Buildings tab data: list every distinct (normalized) building with its
+  // switch + VLAN counts and a "select all in this building" toggle.
+  const buildingOptions = useMemo(() => {
+    const normalize = (raw?: string | null) => {
+      if (!raw) return "Unknown";
+      return raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+    };
+    const map = new Map<
+      string,
+      { name: string; switchIds: number[]; vlanIds: number[] }
+    >();
+    for (const s of switches) {
+      const n = normalize(s.building);
+      if (!map.has(n)) map.set(n, { name: n, switchIds: [], vlanIds: [] });
+      map.get(n)!.switchIds.push(s.id);
+    }
+    for (const v of vlans) {
+      const n = normalize(v.building);
+      if (!map.has(n)) map.set(n, { name: n, switchIds: [], vlanIds: [] });
+      map.get(n)!.vlanIds.push(v.id);
+    }
+    const arr = Array.from(map.values());
+    const q = search.toLowerCase();
+    return arr
+      .filter((b) => !q || b.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [switches, vlans, search]);
+
+  const toggleBuilding = (b: { switchIds: number[]; vlanIds: number[] }) => {
+    const allSelected =
+      b.switchIds.every((id) => selectedSwitchIds.has(id)) &&
+      b.vlanIds.every((id) => selectedVlanIds.has(id));
+    if (allSelected) {
+      const ns = new Set(selectedSwitchIds);
+      b.switchIds.forEach((id) => ns.delete(id));
+      setSelectedSwitchIds(ns);
+      const nv = new Set(selectedVlanIds);
+      b.vlanIds.forEach((id) => nv.delete(id));
+      setSelectedVlanIds(nv);
+    } else {
+      const ns = new Set(selectedSwitchIds);
+      b.switchIds.forEach((id) => ns.add(id));
+      setSelectedSwitchIds(ns);
+      const nv = new Set(selectedVlanIds);
+      b.vlanIds.forEach((id) => nv.add(id));
+      setSelectedVlanIds(nv);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -547,8 +625,11 @@ export default function NetworkVisualize() {
             )}
           </div>
 
-          <Tabs defaultValue="switches">
+          <Tabs defaultValue="buildings">
             <TabsList className="w-full">
+              <TabsTrigger value="buildings" className="flex-1">
+                <Building2 className="h-3 w-3 mr-1" /> Buildings
+              </TabsTrigger>
               <TabsTrigger value="switches" className="flex-1">
                 <Server className="h-3 w-3 mr-1" /> Switches
               </TabsTrigger>
@@ -556,6 +637,55 @@ export default function NetworkVisualize() {
                 <NetIcon className="h-3 w-3 mr-1" /> VLANs
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="buildings" className="mt-3">
+              <Card>
+                <CardContent className="p-2 max-h-[60vh] overflow-y-auto">
+                  {buildingOptions.map((b) => {
+                    const total = b.switchIds.length + b.vlanIds.length;
+                    const selectedHere =
+                      b.switchIds.filter((id) => selectedSwitchIds.has(id)).length +
+                      b.vlanIds.filter((id) => selectedVlanIds.has(id)).length;
+                    const allSelected = total > 0 && selectedHere === total;
+                    const partial = selectedHere > 0 && !allSelected;
+                    return (
+                      <button
+                        key={b.name}
+                        onClick={() => toggleBuilding(b)}
+                        className={`w-full text-left p-2 rounded text-xs hover:bg-muted/50 flex items-start gap-2 ${
+                          allSelected ? "bg-primary/10" : partial ? "bg-primary/5" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = partial;
+                          }}
+                          readOnly
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{b.name}</div>
+                          <div className="text-muted-foreground truncate">
+                            {b.switchIds.length} switch{b.switchIds.length === 1 ? "" : "es"} ·{" "}
+                            {b.vlanIds.length} VLAN{b.vlanIds.length === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                        {selectedHere > 0 && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {selectedHere}/{total}
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {buildingOptions.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-4 text-center">No matches.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="switches" className="mt-3">
               <Card>
