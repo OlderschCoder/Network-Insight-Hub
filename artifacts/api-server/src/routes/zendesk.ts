@@ -88,10 +88,8 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
-      const data = await zget<{
-        results: ZendeskTicket[];
-        next_page: string | null;
-      }>(cfg, nextUrl);
+      type SearchPage = { results: ZendeskTicket[]; next_page: string | null };
+      const data: SearchPage = await zget<SearchPage>(cfg, nextUrl);
       for (const t of data.results) {
         totals.scanned++;
         if (t.status === "solved" || t.status === "closed") {
@@ -244,10 +242,8 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
-      const data = await zget<{
-        results: ZendeskTicket[];
-        next_page: string | null;
-      }>(cfg, nextUrl);
+      type SearchPage = { results: ZendeskTicket[]; next_page: string | null };
+      const data: SearchPage = await zget<SearchPage>(cfg, nextUrl);
       allResults.push(...data.results);
       pages++;
       nextUrl = data.next_page

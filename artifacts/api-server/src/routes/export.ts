@@ -172,6 +172,7 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="it-report-${report.weekOf}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
+    return;
   } catch (err) {
     return res.status(500).json({ error: "Export failed" });
   }
