@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Server, Network as NetworkIcon, Workflow, Building2,
-  Sparkles, Send, Map as MapIcon, Loader2,
+  Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -224,6 +224,139 @@ function AskAIPanel() {
   );
 }
 
+function CloudRemotePanel() {
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="py-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Cloud className="h-4 w-4 text-primary" />
+          Cloud &amp; Remote Sites
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Hybrid Azure deployment and the West campus IPsec site. Switches and
+          subnets below are also indexed under their building in the tabs.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <Accordion type="multiple" className="space-y-2">
+          <AccordionItem value="azure" className="border rounded-md px-3 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2 flex-1">
+                <Cloud className="h-4 w-4 text-sky-400" />
+                <span className="font-medium">Microsoft Azure — Hybrid-VNet (Central US)</span>
+                <Badge variant="outline" className="ml-auto text-xs">RG-Prod-CentralUS</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-sm space-y-3 pt-2">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VNet</p>
+                  <p><span className="text-muted-foreground">Name:</span> <span className="font-mono">Hybrid-VNet</span></p>
+                  <p><span className="text-muted-foreground">Region:</span> centralus</p>
+                  <p><span className="text-muted-foreground">Address space:</span> <span className="font-mono text-emerald-400">10.0.0.0/24, 10.3.0.0/27</span></p>
+                  <p><span className="text-muted-foreground">Peering:</span> none configured</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key subnets</p>
+                  <p><span className="font-mono">GatewaySubnet</span> — <span className="font-mono text-emerald-400">10.0.0.224/27</span> (Hybrid-VPNGateway)</p>
+                  <p><span className="font-mono">Hybrid_default</span> — <span className="font-mono text-emerald-400">10.0.0.0/25</span> (workloads, NAT, PEs)</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VPN</p>
+                  <p><span className="font-mono">Hybrid-VPNGateway</span> — RouteBased, Gen2, Active/Active (VpnGw2AZ)</p>
+                  <p><span className="font-mono">S2S-OnPrem</span> — Connected → <span className="font-mono">OnPrem-LNG</span></p>
+                  <p><span className="font-mono">OnPrem-SNAT</span>: 10.1.0.0/24 → 172.20.1.0/26 (egress)</p>
+                  <p className="text-xs text-amber-400/80"><span className="font-mono">Azure_Ipsec</span> on VNG_NEW — <strong>NotConnected</strong> (separate path)</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Routes (RT-To-Onprem)</p>
+                  <p><span className="font-mono">192.168.0.0/16</span> → VirtualNetworkGateway</p>
+                  <p><span className="font-mono">10.70.0.0/16</span> → VirtualNetworkGateway</p>
+                  <p><span className="font-mono">10.0.0.192/26</span> → VnetLocal (bastion)</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Local Network Gateway (OnPrem-LNG)</p>
+                  <p><span className="text-muted-foreground">Public IP:</span> <span className="font-mono">207.178.111.98</span></p>
+                  <p className="text-xs text-muted-foreground">Address prefixes include 172.25.0.0/21, 172.25.0.0/24…172.25.6.0/24, plus extensive 10.x, 172.16/18/20/23 and 192.168.0.0/16. Confirm in portal before edits.</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">DNS (VNet)</p>
+                  <p className="font-mono text-xs">10.40.1.80, 10.40.1.82, 10.0.0.34, 10.40.1.77, 10.40.1.68 — on-prem / hybrid mix</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Other VNets in subscription</p>
+                  <p className="text-xs font-mono">Hybrid-TEST01-vnet · 104_VNET · vnet-prod-web · vnet_NEW · aadds-vnet (SCCC_DOMAIN_SERVICES) · test-gateway-vnet · TestVM01-vnet · test-wsus-vnet</p>
+                </div>
+              </div>
+              <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                Snapshot is point-in-time from the last <span className="font-mono">azure_visualizer.ps1</span> export.
+                Re-run that script (PowerShell, requires <span className="font-mono">az login</span> and the
+                <span className="font-mono"> resource-graph</span> extension) to refresh.
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="west" className="border rounded-md px-3 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2 flex-1">
+                <Radio className="h-4 w-4 text-amber-400" />
+                <span className="font-medium">West Campus — IPsec site (172.25.0.0/21)</span>
+                <Badge variant="outline" className="ml-auto text-xs">VPN-only</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-sm space-y-3 pt-2">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Addressing</p>
+                  <p><span className="font-mono text-emerald-400">172.25.0.0/21</span> — West aggregate (FortiGate Phase 2 Vlan_910_915, Azure OnPrem-LNG)</p>
+                  <p><span className="font-mono">VLAN 910</span> — <span className="font-mono text-emerald-400">172.25.1.0/24</span> (West_17225_to_Azure)</p>
+                  <p><span className="font-mono">West_Wired</span> — <span className="font-mono text-emerald-400">172.25.0.0/24</span></p>
+                  <p><span className="font-mono">West_Wireless</span> — <span className="font-mono text-emerald-400">10.11.16.0/24</span></p>
+                  <p className="text-xs text-amber-400/80">FortiGate <span className="font-mono">West_All</span> may exclude 172.25.1.0/24 — Vlan_910 sources can miss policies that use it.</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Connectivity</p>
+                  <p>Reaches main campus / Azure via <strong>IPsec</strong> through <span className="font-mono">West_FGT</span> ↔ <span className="font-mono">Fortigate1-Sccc</span>.</p>
+                  <p className="text-xs text-muted-foreground">Static route <span className="font-mono">172.25.0.0/21 → West_FGT</span> on the HQ side.</p>
+                  <p className="text-xs text-muted-foreground">Not extended as a campus L2 VLAN like Epworth — design is VPN-only.</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tunnel runtime (last reviewed)</p>
+                  <p><span className="font-mono">West_FGT</span>: ~28 Phase 2 selectors, 14 up; <span className="text-amber-400">~240k TX errors flagged</span> — investigate MTU / path.</p>
+                  <p><span className="font-mono">Azure-SCCC2</span>: 56 selectors, 33 up (not all SAs up at once is normal).</p>
+                  <p>Phase 2 names: <span className="font-mono">West_17225_to_Azure</span> (172.25.1.0/24 → Azure), <span className="font-mono">Vlan_910_915</span> (172.25.0.0/21 → Azure).</p>
+                </div>
+                <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Relevant FortiGate policies (Fortigate1-Sccc)</p>
+                  <p className="text-xs">222/223 — West ↔ campus &nbsp;·&nbsp; 229 — campus → Azure &nbsp;·&nbsp; 244/245/246/248 — West ↔ Azure</p>
+                  <p className="text-xs"><span className="font-mono">SCCC_To_WestsideFGT</span>: port3 → West_FGT (src WestFGT_Outgoing, dst WestFGT_Incoming)</p>
+                  <p className="text-xs"><span className="font-mono">WestFGT_To_SCCC</span>: West_FGT → port3 (mirror direction)</p>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="epworth" className="border rounded-md px-3 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2 flex-1">
+                <Radio className="h-4 w-4 text-emerald-400" />
+                <span className="font-medium">Epworth — dark fiber / OSPF site</span>
+                <Badge variant="outline" className="ml-auto text-xs">L2/L3 extended</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="text-sm space-y-2 pt-2">
+              <p>Connected to the core via <strong>dark fiber</strong> with OSPF, in contrast to West's IPsec design.</p>
+              <p><span className="font-mono">VLAN 773</span> — <span className="font-mono">EpworthBuilding</span> (named on the aa144 Nexus pair).</p>
+              <p><span className="font-mono">VLAN 616</span> — <span className="font-mono">OSPF10-Epworth</span> (transit /30, e.g. interface description <span className="font-mono">OSPF10-Epworth-To-Cisco9k-A48</span>).</p>
+              <p><span className="font-mono">E117-E213-EpworthLabs</span> for lab segments.</p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CampusMapPanel() {
   return (
     <Sheet>
@@ -316,6 +449,8 @@ export default function Network() {
           className="pl-10"
         />
       </div>
+
+      <CloudRemotePanel />
 
       <Tabs defaultValue="buildings">
         <TabsList>
