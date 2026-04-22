@@ -107,8 +107,24 @@ export default function ReportDetail() {
     }
   };
 
-  const handleExport = (type: "docx" | "xlsx") => {
-    window.open(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, "_blank");
+  const handleExport = async (type: "docx" | "xlsx" | "pdf") => {
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `it-report-${(report as any)?.weekOf ?? id}.${type}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message, variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -164,11 +180,14 @@ export default function ReportDetail() {
             Finalize
           </Button>
         )}
+        <Button variant="outline" onClick={() => handleExport("pdf")}>
+          <Download className="h-4 w-4 mr-2" /> Export PDF
+        </Button>
         <Button variant="outline" onClick={() => handleExport("docx")}>
-          <Download className="h-4 w-4 mr-2" /> Export DOCX
+          <Download className="h-4 w-4 mr-2" /> Export Word
         </Button>
         <Button variant="outline" onClick={() => handleExport("xlsx")}>
-          <Download className="h-4 w-4 mr-2" /> Export XLSX
+          <Download className="h-4 w-4 mr-2" /> Export Excel
         </Button>
         {isCIO && (
           <Button variant="outline" onClick={handleZendesk} disabled={zendeskMutation.isPending}>

@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Pencil } from "lucide-react";
+import { Plus, Search, Pencil, Download } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { RISK_CATEGORIES } from "@/components/RiskForm";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const severityColor: Record<string, string> = {
   critical: "bg-red-600/20 text-red-300 border-red-500/30",
@@ -55,16 +56,46 @@ export default function Risks() {
     queryClient.invalidateQueries({ queryKey: ["/api/risks"] });
   };
 
+  const { toast } = useToast();
+  const handleExport = async (type: "pdf" | "docx") => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}api/export/risks/${type}?scope=open`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `risk-register-open.${type}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Risks, Issues & Design</h1>
-        <Link href="/risks/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Item
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => handleExport("pdf")}>
+            <Download className="h-4 w-4 mr-2" /> Export PDF
           </Button>
-        </Link>
+          <Button variant="outline" onClick={() => handleExport("docx")}>
+            <Download className="h-4 w-4 mr-2" /> Export Word
+          </Button>
+          <Link href="/risks/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Item
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="relative">

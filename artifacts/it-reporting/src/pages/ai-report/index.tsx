@@ -89,6 +89,35 @@ function StatusReportTab() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExport = async (type: "pdf" | "docx") => {
+    if (!report) return;
+    try {
+      const res = await fetch(`${API_BASE}/export/ai-status/${type}`, {
+        method: "POST",
+        headers: authHeaders(),
+        credentials: "include",
+        body: JSON.stringify({
+          title: `${form.accountName} — IT Status Report`,
+          content: report,
+          weekOf: form.endDate,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Seward_Status_${form.endDate}.${type}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <Card>
@@ -215,12 +244,18 @@ function StatusReportTab() {
             )}
           </div>
           {report && (
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <Button variant="ghost" size="icon" onClick={handleCopy} title="Copy">
                 <Copy className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={handleDownload} title="Download">
-                <Download className="h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={() => handleExport("pdf")} title="Export PDF">
+                <Download className="h-4 w-4 mr-1" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport("docx")} title="Export Word">
+                <Download className="h-4 w-4 mr-1" /> Word
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDownload} title="Download Markdown">
+                <Download className="h-4 w-4 mr-1" /> .md
               </Button>
             </div>
           )}
