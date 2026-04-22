@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useListSwitches, useListVlans } from "@workspace/api-client-react";
 import ReactFlow, {
   Background,
@@ -6,14 +6,30 @@ import ReactFlow, {
   MiniMap,
   type Node,
   type Edge,
+  getNodesBounds,
+  getViewportForBounds,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { toPng, toSvg } from "html-to-image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Server, Network as NetIcon, Search, X, Building2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Server,
+  Network as NetIcon,
+  Search,
+  X,
+  Building2,
+  Download,
+} from "lucide-react";
 import { Link } from "wouter";
 
 const statusFill: Record<string, string> = {
@@ -181,6 +197,8 @@ export default function NetworkVisualize() {
       id: internetId,
       position: { x: spineCenterX - SPINE_X_W / 2, y: INTERNET_Y },
       data: {
+        exportLabel: "Internet / WAN",
+        exportShape: "cloud",
         label: (
           <div style={{ fontSize: 12, fontWeight: 700, textAlign: "center" }}>
             🌐 Internet / WAN
@@ -240,6 +258,8 @@ export default function NetworkVisualize() {
         id,
         position: { x: campusVlanX, y: CAMPUS_VLAN_Y },
         data: {
+          exportLabel: `VLAN ${v.vlanId} · ${v.name}\n${v.subnet ?? ""}\ncampus-wide · ${v.type ?? ""}`.trim(),
+          exportColor: "#312e81",
           label: (
             <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "center" }}>
               <div style={{ fontWeight: 700 }}>
@@ -277,7 +297,7 @@ export default function NetworkVisualize() {
       // Tie campus VLAN up to the core spine
       edges.push({
         id: `e-core-${id}`,
-        source: coreId,
+        source: coreChildId,
         target: id,
         animated: true,
         style: { stroke: "#818cf8", strokeWidth: 1.5, strokeDasharray: "3 3" },
@@ -299,7 +319,7 @@ export default function NetworkVisualize() {
       nodes.push({
         id: buildingId,
         position: { x: cursorX, y: BUILDINGS_Y },
-        data: { label: "" },
+        data: { label: "", exportLabel: b, exportShape: "container" },
         style: {
           width: buildingW,
           height: buildingH,
@@ -350,6 +370,7 @@ export default function NetworkVisualize() {
         draggable: false,
         selectable: false,
         data: {
+          exportSkip: true,
           label: (
             <div style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", letterSpacing: 0.3 }}>
               {b.toUpperCase()}
@@ -376,6 +397,8 @@ export default function NetworkVisualize() {
           extent: "parent",
           position: { x: PADDING_X, y: PADDING_TOP },
           data: {
+            exportLabel: `FortiGate Edge Firewall\n${fortigateRecord?.ipAddress ?? ""} · ${fortigateStatus}\nHobble · AA-158`,
+            exportColor: "#7f1d1d",
             label: (
               <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
                 <div
@@ -423,6 +446,8 @@ export default function NetworkVisualize() {
           extent: "parent",
           position: { x: PADDING_X + NODE_W + COL_GAP, y: PADDING_TOP },
           data: {
+            exportLabel: "Cisco 9500 Core\nOSPF Area 0\nDistribution to all buildings",
+            exportColor: "#1e3a8a",
             label: (
               <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
                 <div style={{ fontWeight: 700 }}>⚡ Cisco 9500 Core</div>
@@ -457,6 +482,8 @@ export default function NetworkVisualize() {
             y: PADDING_TOP + infraOffset + row * (NODE_H + ROW_GAP),
           },
           data: {
+            exportLabel: `${s.hostname}\n${s.ipAddress ?? ""}\n${s.model ?? ""}`.trim(),
+            exportColor: "#0f172a",
             label: (
               <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
                 <div style={{ fontWeight: 600 }}>{s.hostname}</div>
@@ -493,6 +520,8 @@ export default function NetworkVisualize() {
             y: vlanYStart + row * (NODE_H + ROW_GAP),
           },
           data: {
+            exportLabel: `VLAN ${v.vlanId} · ${v.name}\n${v.subnet ?? ""}\n${v.type ?? ""}`.trim(),
+            exportColor: "#1e1b4b",
             label: (
               <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
                 <div style={{ fontWeight: 600 }}>
@@ -559,6 +588,100 @@ export default function NetworkVisualize() {
       .filter((b) => !q || b.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [switches, vlans, search]);
+
+  const flowWrapperRef = useRef<HTMLDivElement>(null);
+
+  const downloadDataUrl = (dataUrl: string, filename: string) => {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const exportImage = async (kind: "png" | "svg") => {
+    const wrapper = flowWrapperRef.current;
+    if (!wrapper) return;
+    const viewport = wrapper.querySelector(".react-flow__viewport") as HTMLElement | null;
+    if (!viewport) return;
+    const bounds = getNodesBounds(nodes);
+    const pad = 60;
+    const w = Math.ceil(bounds.width + pad * 2);
+    const h = Math.ceil(bounds.height + pad * 2);
+    const transform = getViewportForBounds(bounds, w, h, 0.5, 2, 0.1);
+    const opts = {
+      backgroundColor: "#020617",
+      width: w,
+      height: h,
+      style: {
+        width: `${w}px`,
+        height: `${h}px`,
+        transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
+      },
+    };
+    const dataUrl = kind === "png" ? await toPng(viewport, opts) : await toSvg(viewport, opts);
+    downloadDataUrl(dataUrl, `network-diagram.${kind}`);
+  };
+
+  const exportDrawio = () => {
+    // Convert each node to an mxCell. Children of group buildings retain
+    // parent="<buildingId>" so positions stay relative just like in React Flow.
+    const sanitizeId = (id: string) => `n_${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    const cells: string[] = [];
+    cells.push('<mxCell id="0"/>');
+    cells.push('<mxCell id="1" parent="0"/>');
+
+    for (const n of nodes) {
+      const data = (n.data ?? {}) as Record<string, unknown>;
+      if (data.exportSkip) continue;
+      const id = sanitizeId(n.id);
+      const parent = n.parentNode ? sanitizeId(n.parentNode) : "1";
+      const label = (data.exportLabel as string) ?? "";
+      const x = Math.round(n.position?.x ?? 0);
+      const y = Math.round(n.position?.y ?? 0);
+      const style = n.style as Record<string, unknown> | undefined;
+      const w = typeof style?.width === "number" ? style.width : 180;
+      const h = typeof style?.height === "number" ? style.height : 70;
+      const fill = (data.exportColor as string) ?? "#1e293b";
+      let mxStyle = "";
+      if (data.exportShape === "container") {
+        mxStyle = `rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;strokeColor=#475569;fontColor=#cbd5e1;verticalAlign=top;align=left;spacingTop=6;spacingLeft=10;`;
+      } else if (data.exportShape === "cloud") {
+        mxStyle = `ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#0c4a6e;strokeColor=#0284c7;fontColor=#e0f2fe;`;
+      } else {
+        mxStyle = `rounded=1;whiteSpace=wrap;html=1;fillColor=${fill};strokeColor=#94a3b8;fontColor=#f8fafc;`;
+      }
+      cells.push(
+        `<mxCell id="${id}" value="${esc(label)}" style="${mxStyle}" vertex="1" parent="${parent}"><mxGeometry x="${x}" y="${y}" width="${Math.round(Number(w))}" height="${Math.round(Number(h))}" as="geometry"/></mxCell>`
+      );
+    }
+
+    for (const e of edges) {
+      const id = sanitizeId(e.id);
+      const src = sanitizeId(e.source);
+      const tgt = sanitizeId(e.target);
+      const label = e.label ? esc(String(e.label)) : "";
+      const stroke = (e.style?.stroke as string) ?? "#94a3b8";
+      const dashed = e.style?.strokeDasharray ? "dashed=1;" : "";
+      cells.push(
+        `<mxCell id="${id}" value="${label}" style="endArrow=classic;html=1;rounded=0;strokeColor=${stroke};${dashed}" edge="1" parent="1" source="${src}" target="${tgt}"><mxGeometry relative="1" as="geometry"/></mxCell>`
+      );
+    }
+
+    const xml =
+      '<mxfile host="app.diagrams.net"><diagram name="SCCC Network">' +
+      '<mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" math="0" shadow="0">' +
+      "<root>" +
+      cells.join("") +
+      "</root></mxGraphModel></diagram></mxfile>";
+
+    const dataUrl = "data:application/xml;charset=utf-8," + encodeURIComponent(xml);
+    downloadDataUrl(dataUrl, "network-diagram.drawio");
+  };
 
   const toggleBuilding = (b: { switchIds: number[]; vlanIds: number[] }) => {
     const allSelected =
@@ -770,11 +893,34 @@ export default function NetworkVisualize() {
         </div>
 
         <Card>
-          <CardHeader className="py-3">
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm">Diagram</CardTitle>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  disabled={totalSelected === 0}
+                >
+                  <Download className="h-3 w-3" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => exportImage("png")}>
+                  PNG image (.png)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportImage("svg")}>
+                  SVG vector (.svg) — editable
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportDrawio}>
+                  draw.io / diagrams.net (.drawio)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardHeader>
           <CardContent className="p-0">
-            <div style={{ height: "70vh" }} className="bg-slate-950 rounded-b-lg">
+            <div ref={flowWrapperRef} style={{ height: "70vh" }} className="bg-slate-950 rounded-b-lg">
               {totalSelected === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                   Select switches or VLANs from the left to draw them here.
