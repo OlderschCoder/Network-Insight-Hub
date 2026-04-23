@@ -4,6 +4,11 @@ import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { streamPdf, type PdfSection } from "../lib/pdf";
+import {
+  gatherReportExportData,
+  buildReportDocxBuffer,
+  buildReportPdfSections,
+} from "../lib/report_export";
 
 const router = Router();
 
@@ -60,69 +65,15 @@ function getWeekStart(): string {
 router.get("/report/:id/docx", requireAuth, async (req: any, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
-
     const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
     if (!report) return res.status(404).json({ error: "Not found" });
-
-    const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
-    const userIds = [...new Set(entries.map(e => e.userId))];
-    const users = await Promise.all(userIds.map(async uid => {
-      const [u] = await db.select().from(usersTable).where(eq(usersTable.id, uid));
-      return u;
-    }));
-    const userMap = Object.fromEntries(users.filter(Boolean).map(u => [u!.id, u!]));
-
-    const doc = new Document({
-      sections: [{
-        children: [
-          new Paragraph({ text: `IT Department Weekly Report — ${report.weekOf}`, heading: HeadingLevel.HEADING_1 }),
-          new Paragraph({ text: `Status: ${report.status.toUpperCase()}`, children: [new TextRun({ text: `Status: ${report.status.toUpperCase()}`, bold: true })] }),
-          new Paragraph({ text: "" }),
-          ...(report.summary ? [
-            new Paragraph({ text: "Executive Summary", heading: HeadingLevel.HEADING_2 }),
-            new Paragraph({ text: report.summary }),
-            new Paragraph({ text: "" }),
-          ] : []),
-          ...(report.accomplishments ? [
-            new Paragraph({ text: "Accomplishments", heading: HeadingLevel.HEADING_2 }),
-            new Paragraph({ text: report.accomplishments }),
-            new Paragraph({ text: "" }),
-          ] : []),
-          ...(report.challenges ? [
-            new Paragraph({ text: "Challenges", heading: HeadingLevel.HEADING_2 }),
-            new Paragraph({ text: report.challenges }),
-            new Paragraph({ text: "" }),
-          ] : []),
-          ...(report.strategicProgress ? [
-            new Paragraph({ text: "Strategic Progress", heading: HeadingLevel.HEADING_2 }),
-            new Paragraph({ text: report.strategicProgress }),
-            new Paragraph({ text: "" }),
-          ] : []),
-          ...(report.nextWeekPlans ? [
-            new Paragraph({ text: "Plans for Next Week", heading: HeadingLevel.HEADING_2 }),
-            new Paragraph({ text: report.nextWeekPlans }),
-            new Paragraph({ text: "" }),
-          ] : []),
-          new Paragraph({ text: "Team Entries", heading: HeadingLevel.HEADING_2 }),
-          ...entries.flatMap(entry => [
-            new Paragraph({ text: entry.title, heading: HeadingLevel.HEADING_3 }),
-            new Paragraph({ text: `By: ${userMap[entry.userId]?.name ?? "Unknown"} | Category: ${entry.category}` }),
-            new Paragraph({ text: entry.description }),
-            ...(entry.accomplishments ? [new Paragraph({ text: `Accomplishments: ${entry.accomplishments}` })] : []),
-            ...(entry.challenges ? [new Paragraph({ text: `Challenges: ${entry.challenges}` })] : []),
-            new Paragraph({ text: "" }),
-          ]),
-        ],
-      }],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
+    const buffer = await buildReportDocxBuffer(report);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.setHeader("Content-Disposition", `attachment; filename="it-report-${report.weekOf}.docx"`);
     return res.send(buffer);
-  } catch (err) {
-    return res.status(500).json({ error: "Export failed" });
+  } catch (err: any) {
+    console.error("Report DOCX export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
   }
 });
 
@@ -134,8 +85,7 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
     const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
     if (!report) return res.status(404).json({ error: "Not found" });
 
-    const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
-    const risks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));
+    const data = await gatherReportExportData(report);
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "SCCC IT Reporting Platform";
@@ -145,27 +95,95 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
     summarySheet.addRow(["IT Department Weekly Report"]);
     summarySheet.addRow(["Week Of", report.weekOf]);
     summarySheet.addRow(["Status", report.status]);
-    summarySheet.addRow(["Entries", entries.length]);
-    summarySheet.addRow(["Total Tickets", entries.reduce((s, e) => s + (e.ticketCount ?? 0), 0)]);
+    summarySheet.addRow(["Weekly Logs", data.entries.length]);
+    summarySheet.addRow(["Tasks Completed (selected)", data.selectedLogItems.length]);
+    summarySheet.addRow(["Additional Tasks", data.customTasks.length]);
+    summarySheet.addRow(["Tickets Resolved", data.totalClosedTickets]);
+    summarySheet.addRow(["Linked Projects", data.linkedProjects.length]);
+    summarySheet.addRow(["Post-Incident Reviews", data.selectedAars.length]);
+    summarySheet.addRow(["Network Maintenance Windows", data.selectedMaintenance.length]);
+    summarySheet.addRow(["Open Risks", data.openRisks.length]);
+    summarySheet.addRow([]);
+    if (report.summary) { summarySheet.addRow(["Summary"]); summarySheet.addRow([report.summary]); summarySheet.addRow([]); }
+    if (report.accomplishments) { summarySheet.addRow(["Accomplishments"]); summarySheet.addRow([report.accomplishments]); summarySheet.addRow([]); }
+    if (report.challenges) { summarySheet.addRow(["Challenges"]); summarySheet.addRow([report.challenges]); summarySheet.addRow([]); }
+    if (report.strategicProgress) { summarySheet.addRow(["Strategic Progress"]); summarySheet.addRow([report.strategicProgress]); summarySheet.addRow([]); }
+    if (report.nextWeekPlans) { summarySheet.addRow(["Plans for Next Week"]); summarySheet.addRow([report.nextWeekPlans]); }
 
-    const entriesSheet = workbook.addWorksheet("Entries");
-    entriesSheet.addRow(["ID", "Category", "Title", "Description", "Accomplishments", "Challenges", "Tickets", "Submitted", "Date"]);
-    for (const entry of entries) {
+    const entriesSheet = workbook.addWorksheet("Weekly Logs");
+    entriesSheet.addRow(["ID", "User", "Category", "Title", "Description", "Accomplishments", "Challenges", "Tickets", "Submitted", "Date"]);
+    for (const entry of data.entries) {
       entriesSheet.addRow([
-        entry.id, entry.category, entry.title, entry.description,
+        entry.id, data.userMap[entry.userId]?.name ?? "Unknown", entry.category, entry.title, entry.description,
         entry.accomplishments ?? "", entry.challenges ?? "",
         entry.ticketCount ?? 0, entry.isSubmitted ? "Yes" : "No", entry.createdAt.toISOString(),
       ]);
     }
 
-    const risksSheet = workbook.addWorksheet("Open Risks");
-    risksSheet.addRow(["ID", "Type", "Severity", "Status", "Title", "Description", "Impact", "Building", "Device"]);
-    for (const risk of risks) {
-      risksSheet.addRow([
-        risk.id, risk.type, risk.severity, risk.status,
-        risk.title, risk.description, risk.impact ?? "",
-        risk.relatedBuilding ?? "", risk.relatedDevice ?? "",
-      ]);
+    const tasksSheet = workbook.addWorksheet("Tasks");
+    tasksSheet.addRow(["User", "Date", "Category", "Title", "Notes"]);
+    for (const it of data.selectedLogItems) {
+      tasksSheet.addRow([it.userName, it.itemDate, it.category, it.title, it.notes ?? ""]);
+    }
+    for (const t of data.customTasks) {
+      tasksSheet.addRow([t.userName ?? "—", "—", "additional", t.title, ""]);
+    }
+
+    if (data.totalClosedTickets > 0) {
+      const ticketsSheet = workbook.addWorksheet("Tickets Resolved");
+      ticketsSheet.addRow(["Assignee", "Tickets Closed"]);
+      const rows = Array.from(data.ticketsByUser.entries()).sort((a, b) => b[1] - a[1]);
+      for (const [name, n] of rows) ticketsSheet.addRow([name, n]);
+      if (data.unassignedTickets > 0) ticketsSheet.addRow(["Unassigned", data.unassignedTickets]);
+    }
+
+    if (data.linkedProjects.length > 0) {
+      const projSheet = workbook.addWorksheet("Projects");
+      projSheet.addRow(["ID", "Title", "Status", "Progress %", "Target Date", "New Estimated", "Description"]);
+      for (const p of data.linkedProjects) {
+        projSheet.addRow([p.id, p.title, p.status, p.progress ?? 0, p.targetDate ?? "", p.newEstimatedDate ?? "", p.description ?? ""]);
+      }
+    }
+
+    if (data.selectedAars.length > 0) {
+      const aarSheet = workbook.addWorksheet("Post-Incident Reviews");
+      aarSheet.addRow(["ID", "Title", "Severity", "Status", "Author", "Building", "Incident Date", "Resolved", "Resolution"]);
+      for (const a of data.selectedAars) {
+        aarSheet.addRow([
+          a.id, a.title, a.severity, a.status, a.authorName, a.building ?? "",
+          a.incidentDate?.toISOString?.() ?? "",
+          a.resolvedAt?.toISOString?.() ?? "",
+          a.resolution ?? "",
+        ]);
+      }
+    }
+
+    if (data.selectedMaintenance.length > 0) {
+      const mSheet = workbook.addWorksheet("Network Maintenance");
+      mSheet.addRow(["Switch", "Building", "Author", "Window Start", "Window End", "Logged", "Notes"]);
+      for (const m of data.selectedMaintenance) {
+        mSheet.addRow([m.switchHostname, m.switchBuilding, m.authorName, m.windowStart ?? "", m.windowEnd ?? "", m.createdAt, m.body]);
+      }
+    }
+
+    if (report.includeGoalProgress && data.goalProgress.length > 0) {
+      const gSheet = workbook.addWorksheet("Goal Progress");
+      gSheet.addRow(["Goal", "Linked Projects", "Active", "Avg Progress %"]);
+      for (const g of data.goalProgress) {
+        gSheet.addRow([g.title, g.projectCount, g.activeProjectCount, g.avgProgress]);
+      }
+    }
+
+    if (report.includeOpenRisks && data.openRisks.length > 0) {
+      const risksSheet = workbook.addWorksheet("Open Risks");
+      risksSheet.addRow(["ID", "Type", "Severity", "Status", "Title", "Description", "Impact", "Building", "Device"]);
+      for (const risk of data.openRisks) {
+        risksSheet.addRow([
+          risk.id, risk.type, risk.severity, risk.status,
+          risk.title, risk.description, risk.impact ?? "",
+          risk.relatedBuilding ?? "", risk.relatedDevice ?? "",
+        ]);
+      }
     }
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -173,8 +191,9 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
     await workbook.xlsx.write(res);
     res.end();
     return;
-  } catch (err) {
-    return res.status(500).json({ error: "Export failed" });
+  } catch (err: any) {
+    console.error("Report XLSX export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
   }
 });
 
@@ -183,54 +202,17 @@ router.get("/report/:id/pdf", requireAuth, async (req: any, res) => {
     const id = parseInt(req.params.id);
     const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
     if (!report) return res.status(404).json({ error: "Not found" });
-    const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
-    const userIds = [...new Set(entries.map(e => e.userId))];
-    const users = await Promise.all(userIds.map(async uid => {
-      const [u] = await db.select().from(usersTable).where(eq(usersTable.id, uid));
-      return u;
-    }));
-    const userMap = Object.fromEntries(users.filter(Boolean).map(u => [u!.id, u!]));
-
-    const sections: PdfSection[] = [];
-    sections.push({ kind: "kv", label: "Status", value: report.status.toUpperCase() });
-    sections.push({ kind: "kv", label: "Total entries", value: String(entries.length) });
-    sections.push({ kind: "kv", label: "Total tickets", value: String(entries.reduce((s, e) => s + (e.ticketCount ?? 0), 0)) });
-    if (report.summary) {
-      sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Executive Summary" }, { kind: "paragraph", text: report.summary });
-    }
-    if (report.accomplishments) {
-      sections.push({ kind: "heading", level: 2, text: "Accomplishments" }, { kind: "paragraph", text: report.accomplishments });
-    }
-    if (report.challenges) {
-      sections.push({ kind: "heading", level: 2, text: "Challenges" }, { kind: "paragraph", text: report.challenges });
-    }
-    if (report.strategicProgress) {
-      sections.push({ kind: "heading", level: 2, text: "Strategic Progress" }, { kind: "paragraph", text: report.strategicProgress });
-    }
-    if (report.nextWeekPlans) {
-      sections.push({ kind: "heading", level: 2, text: "Plans for Next Week" }, { kind: "paragraph", text: report.nextWeekPlans });
-    }
-    sections.push({ kind: "heading", level: 2, text: "Team Entries" });
-    if (entries.length === 0) {
-      sections.push({ kind: "paragraph", text: "No entries logged for this week.", italic: true });
-    }
-    for (const entry of entries) {
-      sections.push({ kind: "heading", level: 3, text: entry.title });
-      sections.push({ kind: "kv", label: "By", value: `${userMap[entry.userId]?.name ?? "Unknown"}  ·  Category: ${entry.category}` });
-      if (entry.description) sections.push({ kind: "paragraph", text: entry.description });
-      if (entry.accomplishments) sections.push({ kind: "kv", label: "Accomplishments", value: entry.accomplishments });
-      if (entry.challenges) sections.push({ kind: "kv", label: "Challenges", value: entry.challenges });
-      sections.push({ kind: "spacer" });
-    }
-
+    const data = await gatherReportExportData(report);
+    const sections = buildReportPdfSections(data);
     return streamPdf(res, {
       title: `IT Department Weekly Report — ${report.weekOf}`,
       subtitle: "Seward County Community College — IT Department",
       filename: `it-report-${report.weekOf}.pdf`,
       sections,
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Export failed" });
+  } catch (err: any) {
+    console.error("Report PDF export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
   }
 });
 

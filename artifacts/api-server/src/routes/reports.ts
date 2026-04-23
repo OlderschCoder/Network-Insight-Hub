@@ -1,8 +1,21 @@
 import { Router } from "express";
-import { db, reportsTable, entriesTable, risksTable, usersTable } from "@workspace/db";
-import { eq, and, desc, count, sum } from "drizzle-orm";
+import {
+  db,
+  reportsTable,
+  entriesTable,
+  risksTable,
+  usersTable,
+  afterActionReportsTable,
+  networkSwitchesTable,
+  strategicObjectivesTable,
+  projectsTable,
+  logItemsTable,
+} from "@workspace/db";
+import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
+import { sendReportEmail } from "../lib/email";
+import { buildReportPdfBuffer, buildReportDocxBuffer } from "../lib/report_export";
 
 const router = Router();
 
@@ -215,6 +228,11 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
       userName: z.string().optional(),
     })).optional(),
     projectIds: z.array(z.number()).optional(),
+    selectedAfterActionIds: z.array(z.number()).nullable().optional(),
+    selectedMaintenanceIds: z.array(z.string()).nullable().optional(),
+    includeGoalProgress: z.boolean().optional(),
+    includeOpenRisks: z.boolean().optional(),
+    emailRecipients: z.array(z.string().email()).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
@@ -222,6 +240,197 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     .where(eq(reportsTable.id, id)).returning();
   if (!report) return res.status(404).json({ error: "Not found" });
   return res.json(report);
+});
+
+// Supplemental data for the report editor:
+//   - afterActionReports: PIRs that occurred (or were resolved/created) within the report week
+//   - maintenance: network maintenance windows scheduled/logged within the report week
+//   - goalProgress: CURRENT snapshot of department-goal progress (NOT week-scoped — strategic
+//     objectives accumulate over time, so the snapshot is what's surfaced in the report).
+// Restricted to CIO since this aggregates organization-wide operational detail intended for
+// report authoring.
+router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
+  if (!report) return res.status(404).json({ error: "Not found" });
+
+  const weekStart = new Date(report.weekOf + "T00:00:00Z");
+  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+  // PIRs (after-action reports) created or resolved in this week
+  const allAars = await db.select().from(afterActionReportsTable);
+  const inWeek = (d: Date | null | undefined) => {
+    if (!d) return false;
+    const t = d.getTime();
+    return t >= weekStart.getTime() && t < weekEnd.getTime();
+  };
+  const aars = allAars.filter(
+    (a) => inWeek(a.incidentDate) || inWeek(a.resolvedAt) || inWeek(a.createdAt),
+  );
+  const aarUsers = aars.length > 0
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, [...new Set(aars.map((a) => a.userId))]))
+    : [];
+  const aarUserMap = new Map(aarUsers.map((u) => [u.id, u.name]));
+  const enrichedAars = aars.map((a) => ({
+    id: a.id,
+    title: a.title,
+    severity: a.severity,
+    status: a.status,
+    building: a.building,
+    incidentDate: a.incidentDate?.toISOString() ?? null,
+    resolvedAt: a.resolvedAt?.toISOString() ?? null,
+    authorName: aarUserMap.get(a.userId) ?? "Unknown",
+    incident: a.incident,
+    resolution: a.resolution,
+  }));
+
+  // Network maintenance windows in this week
+  const switches = await db.select().from(networkSwitchesTable);
+  type MaintRow = {
+    id: string;
+    body: string;
+    authorName: string;
+    createdAt: string;
+    windowStart?: string | null;
+    windowEnd?: string | null;
+    switchHostname: string;
+    switchBuilding: string;
+    switchId: number;
+  };
+  const maintenance: MaintRow[] = [];
+  for (const sw of switches) {
+    for (const log of sw.maintenanceLog ?? []) {
+      const refDate = log.windowStart || log.createdAt;
+      if (!refDate) continue;
+      const d = refDate.slice(0, 10);
+      if (d >= weekStartStr && d < weekEndStr) {
+        maintenance.push({
+          id: log.id,
+          body: log.body,
+          authorName: log.authorName,
+          createdAt: log.createdAt,
+          windowStart: log.windowStart ?? null,
+          windowEnd: log.windowEnd ?? null,
+          switchHostname: sw.hostname,
+          switchBuilding: sw.building,
+          switchId: sw.id,
+        });
+      }
+    }
+  }
+  maintenance.sort((a, b) => (a.windowStart || a.createdAt).localeCompare(b.windowStart || b.createdAt));
+
+  // Goal progress (per strategic objective: linked projects + avg progress)
+  const allObjectives = await db.select().from(strategicObjectivesTable);
+  const allProjects = await db.select().from(projectsTable);
+  const goalProgress = allObjectives
+    .filter((o) => o.status !== "archived")
+    .map((o) => {
+      const linked = allProjects.filter((p) =>
+        Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
+      );
+      const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");
+      const avgProgress = linked.length > 0
+        ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
+        : 0;
+      return {
+        id: o.id,
+        title: o.title,
+        status: o.status,
+        projectCount: linked.length,
+        activeProjectCount: active.length,
+        avgProgress,
+        projects: linked.map((p) => ({
+          id: p.id, title: p.title, status: p.status, progress: p.progress ?? 0,
+        })),
+      };
+    });
+
+  return res.json({
+    weekOf: report.weekOf,
+    weekStart: weekStartStr,
+    weekEnd: weekEndStr,
+    afterActionReports: enrichedAars,
+    maintenance,
+    goalProgress,
+  });
+});
+
+// Email the report (PDF attached) to recipients
+router.post("/:id/email", requireAuth, requireCIO, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const schema = z.object({
+    recipients: z.array(z.string().email()).min(1),
+    subject: z.string().optional(),
+    message: z.string().optional(),
+    format: z.enum(["pdf", "docx"]).default("pdf"),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", details: parsed.error.flatten() });
+
+  const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
+  if (!report) return res.status(404).json({ error: "Not found" });
+
+  let attachment: { filename: string; content: Buffer; contentType: string };
+  try {
+    if (parsed.data.format === "docx") {
+      const buf = await buildReportDocxBuffer(report);
+      attachment = {
+        filename: `it-report-${report.weekOf}.docx`,
+        content: buf,
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      };
+    } else {
+      const buf = await buildReportPdfBuffer(report);
+      attachment = {
+        filename: `it-report-${report.weekOf}.pdf`,
+        content: buf,
+        contentType: "application/pdf",
+      };
+    }
+  } catch (e: any) {
+    return res.status(500).json({ error: "Could not build report file", message: e?.message });
+  }
+
+  try {
+    const subject = parsed.data.subject ||
+      `IT Department Weekly Report — Week of ${report.weekOf}`;
+    const intro = parsed.data.message ||
+      `Attached is the SCCC IT Department weekly report for the week of ${report.weekOf}.`;
+    const html = `<p>${intro.replace(/\n/g, "<br>")}</p><p style="color:#888;font-size:12px">Sent by ${req.user.name} via SCCC IT Reporting Platform.</p>`;
+    const text = `${intro}\n\nSent by ${req.user.name} via SCCC IT Reporting Platform.`;
+    await sendReportEmail({
+      to: parsed.data.recipients,
+      subject,
+      text,
+      html,
+      attachments: [attachment],
+    });
+
+    await db.update(reportsTable).set({
+      emailRecipients: parsed.data.recipients,
+      lastEmailedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(reportsTable.id, id));
+
+    return res.json({
+      sent: true,
+      recipients: parsed.data.recipients,
+      filename: attachment.filename,
+    });
+  } catch (e: any) {
+    const msg = e?.message ?? String(e);
+    if (msg.includes("EMAIL_NOT_CONFIGURED")) {
+      return res.status(503).json({
+        error: "Email not configured",
+        message:
+          "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM environment variables to enable sending email.",
+      });
+    }
+    return res.status(502).json({ error: "Email send failed", message: msg });
+  }
 });
 
 router.post("/:id/finalize", requireAuth, requireCIO, async (req: any, res) => {

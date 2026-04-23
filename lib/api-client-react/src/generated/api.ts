@@ -34,6 +34,8 @@ import type {
   DeleteProject200,
   DeleteReport200,
   DeleteStrategicObjective200,
+  EmailReportBody,
+  EmailReportResponse,
   Entry,
   ErrorResponse,
   GetAggregateReportParams,
@@ -55,6 +57,7 @@ import type {
   ProjectBody,
   RegisterBody,
   Report,
+  ReportExtras,
   ReportTicketsResponse,
   Risk,
   StrategicObjective,
@@ -1611,6 +1614,180 @@ export function useListReportTickets<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Week-scoped extras (PIRs, maintenance, goal progress) for the report
+ */
+export const getGetReportExtrasUrl = (id: number) => {
+  return `/api/reports/${id}/extras`;
+};
+
+export const getReportExtras = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ReportExtras> => {
+  return customFetch<ReportExtras>(getGetReportExtrasUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetReportExtrasQueryKey = (id: number) => {
+  return [`/api/reports/${id}/extras`] as const;
+};
+
+export const getGetReportExtrasQueryOptions = <
+  TData = Awaited<ReturnType<typeof getReportExtras>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportExtras>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetReportExtrasQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportExtras>>> = ({
+    signal,
+  }) => getReportExtras(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getReportExtras>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetReportExtrasQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getReportExtras>>
+>;
+export type GetReportExtrasQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Week-scoped extras (PIRs, maintenance, goal progress) for the report
+ */
+
+export function useGetReportExtras<
+  TData = Awaited<ReturnType<typeof getReportExtras>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportExtras>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetReportExtrasQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Email the report (PDF/DOCX attached) to recipients (CIO only)
+ */
+export const getEmailReportUrl = (id: number) => {
+  return `/api/reports/${id}/email`;
+};
+
+export const emailReport = async (
+  id: number,
+  emailReportBody: EmailReportBody,
+  options?: RequestInit,
+): Promise<EmailReportResponse> => {
+  return customFetch<EmailReportResponse>(getEmailReportUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(emailReportBody),
+  });
+};
+
+export const getEmailReportMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailReport>>,
+    TError,
+    { id: number; data: BodyType<EmailReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emailReport>>,
+  TError,
+  { id: number; data: BodyType<EmailReportBody> },
+  TContext
+> => {
+  const mutationKey = ["emailReport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emailReport>>,
+    { id: number; data: BodyType<EmailReportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return emailReport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmailReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emailReport>>
+>;
+export type EmailReportMutationBody = BodyType<EmailReportBody>;
+export type EmailReportMutationError = ErrorType<void>;
+
+/**
+ * @summary Email the report (PDF/DOCX attached) to recipients (CIO only)
+ */
+export const useEmailReport = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emailReport>>,
+    TError,
+    { id: number; data: BodyType<EmailReportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emailReport>>,
+  TError,
+  { id: number; data: BodyType<EmailReportBody> },
+  TContext
+> => {
+  return useMutation(getEmailReportMutationOptions(options));
+};
 
 /**
  * @summary Finalize and aggregate a weekly report (CIO only)

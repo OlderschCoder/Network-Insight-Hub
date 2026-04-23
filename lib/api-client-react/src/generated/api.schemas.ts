@@ -151,6 +151,12 @@ export interface Report {
   nextWeekPlans?: string;
   metrics?: ReportMetrics;
   selectedItemIds?: number[];
+  selectedAfterActionIds?: number[] | null;
+  selectedMaintenanceIds?: string[] | null;
+  includeGoalProgress?: boolean;
+  includeOpenRisks?: boolean;
+  emailRecipients?: string[];
+  lastEmailedAt?: string | null;
   contributorCount?: number;
   entryCount?: number;
   createdBy?: number;
@@ -186,7 +192,48 @@ export interface UpdateReportBody {
   strategicProgress?: string;
   nextWeekPlans?: string;
   status?: UpdateReportBodyStatus;
-  selectedItemIds?: number[];
+  selectedItemIds?: number[] | null;
+  selectedAfterActionIds?: number[] | null;
+  selectedMaintenanceIds?: string[] | null;
+  includeGoalProgress?: boolean;
+  includeOpenRisks?: boolean;
+  emailRecipients?: string[];
+}
+
+export type ReportExtrasAfterActionReportsItem = { [key: string]: unknown };
+
+export type ReportExtrasMaintenanceItem = { [key: string]: unknown };
+
+export type ReportExtrasGoalProgressItem = { [key: string]: unknown };
+
+export interface ReportExtras {
+  weekOf: string;
+  weekStart?: string;
+  weekEnd?: string;
+  afterActionReports: ReportExtrasAfterActionReportsItem[];
+  maintenance: ReportExtrasMaintenanceItem[];
+  goalProgress: ReportExtrasGoalProgressItem[];
+}
+
+export type EmailReportBodyFormat =
+  (typeof EmailReportBodyFormat)[keyof typeof EmailReportBodyFormat];
+
+export const EmailReportBodyFormat = {
+  pdf: "pdf",
+  docx: "docx",
+} as const;
+
+export interface EmailReportBody {
+  recipients: string[];
+  subject?: string;
+  message?: string;
+  format?: EmailReportBodyFormat;
+}
+
+export interface EmailReportResponse {
+  sent?: boolean;
+  recipients?: string[];
+  filename?: string;
 }
 
 export interface ReportTicket {

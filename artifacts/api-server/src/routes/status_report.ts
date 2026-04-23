@@ -1,6 +1,16 @@
 import { Router, type Request, type Response } from "express";
 import OpenAI from "openai";
-import { db, entriesTable, reportsTable, risksTable, afterActionReportsTable } from "@workspace/db";
+import {
+  db,
+  entriesTable,
+  reportsTable,
+  risksTable,
+  afterActionReportsTable,
+  logItemsTable,
+  projectsTable,
+  strategicObjectivesTable,
+  networkSwitchesTable,
+} from "@workspace/db";
 import { and, gte, lte, sql } from "drizzle-orm";
 
 const entries = entriesTable;
@@ -58,6 +68,10 @@ router.post(
         risksData,
         aarData,
         ticketStats,
+        logItemsData,
+        projectsData,
+        objectivesData,
+        switchesData,
       ] = await Promise.all([
         db
           .select({
@@ -146,7 +160,82 @@ router.post(
               lte(entries.entryDate, end.toISOString().slice(0, 10))
             )
           ),
+        db
+          .select({
+            title: logItemsTable.title,
+            category: logItemsTable.category,
+            notes: logItemsTable.notes,
+            itemDate: logItemsTable.itemDate,
+          })
+          .from(logItemsTable)
+          .where(
+            and(
+              gte(logItemsTable.itemDate, start.toISOString().slice(0, 10)),
+              lte(logItemsTable.itemDate, end.toISOString().slice(0, 10))
+            )
+          ),
+        db.select({
+          id: projectsTable.id,
+          title: projectsTable.title,
+          description: projectsTable.description,
+          status: projectsTable.status,
+          progress: projectsTable.progress,
+          targetDate: projectsTable.targetDate,
+          newEstimatedDate: projectsTable.newEstimatedDate,
+          strategicObjectiveIds: projectsTable.strategicObjectiveIds,
+        }).from(projectsTable),
+        db.select({
+          id: strategicObjectivesTable.id,
+          title: strategicObjectivesTable.title,
+          description: strategicObjectivesTable.description,
+          status: strategicObjectivesTable.status,
+        }).from(strategicObjectivesTable),
+        db.select({
+          hostname: networkSwitchesTable.hostname,
+          building: networkSwitchesTable.building,
+          maintenanceLog: networkSwitchesTable.maintenanceLog,
+        }).from(networkSwitchesTable),
       ]);
+
+      // Filter maintenance windows to the date range
+      const startStr = start.toISOString().slice(0, 10);
+      const endStr = end.toISOString().slice(0, 10);
+      const maintenanceWindows: any[] = [];
+      for (const sw of switchesData) {
+        for (const log of sw.maintenanceLog ?? []) {
+          const d = (log.windowStart || log.createdAt || "").slice(0, 10);
+          if (d >= startStr && d <= endStr) {
+            maintenanceWindows.push({
+              switch: sw.hostname,
+              building: sw.building,
+              author: log.authorName,
+              windowStart: log.windowStart ?? null,
+              windowEnd: log.windowEnd ?? null,
+              body: log.body,
+            });
+          }
+        }
+      }
+
+      // Goal progress derived from projects → objectives
+      const goalProgress = objectivesData
+        .filter((o) => o.status !== "archived")
+        .map((o) => {
+          const linked = projectsData.filter((p) =>
+            Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
+          );
+          const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");
+          const avgProgress = linked.length > 0
+            ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
+            : 0;
+          return {
+            goal: o.title,
+            description: o.description,
+            linkedProjects: linked.length,
+            activeProjects: active.length,
+            avgProgress,
+          };
+        });
 
       const operationalData = {
         period: { startDate, endDate },
@@ -163,11 +252,22 @@ router.post(
         },
         ticketStats: ticketStats[0] ?? { total: 0, categoryCounts: "" },
         entries: entriesData,
+        completedTasks: logItemsData,
         weeklyReports: reportsData,
         openRisksAndIssues: risksData.filter((r) => r.status === "open"),
         mitigatedRisks: risksData.filter((r) => r.status === "mitigated"),
         closedRisks: risksData.filter((r) => r.status === "closed"),
         afterActionReports: aarData,
+        projects: projectsData.map((p) => ({
+          title: p.title,
+          status: p.status,
+          progress: p.progress,
+          targetDate: p.targetDate,
+          newEstimatedDate: p.newEstimatedDate,
+          description: p.description,
+        })),
+        departmentGoals: goalProgress,
+        networkMaintenance: maintenanceWindows,
       };
 
       const systemPrompt = `You are an MSP (Managed Services Provider) account executive writing a professional executive Managed Services Status Report for OculusIT's client, Seward County Community College.
@@ -233,6 +333,11 @@ Contract Valid Until: [date]
           openRisksCount: operationalData.openRisksAndIssues.length,
           aarCount: aarData.length,
           totalTickets: ticketStats[0]?.total ?? 0,
+          completedTasksCount: logItemsData.length,
+          projectsCount: projectsData.length,
+          activeProjectsCount: projectsData.filter((p) => p.status !== "completed" && p.status !== "cancelled").length,
+          goalsCount: goalProgress.length,
+          maintenanceWindowsCount: maintenanceWindows.length,
         },
       });
     } catch (error) {

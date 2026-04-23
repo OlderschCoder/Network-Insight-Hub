@@ -9,6 +9,8 @@ import {
   useListLogItems,
   useListReportTickets,
   useListProjects,
+  useGetReportExtras,
+  useEmailReport,
 } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -18,8 +20,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase } from "lucide-react";
+import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase, Mail, AlertTriangle, Wrench, Target } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -46,10 +57,14 @@ export default function ReportDetail() {
     query: { enabled: !!r?.id },
   } as any);
   const { data: allProjects } = useListProjects();
+  const { data: extras } = useGetReportExtras(id, {
+    query: { enabled: !!r?.id },
+  } as any);
 
   const updateMutation = useUpdateReport();
   const finalizeMutation = useFinalizeReport();
   const zendeskMutation = useSendReportToZendesk();
+  const emailMutation = useEmailReport();
 
   const [draft, setDraft] = useState({
     title: "",
@@ -63,8 +78,17 @@ export default function ReportDetail() {
   const [selectedItemIds, setSelectedItemIds] = useState<number[] | null>(null);
   const [customTasks, setCustomTasks] = useState<{ title: string; userName?: string }[]>([]);
   const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [selectedAarIds, setSelectedAarIds] = useState<number[] | null>(null);
+  const [selectedMaintenanceIds, setSelectedMaintenanceIds] = useState<string[] | null>(null);
+  const [includeGoalProgress, setIncludeGoalProgress] = useState(true);
+  const [includeOpenRisks, setIncludeOpenRisks] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskUser, setNewTaskUser] = useState("");
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailRecipientsText, setEmailRecipientsText] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailFormat, setEmailFormat] = useState<"pdf" | "docx">("pdf");
 
   useEffect(() => {
     if (r) {
@@ -79,6 +103,11 @@ export default function ReportDetail() {
       setSelectedItemIds(Array.isArray(r.selectedItemIds) ? r.selectedItemIds : null);
       setCustomTasks(Array.isArray(r.customTasks) ? r.customTasks : []);
       setProjectIds(Array.isArray(r.projectIds) ? r.projectIds : []);
+      setSelectedAarIds(Array.isArray(r.selectedAfterActionIds) ? r.selectedAfterActionIds : null);
+      setSelectedMaintenanceIds(Array.isArray(r.selectedMaintenanceIds) ? r.selectedMaintenanceIds : null);
+      setIncludeGoalProgress(r.includeGoalProgress !== false);
+      setIncludeOpenRisks(r.includeOpenRisks !== false);
+      setEmailRecipientsText(Array.isArray(r.emailRecipients) ? r.emailRecipients.join(", ") : "");
       setDirty(false);
     }
   }, [r?.id, r?.updatedAt]);
@@ -114,6 +143,68 @@ export default function ReportDetail() {
       : projectIds.filter((x) => x !== pid);
     setProjectIds(next);
     await persist({ projectIds: next });
+  };
+
+  const toggleAar = async (aarId: number, checked: boolean, allIds: number[]) => {
+    const current = selectedAarIds ?? allIds;
+    const next = checked
+      ? Array.from(new Set([...current, aarId]))
+      : current.filter((x) => x !== aarId);
+    setSelectedAarIds(next);
+    await persist({ selectedAfterActionIds: next });
+  };
+  const toggleMaint = async (mId: string, checked: boolean, allIds: string[]) => {
+    const current = selectedMaintenanceIds ?? allIds;
+    const next = checked
+      ? Array.from(new Set([...current, mId]))
+      : current.filter((x) => x !== mId);
+    setSelectedMaintenanceIds(next);
+    await persist({ selectedMaintenanceIds: next });
+  };
+  const toggleIncludeGoals = async (v: boolean) => {
+    setIncludeGoalProgress(v);
+    await persist({ includeGoalProgress: v });
+  };
+  const toggleIncludeRisks = async (v: boolean) => {
+    setIncludeOpenRisks(v);
+    await persist({ includeOpenRisks: v });
+  };
+
+  const handleSendEmail = async () => {
+    const recipients = emailRecipientsText
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && /\S+@\S+\.\S+/.test(s));
+    if (recipients.length === 0) {
+      toast({ title: "Add at least one recipient", variant: "destructive" });
+      return;
+    }
+    try {
+      await emailMutation.mutateAsync({
+        id,
+        data: {
+          recipients,
+          subject: emailSubject.trim() || undefined,
+          message: emailMessage.trim() || undefined,
+          format: emailFormat,
+        } as any,
+      });
+      toast({ title: "Report emailed", description: `Sent to ${recipients.length} recipient${recipients.length === 1 ? "" : "s"}` });
+      setEmailOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const msg = e?.response?.data?.message || e?.message;
+      if (status === 503) {
+        toast({
+          title: "Email is not configured",
+          description: msg || "Ask an admin to add SMTP credentials (SMTP_HOST/PORT/USER/PASS/FROM).",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Email failed", description: msg, variant: "destructive" });
+      }
+    }
   };
 
   const toggleItem = async (itemId: number, checked: boolean) => {
@@ -257,6 +348,80 @@ export default function ReportDetail() {
           <Button variant="outline" onClick={handleZendesk} disabled={zendeskMutation.isPending}>
             <Send className="h-4 w-4 mr-2" /> Send to Zendesk
           </Button>
+        )}
+        {isCIO && (
+          <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Mail className="h-4 w-4 mr-2" /> Email Report
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Email Report</DialogTitle>
+                <DialogDescription>
+                  Send a copy of this report to one or more recipients with the chosen file attached.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Recipients (comma-separated)</Label>
+                  <Textarea
+                    value={emailRecipientsText}
+                    onChange={(e) => setEmailRecipientsText(e.target.value)}
+                    placeholder="alice@sccc.edu, bob@sccc.edu"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Subject (optional)</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder={`IT Department Weekly Report — Week of ${r.weekOf}`}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Message (optional)</Label>
+                  <Textarea
+                    value={emailMessage}
+                    onChange={(e) => setEmailMessage(e.target.value)}
+                    placeholder="Optional intro for the email body…"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Attachment format</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={emailFormat === "pdf" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEmailFormat("pdf")}
+                    >PDF</Button>
+                    <Button
+                      type="button"
+                      variant={emailFormat === "docx" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEmailFormat("docx")}
+                    >Word (.docx)</Button>
+                  </div>
+                </div>
+                {r.lastEmailedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last emailed {format(new Date(r.lastEmailedAt), "PPp")}
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setEmailOpen(false)}>Cancel</Button>
+                <Button onClick={handleSendEmail} disabled={emailMutation.isPending}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  {emailMutation.isPending ? "Sending…" : "Send Email"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 
@@ -559,10 +724,185 @@ export default function ReportDetail() {
         );
       })()}
 
+      {/* Post-Incident Reviews this week */}
+      {(() => {
+        const aars: any[] = (extras as any)?.afterActionReports ?? [];
+        if (aars.length === 0) return null;
+        const allIds = aars.map((a) => a.id as number);
+        const current = selectedAarIds ?? allIds;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                Post-Incident Reviews ({aars.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {canEdit && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Uncheck reviews you don't want included in this report.
+                </p>
+              )}
+              <ul className="space-y-2">
+                {aars.map((a) => {
+                  const checked = current.includes(a.id);
+                  return (
+                    <li key={a.id} className="border rounded p-2">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={checked}
+                          disabled={!canEdit}
+                          onCheckedChange={(v) => toggleAar(a.id, v === true, allIds)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">{a.severity}</Badge>
+                            <Badge variant="outline" className="text-[10px]">{a.status}</Badge>
+                            <Link href={`/after-action/${a.id}`}>
+                              <span className="font-medium hover:underline cursor-pointer">{a.title}</span>
+                            </Link>
+                            {a.building && (
+                              <span className="text-xs text-muted-foreground">· {a.building}</span>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {a.authorName}
+                            </span>
+                          </div>
+                          {a.incident && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.incident}</p>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Network Maintenance windows this week */}
+      {(() => {
+        const maint: any[] = (extras as any)?.maintenance ?? [];
+        if (maint.length === 0) return null;
+        const allIds = maint.map((m) => m.id as string);
+        const current = selectedMaintenanceIds ?? allIds;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-blue-500" />
+                Network Maintenance ({maint.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {canEdit && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Uncheck maintenance windows you don't want included.
+                </p>
+              )}
+              <ul className="space-y-2">
+                {maint.map((m) => {
+                  const checked = current.includes(m.id);
+                  const when = m.windowStart
+                    ? `${m.windowStart}${m.windowEnd ? ` → ${m.windowEnd}` : ""}`
+                    : (m.createdAt ?? "").slice(0, 16).replace("T", " ");
+                  return (
+                    <li key={m.id} className="border rounded p-2">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={checked}
+                          disabled={!canEdit}
+                          onCheckedChange={(v) => toggleMaint(m.id, v === true, allIds)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{m.switchHostname}</span>
+                            <Badge variant="outline" className="text-[10px]">{m.switchBuilding}</Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">{m.authorName}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{when}</p>
+                          {m.body && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.body}</p>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Goal Progress */}
+      {(() => {
+        const goals: any[] = (extras as any)?.goalProgress ?? [];
+        if (goals.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-green-600" />
+                  Department Goals — Progress ({goals.length})
+                </span>
+                {canEdit && (
+                  <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                    <Checkbox
+                      checked={includeGoalProgress}
+                      onCheckedChange={(v) => toggleIncludeGoals(v === true)}
+                    />
+                    Include in this report
+                  </label>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {goals.map((g) => (
+                  <li key={g.id} className="border rounded p-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{g.title}</span>
+                      <Badge variant="outline" className="text-[10px]">{g.status}</Badge>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {g.activeProjectCount} active / {g.projectCount} project{g.projectCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2">
+                      <Progress value={g.avgProgress} className="h-2 flex-1" />
+                      <span className="text-xs text-muted-foreground w-10 text-right">{g.avgProgress}%</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Open risks */}
       {risks.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Open Risks &amp; Issues ({risks.length})</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span>Open Risks &amp; Issues ({risks.length})</span>
+              {canEdit && (
+                <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                  <Checkbox
+                    checked={includeOpenRisks}
+                    onCheckedChange={(v) => toggleIncludeRisks(v === true)}
+                  />
+                  Include in this report
+                </label>
+              )}
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {risks.map((rk: any) => (

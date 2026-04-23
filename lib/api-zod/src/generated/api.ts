@@ -234,6 +234,12 @@ export const ListReportsResponseItem = zod.object({
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
   selectedItemIds: zod.array(zod.number()).optional(),
+  selectedAfterActionIds: zod.array(zod.number()).nullish(),
+  selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  includeGoalProgress: zod.boolean().optional(),
+  includeOpenRisks: zod.boolean().optional(),
+  emailRecipients: zod.array(zod.string()).optional(),
+  lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -273,6 +279,12 @@ export const GetReportResponse = zod.object({
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
   selectedItemIds: zod.array(zod.number()).optional(),
+  selectedAfterActionIds: zod.array(zod.number()).nullish(),
+  selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  includeGoalProgress: zod.boolean().optional(),
+  includeOpenRisks: zod.boolean().optional(),
+  emailRecipients: zod.array(zod.string()).optional(),
+  lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -294,7 +306,12 @@ export const UpdateReportBody = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   status: zod.enum(["draft", "finalized"]).optional(),
-  selectedItemIds: zod.array(zod.number()).optional(),
+  selectedItemIds: zod.array(zod.number()).nullish(),
+  selectedAfterActionIds: zod.array(zod.number()).nullish(),
+  selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  includeGoalProgress: zod.boolean().optional(),
+  includeOpenRisks: zod.boolean().optional(),
+  emailRecipients: zod.array(zod.string().email()).optional(),
 });
 
 export const UpdateReportResponse = zod.object({
@@ -309,6 +326,12 @@ export const UpdateReportResponse = zod.object({
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
   selectedItemIds: zod.array(zod.number()).optional(),
+  selectedAfterActionIds: zod.array(zod.number()).nullish(),
+  selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  includeGoalProgress: zod.boolean().optional(),
+  includeOpenRisks: zod.boolean().optional(),
+  emailRecipients: zod.array(zod.string()).optional(),
+  lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -353,6 +376,42 @@ export const ListReportTicketsResponse = zod.object({
 });
 
 /**
+ * @summary Week-scoped extras (PIRs, maintenance, goal progress) for the report
+ */
+export const GetReportExtrasParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetReportExtrasResponse = zod.object({
+  weekOf: zod.string(),
+  weekStart: zod.string().optional(),
+  weekEnd: zod.string().optional(),
+  afterActionReports: zod.array(zod.record(zod.string(), zod.unknown())),
+  maintenance: zod.array(zod.record(zod.string(), zod.unknown())),
+  goalProgress: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+/**
+ * @summary Email the report (PDF/DOCX attached) to recipients (CIO only)
+ */
+export const EmailReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const EmailReportBody = zod.object({
+  recipients: zod.array(zod.string().email()),
+  subject: zod.string().optional(),
+  message: zod.string().optional(),
+  format: zod.enum(["pdf", "docx"]).optional(),
+});
+
+export const EmailReportResponse = zod.object({
+  sent: zod.boolean().optional(),
+  recipients: zod.array(zod.string()).optional(),
+  filename: zod.string().optional(),
+});
+
+/**
  * @summary Finalize and aggregate a weekly report (CIO only)
  */
 export const FinalizeReportParams = zod.object({
@@ -371,6 +430,12 @@ export const FinalizeReportResponse = zod.object({
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
   selectedItemIds: zod.array(zod.number()).optional(),
+  selectedAfterActionIds: zod.array(zod.number()).nullish(),
+  selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  includeGoalProgress: zod.boolean().optional(),
+  includeOpenRisks: zod.boolean().optional(),
+  emailRecipients: zod.array(zod.string()).optional(),
+  lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),

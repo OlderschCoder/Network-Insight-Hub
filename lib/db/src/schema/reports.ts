@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, varchar, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, timestamp, json, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -17,6 +17,12 @@ export const reportsTable = pgTable("reports", {
   selectedItemIds: json("selected_item_ids").$type<number[] | null>().default(null),
   customTasks: json("custom_tasks").$type<{ title: string; userName?: string }[]>().default([]),
   projectIds: json("project_ids").$type<number[]>().default([]),
+  selectedAfterActionIds: json("selected_after_action_ids").$type<number[] | null>().default(null),
+  selectedMaintenanceIds: json("selected_maintenance_ids").$type<string[] | null>().default(null),
+  includeGoalProgress: boolean("include_goal_progress").notNull().default(true),
+  includeOpenRisks: boolean("include_open_risks").notNull().default(true),
+  emailRecipients: json("email_recipients").$type<string[]>().default([]),
+  lastEmailedAt: timestamp("last_emailed_at"),
   contributorCount: integer("contributor_count").default(0),
   entryCount: integer("entry_count").default(0),
   createdBy: integer("created_by").references(() => usersTable.id),
