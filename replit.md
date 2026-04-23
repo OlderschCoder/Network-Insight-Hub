@@ -88,8 +88,13 @@ All routes under `/api/`:
 ## Export Features
 
 - DOCX export via `docx` npm package
-- XLSX export via `exceljs` npm package
+- XLSX export via `exceljs` npm package (multi-sheet: Summary, Weekly Logs, Tasks, Tickets Resolved, Projects, Post-Incident Reviews, Network Maintenance, Goal Progress, Open Risks)
+- PDF export via `pdfkit`
 - Zendesk ticket creation
+- Email Report (CIO): POST `/api/reports/:id/email` sends a PDF or DOCX attachment via SMTP. Requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`. Returns 503 with EMAIL_NOT_CONFIGURED if missing.
+- Shared report builders live in `artifacts/api-server/src/lib/report_export.ts` (used by both export routes and email route).
+- Report editor opt-ins persisted on `reports` table: `selectedAfterActionIds`, `selectedMaintenanceIds`, `includeGoalProgress`, `includeOpenRisks`, `emailRecipients`, `lastEmailedAt`.
+- Week-scoped extras endpoint: GET `/api/reports/:id/extras` (CIO) returns this week's PIRs, maintenance windows, and a goal-progress snapshot for the report editor cards.
 
 ## Frontend Pages
 
