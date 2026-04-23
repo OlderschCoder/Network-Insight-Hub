@@ -37,18 +37,18 @@ const HELPDESK_STEPS: Step[] = [
       <>
         Each time you finish a ticket, project task, install, or piece of
         research, click <strong>Quick Add Item</strong> at the top of the page
-        (or open <Link href="/items" className="underline">My Items</Link>).
+        (or open <Link href="/items" className="underline">Tasks Completed</Link>).
         Give it a short title, pick a category (Task, Research, Documentation,
         Incident…), and add notes. Resolved Zendesk tickets are pulled in
         automatically — you do not need to re-enter them.
       </>
     ),
-    cta: { href: "/items", label: "Go to My Items" },
+    cta: { href: "/items", label: "Go to Tasks Completed" },
   },
   {
     num: 2,
     icon: <FileText className="h-4 w-4" />,
-    title: "Friday — turn your items into a Weekly Log",
+    title: "Friday — turn your tasks completed into a Weekly Log",
     body: (
       <>
         On Friday open <Link href="/entries/new" className="underline">Generate

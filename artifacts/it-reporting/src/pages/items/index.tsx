@@ -84,7 +84,7 @@ export default function ItemsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Items</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Tasks Completed</h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
             <strong>Step 1 of the weekly workflow.</strong> Log every completed
             ticket, project task, install, or piece of research as you finish

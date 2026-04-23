@@ -66,7 +66,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuButton asChild isActive={location.startsWith("/items")}>
                       <Link href="/items">
                         <ListChecks className="mr-2" />
-                        My Items
+                        Tasks Completed
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

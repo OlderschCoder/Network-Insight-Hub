@@ -200,7 +200,7 @@ export default function ReportDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Weekly Logs" value={agg.totalEntries ?? 0} />
         <MetricCard label="Contributors" value={agg.contributorCount ?? 0} />
-        <MetricCard label="Items Logged" value={items.length} />
+        <MetricCard label="Tasks Completed" value={items.length} />
         <MetricCard label="Tickets Resolved" value={agg.totalTickets ?? 0} />
       </div>
 
