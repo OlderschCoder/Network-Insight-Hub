@@ -210,6 +210,11 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     nextWeekPlans: z.string().optional(),
     status: z.enum(["draft", "finalized"]).optional(),
     selectedItemIds: z.array(z.number()).nullable().optional(),
+    customTasks: z.array(z.object({
+      title: z.string().min(1),
+      userName: z.string().optional(),
+    })).optional(),
+    projectIds: z.array(z.number()).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });

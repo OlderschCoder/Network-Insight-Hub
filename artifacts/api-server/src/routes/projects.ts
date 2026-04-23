@@ -12,6 +12,16 @@ const attachmentSchema = z.object({
   addedAt: z.string().optional(),
 });
 
+const decisionSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(["pending", "decided"]),
+  decidedBy: z.string().optional(),
+  decidedAt: z.string().optional(),
+  createdAt: z.string().optional(),
+});
+
 const projectBodySchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -20,6 +30,7 @@ const projectBodySchema = z.object({
   targetDate: z.string().optional().nullable(),
   newEstimatedDate: z.string().optional().nullable(),
   attachments: z.array(attachmentSchema).optional(),
+  pendingDecisions: z.array(decisionSchema).optional(),
   assigneeIds: z.array(z.number().int()).optional(),
 });
 

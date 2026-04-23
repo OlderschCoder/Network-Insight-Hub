@@ -57,9 +57,15 @@ export default function ProjectDetail() {
   });
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [attachments, setAttachments] = useState<{ name: string; url: string; addedAt?: string }[]>([]);
+  const [decisions, setDecisions] = useState<{
+    id: string; title: string; description?: string;
+    status: "pending" | "decided"; decidedBy?: string; decidedAt?: string; createdAt?: string;
+  }[]>([]);
   const [dirty, setDirty] = useState(false);
   const [newAttName, setNewAttName] = useState("");
   const [newAttUrl, setNewAttUrl] = useState("");
+  const [newDecTitle, setNewDecTitle] = useState("");
+  const [newDecDesc, setNewDecDesc] = useState("");
 
   useEffect(() => {
     if (p) {
@@ -73,6 +79,7 @@ export default function ProjectDetail() {
       });
       setAssigneeIds((p.assignees ?? []).map((a: any) => a.userId));
       setAttachments(Array.isArray(p.attachments) ? p.attachments : []);
+      setDecisions(Array.isArray(p.pendingDecisions) ? p.pendingDecisions : []);
       setDirty(false);
     }
   }, [p?.id, p?.updatedAt]);
@@ -111,6 +118,39 @@ export default function ProjectDetail() {
     setDirty(true);
   };
 
+  const addDecision = () => {
+    if (!newDecTitle.trim()) return;
+    setDecisions((d) => [
+      ...d,
+      {
+        id: `dec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        title: newDecTitle.trim(),
+        description: newDecDesc.trim() || undefined,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setNewDecTitle("");
+    setNewDecDesc("");
+    setDirty(true);
+  };
+  const toggleDecisionStatus = (id: string) => {
+    setDecisions((d) =>
+      d.map((x) =>
+        x.id === id
+          ? x.status === "pending"
+            ? { ...x, status: "decided", decidedAt: new Date().toISOString() }
+            : { ...x, status: "pending", decidedAt: undefined }
+          : x,
+      ),
+    );
+    setDirty(true);
+  };
+  const removeDecision = (id: string) => {
+    setDecisions((d) => d.filter((x) => x.id !== id));
+    setDirty(true);
+  };
+
   const handleSave = async () => {
     try {
       await updateMutation.mutateAsync({
@@ -121,6 +161,7 @@ export default function ProjectDetail() {
           newEstimatedDate: draft.newEstimatedDate || null,
           assigneeIds,
           attachments,
+          pendingDecisions: decisions,
         } as any,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -358,6 +399,94 @@ export default function ProjectDetail() {
           <p className="text-xs text-muted-foreground">
             Paste links to SharePoint, Google Drive, or other shared documents.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Pending Decisions</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {decisions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No decisions tracked yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {decisions.map((d) => (
+                <li
+                  key={d.id}
+                  className={`border rounded p-2 text-sm ${
+                    d.status === "decided" ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={d.status === "decided"}
+                      onCheckedChange={() => isCIO && toggleDecisionStatus(d.id)}
+                      disabled={!isCIO}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`font-medium ${
+                            d.status === "decided" ? "line-through" : ""
+                          }`}
+                        >
+                          {d.title}
+                        </span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {d.status === "decided" ? "Decided" : "Pending"}
+                        </Badge>
+                        {d.decidedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(d.decidedAt), "MMM d, yyyy")}
+                          </span>
+                        )}
+                      </div>
+                      {d.description && (
+                        <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">
+                          {d.description}
+                        </p>
+                      )}
+                    </div>
+                    {isCIO && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => removeDecision(d.id)}
+                        aria-label="Remove decision"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {isCIO && (
+            <div className="space-y-2 pt-2 border-t">
+              <Input
+                placeholder="Decision needed (e.g. Pick vendor for switches)"
+                value={newDecTitle}
+                onChange={(e) => setNewDecTitle(e.target.value)}
+              />
+              <Textarea
+                rows={2}
+                placeholder="Optional context…"
+                value={newDecDesc}
+                onChange={(e) => setNewDecDesc(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addDecision}
+                disabled={!newDecTitle.trim()}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add decision
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

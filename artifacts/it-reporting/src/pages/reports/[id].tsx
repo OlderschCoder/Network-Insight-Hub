@@ -8,6 +8,7 @@ import {
   useGetAggregateReport,
   useListLogItems,
   useListReportTickets,
+  useListProjects,
 } from "@workspace/api-client-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
-import { ArrowLeft, Lock, Send, Download, Save } from "lucide-react";
+import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +45,7 @@ export default function ReportDetail() {
   const { data: ticketsResponse } = useListReportTickets(id, {
     query: { enabled: !!r?.id },
   } as any);
+  const { data: allProjects } = useListProjects();
 
   const updateMutation = useUpdateReport();
   const finalizeMutation = useFinalizeReport();
@@ -58,6 +61,10 @@ export default function ReportDetail() {
   });
   const [dirty, setDirty] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<number[] | null>(null);
+  const [customTasks, setCustomTasks] = useState<{ title: string; userName?: string }[]>([]);
+  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskUser, setNewTaskUser] = useState("");
 
   useEffect(() => {
     if (r) {
@@ -70,9 +77,44 @@ export default function ReportDetail() {
         nextWeekPlans: r.nextWeekPlans ?? "",
       });
       setSelectedItemIds(Array.isArray(r.selectedItemIds) ? r.selectedItemIds : null);
+      setCustomTasks(Array.isArray(r.customTasks) ? r.customTasks : []);
+      setProjectIds(Array.isArray(r.projectIds) ? r.projectIds : []);
       setDirty(false);
     }
   }, [r?.id, r?.updatedAt]);
+
+  const persist = async (patch: Record<string, unknown>) => {
+    try {
+      await updateMutation.mutateAsync({ id, data: patch as any });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const addCustomTask = async () => {
+    if (!newTaskTitle.trim()) return;
+    const next = [
+      ...customTasks,
+      { title: newTaskTitle.trim(), userName: newTaskUser.trim() || undefined },
+    ];
+    setCustomTasks(next);
+    setNewTaskTitle("");
+    setNewTaskUser("");
+    await persist({ customTasks: next });
+  };
+  const removeCustomTask = async (idx: number) => {
+    const next = customTasks.filter((_, i) => i !== idx);
+    setCustomTasks(next);
+    await persist({ customTasks: next });
+  };
+  const toggleProject = async (pid: number, checked: boolean) => {
+    const next = checked
+      ? Array.from(new Set([...projectIds, pid]))
+      : projectIds.filter((x) => x !== pid);
+    setProjectIds(next);
+    await persist({ projectIds: next });
+  };
 
   const toggleItem = async (itemId: number, checked: boolean) => {
     const allIds = ((weekItems ?? []) as any[]).map((it: any) => it.id as number);
@@ -340,9 +382,81 @@ export default function ReportDetail() {
         </CardContent>
       </Card>
 
-      {/* Closed Zendesk tickets */}
+      {/* Additional / custom tasks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Tasks ({customTasks.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {customTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No additional tasks. Use this to add work that wasn't logged in the system.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {customTasks.map((t, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm border rounded p-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{t.title}</span>
+                    {t.userName && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {t.userName}
+                      </span>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => removeCustomTask(i)}
+                      aria-label="Remove task"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+              <Input
+                placeholder="Task description"
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                className="flex-1"
+              />
+              <Input
+                placeholder="Assignee (optional)"
+                value={newTaskUser}
+                onChange={(e) => setNewTaskUser(e.target.value)}
+                className="sm:w-48"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addCustomTask}
+                disabled={!newTaskTitle.trim()}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Closed Zendesk tickets — per-user totals */}
       {(() => {
         const tickets: any[] = (ticketsResponse as any)?.tickets ?? [];
+        const counts = new Map<string, number>();
+        let unassigned = 0;
+        for (const t of tickets) {
+          const name = t.assigneeName as string | null | undefined;
+          if (!name) unassigned++;
+          else counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+        const rows = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
         return (
           <Card>
             <CardHeader>
@@ -355,22 +469,90 @@ export default function ReportDetail() {
                 </p>
               ) : (
                 <ul className="space-y-1.5 text-sm">
-                  {tickets.map((t: any) => (
-                    <li key={t.id} className="flex items-start gap-2">
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        #{t.id}
+                  {rows.map(([name, n]) => (
+                    <li key={name} className="flex items-center justify-between gap-2 border rounded p-2">
+                      <span className="font-medium truncate">{name}</span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {n} ticket{n !== 1 ? "s" : ""}
                       </Badge>
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate">{t.subject}</p>
-                        {t.assigneeName && (
-                          <p className="text-xs text-muted-foreground">
-                            {t.assigneeName}
-                          </p>
+                    </li>
+                  ))}
+                  {unassigned > 0 && (
+                    <li className="flex items-center justify-between gap-2 border rounded p-2 text-muted-foreground">
+                      <span>Unassigned</span>
+                      <Badge variant="outline" className="shrink-0">
+                        {unassigned}
+                      </Badge>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Linked Projects */}
+      {(() => {
+        const projects: any[] = (allProjects ?? []) as any[];
+        const linked = projects.filter((p: any) => projectIds.includes(p.id));
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Projects in this Report ({linked.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {linked.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {canEdit ? "Pick projects below to include in this report." : "No projects linked."}
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {linked.map((p: any) => (
+                    <li key={p.id} className="border rounded p-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Briefcase className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Link href={`/projects/${p.id}`}>
+                          <span className="font-medium hover:underline cursor-pointer">{p.title}</span>
+                        </Link>
+                        <Badge variant="outline" className="text-[10px]">{p.status}</Badge>
+                        {p.targetDate && (
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            Target: {format(new Date(p.targetDate + "T00:00:00"), "MMM d, yyyy")}
+                          </span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-2">
+                        <Progress value={p.progress ?? 0} className="h-2 flex-1" />
+                        <span className="text-xs text-muted-foreground w-10 text-right">
+                          {p.progress ?? 0}%
+                        </span>
                       </div>
                     </li>
                   ))}
                 </ul>
+              )}
+              {canEdit && projects.length > 0 && (
+                <div className="pt-2 border-t space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Available projects</p>
+                  <div className="grid sm:grid-cols-2 gap-1.5 max-h-56 overflow-auto">
+                    {projects.map((p: any) => (
+                      <label
+                        key={p.id}
+                        className="flex items-center gap-2 text-sm cursor-pointer p-1"
+                      >
+                        <Checkbox
+                          checked={projectIds.includes(p.id)}
+                          onCheckedChange={(v) => toggleProject(p.id, v === true)}
+                        />
+                        <span className="truncate">{p.title}</span>
+                        <Badge variant="outline" className="text-[10px] ml-auto shrink-0">
+                          {p.status}
+                        </Badge>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

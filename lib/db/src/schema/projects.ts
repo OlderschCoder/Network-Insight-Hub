@@ -9,6 +9,16 @@ export type ProjectAttachment = {
   addedAt?: string;
 };
 
+export type ProjectDecision = {
+  id: string;
+  title: string;
+  description?: string;
+  status: "pending" | "decided";
+  decidedBy?: string;
+  decidedAt?: string;
+  createdAt?: string;
+};
+
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 500 }).notNull(),
@@ -18,6 +28,7 @@ export const projectsTable = pgTable("projects", {
   targetDate: varchar("target_date", { length: 20 }),
   newEstimatedDate: varchar("new_estimated_date", { length: 20 }),
   attachments: json("attachments").$type<ProjectAttachment[]>().default([]),
+  pendingDecisions: json("pending_decisions").$type<ProjectDecision[]>().default([]),
   createdBy: integer("created_by").references(() => usersTable.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
