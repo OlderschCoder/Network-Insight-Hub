@@ -9,3 +9,4 @@ export * from "./after_action";
 export * from "./quotes";
 export * from "./processes";
 export * from "./projects";
+export * from "./strategic_objectives";

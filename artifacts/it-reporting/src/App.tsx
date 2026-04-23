@@ -33,6 +33,7 @@ import ProcessDetail from "@/pages/processes/[id]";
 import ProjectsIndex from "@/pages/projects/index";
 import NewProject from "@/pages/projects/new";
 import ProjectDetail from "@/pages/projects/[id]";
+import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,8 @@ function Router() {
       <Route path="/projects" component={() => <ProtectedRoute component={ProjectsIndex} />} />
       <Route path="/projects/new" component={() => <ProtectedRoute component={NewProject} />} />
       <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
+
+      <Route path="/strategic-objectives" component={() => <ProtectedRoute component={StrategicObjectivesIndex} />} />
 
       <Route path="/risks" component={() => <ProtectedRoute component={Risks} />} />
       <Route path="/risks/new" component={() => <ProtectedRoute component={NewRisk} />} />

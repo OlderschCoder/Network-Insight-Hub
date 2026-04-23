@@ -31,6 +31,7 @@ const projectBodySchema = z.object({
   newEstimatedDate: z.string().optional().nullable(),
   attachments: z.array(attachmentSchema).optional(),
   pendingDecisions: z.array(decisionSchema).optional(),
+  strategicObjectiveIds: z.array(z.number().int()).optional(),
   assigneeIds: z.array(z.number().int()).optional(),
 });
 

@@ -30,6 +30,8 @@ tags:
     description: Dashboard and aggregation
   - name: projects
     description: Project management
+  - name: strategic-objectives
+    description: Strategic objectives
 paths:
   /healthz:
     get:
@@ -670,6 +672,95 @@ paths:
     delete:
       operationId: deleteProject
       tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # STRATEGIC OBJECTIVES
+  /strategic-objectives:
+    get:
+      operationId: listStrategicObjectives
+      tags: [strategic-objectives]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategicObjective"
+    post:
+      operationId: createStrategicObjective
+      tags: [strategic-objectives]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategicObjectiveBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+  /strategic-objectives/{id}:
+    get:
+      operationId: getStrategicObjective
+      tags: [strategic-objectives]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+    patch:
+      operationId: updateStrategicObjective
+      tags: [strategic-objectives]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategicObjectiveBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+    delete:
+      operationId: deleteStrategicObjective
+      tags: [strategic-objectives]
       parameters:
         - name: id
           in: path
@@ -1655,6 +1746,44 @@ components:
         role:
           type: string
 
+    StrategicObjective:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived]
+        createdBy:
+          type: integer
+          nullable: true
+        createdByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status]
+
+    StrategicObjectiveBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived]
+      required: [title]
+
     Project:
       type: object
       properties:
@@ -1680,6 +1809,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProjectAttachment"
+        strategicObjectiveIds:
+          type: array
+          items:
+            type: integer
         assignees:
           type: array
           items:
@@ -1724,6 +1857,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProjectAttachment"
+        strategicObjectiveIds:
+          type: array
+          items:
+            type: integer
         assigneeIds:
           type: array
           items:

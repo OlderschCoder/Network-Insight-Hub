@@ -32,6 +32,7 @@ import type {
   DashboardSummary,
   DeleteProject200,
   DeleteReport200,
+  DeleteStrategicObjective200,
   Entry,
   ErrorResponse,
   GetAggregateReportParams,
@@ -55,6 +56,8 @@ import type {
   Report,
   ReportTicketsResponse,
   Risk,
+  StrategicObjective,
+  StrategicObjectiveBody,
   UpdateLogItemBody,
   UpdateProcessBody,
   UpdateReportBody,
@@ -2898,6 +2901,400 @@ export const useDeleteProject = <
   TContext
 > => {
   return useMutation(getDeleteProjectMutationOptions(options));
+};
+
+export const getListStrategicObjectivesUrl = () => {
+  return `/api/strategic-objectives`;
+};
+
+export const listStrategicObjectives = async (
+  options?: RequestInit,
+): Promise<StrategicObjective[]> => {
+  return customFetch<StrategicObjective[]>(getListStrategicObjectivesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListStrategicObjectivesQueryKey = () => {
+  return [`/api/strategic-objectives`] as const;
+};
+
+export const getListStrategicObjectivesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStrategicObjectives>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStrategicObjectives>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListStrategicObjectivesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStrategicObjectives>>
+  > = ({ signal }) => listStrategicObjectives({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStrategicObjectives>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStrategicObjectivesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStrategicObjectives>>
+>;
+export type ListStrategicObjectivesQueryError = ErrorType<unknown>;
+
+export function useListStrategicObjectives<
+  TData = Awaited<ReturnType<typeof listStrategicObjectives>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listStrategicObjectives>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStrategicObjectivesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreateStrategicObjectiveUrl = () => {
+  return `/api/strategic-objectives`;
+};
+
+export const createStrategicObjective = async (
+  strategicObjectiveBody: StrategicObjectiveBody,
+  options?: RequestInit,
+): Promise<StrategicObjective> => {
+  return customFetch<StrategicObjective>(getCreateStrategicObjectiveUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(strategicObjectiveBody),
+  });
+};
+
+export const getCreateStrategicObjectiveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStrategicObjective>>,
+    TError,
+    { data: BodyType<StrategicObjectiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createStrategicObjective>>,
+  TError,
+  { data: BodyType<StrategicObjectiveBody> },
+  TContext
+> => {
+  const mutationKey = ["createStrategicObjective"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createStrategicObjective>>,
+    { data: BodyType<StrategicObjectiveBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createStrategicObjective(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateStrategicObjectiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createStrategicObjective>>
+>;
+export type CreateStrategicObjectiveMutationBody =
+  BodyType<StrategicObjectiveBody>;
+export type CreateStrategicObjectiveMutationError = ErrorType<unknown>;
+
+export const useCreateStrategicObjective = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createStrategicObjective>>,
+    TError,
+    { data: BodyType<StrategicObjectiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createStrategicObjective>>,
+  TError,
+  { data: BodyType<StrategicObjectiveBody> },
+  TContext
+> => {
+  return useMutation(getCreateStrategicObjectiveMutationOptions(options));
+};
+
+export const getGetStrategicObjectiveUrl = (id: number) => {
+  return `/api/strategic-objectives/${id}`;
+};
+
+export const getStrategicObjective = async (
+  id: number,
+  options?: RequestInit,
+): Promise<StrategicObjective> => {
+  return customFetch<StrategicObjective>(getGetStrategicObjectiveUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStrategicObjectiveQueryKey = (id: number) => {
+  return [`/api/strategic-objectives/${id}`] as const;
+};
+
+export const getGetStrategicObjectiveQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStrategicObjective>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStrategicObjective>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStrategicObjectiveQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStrategicObjective>>
+  > = ({ signal }) => getStrategicObjective(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStrategicObjective>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStrategicObjectiveQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStrategicObjective>>
+>;
+export type GetStrategicObjectiveQueryError = ErrorType<unknown>;
+
+export function useGetStrategicObjective<
+  TData = Awaited<ReturnType<typeof getStrategicObjective>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStrategicObjective>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStrategicObjectiveQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateStrategicObjectiveUrl = (id: number) => {
+  return `/api/strategic-objectives/${id}`;
+};
+
+export const updateStrategicObjective = async (
+  id: number,
+  strategicObjectiveBody: StrategicObjectiveBody,
+  options?: RequestInit,
+): Promise<StrategicObjective> => {
+  return customFetch<StrategicObjective>(getUpdateStrategicObjectiveUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(strategicObjectiveBody),
+  });
+};
+
+export const getUpdateStrategicObjectiveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStrategicObjective>>,
+    TError,
+    { id: number; data: BodyType<StrategicObjectiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateStrategicObjective>>,
+  TError,
+  { id: number; data: BodyType<StrategicObjectiveBody> },
+  TContext
+> => {
+  const mutationKey = ["updateStrategicObjective"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateStrategicObjective>>,
+    { id: number; data: BodyType<StrategicObjectiveBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateStrategicObjective(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateStrategicObjectiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateStrategicObjective>>
+>;
+export type UpdateStrategicObjectiveMutationBody =
+  BodyType<StrategicObjectiveBody>;
+export type UpdateStrategicObjectiveMutationError = ErrorType<unknown>;
+
+export const useUpdateStrategicObjective = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStrategicObjective>>,
+    TError,
+    { id: number; data: BodyType<StrategicObjectiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateStrategicObjective>>,
+  TError,
+  { id: number; data: BodyType<StrategicObjectiveBody> },
+  TContext
+> => {
+  return useMutation(getUpdateStrategicObjectiveMutationOptions(options));
+};
+
+export const getDeleteStrategicObjectiveUrl = (id: number) => {
+  return `/api/strategic-objectives/${id}`;
+};
+
+export const deleteStrategicObjective = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteStrategicObjective200> => {
+  return customFetch<DeleteStrategicObjective200>(
+    getDeleteStrategicObjectiveUrl(id),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteStrategicObjectiveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteStrategicObjective>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteStrategicObjective>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteStrategicObjective"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteStrategicObjective>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteStrategicObjective(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteStrategicObjectiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteStrategicObjective>>
+>;
+
+export type DeleteStrategicObjectiveMutationError = ErrorType<unknown>;
+
+export const useDeleteStrategicObjective = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteStrategicObjective>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteStrategicObjective>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteStrategicObjectiveMutationOptions(options));
 };
 
 export const getListLogItemsUrl = (params?: ListLogItemsParams) => {

@@ -29,6 +29,7 @@ export const projectsTable = pgTable("projects", {
   newEstimatedDate: varchar("new_estimated_date", { length: 20 }),
   attachments: json("attachments").$type<ProjectAttachment[]>().default([]),
   pendingDecisions: json("pending_decisions").$type<ProjectDecision[]>().default([]),
+  strategicObjectiveIds: json("strategic_objective_ids").$type<number[]>().default([]),
   createdBy: integer("created_by").references(() => usersTable.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

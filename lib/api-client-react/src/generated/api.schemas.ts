@@ -419,6 +419,39 @@ export interface ProjectAssignee {
   role?: string;
 }
 
+export type StrategicObjectiveStatus =
+  (typeof StrategicObjectiveStatus)[keyof typeof StrategicObjectiveStatus];
+
+export const StrategicObjectiveStatus = {
+  active: "active",
+  archived: "archived",
+} as const;
+
+export interface StrategicObjective {
+  id: number;
+  title: string;
+  description?: string | null;
+  status: StrategicObjectiveStatus;
+  createdBy?: number | null;
+  createdByName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type StrategicObjectiveBodyStatus =
+  (typeof StrategicObjectiveBodyStatus)[keyof typeof StrategicObjectiveBodyStatus];
+
+export const StrategicObjectiveBodyStatus = {
+  active: "active",
+  archived: "archived",
+} as const;
+
+export interface StrategicObjectiveBody {
+  title: string;
+  description?: string | null;
+  status?: StrategicObjectiveBodyStatus;
+}
+
 export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
 
 export const ProjectStatus = {
@@ -438,6 +471,7 @@ export interface Project {
   targetDate?: string | null;
   newEstimatedDate?: string | null;
   attachments?: ProjectAttachment[];
+  strategicObjectiveIds?: number[];
   assignees?: ProjectAssignee[];
   risks?: Risk[];
   createdBy?: number | null;
@@ -469,6 +503,7 @@ export interface ProjectBody {
   targetDate?: string | null;
   newEstimatedDate?: string | null;
   attachments?: ProjectAttachment[];
+  strategicObjectiveIds?: number[];
   assigneeIds?: number[];
 }
 
@@ -809,6 +844,10 @@ export type ListProcessesParams = {
 };
 
 export type DeleteProject200 = {
+  success?: boolean;
+};
+
+export type DeleteStrategicObjective200 = {
   success?: boolean;
 };
 

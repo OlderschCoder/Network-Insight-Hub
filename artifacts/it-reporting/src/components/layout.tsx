@@ -27,6 +27,7 @@ import {
   Sparkles,
   BookOpen,
   Briefcase,
+  Target,
   LogOut
 } from "lucide-react";
 
@@ -92,6 +93,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/projects">
                         <Briefcase className="mr-2" />
                         Projects
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/strategic-objectives")}>
+                      <Link href="/strategic-objectives">
+                        <Target className="mr-2" />
+                        Strategic Objectives
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

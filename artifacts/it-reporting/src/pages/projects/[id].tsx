@@ -5,6 +5,7 @@ import {
   useUpdateProject,
   useDeleteProject,
   useListUsers,
+  useListStrategicObjectives,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ export default function ProjectDetail() {
 
   const { data: project, isLoading } = useGetProject(id);
   const { data: users } = useListUsers();
+  const { data: objectives } = useListStrategicObjectives();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
 
@@ -56,6 +58,7 @@ export default function ProjectDetail() {
     newEstimatedDate: "",
   });
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
+  const [strategicObjectiveIds, setStrategicObjectiveIds] = useState<number[]>([]);
   const [attachments, setAttachments] = useState<{ name: string; url: string; addedAt?: string }[]>([]);
   const [decisions, setDecisions] = useState<{
     id: string; title: string; description?: string;
@@ -78,6 +81,7 @@ export default function ProjectDetail() {
         newEstimatedDate: p.newEstimatedDate ?? "",
       });
       setAssigneeIds((p.assignees ?? []).map((a: any) => a.userId));
+      setStrategicObjectiveIds(Array.isArray(p.strategicObjectiveIds) ? p.strategicObjectiveIds : []);
       setAttachments(Array.isArray(p.attachments) ? p.attachments : []);
       setDecisions(Array.isArray(p.pendingDecisions) ? p.pendingDecisions : []);
       setDirty(false);
@@ -100,6 +104,13 @@ export default function ProjectDetail() {
     setDraft((d) => ({ ...d, [field]: value }));
     setDirty(true);
   };
+  const toggleObjective = (objId: number, checked: boolean) => {
+    setStrategicObjectiveIds((ids) =>
+      checked ? Array.from(new Set([...ids, objId])) : ids.filter((x) => x !== objId),
+    );
+    setDirty(true);
+  };
+
   const toggleAssignee = (userId: number, checked: boolean) => {
     setAssigneeIds((ids) =>
       checked ? Array.from(new Set([...ids, userId])) : ids.filter((x) => x !== userId),
@@ -158,6 +169,7 @@ export default function ProjectDetail() {
         data: {
           ...draft,
           targetDate: draft.targetDate || null,
+          strategicObjectiveIds,
           newEstimatedDate: draft.newEstimatedDate || null,
           assigneeIds,
           attachments,
@@ -301,6 +313,48 @@ export default function ProjectDetail() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Strategic Objectives</CardTitle></CardHeader>
+        <CardContent>
+          {(() => {
+            const objList = (objectives ?? []) as any[];
+            const visible = objList.filter(
+              (o: any) => o.status !== "archived" || strategicObjectiveIds.includes(o.id),
+            );
+            if (visible.length === 0) {
+              return (
+                <p className="text-sm text-muted-foreground">
+                  No strategic objectives yet. Add them on the Strategic Objectives page first.
+                </p>
+              );
+            }
+            return (
+              <div className="space-y-1.5">
+                {visible.map((o: any) => (
+                  <label
+                    key={o.id}
+                    className="flex items-start gap-2 text-sm cursor-pointer p-1"
+                  >
+                    <Checkbox
+                      checked={strategicObjectiveIds.includes(o.id)}
+                      onCheckedChange={(v) => toggleObjective(o.id, v === true)}
+                      disabled={!isCIO}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      {o.title}
+                      {o.status === "archived" && (
+                        <span className="text-xs text-muted-foreground ml-2">(archived)</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

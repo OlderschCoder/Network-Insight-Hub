@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useCreateProject, useListUsers } from "@workspace/api-client-react";
+import { useCreateProject, useListUsers, useListStrategicObjectives } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ export default function NewProject() {
   const queryClient = useQueryClient();
   const createMutation = useCreateProject();
   const { data: users } = useListUsers();
+  const { data: objectives } = useListStrategicObjectives();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -31,6 +32,7 @@ export default function NewProject() {
   const [progress, setProgress] = useState(0);
   const [targetDate, setTargetDate] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
+  const [strategicObjectiveIds, setStrategicObjectiveIds] = useState<number[]>([]);
 
   if (!isCIO) {
     return (
@@ -62,6 +64,7 @@ export default function NewProject() {
           progress,
           targetDate: targetDate || null,
           assigneeIds,
+          strategicObjectiveIds,
         } as any,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -73,6 +76,15 @@ export default function NewProject() {
   };
 
   const userList = (users ?? []) as any[];
+  const objectiveList = ((objectives ?? []) as any[]).filter(
+    (o: any) => o.status !== "archived",
+  );
+
+  const toggleObjective = (id: number, checked: boolean) => {
+    setStrategicObjectiveIds((ids) =>
+      checked ? Array.from(new Set([...ids, id])) : ids.filter((x) => x !== id),
+    );
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -146,6 +158,28 @@ export default function NewProject() {
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Strategic Objectives</Label>
+              {objectiveList.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No active strategic objectives yet. Add some on the Strategic Objectives page.
+                </p>
+              ) : (
+                <div className="space-y-1.5 border rounded p-3 max-h-56 overflow-auto">
+                  {objectiveList.map((o: any) => (
+                    <label key={o.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={strategicObjectiveIds.includes(o.id)}
+                        onCheckedChange={(v) => toggleObjective(o.id, v === true)}
+                        className="mt-0.5"
+                      />
+                      <span>{o.title}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

@@ -15,6 +15,7 @@ import quotesRouter from "./quotes";
 import zendeskRouter from "./zendesk";
 import processesRouter from "./processes";
 import projectsRouter from "./projects";
+import strategicObjectivesRouter from "./strategic_objectives";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use("/quotes", quotesRouter);
 router.use("/zendesk", zendeskRouter);
 router.use("/processes", processesRouter);
 router.use("/projects", projectsRouter);
+router.use("/strategic-objectives", strategicObjectivesRouter);
 
 export default router;

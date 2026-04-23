@@ -654,6 +654,7 @@ export const ListProjectsResponseItem = zod.object({
       }),
     )
     .optional(),
+  strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(
       zod.object({
@@ -719,6 +720,7 @@ export const CreateProjectBody = zod.object({
       }),
     )
     .optional(),
+  strategicObjectiveIds: zod.array(zod.number()).optional(),
   assigneeIds: zod.array(zod.number()).optional(),
 });
 
@@ -749,6 +751,7 @@ export const GetProjectResponse = zod.object({
       }),
     )
     .optional(),
+  strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(
       zod.object({
@@ -817,6 +820,7 @@ export const UpdateProjectBody = zod.object({
       }),
     )
     .optional(),
+  strategicObjectiveIds: zod.array(zod.number()).optional(),
   assigneeIds: zod.array(zod.number()).optional(),
 });
 
@@ -843,6 +847,7 @@ export const UpdateProjectResponse = zod.object({
       }),
     )
     .optional(),
+  strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(
       zod.object({
@@ -887,6 +892,70 @@ export const DeleteProjectParams = zod.object({
 });
 
 export const DeleteProjectResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+export const ListStrategicObjectivesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "archived"]),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+export const ListStrategicObjectivesResponse = zod.array(
+  ListStrategicObjectivesResponseItem,
+);
+
+export const CreateStrategicObjectiveBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "archived"]).optional(),
+});
+
+export const GetStrategicObjectiveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetStrategicObjectiveResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "archived"]),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+export const UpdateStrategicObjectiveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateStrategicObjectiveBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "archived"]).optional(),
+});
+
+export const UpdateStrategicObjectiveResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "archived"]),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+export const DeleteStrategicObjectiveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteStrategicObjectiveResponse = zod.object({
   success: zod.boolean().optional(),
 });
 
