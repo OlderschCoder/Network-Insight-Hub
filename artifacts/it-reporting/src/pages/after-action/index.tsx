@@ -44,14 +44,14 @@ export default function AfterAction() {
                     <div>
                       <p className="font-medium">{report.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(report.incidentDate), "MMM d, yyyy")}
+                        {format(new Date(report.incidentDate ?? report.createdAt ?? Date.now()), "MMM d, yyyy")}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {report.outcome && (
-                      <Badge variant="outline" className={outcomeColor[report.outcome] ?? ""}>
-                        {report.outcome}
+                    {(report as any).outcome && (
+                      <Badge variant="outline" className={outcomeColor[(report as any).outcome] ?? ""}>
+                        {(report as any).outcome}
                       </Badge>
                     )}
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />

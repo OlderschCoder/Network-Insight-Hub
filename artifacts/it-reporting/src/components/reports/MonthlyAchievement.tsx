@@ -29,7 +29,7 @@ export default function MonthlyAchievement() {
   const [month, setMonth] = useState<string>(defaultMonth);
   const [scope, setScope] = useState<string>("all"); // 'all' or userId string
 
-  const { data: users } = useListUsers(undefined, { query: { enabled: isCIO } } as any);
+  const { data: users } = useListUsers({ query: { enabled: isCIO } } as any);
 
   const { from, to, label } = monthBounds(month);
   const userIdParam =

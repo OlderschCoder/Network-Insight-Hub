@@ -61,7 +61,7 @@ export default function Admin() {
 
   const handleActiveToggle = async (userId: number, currentActive: boolean) => {
     try {
-      await updateMutation.mutateAsync({ id: userId, data: { isActive: !currentActive } });
+      await updateMutation.mutateAsync({ id: userId, data: { isActive: !currentActive } as any });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: currentActive ? "User deactivated" : "User activated" });
     } catch {
@@ -92,13 +92,13 @@ export default function Admin() {
                 <div
                   key={user.id}
                   className={`flex items-center gap-4 p-3 rounded-lg border ${
-                    user.isActive ? "border-border" : "border-destructive/20 opacity-60"
+                    (user as any).isActive ? "border-border" : "border-destructive/20 opacity-60"
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium truncate">{user.name}</p>
-                      {!user.isActive && (
+                      {!(user as any).isActive && (
                         <Badge variant="destructive" className="text-xs">Inactive</Badge>
                       )}
                     </div>
@@ -142,10 +142,10 @@ export default function Admin() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleActiveToggle(user.id, user.isActive ?? true)}
+                      onClick={() => handleActiveToggle(user.id, (user as any).isActive ?? true)}
                       disabled={updateMutation.isPending}
                     >
-                      {user.isActive ? "Deactivate" : "Activate"}
+                      {(user as any).isActive ? "Deactivate" : "Activate"}
                     </Button>
                   </div>
                 </div>

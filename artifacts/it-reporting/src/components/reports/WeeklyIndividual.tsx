@@ -22,7 +22,7 @@ export default function WeeklyIndividual() {
   const [weekOf, setWeekOf] = useState<string>(isoMondayCentral(todayCentral()));
   const [userId, setUserId] = useState<string>(String(user?.id ?? ""));
 
-  const { data: users } = useListUsers(undefined, {
+  const { data: users } = useListUsers({
     query: { enabled: isCIO },
   } as any);
 

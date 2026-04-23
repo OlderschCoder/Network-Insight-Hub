@@ -117,7 +117,7 @@ export default function Risks() {
           {filtered.map((risk) => (
             <Card
               key={risk.id}
-              className={`transition-colors ${risk.status === "resolved" ? "opacity-60" : "hover:border-primary/50"}`}
+              className={`transition-colors ${risk.status === "closed" ? "opacity-60" : "hover:border-primary/50"}`}
             >
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-4">

@@ -100,7 +100,7 @@ export default function ReportDetail() {
 
   const handleZendesk = async () => {
     try {
-      await zendeskMutation.mutateAsync({ id });
+      await zendeskMutation.mutateAsync({ id, data: {} as any });
       toast({ title: "Sent to Zendesk" });
     } catch (e: any) {
       toast({ title: "Send failed", description: e?.message, variant: "destructive" });

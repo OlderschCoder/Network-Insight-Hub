@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     query: {
       enabled: !!token,
       retry: false,
-    }
+    } as any,
   });
 
   useEffect(() => {

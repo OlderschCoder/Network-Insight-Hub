@@ -55,7 +55,7 @@ export default function NewAfterAction() {
   const outcome = watch("outcome");
 
   const onSubmit = async (data: FormData) => {
-    const body: CreateAfterActionBody = {
+    const body = {
       title: data.title,
       incidentDate: data.incidentDate,
       outcome: data.outcome as any,
@@ -64,8 +64,8 @@ export default function NewAfterAction() {
       whatWentWell: data.whatWentWell || undefined,
       whatWentPoorly: data.whatWentPoorly || undefined,
       actionItems: data.actionItems || undefined,
-    };
-    await createMutation.mutateAsync({ data: body });
+    } as unknown as CreateAfterActionBody;
+    await createMutation.mutateAsync({ data: body as any });
     queryClient.invalidateQueries({ queryKey: ["/api/after-action"] });
     setLocation("/after-action");
   };
