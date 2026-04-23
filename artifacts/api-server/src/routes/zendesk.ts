@@ -77,6 +77,54 @@ router.get("/my-open-count", requireAuth, async (req: any, res) => {
   }
 });
 
+router.get("/my-open", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) {
+    return res.json({ configured: false, tickets: [] });
+  }
+  const parsedLimit = Number.parseInt((req.query.limit as string) || "5", 10);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, 1), 25)
+    : 5;
+  try {
+    const email = (req.user?.email || "").trim();
+    const zendeskEmail = (req.user?.zendeskEmail || "").trim();
+    const lookupEmail = zendeskEmail || email;
+    if (!lookupEmail) {
+      return res.json({ configured: true, tickets: [], message: "No email on user" });
+    }
+
+    type UsersResp = { users: ZendeskUser[] };
+    const usersResp = await zget<UsersResp>(
+      cfg,
+      `users/search.json?query=${encodeURIComponent(`email:${lookupEmail}`)}`,
+    );
+    const me = usersResp.users?.[0];
+    if (!me) {
+      return res.json({ configured: true, tickets: [], message: "No matching Zendesk user" });
+    }
+
+    type SearchResp = { results: ZendeskTicket[] };
+    const data = await zget<SearchResp>(
+      cfg,
+      `search.json?query=${encodeURIComponent(
+        `type:ticket assignee:${me.id} status<solved`,
+      )}&sort_by=updated_at&sort_order=desc&per_page=${limit}`,
+    );
+    const tickets = (data.results || []).slice(0, limit).map((t) => ({
+      id: t.id,
+      subject: t.subject,
+      status: t.status,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at,
+      url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
+    }));
+    return res.json({ configured: true, tickets });
+  } catch (e: any) {
+    return res.json({ configured: true, tickets: [], error: e.message });
+  }
+});
+
 router.get("/status", requireAuth, async (_req, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {

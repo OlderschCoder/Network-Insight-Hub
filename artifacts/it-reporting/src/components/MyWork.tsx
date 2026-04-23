@@ -77,6 +77,126 @@ function MyZendesk() {
   );
 }
 
+type OpenTicket = {
+  id: number;
+  subject: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+};
+
+function ticketAge(createdAt: string): string {
+  const created = new Date(createdAt).getTime();
+  if (!created) return "";
+  const diffMs = Date.now() - created;
+  const days = Math.floor(diffMs / 86400000);
+  if (days >= 1) return `${days}d old`;
+  const hours = Math.floor(diffMs / 3600000);
+  if (hours >= 1) return `${hours}h old`;
+  const mins = Math.max(1, Math.floor(diffMs / 60000));
+  return `${mins}m old`;
+}
+
+function MyZendeskTickets() {
+  const [tickets, setTickets] = useState<OpenTicket[] | null>(null);
+  const [state, setState] = useState<{ configured: boolean; error?: string; message?: string }>({
+    configured: true,
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    fetch(`${import.meta.env.BASE_URL}api/zendesk/my-open?limit=5`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        setTickets(body.tickets ?? []);
+        setState({
+          configured: body.configured ?? false,
+          error: body.error,
+          message: body.message,
+        });
+      })
+      .catch((e) => {
+        setTickets([]);
+        setState({ configured: false, error: e.message });
+      });
+  }, []);
+
+  if (!state.configured) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Ticket className="h-5 w-5" />
+          My Recent Open Tickets
+        </CardTitle>
+        <CardDescription>
+          Jump straight from a Zendesk ticket into a Post-Incident Review with
+          the subject and link prefilled.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {tickets === null ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : state.error ? (
+          <p className="text-sm text-destructive">{state.error}</p>
+        ) : tickets.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {state.message ?? "No open tickets assigned to you right now."}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {tickets.map((t) => {
+              const summary = `Started from Zendesk ticket #${t.id}: ${t.subject}\n${t.url}`;
+              const params = new URLSearchParams({
+                title: t.subject,
+                summary,
+                source: t.url,
+                sourceLabel: `Zendesk #${t.id}`,
+                incidentDate: (t.createdAt || "").slice(0, 10),
+              });
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between gap-3 border rounded-md p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:underline"
+                      >
+                        #{t.id} · {t.subject}
+                      </a>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t.status}
+                      {t.createdAt ? ` · ${ticketAge(t.createdAt)}` : ""}
+                    </div>
+                  </div>
+                  <Link href={`/after-action/new?${params.toString()}`}>
+                    <Button size="sm" variant="outline">
+                      Start Review
+                      <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MyWork() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
@@ -267,6 +387,8 @@ export default function MyWork() {
           )}
         </CardContent>
       </Card>
+
+      <MyZendeskTickets />
 
       {myOpenRisks.length > 0 && (
         <Card>
