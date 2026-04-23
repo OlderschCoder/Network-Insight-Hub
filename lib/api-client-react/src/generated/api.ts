@@ -24,6 +24,7 @@ import type {
   CreateAfterActionBody,
   CreateEntryBody,
   CreateLogItemBody,
+  CreateMaintenanceLogEntryBody,
   CreateProcessBody,
   CreateReportBody,
   CreateRiskBody,
@@ -4034,6 +4035,94 @@ export const useUpdateSwitch = <
   TContext
 > => {
   return useMutation(getUpdateSwitchMutationOptions(options));
+};
+
+/**
+ * @summary Append a maintenance-log entry to a switch
+ */
+export const getAddSwitchMaintenanceLogEntryUrl = (id: number) => {
+  return `/api/network/switches/${id}/maintenance-log`;
+};
+
+export const addSwitchMaintenanceLogEntry = async (
+  id: number,
+  createMaintenanceLogEntryBody: CreateMaintenanceLogEntryBody,
+  options?: RequestInit,
+): Promise<NetworkSwitch> => {
+  return customFetch<NetworkSwitch>(getAddSwitchMaintenanceLogEntryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMaintenanceLogEntryBody),
+  });
+};
+
+export const getAddSwitchMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>,
+    TError,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>,
+  TError,
+  { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+  TContext
+> => {
+  const mutationKey = ["addSwitchMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addSwitchMaintenanceLogEntry(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddSwitchMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>
+>;
+export type AddSwitchMaintenanceLogEntryMutationBody =
+  BodyType<CreateMaintenanceLogEntryBody>;
+export type AddSwitchMaintenanceLogEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Append a maintenance-log entry to a switch
+ */
+export const useAddSwitchMaintenanceLogEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>,
+    TError,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addSwitchMaintenanceLogEntry>>,
+  TError,
+  { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+  TContext
+> => {
+  return useMutation(getAddSwitchMaintenanceLogEntryMutationOptions(options));
 };
 
 /**

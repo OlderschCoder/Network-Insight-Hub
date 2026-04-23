@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { db, networkSwitchesTable, vlansTable } from "@workspace/db";
+import type { MaintenanceLogEntry } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
+import crypto from "crypto";
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
@@ -97,6 +99,40 @@ router.patch("/switches/:id", requireAuth, async (req: any, res) => {
   const [sw] = await db.update(networkSwitchesTable).set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id)).returning();
   if (!sw) return res.status(404).json({ error: "Not found" });
+  return res.json(sw);
+});
+
+router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const entry: MaintenanceLogEntry = {
+    id: crypto.randomUUID(),
+    body: parsed.data.body,
+    authorId: req.user?.id ?? null,
+    authorName: req.user?.name ?? req.user?.email ?? "Unknown",
+    createdAt: new Date().toISOString(),
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+  };
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const nextLog = [entry, ...log];
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
   return res.json(sw);
 });
 

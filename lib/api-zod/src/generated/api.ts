@@ -1056,6 +1056,17 @@ export const ListSwitchesResponseItem = zod.object({
   status: zod.enum(["online", "offline", "unknown"]),
   configFile: zod.string().optional(),
   notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+    }),
+  ),
   location: zod.string().optional(),
   lastSeen: zod.coerce.date().optional(),
   createdAt: zod.coerce.date().optional(),
@@ -1087,6 +1098,17 @@ export const GetSwitchResponse = zod.object({
   status: zod.enum(["online", "offline", "unknown"]),
   configFile: zod.string().optional(),
   notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+    }),
+  ),
   location: zod.string().optional(),
   lastSeen: zod.coerce.date().optional(),
   createdAt: zod.coerce.date().optional(),
@@ -1117,6 +1139,56 @@ export const UpdateSwitchResponse = zod.object({
   status: zod.enum(["online", "offline", "unknown"]),
   configFile: zod.string().optional(),
   notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+    }),
+  ),
+  location: zod.string().optional(),
+  lastSeen: zod.coerce.date().optional(),
+  createdAt: zod.coerce.date().optional(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Append a maintenance-log entry to a switch
+ */
+export const AddSwitchMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddSwitchMaintenanceLogEntryBody = zod.object({
+  body: zod.string(),
+  windowStart: zod.coerce.date().nullish(),
+  windowEnd: zod.coerce.date().nullish(),
+});
+
+export const AddSwitchMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  hostname: zod.string(),
+  building: zod.string(),
+  ipAddress: zod.string(),
+  model: zod.string().optional(),
+  status: zod.enum(["online", "offline", "unknown"]),
+  configFile: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+    }),
+  ),
   location: zod.string().optional(),
   lastSeen: zod.coerce.date().optional(),
   createdAt: zod.coerce.date().optional(),

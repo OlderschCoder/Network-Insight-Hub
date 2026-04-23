@@ -962,6 +962,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}/maintenance-log:
+    post:
+      operationId: addSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Append a maintenance-log entry to a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
   /network/vlans:
     get:
       operationId: listVlans
@@ -1946,6 +1970,10 @@ components:
           type: string
         notes:
           type: string
+        maintenanceLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceLogEntry"
         location:
           type: string
         lastSeen:
@@ -1957,7 +1985,47 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, hostname, building, ipAddress, status]
+      required: [id, hostname, building, ipAddress, status, maintenanceLog]
+
+    MaintenanceLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        authorId:
+          type: integer
+          nullable: true
+        authorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, body, authorName, createdAt]
+
+    CreateMaintenanceLogEntryBody:
+      type: object
+      properties:
+        body:
+          type: string
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+      required: [body]
 
     CreateSwitchBody:
       type: object

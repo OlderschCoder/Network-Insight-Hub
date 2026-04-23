@@ -2,10 +2,10 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import {
   useListSwitches,
   useListVlans,
-  useUpdateSwitch,
+  useAddSwitchMaintenanceLogEntry,
   getListSwitchesQueryKey,
 } from "@workspace/api-client-react";
-import type { NetworkSwitch, Vlan } from "@workspace/api-client-react";
+import type { NetworkSwitch, Vlan, MaintenanceLogEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,40 +111,86 @@ function buildVlanAIPrompt(vlan: Vlan): string {
     `What is it used for, which switches and buildings rely on it, and what should I check first if users on it report issues?`;
 }
 
+function formatLogTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function MaintenanceLogList({ entries }: { entries: MaintenanceLogEntry[] }) {
+  if (!entries?.length) return null;
+  const recent = entries.slice(0, 3);
+  const remaining = entries.length - recent.length;
+  return (
+    <div className="w-full mt-2 space-y-1.5">
+      {recent.map((e) => (
+        <div
+          key={e.id}
+          className="text-xs border-l-2 border-primary/40 pl-2 py-1 bg-muted/30 rounded-sm"
+        >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="font-semibold text-foreground/80 normal-case tracking-normal text-xs">
+              {e.authorName}
+            </span>
+            <span>{formatLogTimestamp(e.createdAt)}</span>
+            {(e.windowStart || e.windowEnd) && (
+              <span className="text-amber-300 normal-case tracking-normal">
+                window: {formatLogTimestamp(e.windowStart)}
+                {e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}
+              </span>
+            )}
+          </div>
+          <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5">{e.body}</p>
+        </div>
+      ))}
+      {remaining > 0 && (
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+          + {remaining} older {remaining === 1 ? "entry" : "entries"}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState<string>(sw.notes ?? "");
+  const [body, setBody] = useState("");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
   const queryClient = useQueryClient();
-  const update = useUpdateSwitch();
+  const addEntry = useAddSwitchMaintenanceLogEntry();
   const { toast } = useToast();
 
-  useEffect(() => {
-    setValue(sw.notes ?? "");
-  }, [sw.notes]);
+  const reset = () => {
+    setBody("");
+    setWindowStart("");
+    setWindowEnd("");
+  };
 
   const save = async () => {
+    if (!body.trim()) return;
     try {
-      await update.mutateAsync({
+      const toIso = (s: string) => (s ? new Date(s).toISOString() : null);
+      await addEntry.mutateAsync({
         id: sw.id,
         data: {
-          hostname: sw.hostname,
-          building: sw.building,
-          ipAddress: sw.ipAddress,
-          model: sw.model,
-          status: sw.status,
-          configFile: sw.configFile,
-          location: sw.location,
-          notes: value,
+          body: body.trim(),
+          windowStart: toIso(windowStart),
+          windowEnd: toIso(windowEnd),
         },
       });
       await queryClient.invalidateQueries({
         queryKey: getListSwitchesQueryKey().slice(0, 1),
       });
-      toast({ title: "Maintenance notes saved", description: sw.hostname });
+      toast({ title: "Maintenance note added", description: sw.hostname });
+      reset();
       setEditing(false);
     } catch (e: any) {
       toast({
-        title: "Couldn't save notes",
+        title: "Couldn't save note",
         description: e?.message ?? "Try again in a moment.",
         variant: "destructive",
       });
@@ -152,6 +198,7 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
   };
 
   if (!editing) {
+    const hasHistory = (sw.maintenanceLog?.length ?? 0) > 0;
     return (
       <Button
         variant="outline"
@@ -160,7 +207,7 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
         onClick={() => setEditing(true)}
       >
         <Wrench className="h-3 w-3 mr-1" />
-        {sw.notes ? "Edit notes" : "Add maintenance notes"}
+        {hasHistory ? "Add maintenance note" : "Add first maintenance note"}
       </Button>
     );
   }
@@ -169,22 +216,47 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
     <div className="w-full space-y-2 mt-1">
       <Textarea
         rows={3}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Maintenance window, planned change, gotchas to remember..."
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="What changed, why, and anything the next engineer should know..."
         className="text-xs"
       />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Window start (optional)
+          <Input
+            type="datetime-local"
+            value={windowStart}
+            onChange={(e) => setWindowStart(e.target.value)}
+            className="h-7 text-xs mt-1"
+          />
+        </label>
+        <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Window end (optional)
+          <Input
+            type="datetime-local"
+            value={windowEnd}
+            onChange={(e) => setWindowEnd(e.target.value)}
+            className="h-7 text-xs mt-1"
+          />
+        </label>
+      </div>
       <div className="flex gap-2">
-        <Button size="sm" className="h-7 text-xs" onClick={save} disabled={update.isPending}>
+        <Button
+          size="sm"
+          className="h-7 text-xs"
+          onClick={save}
+          disabled={addEntry.isPending || !body.trim()}
+        >
           <Save className="h-3 w-3 mr-1" />
-          {update.isPending ? "Saving…" : "Save"}
+          {addEntry.isPending ? "Saving…" : "Add to log"}
         </Button>
         <Button
           size="sm"
           variant="ghost"
           className="h-7 text-xs"
           onClick={() => {
-            setValue(sw.notes ?? "");
+            reset();
             setEditing(false);
           }}
         >
@@ -210,6 +282,7 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
           {sw.status ?? "unknown"}
         </Badge>
       </div>
+      <MaintenanceLogList entries={sw.maintenanceLog ?? []} />
       <div className="flex flex-wrap gap-2 mt-2">
         <SwitchNotesEditor sw={sw} />
         <Link href={switchPostIncidentHref(sw)}>

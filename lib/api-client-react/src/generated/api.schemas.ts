@@ -545,6 +545,16 @@ export const NetworkSwitchStatus = {
   unknown: "unknown",
 } as const;
 
+export interface MaintenanceLogEntry {
+  id: string;
+  body: string;
+  authorId?: number | null;
+  authorName: string;
+  createdAt: string;
+  windowStart?: string | null;
+  windowEnd?: string | null;
+}
+
 export interface NetworkSwitch {
   id: number;
   hostname: string;
@@ -554,10 +564,17 @@ export interface NetworkSwitch {
   status: NetworkSwitchStatus;
   configFile?: string;
   notes?: string;
+  maintenanceLog: MaintenanceLogEntry[];
   location?: string;
   lastSeen?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreateMaintenanceLogEntryBody {
+  body: string;
+  windowStart?: string | null;
+  windowEnd?: string | null;
 }
 
 export type CreateSwitchBodyStatus =
