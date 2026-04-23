@@ -7,7 +7,9 @@ import {
   useSendReportToZendesk,
   useGetAggregateReport,
   useListLogItems,
+  useListReportTickets,
 } from "@workspace/api-client-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +40,9 @@ export default function ReportDetail() {
     { weekOf: r?.weekOf ?? "" },
     { query: { enabled: !!r?.weekOf } } as any,
   );
+  const { data: ticketsResponse } = useListReportTickets(id, {
+    query: { enabled: !!r?.id },
+  } as any);
 
   const updateMutation = useUpdateReport();
   const finalizeMutation = useFinalizeReport();
@@ -52,6 +57,7 @@ export default function ReportDetail() {
     nextWeekPlans: "",
   });
   const [dirty, setDirty] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<number[] | null>(null);
 
   useEffect(() => {
     if (r) {
@@ -63,9 +69,25 @@ export default function ReportDetail() {
         strategicProgress: r.strategicProgress ?? "",
         nextWeekPlans: r.nextWeekPlans ?? "",
       });
+      setSelectedItemIds(Array.isArray(r.selectedItemIds) ? r.selectedItemIds : null);
       setDirty(false);
     }
   }, [r?.id, r?.updatedAt]);
+
+  const toggleItem = async (itemId: number, checked: boolean) => {
+    const allIds = ((weekItems ?? []) as any[]).map((it: any) => it.id as number);
+    const current = selectedItemIds ?? allIds;
+    const next = checked
+      ? Array.from(new Set([...current, itemId]))
+      : current.filter((x) => x !== itemId);
+    setSelectedItemIds(next);
+    try {
+      await updateMutation.mutateAsync({ id, data: { selectedItemIds: next } as any });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+    } catch (e: any) {
+      toast({ title: "Could not save selection", description: e?.message, variant: "destructive" });
+    }
+  };
 
   const isFinalized = r?.status === "finalized";
   const canEdit = isCIO && !isFinalized;
@@ -273,6 +295,87 @@ export default function ReportDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Task selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tasks Completed This Week ({items.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No tasks logged for this week.</p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground mb-3">
+                {canEdit
+                  ? "Uncheck any task you don't want included in this report."
+                  : "Tasks included in this report."}
+              </p>
+              <ul className="space-y-1.5">
+                {items.map((it: any) => {
+                  const allIds = items.map((x: any) => x.id);
+                  const current = selectedItemIds ?? allIds;
+                  const checked = current.includes(it.id);
+                  return (
+                    <li key={it.id} className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        id={`item-${it.id}`}
+                        checked={checked}
+                        disabled={!canEdit}
+                        onCheckedChange={(v) => toggleItem(it.id, v === true)}
+                        className="mt-0.5"
+                      />
+                      <label htmlFor={`item-${it.id}`} className="flex-1 cursor-pointer">
+                        <span className="font-medium">{it.title}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {it.userName}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Closed Zendesk tickets */}
+      {(() => {
+        const tickets: any[] = (ticketsResponse as any)?.tickets ?? [];
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Closed Helpdesk Tickets ({tickets.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tickets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No solved Zendesk tickets for this week.
+                </p>
+              ) : (
+                <ul className="space-y-1.5 text-sm">
+                  {tickets.map((t: any) => (
+                    <li key={t.id} className="flex items-start gap-2">
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        #{t.id}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate">{t.subject}</p>
+                        {t.assigneeName && (
+                          <p className="text-xs text-muted-foreground">
+                            {t.assigneeName}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Open risks */}
       {risks.length > 0 && (

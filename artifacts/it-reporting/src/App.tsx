@@ -30,6 +30,9 @@ import AIReport from "@/pages/ai-report/index";
 import ProcessesIndex from "@/pages/processes/index";
 import NewProcess from "@/pages/processes/new";
 import ProcessDetail from "@/pages/processes/[id]";
+import ProjectsIndex from "@/pages/projects/index";
+import NewProject from "@/pages/projects/new";
+import ProjectDetail from "@/pages/projects/[id]";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +87,10 @@ function Router() {
       <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
       <Route path="/reports/:id" component={() => <ProtectedRoute component={ReportDetail} />} />
       
+      <Route path="/projects" component={() => <ProtectedRoute component={ProjectsIndex} />} />
+      <Route path="/projects/new" component={() => <ProtectedRoute component={NewProject} />} />
+      <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
+
       <Route path="/risks" component={() => <ProtectedRoute component={Risks} />} />
       <Route path="/risks/new" component={() => <ProtectedRoute component={NewRisk} />} />
       <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />

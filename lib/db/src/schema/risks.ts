@@ -18,6 +18,7 @@ export const risksTable = pgTable("risks", {
   relatedBuilding: varchar("related_building", { length: 255 }),
   relatedDevice: varchar("related_device", { length: 255 }),
   sharedWith: json("shared_with").$type<string[]>().default([]),
+  projectId: integer("project_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

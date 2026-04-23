@@ -233,6 +233,7 @@ export const ListReportsResponseItem = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
+  selectedItemIds: zod.array(zod.number()).optional(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -271,6 +272,7 @@ export const GetReportResponse = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
+  selectedItemIds: zod.array(zod.number()).optional(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -292,6 +294,7 @@ export const UpdateReportBody = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   status: zod.enum(["draft", "finalized"]).optional(),
+  selectedItemIds: zod.array(zod.number()).optional(),
 });
 
 export const UpdateReportResponse = zod.object({
@@ -305,6 +308,7 @@ export const UpdateReportResponse = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
+  selectedItemIds: zod.array(zod.number()).optional(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -312,6 +316,40 @@ export const UpdateReportResponse = zod.object({
   finalizedAt: zod.coerce.date().optional(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Delete a weekly report (CIO only)
+ */
+export const DeleteReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteReportResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Solved Zendesk tickets during this report's week
+ */
+export const ListReportTicketsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListReportTicketsResponse = zod.object({
+  weekOf: zod.string(),
+  count: zod.number(),
+  configured: zod.boolean().optional(),
+  tickets: zod.array(
+    zod.object({
+      id: zod.number(),
+      subject: zod.string(),
+      status: zod.string(),
+      assigneeName: zod.string().nullish(),
+      updatedAt: zod.string().optional(),
+      url: zod.string(),
+    }),
+  ),
 });
 
 /**
@@ -332,6 +370,7 @@ export const FinalizeReportResponse = zod.object({
   strategicProgress: zod.string().optional(),
   nextWeekPlans: zod.string().optional(),
   metrics: zod.record(zod.string(), zod.unknown()).optional(),
+  selectedItemIds: zod.array(zod.number()).optional(),
   contributorCount: zod.number().optional(),
   entryCount: zod.number().optional(),
   createdBy: zod.number().optional(),
@@ -590,6 +629,265 @@ export const UpdateProcessResponse = zod.object({
 
 export const DeleteProcessParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const ListProjectsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum([
+    "planning",
+    "in_progress",
+    "on_hold",
+    "completed",
+    "cancelled",
+  ]),
+  progress: zod.number(),
+  targetDate: zod.string().nullish(),
+  newEstimatedDate: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        url: zod.string(),
+        addedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  assignees: zod
+    .array(
+      zod.object({
+        userId: zod.number().optional(),
+        name: zod.string().nullish(),
+        email: zod.string().optional(),
+        role: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  risks: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        userId: zod.number(),
+        userName: zod.string().optional(),
+        type: zod.enum(["risk", "issue", "suggestion"]),
+        severity: zod.enum(["low", "medium", "high", "critical"]),
+        probability: zod.enum(["low", "medium", "high", "critical"]).optional(),
+        category: zod.string().optional(),
+        status: zod.enum(["open", "mitigated", "closed"]),
+        title: zod.string(),
+        description: zod.string(),
+        impact: zod.string().optional(),
+        mitigation: zod.string().optional(),
+        relatedBuilding: zod.string().optional(),
+        relatedDevice: zod.string().optional(),
+        sharedWith: zod.array(zod.string()).optional(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date().optional(),
+      }),
+    )
+    .optional(),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
+
+export const createProjectBodyProgressMin = 0;
+export const createProjectBodyProgressMax = 100;
+
+export const CreateProjectBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  status: zod
+    .enum(["planning", "in_progress", "on_hold", "completed", "cancelled"])
+    .optional(),
+  progress: zod
+    .number()
+    .min(createProjectBodyProgressMin)
+    .max(createProjectBodyProgressMax)
+    .optional(),
+  targetDate: zod.string().nullish(),
+  newEstimatedDate: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        url: zod.string(),
+        addedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  assigneeIds: zod.array(zod.number()).optional(),
+});
+
+export const GetProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum([
+    "planning",
+    "in_progress",
+    "on_hold",
+    "completed",
+    "cancelled",
+  ]),
+  progress: zod.number(),
+  targetDate: zod.string().nullish(),
+  newEstimatedDate: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        url: zod.string(),
+        addedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  assignees: zod
+    .array(
+      zod.object({
+        userId: zod.number().optional(),
+        name: zod.string().nullish(),
+        email: zod.string().optional(),
+        role: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  risks: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        userId: zod.number(),
+        userName: zod.string().optional(),
+        type: zod.enum(["risk", "issue", "suggestion"]),
+        severity: zod.enum(["low", "medium", "high", "critical"]),
+        probability: zod.enum(["low", "medium", "high", "critical"]).optional(),
+        category: zod.string().optional(),
+        status: zod.enum(["open", "mitigated", "closed"]),
+        title: zod.string(),
+        description: zod.string(),
+        impact: zod.string().optional(),
+        mitigation: zod.string().optional(),
+        relatedBuilding: zod.string().optional(),
+        relatedDevice: zod.string().optional(),
+        sharedWith: zod.array(zod.string()).optional(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date().optional(),
+      }),
+    )
+    .optional(),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+export const UpdateProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateProjectBodyProgressMin = 0;
+export const updateProjectBodyProgressMax = 100;
+
+export const UpdateProjectBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  status: zod
+    .enum(["planning", "in_progress", "on_hold", "completed", "cancelled"])
+    .optional(),
+  progress: zod
+    .number()
+    .min(updateProjectBodyProgressMin)
+    .max(updateProjectBodyProgressMax)
+    .optional(),
+  targetDate: zod.string().nullish(),
+  newEstimatedDate: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        url: zod.string(),
+        addedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  assigneeIds: zod.array(zod.number()).optional(),
+});
+
+export const UpdateProjectResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum([
+    "planning",
+    "in_progress",
+    "on_hold",
+    "completed",
+    "cancelled",
+  ]),
+  progress: zod.number(),
+  targetDate: zod.string().nullish(),
+  newEstimatedDate: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        url: zod.string(),
+        addedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  assignees: zod
+    .array(
+      zod.object({
+        userId: zod.number().optional(),
+        name: zod.string().nullish(),
+        email: zod.string().optional(),
+        role: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  risks: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        userId: zod.number(),
+        userName: zod.string().optional(),
+        type: zod.enum(["risk", "issue", "suggestion"]),
+        severity: zod.enum(["low", "medium", "high", "critical"]),
+        probability: zod.enum(["low", "medium", "high", "critical"]).optional(),
+        category: zod.string().optional(),
+        status: zod.enum(["open", "mitigated", "closed"]),
+        title: zod.string(),
+        description: zod.string(),
+        impact: zod.string().optional(),
+        mitigation: zod.string().optional(),
+        relatedBuilding: zod.string().optional(),
+        relatedDevice: zod.string().optional(),
+        sharedWith: zod.array(zod.string()).optional(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date().optional(),
+      }),
+    )
+    .optional(),
+  createdBy: zod.number().nullish(),
+  createdByName: zod.string().nullish(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+export const DeleteProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteProjectResponse = zod.object({
+  success: zod.boolean().optional(),
 });
 
 export const ListLogItemsQueryParams = zod.object({

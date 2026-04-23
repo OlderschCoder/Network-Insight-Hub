@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListReports, useCreateReport } from "@workspace/api-client-react";
+import { useListReports, useCreateReport, useDeleteReport } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Plus, FileText, ChevronRight } from "lucide-react";
+import { Plus, FileText, ChevronRight, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,20 @@ export default function WeeklyTeam() {
   const { toast } = useToast();
   const { data: reports, isLoading } = useListReports({});
   const createMutation = useCreateReport();
+  const deleteMutation = useDeleteReport();
+
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this report? This cannot be undone.")) return;
+    try {
+      await deleteMutation.mutateAsync({ id });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+      toast({ title: "Report deleted" });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message, variant: "destructive" });
+    }
+  };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [weekOf, setWeekOf] = useState<string>(isoMondayCentral(todayCentral()));
 
@@ -78,10 +92,22 @@ export default function WeeklyTeam() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <Badge variant={report.status === "finalized" ? "default" : "secondary"}>
                       {report.status === "finalized" ? "Finalized" : "Draft"}
                     </Badge>
+                    {isCIO && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={(e) => handleDelete(report.id, e)}
+                        disabled={deleteMutation.isPending}
+                        aria-label="Delete report"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </CardContent>

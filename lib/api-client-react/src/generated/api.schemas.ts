@@ -150,6 +150,7 @@ export interface Report {
   strategicProgress?: string;
   nextWeekPlans?: string;
   metrics?: ReportMetrics;
+  selectedItemIds?: number[];
   contributorCount?: number;
   entryCount?: number;
   createdBy?: number;
@@ -185,6 +186,23 @@ export interface UpdateReportBody {
   strategicProgress?: string;
   nextWeekPlans?: string;
   status?: UpdateReportBodyStatus;
+  selectedItemIds?: number[];
+}
+
+export interface ReportTicket {
+  id: number;
+  subject: string;
+  status: string;
+  assigneeName?: string | null;
+  updatedAt?: string;
+  url: string;
+}
+
+export interface ReportTicketsResponse {
+  weekOf: string;
+  count: number;
+  configured?: boolean;
+  tickets: ReportTicket[];
 }
 
 export type AggregateReportByRole = { [key: string]: number };
@@ -386,6 +404,72 @@ export interface UpdateProcessBody {
   content?: string;
   tags?: string[];
   slug?: string;
+}
+
+export interface ProjectAttachment {
+  name: string;
+  url: string;
+  addedAt?: string;
+}
+
+export interface ProjectAssignee {
+  userId?: number;
+  name?: string | null;
+  email?: string;
+  role?: string;
+}
+
+export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
+
+export const ProjectStatus = {
+  planning: "planning",
+  in_progress: "in_progress",
+  on_hold: "on_hold",
+  completed: "completed",
+  cancelled: "cancelled",
+} as const;
+
+export interface Project {
+  id: number;
+  title: string;
+  description?: string | null;
+  status: ProjectStatus;
+  progress: number;
+  targetDate?: string | null;
+  newEstimatedDate?: string | null;
+  attachments?: ProjectAttachment[];
+  assignees?: ProjectAssignee[];
+  risks?: Risk[];
+  createdBy?: number | null;
+  createdByName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ProjectBodyStatus =
+  (typeof ProjectBodyStatus)[keyof typeof ProjectBodyStatus];
+
+export const ProjectBodyStatus = {
+  planning: "planning",
+  in_progress: "in_progress",
+  on_hold: "on_hold",
+  completed: "completed",
+  cancelled: "cancelled",
+} as const;
+
+export interface ProjectBody {
+  title: string;
+  description?: string;
+  status?: ProjectBodyStatus;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  progress?: number;
+  targetDate?: string | null;
+  newEstimatedDate?: string | null;
+  attachments?: ProjectAttachment[];
+  assigneeIds?: number[];
 }
 
 export interface LogItem {
@@ -678,6 +762,10 @@ export const ListReportsStatus = {
   finalized: "finalized",
 } as const;
 
+export type DeleteReport200 = {
+  success?: boolean;
+};
+
 export type GetAggregateReportParams = {
   weekOf: string;
 };
@@ -718,6 +806,10 @@ export const ListRisksType = {
 export type ListProcessesParams = {
   category?: string;
   q?: string;
+};
+
+export type DeleteProject200 = {
+  success?: boolean;
 };
 
 export type ListLogItemsParams = {

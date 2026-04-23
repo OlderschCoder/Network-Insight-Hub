@@ -28,6 +28,8 @@ tags:
     description: Export and integrations
   - name: dashboard
     description: Dashboard and aggregation
+  - name: projects
+    description: Project management
 paths:
   /healthz:
     get:
@@ -344,6 +346,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Report"
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete a weekly report (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /reports/{id}/tickets:
+    get:
+      operationId: listReportTickets
+      tags: [reports]
+      summary: Solved Zendesk tickets during this report's week
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTicketsResponse"
   /reports/{id}/finalize:
     post:
       operationId: finalizeReport
@@ -557,6 +597,95 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  # PROJECTS
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
 
   # LOG ITEMS (standalone daily items that roll up into a weekly log)
   /log-items:
@@ -1183,6 +1312,10 @@ components:
         metrics:
           type: object
           additionalProperties: true
+        selectedItemIds:
+          type: array
+          items:
+            type: integer
         contributorCount:
           type: integer
         entryCount:
@@ -1239,6 +1372,43 @@ components:
         status:
           type: string
           enum: [draft, finalized]
+        selectedItemIds:
+          type: array
+          items:
+            type: integer
+
+    ReportTicket:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+        assigneeName:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+        url:
+          type: string
+      required: [id, subject, status, url]
+
+    ReportTicketsResponse:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        count:
+          type: integer
+        configured:
+          type: boolean
+        tickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportTicket"
+      required: [weekOf, count, tickets]
 
     AggregateReport:
       type: object
@@ -1460,6 +1630,105 @@ components:
             type: string
         slug:
           type: string
+
+    ProjectAttachment:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        addedAt:
+          type: string
+      required: [name, url]
+
+    ProjectAssignee:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+        role:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [planning, in_progress, on_hold, completed, cancelled]
+        progress:
+          type: integer
+        targetDate:
+          type: string
+          nullable: true
+        newEstimatedDate:
+          type: string
+          nullable: true
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAttachment"
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAssignee"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+        createdBy:
+          type: integer
+          nullable: true
+        createdByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status, progress]
+
+    ProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [planning, in_progress, on_hold, completed, cancelled]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        targetDate:
+          type: string
+          nullable: true
+        newEstimatedDate:
+          type: string
+          nullable: true
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAttachment"
+        assigneeIds:
+          type: array
+          items:
+            type: integer
+      required: [title]
 
     LogItem:
       type: object

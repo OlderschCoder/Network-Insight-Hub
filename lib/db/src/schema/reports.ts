@@ -14,6 +14,7 @@ export const reportsTable = pgTable("reports", {
   strategicProgress: text("strategic_progress"),
   nextWeekPlans: text("next_week_plans"),
   metrics: json("metrics").$type<Record<string, unknown>>().default({}),
+  selectedItemIds: json("selected_item_ids").$type<number[] | null>().default(null),
   contributorCount: integer("contributor_count").default(0),
   entryCount: integer("entry_count").default(0),
   createdBy: integer("created_by").references(() => usersTable.id),

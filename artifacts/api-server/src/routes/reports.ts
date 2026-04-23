@@ -114,6 +114,91 @@ router.get("/:id", requireAuth, async (req: any, res) => {
   return res.json({ ...report, createdByName });
 });
 
+// All Zendesk-resolved tickets during this report's week (group-wide)
+router.get("/:id/tickets", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
+  if (!report) return res.status(404).json({ error: "Not found" });
+
+  const subdomain = process.env.ZENDESK_SUBDOMAIN;
+  const email = process.env.ZENDESK_EMAIL;
+  const token = process.env.ZENDESK_API_TOKEN;
+  if (!subdomain || !email || !token) {
+    return res.json({ weekOf: report.weekOf, count: 0, tickets: [], configured: false });
+  }
+  const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
+  const group = process.env.ZENDESK_GROUP || "Onsite_it";
+
+  // Build a 7-day date set starting at weekOf
+  const dateSet = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(report.weekOf + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + i);
+    dateSet.add(d.toISOString().slice(0, 10));
+  }
+  const earliest = Array.from(dateSet).sort()[0];
+  const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+
+  try {
+    const all: any[] = [];
+    let nextUrl: string | null =
+      `https://${subdomain}.zendesk.com/api/v2/search.json?query=${encodeURIComponent(
+        `type:ticket solved>${dayBefore} group:"${group}"`
+      )}&per_page=100`;
+    let pages = 0;
+    while (nextUrl && pages < 10) {
+      const r = await fetch(nextUrl, {
+        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+      });
+      if (!r.ok) break;
+      const data: any = await r.json();
+      all.push(...(data.results ?? []));
+      nextUrl = data.next_page ?? null;
+      pages++;
+    }
+
+    const onWeek = all.filter((t) => dateSet.has((t.updated_at || "").slice(0, 10)));
+
+    // Resolve assignee names
+    const ids = Array.from(new Set(onWeek.map((t) => t.assignee_id).filter(Boolean)));
+    const userMap = new Map<number, string>();
+    if (ids.length > 0) {
+      const r = await fetch(
+        `https://${subdomain}.zendesk.com/api/v2/users/show_many.json?ids=${ids.join(",")}`,
+        { headers: { Authorization: `Basic ${auth}` } },
+      );
+      if (r.ok) {
+        const data: any = await r.json();
+        for (const u of data.users ?? []) userMap.set(u.id, u.name);
+      }
+    }
+
+    return res.json({
+      weekOf: report.weekOf,
+      count: onWeek.length,
+      configured: true,
+      tickets: onWeek.map((t) => ({
+        id: t.id,
+        subject: t.subject,
+        status: t.status,
+        assigneeName: t.assignee_id ? userMap.get(t.assignee_id) ?? null : null,
+        updatedAt: t.updated_at,
+        url: `https://${subdomain}.zendesk.com/agent/tickets/${t.id}`,
+      })),
+    });
+  } catch (e: any) {
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+router.delete("/:id", requireAuth, requireCIO, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [deleted] = await db.delete(reportsTable).where(eq(reportsTable.id, id)).returning();
+  if (!deleted) return res.status(404).json({ error: "Not found" });
+  return res.json({ success: true });
+});
+
 router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
   const id = parseInt(req.params.id);
   const schema = z.object({
@@ -124,6 +209,7 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     strategicProgress: z.string().optional(),
     nextWeekPlans: z.string().optional(),
     status: z.enum(["draft", "finalized"]).optional(),
+    selectedItemIds: z.array(z.number()).nullable().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
