@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -280,13 +281,39 @@ function StatusReportTab() {
   );
 }
 
-function ChatTab() {
+function pageHintFromPath(path: string): string | null {
+  if (!path || path === "/" || path === "/ai-report") return null;
+  const map: Record<string, string> = {
+    "/network": "the Network inventory page",
+    "/risks": "the Risks & Issues page",
+    "/after-action": "the Post-Incident Reviews page",
+    "/items": "the My Tasks page",
+    "/entries": "the Weekly Log page",
+    "/projects": "the Projects page",
+    "/strategic-objectives": "the Department Goals page",
+    "/processes": "the Process Library page",
+    "/reports": "the Reports page",
+  };
+  for (const [prefix, label] of Object.entries(map)) {
+    if (path === prefix || path.startsWith(prefix + "/")) return label;
+  }
+  return null;
+}
+
+function ChatTab({ contextHint }: { contextHint?: string | null }) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (contextHint && !input) {
+      setInput(`About ${contextHint}: `);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextHint]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -421,20 +448,23 @@ function ChatTab() {
 
 export default function AIReport() {
   const { isCIO } = useAuth();
+  const search = useSearch();
+  const fromPath = new URLSearchParams(search).get("from") ?? "";
+  const contextHint = pageHintFromPath(fromPath);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Sparkles className="h-7 w-7" />
-          AI Reporting Assistant
+          AI Assistant
         </h1>
         <p className="text-muted-foreground mt-1">
-          Generate executive reports and ask questions about your IT department data.
+          Ask questions about IT data, or (for the CIO) generate executive status reports.
         </p>
       </div>
 
-      <Tabs defaultValue={isCIO ? "status" : "chat"}>
+      <Tabs defaultValue={contextHint || !isCIO ? "chat" : "status"}>
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           <TabsTrigger value="chat">Ask AI</TabsTrigger>
@@ -445,7 +475,7 @@ export default function AIReport() {
           </TabsContent>
         )}
         <TabsContent value="chat" className="mt-6">
-          <ChatTab />
+          <ChatTab contextHint={contextHint} />
         </TabsContent>
       </Tabs>
     </div>

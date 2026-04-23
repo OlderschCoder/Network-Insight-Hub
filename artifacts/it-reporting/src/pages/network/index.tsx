@@ -1,12 +1,22 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { useListSwitches, useListVlans } from "@workspace/api-client-react";
+import {
+  useListSwitches,
+  useListVlans,
+  useUpdateSwitch,
+  getListSwitchesQueryKey,
+} from "@workspace/api-client-react";
+import type { NetworkSwitch, Vlan } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Server, Network as NetworkIcon, Workflow, Building2,
   Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
+  Activity, Wrench, Save,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -33,64 +43,253 @@ const vlanTypeColor: Record<string, string> = {
   other: "bg-slate-500/20 text-slate-300 border-slate-500/30",
 };
 
-const matchSwitch = (s: any, q: string) =>
+const matchSwitch = (s: NetworkSwitch, q: string) =>
   !q ||
   s.hostname?.toLowerCase().includes(q) ||
   s.building?.toLowerCase().includes(q) ||
   s.ipAddress?.toLowerCase().includes(q) ||
-  s.model?.toLowerCase().includes(q);
+  (s.model ?? "").toLowerCase().includes(q);
 
-const matchVlan = (v: any, q: string) =>
+const matchVlan = (v: Vlan, q: string) =>
   !q ||
   String(v.vlanId).includes(q) ||
   v.name?.toLowerCase().includes(q) ||
-  v.description?.toLowerCase().includes(q) ||
+  (v.description ?? "").toLowerCase().includes(q) ||
   v.building?.toLowerCase().includes(q) ||
-  v.subnet?.toLowerCase().includes(q);
+  (v.subnet ?? "").toLowerCase().includes(q);
 
-function SwitchRow({ sw }: { sw: any }) {
+function switchPostIncidentHref(sw: NetworkSwitch): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const title = `Incident on ${sw.hostname}${sw.building ? ` (${sw.building})` : ""}`;
+  const summary = [
+    `Device: ${sw.hostname} (${sw.ipAddress})`,
+    sw.model && `Model: ${sw.model}`,
+    sw.building && `Building: ${sw.building}`,
+    sw.location && `Location: ${sw.location}`,
+    sw.notes && `Existing notes: ${sw.notes}`,
+  ].filter(Boolean).join("\n");
+  const params = new URLSearchParams({
+    title,
+    summary,
+    incidentDate: today,
+    outcome: "partial",
+    source: "/network",
+    sourceLabel: `Switch ${sw.hostname}`,
+  });
+  return `/after-action/new?${params.toString()}`;
+}
+
+function vlanPostIncidentHref(vlan: Vlan): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const title = `Incident on VLAN ${vlan.vlanId} — ${vlan.name}`;
+  const summary = [
+    `VLAN: ${vlan.vlanId} (${vlan.name})`,
+    `Type: ${vlan.type}`,
+    vlan.building && `Building: ${vlan.building}`,
+    vlan.subnet && `Subnet: ${vlan.subnet}${vlan.gateway ? ` via ${vlan.gateway}` : ""}`,
+    vlan.description && `Description: ${vlan.description}`,
+    vlan.notes && `Existing notes: ${vlan.notes}`,
+  ].filter(Boolean).join("\n");
+  const params = new URLSearchParams({
+    title,
+    summary,
+    incidentDate: today,
+    outcome: "partial",
+    source: "/network",
+    sourceLabel: `VLAN ${vlan.vlanId} (${vlan.name})`,
+  });
+  return `/after-action/new?${params.toString()}`;
+}
+
+function buildSwitchAIPrompt(sw: NetworkSwitch): string {
+  return `Tell me about switch ${sw.hostname} (${sw.ipAddress})${sw.building ? ` in ${sw.building}` : ""}. ` +
+    `What does it serve, what is its uplink path, and what should I check first if a user on it reports an issue?`;
+}
+
+function buildVlanAIPrompt(vlan: Vlan): string {
+  return `Tell me about VLAN ${vlan.vlanId} (${vlan.name})${vlan.building ? ` in ${vlan.building}` : ""}. ` +
+    `What is it used for, which switches and buildings rely on it, and what should I check first if users on it report issues?`;
+}
+
+function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState<string>(sw.notes ?? "");
+  const queryClient = useQueryClient();
+  const update = useUpdateSwitch();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setValue(sw.notes ?? "");
+  }, [sw.notes]);
+
+  const save = async () => {
+    try {
+      await update.mutateAsync({
+        id: sw.id,
+        data: {
+          hostname: sw.hostname,
+          building: sw.building,
+          ipAddress: sw.ipAddress,
+          model: sw.model,
+          status: sw.status,
+          configFile: sw.configFile,
+          location: sw.location,
+          notes: value,
+        },
+      });
+      await queryClient.invalidateQueries({
+        queryKey: getListSwitchesQueryKey().slice(0, 1),
+      });
+      toast({ title: "Maintenance notes saved", description: sw.hostname });
+      setEditing(false);
+    } catch (e: any) {
+      toast({
+        title: "Couldn't save notes",
+        description: e?.message ?? "Try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (!editing) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 text-xs"
+        onClick={() => setEditing(true)}
+      >
+        <Wrench className="h-3 w-3 mr-1" />
+        {sw.notes ? "Edit notes" : "Add maintenance notes"}
+      </Button>
+    );
+  }
+
   return (
-    <div className="flex items-start justify-between border-b last:border-b-0 py-2 px-1 gap-3">
-      <div className="min-w-0">
-        <p className="font-mono font-medium text-sm">{sw.hostname}</p>
-        <p className="font-mono text-xs text-primary mt-0.5">{sw.ipAddress}</p>
-        {sw.model && <p className="text-xs text-muted-foreground mt-0.5">{sw.model}</p>}
-        {sw.location && <p className="text-xs text-muted-foreground/80 mt-0.5">{sw.location}</p>}
-        {sw.notes && <p className="text-xs italic text-muted-foreground/70 mt-1">{sw.notes}</p>}
+    <div className="w-full space-y-2 mt-1">
+      <Textarea
+        rows={3}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Maintenance window, planned change, gotchas to remember..."
+        className="text-xs"
+      />
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 text-xs" onClick={save} disabled={update.isPending}>
+          <Save className="h-3 w-3 mr-1" />
+          {update.isPending ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => {
+            setValue(sw.notes ?? "");
+            setEditing(false);
+          }}
+        >
+          Cancel
+        </Button>
       </div>
-      <Badge variant="outline" className={`shrink-0 ${statusColor[sw.status ?? "unknown"] ?? ""}`}>
-        {sw.status ?? "unknown"}
-      </Badge>
     </div>
   );
 }
 
-function VlanRow({ vlan }: { vlan: any }) {
+function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: string) => void }) {
   return (
-    <div className="flex items-start justify-between border-b last:border-b-0 py-2 px-1 gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono font-bold text-primary text-sm">VLAN {vlan.vlanId}</span>
-          <span className="font-medium text-sm truncate">{vlan.name}</span>
+    <div className="border-b last:border-b-0 py-2 px-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono font-medium text-sm">{sw.hostname}</p>
+          <p className="font-mono text-xs text-primary mt-0.5">{sw.ipAddress}</p>
+          {sw.model && <p className="text-xs text-muted-foreground mt-0.5">{sw.model}</p>}
+          {sw.location && <p className="text-xs text-muted-foreground/80 mt-0.5">{sw.location}</p>}
+          {sw.notes && <p className="text-xs italic text-muted-foreground/70 mt-1">{sw.notes}</p>}
         </div>
-        {vlan.description && <p className="text-xs text-muted-foreground mt-0.5">{vlan.description}</p>}
-        {vlan.subnet && (
-          <p className="font-mono text-xs text-emerald-400 mt-0.5">
-            {vlan.subnet}{vlan.gateway && ` via ${vlan.gateway}`}
-          </p>
+        <Badge variant="outline" className={`shrink-0 ${statusColor[sw.status ?? "unknown"] ?? ""}`}>
+          {sw.status ?? "unknown"}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        <SwitchNotesEditor sw={sw} />
+        <Link href={switchPostIncidentHref(sw)}>
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Activity className="h-3 w-3 mr-1" />
+            Start Post-Incident Review
+          </Button>
+        </Link>
+        {onAskAI && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onAskAI(buildSwitchAIPrompt(sw))}
+          >
+            <Sparkles className="h-3 w-3 mr-1" />
+            Ask AI about this switch
+          </Button>
         )}
       </div>
-      <Badge variant="outline" className={`shrink-0 ${vlanTypeColor[vlan.type ?? "other"] ?? ""}`}>
-        {vlan.type ?? "other"}
-      </Badge>
+    </div>
+  );
+}
+
+function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => void }) {
+  return (
+    <div className="border-b last:border-b-0 py-2 px-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono font-bold text-primary text-sm">VLAN {vlan.vlanId}</span>
+            <span className="font-medium text-sm truncate">{vlan.name}</span>
+          </div>
+          {vlan.description && <p className="text-xs text-muted-foreground mt-0.5">{vlan.description}</p>}
+          {vlan.subnet && (
+            <p className="font-mono text-xs text-emerald-400 mt-0.5">
+              {vlan.subnet}{vlan.gateway && ` via ${vlan.gateway}`}
+            </p>
+          )}
+        </div>
+        <Badge variant="outline" className={`shrink-0 ${vlanTypeColor[vlan.type ?? "other"] ?? ""}`}>
+          {vlan.type ?? "other"}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        <Link href={vlanPostIncidentHref(vlan)}>
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Activity className="h-3 w-3 mr-1" />
+            Start Post-Incident Review
+          </Button>
+        </Link>
+        {onAskAI && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onAskAI(buildVlanAIPrompt(vlan))}
+          >
+            <Sparkles className="h-3 w-3 mr-1" />
+            Ask AI about this VLAN
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-function AskAIPanel() {
-  const [open, setOpen] = useState(false);
+function AskAIPanel({
+  open,
+  onOpenChange,
+  pendingPrompt,
+  onPromptConsumed,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pendingPrompt: string | null;
+  onPromptConsumed: () => void;
+}) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -100,6 +299,13 @@ function AskAIPanel() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
+
+  useEffect(() => {
+    if (pendingPrompt) {
+      setInput(pendingPrompt);
+      onPromptConsumed();
+    }
+  }, [pendingPrompt, onPromptConsumed]);
 
   const send = async () => {
     const trimmed = input.trim();
@@ -141,7 +347,7 @@ function AskAIPanel() {
   ];
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
         <Button size="sm">
           <Sparkles className="h-4 w-4 mr-2" /> Ask AI
@@ -386,17 +592,23 @@ function CampusMapPanel() {
 
 export default function Network() {
   const [search, setSearch] = useState("");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const askAI = (prompt: string) => {
+    setPendingPrompt(prompt);
+    setAiOpen(true);
+  };
   const { data: switches, isLoading: switchesLoading } = useListSwitches({});
   const { data: vlans, isLoading: vlansLoading } = useListVlans({});
 
   const q = search.toLowerCase();
-  const allSwitches = (switches ?? []) as any[];
-  const allVlans = (vlans ?? []) as any[];
+  const allSwitches: NetworkSwitch[] = switches ?? [];
+  const allVlans: Vlan[] = vlans ?? [];
   const filteredSwitches = allSwitches.filter((s) => matchSwitch(s, q));
   const filteredVlans = allVlans.filter((v) => matchVlan(v, q));
 
   const buildings = useMemo(() => {
-    const m: Record<string, { switches: any[]; vlans: any[] }> = {};
+    const m: Record<string, { switches: NetworkSwitch[]; vlans: Vlan[] }> = {};
     for (const s of allSwitches) {
       const b = s.building || "Unassigned";
       (m[b] ||= { switches: [], vlans: [] }).switches.push(s);
@@ -418,7 +630,7 @@ export default function Network() {
           }
           return null;
         })
-        .filter(Boolean) as [string, { switches: any[]; vlans: any[] }][];
+        .filter(Boolean) as [string, { switches: NetworkSwitch[]; vlans: Vlan[] }][];
     }
     return entries;
   }, [allSwitches, allVlans, q]);
@@ -436,7 +648,12 @@ export default function Network() {
               <Workflow className="h-4 w-4 mr-2" /> Visualizer
             </Button>
           </Link>
-          <AskAIPanel />
+          <AskAIPanel
+            open={aiOpen}
+            onOpenChange={setAiOpen}
+            pendingPrompt={pendingPrompt}
+            onPromptConsumed={() => setPendingPrompt(null)}
+          />
         </div>
       </div>
 
@@ -504,7 +721,7 @@ export default function Network() {
                           <p className="text-xs text-muted-foreground italic">No switches recorded.</p>
                         ) : (
                           <div className="rounded border bg-background/40">
-                            {group.switches.map((s) => <SwitchRow key={s.id} sw={s} />)}
+                            {group.switches.map((s) => <SwitchRow key={s.id} sw={s} onAskAI={askAI} />)}
                           </div>
                         )}
                       </div>
@@ -516,7 +733,7 @@ export default function Network() {
                           <p className="text-xs text-muted-foreground italic">No VLANs recorded.</p>
                         ) : (
                           <div className="rounded border bg-background/40">
-                            {group.vlans.map((v) => <VlanRow key={v.id} vlan={v} />)}
+                            {group.vlans.map((v) => <VlanRow key={v.id} vlan={v} onAskAI={askAI} />)}
                           </div>
                         )}
                       </div>
@@ -538,18 +755,8 @@ export default function Network() {
               {filteredSwitches.map((sw) => (
                 <Card key={sw.id} className="hover:border-primary/30 transition-colors">
                   <CardContent className="py-3 px-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-mono font-medium text-sm">{sw.hostname}</p>
-                        <p className="text-xs text-muted-foreground">{sw.building}</p>
-                        <p className="font-mono text-xs text-primary mt-1">{sw.ipAddress}</p>
-                        {sw.model && <p className="text-xs text-muted-foreground mt-1">{sw.model}</p>}
-                        {sw.notes && <p className="text-xs italic text-muted-foreground/70 mt-1">{sw.notes}</p>}
-                      </div>
-                      <Badge variant="outline" className={statusColor[sw.status ?? "unknown"] ?? ""}>
-                        {sw.status ?? "unknown"}
-                      </Badge>
-                    </div>
+                    <p className="text-xs text-muted-foreground mb-1">{sw.building}</p>
+                    <SwitchRow sw={sw} onAskAI={askAI} />
                   </CardContent>
                 </Card>
               ))}
@@ -567,26 +774,8 @@ export default function Network() {
               {filteredVlans.map((vlan) => (
                 <Card key={vlan.id} className="hover:border-primary/30 transition-colors">
                   <CardContent className="py-3 px-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-primary">VLAN {vlan.vlanId}</span>
-                          <span className="font-medium text-sm truncate">{vlan.name}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{vlan.building}</p>
-                        {vlan.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{vlan.description}</p>
-                        )}
-                        {vlan.subnet && (
-                          <p className="font-mono text-xs text-emerald-400 mt-1">
-                            {vlan.subnet}{vlan.gateway && ` via ${vlan.gateway}`}
-                          </p>
-                        )}
-                      </div>
-                      <Badge variant="outline" className={`ml-2 shrink-0 ${vlanTypeColor[vlan.type ?? "other"] ?? ""}`}>
-                        {vlan.type ?? "other"}
-                      </Badge>
-                    </div>
+                    <p className="text-xs text-muted-foreground mb-1">{vlan.building}</p>
+                    <VlanRow vlan={vlan} onAskAI={askAI} />
                   </CardContent>
                 </Card>
               ))}

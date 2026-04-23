@@ -37,13 +37,13 @@ const HELPDESK_STEPS: Step[] = [
       <>
         Each time you finish a ticket, project task, install, or piece of
         research, click <strong>Quick Add Item</strong> at the top of the page
-        (or open <Link href="/items" className="underline">Tasks Completed</Link>).
+        (or open <Link href="/items" className="underline">My Tasks</Link>).
         Give it a short title, pick a category (Task, Research, Documentation,
         Incident…), and add notes. Resolved Zendesk tickets are pulled in
         automatically — you do not need to re-enter them.
       </>
     ),
-    cta: { href: "/items", label: "Go to Tasks Completed" },
+    cta: { href: "/items", label: "Go to My Tasks" },
   },
   {
     num: 2,
@@ -70,7 +70,7 @@ const HELPDESK_STEPS: Step[] = [
         Found a security or operational risk? Add it under{" "}
         <Link href="/risks" className="underline">Risks &amp; Issues</Link>.
         Just finished an incident or major change? File an{" "}
-        <Link href="/after-action" className="underline">After-Action Report</Link>.
+        <Link href="/after-action" className="underline">Post-Incident Review</Link>.
         Documenting a recurring procedure? Drop it in the{" "}
         <Link href="/processes" className="underline">Process Library</Link>{" "}
         so the rest of the team can use it.
@@ -101,8 +101,8 @@ const CIO_STEPS: Step[] = [
     body: (
       <>
         The <Link href="/reports" className="underline">Reports</Link> hub
-        rolls up Individual, Team, Monthly Achievements and Open Items views.
-        Use <Link href="/ai-report" className="underline">AI Reports</Link> to
+        rolls up Individual, Team, Monthly Achievements and Open Items views.{" "}
+        Use <Link href="/ai-report" className="underline">AI Assistant</Link> to
         generate a finished status report from the week's data, or export any
         log as DOCX / XLSX from its detail page.
       </>

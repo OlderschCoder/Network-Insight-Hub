@@ -131,7 +131,7 @@ export default function StrategicObjectivesIndex() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Target className="h-6 w-6" /> Strategic Objectives
+            <Target className="h-6 w-6" /> Department Goals
           </h1>
           <p className="text-sm text-muted-foreground">
             Department-wide goals that projects align with.
@@ -186,7 +186,7 @@ export default function StrategicObjectivesIndex() {
       ) : objectives.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            No strategic objectives yet.
+            No department goals yet.
             {isCIO && " Click 'New Objective' to add one."}
           </CardContent>
         </Card>

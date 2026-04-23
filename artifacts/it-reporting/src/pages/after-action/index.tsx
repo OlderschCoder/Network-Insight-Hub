@@ -18,11 +18,11 @@ export default function AfterAction() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">After-Action Reports</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Post-Incident Reviews</h1>
         <Link href="/after-action/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            New Report
+            New Review
           </Button>
         </Link>
       </div>
@@ -31,7 +31,7 @@ export default function AfterAction() {
         <div className="text-center text-muted-foreground py-8">Loading...</div>
       ) : (reports ?? []).length === 0 ? (
         <div className="text-center text-muted-foreground py-8">
-          No after-action reports yet.
+          No post-incident reviews yet.
         </div>
       ) : (
         <div className="space-y-3">

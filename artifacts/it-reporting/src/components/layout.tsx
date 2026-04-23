@@ -15,21 +15,26 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Files, 
+import QuickAddItemDialog from "@/components/QuickAddItemDialog";
+import {
+  LayoutDashboard,
+  FileText,
+  Files,
   ListChecks,
-  ShieldAlert, 
-  Network, 
+  ShieldAlert,
+  Network,
   Activity,
   Users,
   Sparkles,
   BookOpen,
   Briefcase,
   Target,
-  LogOut
+  LogOut,
+  Zap,
 } from "lucide-react";
+
+type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
+type NavGroup = { label: string; items: NavItem[] };
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout, isCIO } = useAuth();
@@ -44,6 +49,51 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const myWorkGroup: NavGroup = {
+    label: "My Work",
+    items: [
+      { href: "/", label: isCIO ? "Dashboard" : "Home", icon: LayoutDashboard, match: (l) => l === "/" },
+      { href: "/items", label: "My Tasks", icon: ListChecks },
+      { href: "/entries", label: "Weekly Log", icon: FileText },
+    ],
+  };
+
+  const knowledgeGroup: NavGroup = {
+    label: "Knowledge",
+    items: [
+      { href: "/network", label: "Network", icon: Network },
+      { href: "/processes", label: "Process Library", icon: BookOpen },
+      { href: "/ai-report", label: "AI Assistant", icon: Sparkles },
+    ],
+  };
+
+  const teamGroup: NavGroup = {
+    label: "Team",
+    items: [
+      { href: "/risks", label: "Risks & Issues", icon: ShieldAlert },
+      { href: "/after-action", label: "Post-Incident Reviews", icon: Activity },
+      { href: "/reports", label: "Reports", icon: Files },
+    ],
+  };
+
+  const leadershipGroup: NavGroup = {
+    label: "Leadership & Admin",
+    items: [
+      { href: "/projects", label: "Projects", icon: Briefcase },
+      { href: "/strategic-objectives", label: "Department Goals", icon: Target },
+      { href: "/admin", label: "Admin", icon: Users },
+    ],
+  };
+
+  const groups: NavGroup[] = isCIO
+    ? [myWorkGroup, knowledgeGroup, teamGroup, leadershipGroup]
+    : [myWorkGroup, knowledgeGroup, teamGroup];
+
+  const isActive = (item: NavItem) => {
+    if (item.match) return item.match(location);
+    return location.startsWith(item.href);
+  };
+
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-background w-full">
@@ -52,111 +102,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="p-4 font-bold text-lg tracking-tight text-sidebar-foreground border-b border-sidebar-border">
               SCCC IT HUB
             </div>
-            <SidebarGroup>
-              <SidebarGroupLabel>Menu</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location === "/"}>
-                      <Link href="/">
-                        <LayoutDashboard className="mr-2" />
-                        Dashboard
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/items")}>
-                      <Link href="/items">
-                        <ListChecks className="mr-2" />
-                        Tasks Completed
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/entries")}>
-                      <Link href="/entries">
-                        <FileText className="mr-2" />
-                        Weekly Logs
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/reports")}>
-                      <Link href="/reports">
-                        <Files className="mr-2" />
-                        Reports
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/projects")}>
-                      <Link href="/projects">
-                        <Briefcase className="mr-2" />
-                        Projects
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/strategic-objectives")}>
-                      <Link href="/strategic-objectives">
-                        <Target className="mr-2" />
-                        Strategic Objectives
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/risks")}>
-                      <Link href="/risks">
-                        <ShieldAlert className="mr-2" />
-                        Risks & Issues
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/network")}>
-                      <Link href="/network">
-                        <Network className="mr-2" />
-                        Network Ref
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/processes")}>
-                      <Link href="/processes">
-                        <BookOpen className="mr-2" />
-                        Process Library
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/after-action")}>
-                      <Link href="/after-action">
-                        <Activity className="mr-2" />
-                        After Action
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/ai-report")}>
-                      <Link href="/ai-report">
-                        <Sparkles className="mr-2" />
-                        AI Reports
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  {isCIO && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location.startsWith("/admin")}>
-                        <Link href="/admin">
-                          <Users className="mr-2" />
-                          Admin
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {groups.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton asChild isActive={isActive(item)}>
+                            <Link href={item.href}>
+                              <Icon className="mr-2" />
+                              {item.label}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
           <SidebarFooter className="border-t border-sidebar-border p-4 flex flex-col gap-2">
             <div className="text-xs text-muted-foreground truncate">
@@ -169,8 +136,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <main className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card">
+          <div className="h-12 border-b border-border flex items-center justify-between px-4 shrink-0 bg-card gap-2">
             <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <QuickAddItemDialog
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Zap className="h-4 w-4 mr-2" />
+                    Quick Add
+                  </Button>
+                }
+              />
+              <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
+                <Button variant="outline" size="sm">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Ask AI
+                </Button>
+              </Link>
+            </div>
           </div>
           <div className="flex-1 overflow-auto p-6 bg-background">
             {children}

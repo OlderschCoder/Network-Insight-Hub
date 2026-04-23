@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
-import { useLocation, Link } from "wouter";
+import { useEffect } from "react";
+import { useLocation, Link, useSearch } from "wouter";
 import { useCreateAfterActionReport } from "@workspace/api-client-react";
 import type { CreateAfterActionBody } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,14 @@ export default function NewAfterAction() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createMutation = useCreateAfterActionReport();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const prefillTitle = params.get("title") ?? "";
+  const prefillSummary = params.get("summary") ?? "";
+  const prefillIncidentDate = params.get("incidentDate") ?? new Date().toISOString().slice(0, 10);
+  const prefillOutcome = params.get("outcome") ?? "success";
+  const sourcePath = params.get("source") ?? "";
+  const sourceLabel = params.get("sourceLabel") ?? "";
 
   const {
     register,
@@ -41,10 +50,10 @@ export default function NewAfterAction() {
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      title: "",
-      incidentDate: new Date().toISOString().slice(0, 10),
-      outcome: "success",
-      summary: "",
+      title: prefillTitle,
+      incidentDate: prefillIncidentDate,
+      outcome: prefillOutcome,
+      summary: prefillSummary,
       timeline: "",
       whatWentWell: "",
       whatWentPoorly: "",
@@ -52,20 +61,37 @@ export default function NewAfterAction() {
     },
   });
 
+  useEffect(() => {
+    if (prefillTitle) setValue("title", prefillTitle);
+    if (prefillSummary) setValue("summary", prefillSummary);
+  }, [prefillTitle, prefillSummary, setValue]);
+
   const outcome = watch("outcome");
 
   const onSubmit = async (data: FormData) => {
-    const body = {
+    const lessons = [
+      data.whatWentWell && `What went well:\n${data.whatWentWell}`,
+      data.whatWentPoorly && `What went poorly:\n${data.whatWentPoorly}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const severity: CreateAfterActionBody["severity"] =
+      data.outcome === "failure"
+        ? "high"
+        : data.outcome === "partial"
+        ? "medium"
+        : "low";
+    const body: CreateAfterActionBody = {
       title: data.title,
-      incidentDate: data.incidentDate,
-      outcome: data.outcome as any,
-      summary: data.summary || undefined,
+      incident: data.summary || data.title,
+      incidentDate: data.incidentDate || undefined,
+      status: "open",
+      severity,
       timeline: data.timeline || undefined,
-      whatWentWell: data.whatWentWell || undefined,
-      whatWentPoorly: data.whatWentPoorly || undefined,
-      actionItems: data.actionItems || undefined,
-    } as unknown as CreateAfterActionBody;
-    await createMutation.mutateAsync({ data: body as any });
+      lessonsLearned: lessons || undefined,
+      preventionMeasures: data.actionItems || undefined,
+    };
+    await createMutation.mutateAsync({ data: body });
     queryClient.invalidateQueries({ queryKey: ["/api/after-action"] });
     setLocation("/after-action");
   };
@@ -78,8 +104,21 @@ export default function NewAfterAction() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight">New After-Action Report</h1>
+        <h1 className="text-3xl font-bold tracking-tight">New Post-Incident Review</h1>
       </div>
+
+      {sourcePath && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-4 py-2 text-sm flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">
+            Started from {sourceLabel || sourcePath}
+          </span>
+          <Link href={sourcePath}>
+            <Button variant="ghost" size="sm">
+              Back to {sourceLabel || "source"}
+            </Button>
+          </Link>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-6">

@@ -47,6 +47,36 @@ async function zget<T>(cfg: ReturnType<typeof zendeskConfig>, path: string): Pro
   return (await r.json()) as T;
 }
 
+router.get("/my-open-count", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) {
+    return res.json({ configured: false, count: 0 });
+  }
+  try {
+    const email = (req.user?.email || "").trim();
+    if (!email) return res.json({ configured: true, count: 0, message: "No email on user" });
+
+    type UsersResp = { users: ZendeskUser[] };
+    const usersResp = await zget<UsersResp>(
+      cfg,
+      `users/search.json?query=${encodeURIComponent(`email:${email}`)}`,
+    );
+    const me = usersResp.users?.[0];
+    if (!me) return res.json({ configured: true, count: 0, message: "No matching Zendesk user" });
+
+    type CountResp = { count: { value: number } };
+    const data = await zget<CountResp>(
+      cfg,
+      `search/count.json?query=${encodeURIComponent(
+        `type:ticket assignee:${me.id} status<solved`,
+      )}`,
+    );
+    return res.json({ configured: true, count: data.count?.value ?? 0 });
+  } catch (e: any) {
+    return res.json({ configured: true, count: 0, error: e.message });
+  }
+});
+
 router.get("/status", requireAuth, async (_req, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {

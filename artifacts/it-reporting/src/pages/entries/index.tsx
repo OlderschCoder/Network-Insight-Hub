@@ -43,7 +43,7 @@ export default function Entries() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Log Entries</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Weekly Log</h1>
         <div className="flex gap-2">
           <QuickAddItemDialog />
           <Link href="/entries/new">

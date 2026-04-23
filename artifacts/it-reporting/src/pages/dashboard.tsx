@@ -7,8 +7,18 @@ import { QuoteOfDay } from "@/components/QuoteOfDay";
 import { ZendeskResolved } from "@/components/ZendeskResolved";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { HowToUse } from "@/components/HowToUse";
+import { useAuth } from "@/context/AuthContext";
+import MyWork from "@/components/MyWork";
 
 export default function Dashboard() {
+  const { isCIO } = useAuth();
+  if (!isCIO) {
+    return <MyWork />;
+  }
+  return <CIODashboard />;
+}
+
+function CIODashboard() {
   const { data: summary } = useGetDashboardSummary();
   const { data: recentActivity } = useGetRecentActivity({ limit: 10 });
   const { data: weekStatus } = useGetWeekStatus();
@@ -76,7 +86,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">After Action Reports</CardTitle>
+            <CardTitle className="text-sm font-medium">Post-Incident Reviews</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
