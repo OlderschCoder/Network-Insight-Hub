@@ -34,6 +34,7 @@ import ProjectsIndex from "@/pages/projects/index";
 import NewProject from "@/pages/projects/new";
 import ProjectDetail from "@/pages/projects/[id]";
 import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
+import AzureVms from "@/pages/azure-vms/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +101,7 @@ function Router() {
       
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
+      <Route path="/azure-vms" component={() => <ProtectedRoute component={AzureVms} />} />
       
       <Route path="/after-action" component={() => <ProtectedRoute component={AfterAction} />} />
       <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />

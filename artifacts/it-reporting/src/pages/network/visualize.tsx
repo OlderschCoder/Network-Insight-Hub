@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import {
   useListSwitches,
   useListVlans,
+  useListAzureVms,
   useGetNetworkLayout,
   useSaveNetworkLayout,
   useClearNetworkLayout,
@@ -40,6 +41,7 @@ import {
   X,
   Building2,
   Download,
+  Cloud,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -52,9 +54,11 @@ const statusFill: Record<string, string> = {
 export default function NetworkVisualize() {
   const { data: switches = [] } = useListSwitches({});
   const { data: vlans = [] } = useListVlans({});
+  const { data: azureVms = [] } = useListAzureVms({});
   const [search, setSearch] = useState("");
   const [selectedSwitchIds, setSelectedSwitchIds] = useState<Set<number>>(new Set());
   const [selectedVlanIds, setSelectedVlanIds] = useState<Set<number>>(new Set());
+  const [selectedVmIds, setSelectedVmIds] = useState<Set<number>>(new Set());
 
   const filteredSwitches = useMemo(() => {
     const q = search.toLowerCase();
@@ -77,6 +81,19 @@ export default function NetworkVisualize() {
         v.building?.toLowerCase().includes(q)
     );
   }, [vlans, search]);
+
+  const filteredVms = useMemo(() => {
+    const q = search.toLowerCase();
+    return azureVms.filter(
+      (v) =>
+        !q ||
+        v.name?.toLowerCase().includes(q) ||
+        v.resourceGroup?.toLowerCase().includes(q) ||
+        v.privateIp?.toLowerCase().includes(q) ||
+        v.publicIp?.toLowerCase().includes(q) ||
+        v.purpose?.toLowerCase().includes(q),
+    );
+  }, [azureVms, search]);
 
   const toggle = <T,>(set: Set<T>, val: T): Set<T> => {
     const next = new Set(set);
@@ -567,8 +584,132 @@ export default function NetworkVisualize() {
       cursorX += buildingW + BUILDING_GAP;
     });
 
+    // --- Azure (via FortiGate) container ---
+    // Selected Azure VMs render in their own container to the RIGHT of the
+    // buildings row, with a single edge from the FortiGate to the container.
+    // VMs inside are arranged in a grid identical to switches.
+    const selVms = azureVms.filter((v) => selectedVmIds.has(v.id));
+    if (selVms.length > 0) {
+      const vmRows = Math.ceil(selVms.length / COLS) || 0;
+      const vmHeight = vmRows ? vmRows * NODE_H + (vmRows - 1) * ROW_GAP : 0;
+      const innerCols = Math.min(COLS, Math.max(1, selVms.length));
+      const innerWidth = innerCols * NODE_W + (innerCols - 1) * COL_GAP;
+      const azureW = innerWidth + PADDING_X * 2;
+      const azureH = PADDING_TOP + vmHeight + PADDING_BOTTOM;
+      const azureId = "container-azure";
+
+      nodes.push({
+        id: azureId,
+        position: { x: cursorX, y: BUILDINGS_Y },
+        data: { label: "", exportLabel: "Azure (via FortiGate)", exportShape: "container" },
+        style: {
+          width: azureW,
+          height: azureH,
+          background: "rgba(8,47,73,0.55)",
+          border: "2px solid #0ea5e9",
+          borderRadius: 12,
+          color: "#f0f9ff",
+          fontWeight: 600,
+          fontSize: 13,
+          padding: 0,
+        },
+        draggable: true,
+        selectable: true,
+      });
+
+      // Container header label
+      nodes.push({
+        id: `${azureId}-label`,
+        position: { x: PADDING_X - 6, y: 8 },
+        parentNode: azureId,
+        extent: "parent",
+        draggable: false,
+        selectable: false,
+        data: {
+          exportSkip: true,
+          label: (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#bae6fd",
+                letterSpacing: 0.3,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              ☁ AZURE (via FortiGate)
+            </div>
+          ),
+        },
+        style: {
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          width: azureW - PADDING_X * 2,
+        },
+      });
+
+      // Single edge from FortiGate to the Azure container.
+      edges.push({
+        id: "e-fortigate-azure",
+        source: fortigateChildId,
+        target: azureId,
+        animated: true,
+        style: { stroke: "#0ea5e9", strokeWidth: 2, strokeDasharray: "4 3" },
+        label: "Azure tunnel",
+        labelStyle: { fill: "#94a3b8", fontSize: 10 },
+        labelBgStyle: { fill: "#020617" },
+      });
+
+      selVms.forEach((vm, idx) => {
+        const col = idx % COLS;
+        const row = Math.floor(idx / COLS);
+        const status = (vm.status ?? "unknown").toLowerCase();
+        const borderColor =
+          status === "running" ? "#10b981" : status === "stopped" ? "#ef4444" : "#0ea5e9";
+        nodes.push({
+          id: `vm-${vm.id}`,
+          parentNode: azureId,
+          extent: "parent",
+          position: {
+            x: PADDING_X + col * (NODE_W + COL_GAP),
+            y: PADDING_TOP + row * (NODE_H + ROW_GAP),
+          },
+          data: {
+            exportLabel: `${vm.name}\n${vm.privateIp ?? vm.publicIp ?? ""}\n${vm.os ?? vm.size ?? ""}`.trim(),
+            exportColor: "#082f49",
+            label: (
+              <div style={{ fontSize: 11, lineHeight: 1.3, textAlign: "left" }}>
+                <div style={{ fontWeight: 600 }}>{vm.name}</div>
+                {(vm.privateIp || vm.publicIp) && (
+                  <div style={{ opacity: 0.85, fontFamily: "monospace", fontSize: 10 }}>
+                    {vm.privateIp ?? vm.publicIp}
+                  </div>
+                )}
+                {(vm.os || vm.size) && (
+                  <div style={{ opacity: 0.6, fontSize: 10 }}>{vm.os ?? vm.size}</div>
+                )}
+              </div>
+            ),
+          },
+          style: {
+            width: NODE_W,
+            height: NODE_H,
+            background: "#082f49",
+            color: "#e0f2fe",
+            border: `2px solid ${borderColor}`,
+            borderRadius: 8,
+            padding: 8,
+          },
+          draggable: true,
+        });
+      });
+    }
+
     return { nodes, edges };
-  }, [switches, vlans, selectedSwitchIds, selectedVlanIds]);
+  }, [switches, vlans, azureVms, selectedSwitchIds, selectedVlanIds, selectedVmIds]);
 
   // ---- Layout persistence -------------------------------------------------
   // Saved per-node positions (shared across users) override the auto-layout
@@ -666,7 +807,7 @@ export default function NetworkVisualize() {
     }
   }, [clearLayoutMutation, refetchLayout, toast]);
 
-  const totalSelected = selectedSwitchIds.size + selectedVlanIds.size;
+  const totalSelected = selectedSwitchIds.size + selectedVlanIds.size + selectedVmIds.size;
 
   // Buildings tab data: list every distinct (normalized) building with its
   // switch + VLAN counts and a "select all in this building" toggle.
@@ -848,6 +989,7 @@ export default function NetworkVisualize() {
                 onClick={() => {
                   setSelectedSwitchIds(new Set());
                   setSelectedVlanIds(new Set());
+                  setSelectedVmIds(new Set());
                 }}
               >
                 <X className="h-3 w-3 mr-1" /> Clear
@@ -865,6 +1007,9 @@ export default function NetworkVisualize() {
               </TabsTrigger>
               <TabsTrigger value="vlans" className="flex-1">
                 <NetIcon className="h-3 w-3 mr-1" /> VLANs
+              </TabsTrigger>
+              <TabsTrigger value="azure" className="flex-1">
+                <Cloud className="h-3 w-3 mr-1" /> Azure
               </TabsTrigger>
             </TabsList>
 
@@ -996,6 +1141,68 @@ export default function NetworkVisualize() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="azure" className="mt-3">
+              <Card>
+                <CardContent className="p-2 max-h-[60vh] overflow-y-auto">
+                  {filteredVms.map((vm) => {
+                    const checked = selectedVmIds.has(vm.id);
+                    const status = (vm.status ?? "unknown").toLowerCase();
+                    const dot =
+                      status === "running"
+                        ? "#10b981"
+                        : status === "stopped"
+                          ? "#ef4444"
+                          : "#0ea5e9";
+                    return (
+                      <button
+                        key={vm.id}
+                        onClick={() => setSelectedVmIds((prev) => toggle(prev, vm.id))}
+                        className={`w-full text-left p-2 rounded text-xs hover:bg-muted/50 flex items-start gap-2 ${
+                          checked ? "bg-primary/10" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          readOnly
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{vm.name}</div>
+                          <div className="text-muted-foreground truncate">
+                            {vm.privateIp ?? vm.publicIp ?? "—"}
+                            {vm.resourceGroup ? ` · ${vm.resourceGroup}` : ""}
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1 py-0"
+                          style={{ borderColor: dot }}
+                        >
+                          {vm.status}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                  {filteredVms.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-4 text-center">
+                      {azureVms.length === 0 ? (
+                        <>
+                          No Azure VMs yet.{" "}
+                          <Link href="/azure-vms" className="underline">
+                            Add some
+                          </Link>
+                          .
+                        </>
+                      ) : (
+                        "No matches."
+                      )}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -1049,7 +1256,7 @@ export default function NetworkVisualize() {
             <div ref={flowWrapperRef} style={{ height: "70vh" }} className="bg-slate-950 rounded-b-lg">
               {totalSelected === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                  Select switches or VLANs from the left to draw them here.
+                  Select switches, VLANs, or Azure VMs from the left to draw them here.
                 </div>
               ) : (
                 <ReactFlow
