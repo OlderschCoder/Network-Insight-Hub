@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, Link, useSearch } from "wouter";
 import { useCreateAfterActionReport } from "@workspace/api-client-react";
 import type { CreateAfterActionBody } from "@workspace/api-client-react";
@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type FormData = {
   title: string;
@@ -43,6 +44,8 @@ export default function NewAfterAction() {
   const sourceLabel = params.get("sourceLabel") ?? "";
   const prefillTimeline = params.get("timeline") ?? "";
   const zendeskTicketId = params.get("zendeskTicketId") ?? "";
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     register,
@@ -96,6 +99,52 @@ export default function NewAfterAction() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zendeskTicketId]);
+
+  const handleRefreshTimeline = async () => {
+    if (!zendeskTicketId || isRefreshing) return;
+    const current = (watch("timeline") || "").trim();
+    if (current.length > 0) {
+      const ok = window.confirm(
+        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
+      );
+      if (!ok) return;
+    }
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const r = await fetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
+          zendeskTicketId,
+        )}/timeline`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok || !body.timeline) {
+        toast({
+          title: "Couldn't refresh timeline",
+          description:
+            (body && (body.error || body.message)) ||
+            "Zendesk did not return a timeline for this ticket.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setValue("timeline", body.timeline, { shouldDirty: true });
+      toast({
+        title: "Timeline refreshed",
+        description: `Pulled the latest comments from Zendesk ticket #${zendeskTicketId}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Couldn't refresh timeline",
+        description:
+          err instanceof Error ? err.message : "Network request failed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const outcome = watch("outcome");
 
@@ -201,13 +250,38 @@ export default function NewAfterAction() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="timeline">Timeline</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="timeline">Timeline</Label>
+                {zendeskTicketId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshTimeline}
+                    disabled={isRefreshing}
+                    data-testid="button-refresh-timeline"
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 mr-1.5 ${
+                        isRefreshing ? "animate-spin" : ""
+                      }`}
+                    />
+                    {isRefreshing ? "Refreshing..." : "Refresh from Zendesk"}
+                  </Button>
+                )}
+              </div>
               <Textarea
                 id="timeline"
                 rows={4}
                 placeholder="Chronological sequence of events..."
                 {...register("timeline")}
               />
+              {zendeskTicketId && (
+                <p className="text-xs text-muted-foreground">
+                  Linked to Zendesk ticket #{zendeskTicketId}. Use Refresh to
+                  pull in any new comments.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
