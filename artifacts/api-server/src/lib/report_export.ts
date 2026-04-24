@@ -227,15 +227,26 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     ? allProjectsForGoals.filter((p) => reportProjectIds.includes(p.id))
     : allProjectsForGoals;
   const weekStartIso = new Date(weekStartStr + "T00:00:00.000Z").toISOString();
+  const weekEndIso = new Date(weekEndStr + "T00:00:00.000Z").toISOString();
   function projectWeekDelta(p: typeof allProjectsForGoals[number]) {
     const log = Array.isArray(p.progressLog) ? (p.progressLog as { date: string; value: number }[]) : [];
     const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
-    let startVal = 0;
+    // Both START and END derive from progressLog snapshots so historical reports stay
+    // accurate over time. END must be the value as of weekEnd, NOT current progress.
+    let startVal: number | null = null;
+    let endVal: number | null = null;
     for (const e of sorted) {
-      if (e.date <= weekStartIso) startVal = e.value; else break;
+      if (e.date <= weekStartIso) startVal = e.value;
+      if (e.date <= weekEndIso) endVal = e.value;
+      else break;
     }
-    const endVal = p.progress ?? 0;
-    return { startVal, endVal, delta: endVal - startVal };
+    if (sorted.length === 0) {
+      const cur = p.progress ?? 0;
+      return { startVal: cur, endVal: cur, delta: 0 };
+    }
+    const s = startVal ?? 0;
+    const e = endVal ?? s;
+    return { startVal: s, endVal: e, delta: e - s };
   }
   const goalProgress = allObjectives
     .filter((o) => o.status !== "archived")

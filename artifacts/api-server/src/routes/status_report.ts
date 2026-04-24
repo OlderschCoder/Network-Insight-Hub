@@ -378,7 +378,16 @@ Contract Valid Until: [date]
 - Calculate reasonable approximations for uptime and ticket SLA when data permits.
 - Use Markdown formatting with bold section headings.
 - Do NOT invent stakeholder names, dollar amounts, or contract dates — use only what is provided in accountInfo.
-- If accountInfo fields are empty, write "[To be provided]" rather than fabricating.`;
+- If accountInfo fields are empty, write "[To be provided]" rather than fabricating.
+
+# Required data inputs (use them all — do not omit a section because data is light)
+- \`logEntries\` and \`weeklyReports\`: drive On-going Projects / Services and Recent Wins / Challenges.
+- \`tasksAndLogItems\` (open log items / tasks): include forward-looking ones in Key Actions / Decisions.
+- \`projects\`: cite project name, status, and progress in On-going Projects / Services. Use the per-project deltas in \`departmentGoals.projects[]\` (weekStartProgress → progress, weekDelta) to describe momentum during the period.
+- \`departmentGoals\` (with \`avgRangeDelta\`, \`sumRangeDelta\`): briefly summarize movement against strategic objectives in On-going Projects / Services or Recent Wins (e.g., "Modernize Network advanced +12 pts this period").
+- \`networkMaintenance\`: mention notable maintenance windows (host, building, time) under On-going Projects / Services or Service Level Metrics.
+- \`afterActionReports\` / PIRs: summarize incidents and learnings in Recent Wins / Challenges.
+- \`risks\`: open risks belong in Key Actions / Decisions and (if material) Challenges.`;
 
       const userPrompt = `Generate the Managed Services Status Report from the following operational data:\n\n${JSON.stringify(operationalData, null, 2)}`;
 

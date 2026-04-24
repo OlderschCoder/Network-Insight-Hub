@@ -249,9 +249,10 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
 //   - goalProgress: WEEK-SCOPED deltas for department goals derived from the report's linked
 //     projects (or all projects if the report has no projectIds). Per project: progress at
 //     week start (last progressLog entry on or before weekStart, or 0) vs current progress.
-// Restricted to CIO since this aggregates organization-wide operational detail intended for
-// report authoring.
-router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
+// Available to any authenticated viewer so non-CIO recipients also see the report's
+// PIR / maintenance / goal-progress cards (the underlying data is otherwise readable
+// via its own list endpoints).
+router.get("/:id/extras", requireAuth, async (req: any, res) => {
   const id = parseInt(req.params.id);
   const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Not found" });
@@ -343,13 +344,25 @@ router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
       ? (p.progressLog as { date: string; value: number }[])
       : [];
     const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
-    let startVal = 0;
+    const weekStartIso = weekStart.toISOString();
+    const weekEndIso = weekEnd.toISOString();
+    // Both START and END derive from progressLog snapshots so historical reports stay
+    // accurate over time (END must be the value as of weekEnd, NOT the current value).
+    // If no log entries exist at all, fall back to current progress for both -> delta 0.
+    let startVal: number | null = null;
+    let endVal: number | null = null;
     for (const e of sorted) {
-      if (e.date <= weekStart.toISOString()) startVal = e.value;
+      if (e.date <= weekStartIso) startVal = e.value;
+      if (e.date <= weekEndIso) endVal = e.value;
       else break;
     }
-    const endVal = p.progress ?? 0;
-    return { startVal, delta: endVal - startVal };
+    if (sorted.length === 0) {
+      const cur = p.progress ?? 0;
+      return { startVal: cur, endVal: cur, delta: 0 };
+    }
+    const s = startVal ?? 0;
+    const e = endVal ?? s;
+    return { startVal: s, endVal: e, delta: e - s };
   };
   const goalProgress = allObjectives
     .filter((o) => o.status !== "archived")
