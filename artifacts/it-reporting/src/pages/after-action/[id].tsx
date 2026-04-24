@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ArrowLeft, Download, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Pencil, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const severityColor: Record<string, string> = {
@@ -117,6 +117,32 @@ export default function AfterActionDetail() {
         <Badge variant="outline" className={severityColor[r.severity] ?? ""}>
           {r.severity}
         </Badge>
+        {r.zendeskTicketId ? (
+          r.zendeskTicketUrl ? (
+            <a
+              href={r.zendeskTicketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="link-zendesk-ticket"
+            >
+              <Badge
+                variant="outline"
+                className="bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30 cursor-pointer gap-1"
+              >
+                Zendesk #{r.zendeskTicketId}
+                <ExternalLink className="h-3 w-3" />
+              </Badge>
+            </a>
+          ) : (
+            <Badge
+              variant="outline"
+              className="bg-sky-500/20 text-sky-300 border-sky-500/30"
+              data-testid="badge-zendesk-ticket"
+            >
+              Zendesk #{r.zendeskTicketId}
+            </Badge>
+          )
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">

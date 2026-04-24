@@ -6,9 +6,20 @@ import { z } from "zod";
 
 const router = Router();
 
+function zendeskTicketUrl(ticketId: number | null | undefined): string | null {
+  if (!ticketId) return null;
+  const subdomain = process.env.ZENDESK_SUBDOMAIN;
+  if (!subdomain) return null;
+  return `https://${subdomain}.zendesk.com/agent/tickets/${ticketId}`;
+}
+
 async function enrichReport(r: any) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, r.userId));
-  return { ...r, userName: user?.name ?? "Unknown" };
+  return {
+    ...r,
+    userName: user?.name ?? "Unknown",
+    zendeskTicketUrl: zendeskTicketUrl(r.zendeskTicketId),
+  };
 }
 
 router.get("/", requireAuth, async (req: any, res) => {
@@ -39,6 +50,7 @@ router.post("/", requireAuth, async (req: any, res) => {
     preventionMeasures: z.string().optional(),
     status: z.enum(["open", "resolved", "closed"]),
     severity: z.enum(["low", "medium", "high", "critical"]),
+    zendeskTicketId: z.number().int().positive().nullable().optional(),
     incidentDate: z.string().optional(),
   });
   const parsed = schema.safeParse(req.body);
@@ -46,6 +58,7 @@ router.post("/", requireAuth, async (req: any, res) => {
   const [report] = await db.insert(afterActionReportsTable).values({
     ...parsed.data,
     userId: req.user.id,
+    zendeskTicketId: parsed.data.zendeskTicketId ?? null,
     incidentDate: parsed.data.incidentDate ? new Date(parsed.data.incidentDate) : null,
   }).returning();
   return res.status(201).json(await enrichReport(report));
@@ -78,6 +91,7 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
     preventionMeasures: z.string().optional(),
     status: z.enum(["open", "resolved", "closed"]).optional(),
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+    zendeskTicketId: z.number().int().positive().nullable().optional(),
     incidentDate: z.string().optional(),
   });
   const parsed = schema.safeParse(req.body);

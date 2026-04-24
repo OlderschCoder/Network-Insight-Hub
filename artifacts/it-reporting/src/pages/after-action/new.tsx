@@ -161,6 +161,9 @@ export default function NewAfterAction() {
         : data.outcome === "partial"
         ? "medium"
         : "low";
+    const parsedTicketId = zendeskTicketId
+      ? Number.parseInt(zendeskTicketId, 10)
+      : NaN;
     const body: CreateAfterActionBody = {
       title: data.title,
       incident: data.summary || data.title,
@@ -170,6 +173,9 @@ export default function NewAfterAction() {
       timeline: data.timeline || undefined,
       lessonsLearned: lessons || undefined,
       preventionMeasures: data.actionItems || undefined,
+      zendeskTicketId: Number.isFinite(parsedTicketId) && parsedTicketId > 0
+        ? parsedTicketId
+        : undefined,
     };
     await createMutation.mutateAsync({ data: body });
     queryClient.invalidateQueries({ queryKey: ["/api/after-action"] });

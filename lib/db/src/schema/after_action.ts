@@ -18,6 +18,7 @@ export const afterActionReportsTable = pgTable("after_action_reports", {
   preventionMeasures: text("prevention_measures"),
   status: varchar("status", { length: 20 }).notNull().default("open"),
   severity: varchar("severity", { length: 20 }).notNull(),
+  zendeskTicketId: integer("zendesk_ticket_id"),
   incidentDate: timestamp("incident_date"),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

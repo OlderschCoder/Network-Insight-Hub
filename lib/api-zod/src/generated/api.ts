@@ -1887,6 +1887,8 @@ export const ListAfterActionReportsResponseItem = zod.object({
   preventionMeasures: zod.string().optional(),
   status: zod.enum(["open", "resolved", "closed"]),
   severity: zod.enum(["low", "medium", "high", "critical"]),
+  zendeskTicketId: zod.number().nullish(),
+  zendeskTicketUrl: zod.string().nullish(),
   incidentDate: zod.coerce.date().optional(),
   resolvedAt: zod.coerce.date().optional(),
   createdAt: zod.coerce.date(),
@@ -1909,6 +1911,7 @@ export const CreateAfterActionReportBody = zod.object({
   preventionMeasures: zod.string().optional(),
   status: zod.enum(["open", "resolved", "closed"]),
   severity: zod.enum(["low", "medium", "high", "critical"]),
+  zendeskTicketId: zod.number().nullish(),
   incidentDate: zod.coerce.date().optional(),
 });
 
@@ -1932,6 +1935,8 @@ export const GetAfterActionReportResponse = zod.object({
   preventionMeasures: zod.string().optional(),
   status: zod.enum(["open", "resolved", "closed"]),
   severity: zod.enum(["low", "medium", "high", "critical"]),
+  zendeskTicketId: zod.number().nullish(),
+  zendeskTicketUrl: zod.string().nullish(),
   incidentDate: zod.coerce.date().optional(),
   resolvedAt: zod.coerce.date().optional(),
   createdAt: zod.coerce.date(),
@@ -1955,6 +1960,7 @@ export const UpdateAfterActionReportBody = zod.object({
   preventionMeasures: zod.string().optional(),
   status: zod.enum(["open", "resolved", "closed"]),
   severity: zod.enum(["low", "medium", "high", "critical"]),
+  zendeskTicketId: zod.number().nullish(),
   incidentDate: zod.coerce.date().optional(),
 });
 
@@ -1974,6 +1980,8 @@ export const UpdateAfterActionReportResponse = zod.object({
   preventionMeasures: zod.string().optional(),
   status: zod.enum(["open", "resolved", "closed"]),
   severity: zod.enum(["low", "medium", "high", "critical"]),
+  zendeskTicketId: zod.number().nullish(),
+  zendeskTicketUrl: zod.string().nullish(),
   incidentDate: zod.coerce.date().optional(),
   resolvedAt: zod.coerce.date().optional(),
   createdAt: zod.coerce.date(),

@@ -810,6 +810,8 @@ export interface AfterActionReport {
   preventionMeasures?: string;
   status: AfterActionReportStatus;
   severity: AfterActionReportSeverity;
+  zendeskTicketId?: number | null;
+  zendeskTicketUrl?: string | null;
   incidentDate?: string;
   resolvedAt?: string;
   createdAt: string;
@@ -848,6 +850,7 @@ export interface CreateAfterActionBody {
   preventionMeasures?: string;
   status: CreateAfterActionBodyStatus;
   severity: CreateAfterActionBodySeverity;
+  zendeskTicketId?: number | null;
   incidentDate?: string;
 }
 

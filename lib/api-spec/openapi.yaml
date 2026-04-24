@@ -3032,6 +3032,12 @@ components:
         severity:
           type: string
           enum: [low, medium, high, critical]
+        zendeskTicketId:
+          type: integer
+          nullable: true
+        zendeskTicketUrl:
+          type: string
+          nullable: true
         incidentDate:
           type: string
           format: date-time
@@ -3075,6 +3081,9 @@ components:
         severity:
           type: string
           enum: [low, medium, high, critical]
+        zendeskTicketId:
+          type: integer
+          nullable: true
         incidentDate:
           type: string
           format: date-time
