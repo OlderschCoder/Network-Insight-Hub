@@ -29,13 +29,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Server, Network as NetworkIcon, Workflow, Building2,
   Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
-  Activity, Wrench, Save, Pencil, Trash2, X,
+  Activity, Wrench, Save, Pencil, Trash2, X, History, Download, FileDown,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
@@ -341,36 +347,227 @@ function MaintenanceLogEntryRow({
   );
 }
 
+function downloadBlob(filename: string, mime: string, contents: string) {
+  const blob = new Blob([contents], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value: string | null | undefined): string {
+  const s = value ?? "";
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function entriesToCsv(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): string {
+  const header = ["switch", "author", "created_at", "edited_at", "window_start", "window_end", "body"];
+  const rows = entries.map((e) =>
+    [
+      sw.hostname,
+      e.authorName,
+      e.createdAt ?? "",
+      e.editedAt ?? "",
+      e.windowStart ?? "",
+      e.windowEnd ?? "",
+      e.body,
+    ].map((v) => csvEscape(String(v ?? ""))).join(","),
+  );
+  return [header.join(","), ...rows].join("\n");
+}
+
+function entriesToMarkdown(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): string {
+  const lines: string[] = [];
+  lines.push(`# Maintenance log — ${sw.hostname}`);
+  if (sw.ipAddress) lines.push(`*${sw.ipAddress}${sw.building ? ` · ${sw.building}` : ""}*`);
+  lines.push("");
+  if (!entries.length) {
+    lines.push("_No entries match the current filters._");
+    return lines.join("\n");
+  }
+  for (const e of entries) {
+    lines.push(`## ${formatLogTimestamp(e.createdAt)} — ${e.authorName}`);
+    if (e.windowStart || e.windowEnd) {
+      lines.push(
+        `*Window: ${formatLogTimestamp(e.windowStart)}${e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}*`,
+      );
+    }
+    if (e.editedAt) lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
+    lines.push("");
+    lines.push(e.body);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function MaintenanceHistoryDialog({
+  sw,
+  entries,
+  open,
+  onOpenChange,
+}: {
+  sw: NetworkSwitch;
+  entries: MaintenanceLogEntry[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [author, setAuthor] = useState<string>("__all__");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+
+  const authors = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const e of entries) {
+      const key = e.authorName ?? "Unknown";
+      if (!seen.has(key)) seen.set(key, key);
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    const fromTs = from ? new Date(from).getTime() : null;
+    const toTs = to ? new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+    const q = search.trim().toLowerCase();
+    return entries.filter((e) => {
+      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
+      const created = e.createdAt ? new Date(e.createdAt).getTime() : null;
+      if (fromTs != null && (created == null || created < fromTs)) return false;
+      if (toTs != null && (created == null || created > toTs)) return false;
+      if (q) {
+        const hay = [e.body, e.authorName].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [entries, author, from, to, search]);
+
+  const reset = () => {
+    setAuthor("__all__");
+    setFrom("");
+    setTo("");
+    setSearch("");
+  };
+
+  const safeName = sw.hostname.replace(/[^a-z0-9._-]+/gi, "_");
+  const exportCsv = () => downloadBlob(`${safeName}-maintenance.csv`, "text/csv;charset=utf-8", entriesToCsv(sw, filtered));
+  const exportMd = () =>
+    downloadBlob(`${safeName}-maintenance.md`, "text/markdown;charset=utf-8", entriesToMarkdown(sw, filtered));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="font-mono">{sw.hostname} — maintenance history</DialogTitle>
+          <DialogDescription>
+            {entries.length} total {entries.length === 1 ? "entry" : "entries"}. Filter, search, or export the log.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Author
+            <Select value={author} onValueChange={setAuthor}>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder="All authors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All authors</SelectItem>
+                {authors.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            From
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 text-xs mt-1" />
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            To
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 text-xs mt-1" />
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Search body
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="text, keyword..."
+              className="h-8 text-xs mt-1"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            Showing {filtered.length} of {entries.length}
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={reset}>
+            <X className="h-3 w-3 mr-1" /> Reset filters
+          </Button>
+        </div>
+
+        <ScrollArea className="max-h-[50vh] pr-2">
+          {filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-8 text-center">
+              No entries match the current filters.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {filtered.map((e) => (
+                <MaintenanceLogEntryRow key={e.id} sw={sw} entry={e} />
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={exportCsv} disabled={!filtered.length}>
+            <Download className="h-3 w-3 mr-1" /> Export CSV
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={exportMd} disabled={!filtered.length}>
+            <FileDown className="h-3 w-3 mr-1" /> Export Markdown
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: MaintenanceLogEntry[] }) {
-  const [showAll, setShowAll] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   if (!entries?.length) return null;
-  const visible = showAll ? entries : entries.slice(0, 3);
+  const visible = entries.slice(0, 3);
   const hiddenCount = entries.length - visible.length;
   return (
     <div className="w-full mt-2 space-y-1.5">
       {visible.map((e) => (
         <MaintenanceLogEntryRow key={e.id} sw={sw} entry={e} />
       ))}
-      {hiddenCount > 0 && !showAll && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-[10px] uppercase tracking-wide text-muted-foreground/80"
-          onClick={() => setShowAll(true)}
-        >
-          + Show {hiddenCount} older {hiddenCount === 1 ? "entry" : "entries"}
-        </Button>
-      )}
-      {showAll && entries.length > 3 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-[10px] uppercase tracking-wide text-muted-foreground/80"
-          onClick={() => setShowAll(false)}
-        >
-          Show fewer
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+        onClick={() => setHistoryOpen(true)}
+      >
+        <History className="h-3 w-3 mr-1" />
+        View full history
+        {hiddenCount > 0 && ` (${entries.length} total, ${hiddenCount} older)`}
+      </Button>
+      <MaintenanceHistoryDialog
+        sw={sw}
+        entries={entries}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+      />
     </div>
   );
 }
