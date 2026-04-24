@@ -587,12 +587,15 @@ export default function NetworkVisualize() {
     // --- Azure (via FortiGate) container ---
     // Selected Azure VMs render in their own container to the RIGHT of the
     // buildings row, with a single edge from the FortiGate to the container.
-    // VMs inside are arranged in a grid identical to switches.
+    // The container uses its own wider grid (AZURE_COLS) so the border stays
+    // a sensible shape even when many VMs are selected, and we always size
+    // the container to fully encircle every VM child.
     const selVms = azureVms.filter((v) => selectedVmIds.has(v.id));
     if (selVms.length > 0) {
-      const vmRows = Math.ceil(selVms.length / COLS) || 0;
+      const AZURE_COLS = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(selVms.length))));
+      const vmRows = Math.ceil(selVms.length / AZURE_COLS) || 0;
       const vmHeight = vmRows ? vmRows * NODE_H + (vmRows - 1) * ROW_GAP : 0;
-      const innerCols = Math.min(COLS, Math.max(1, selVms.length));
+      const innerCols = Math.min(AZURE_COLS, Math.max(1, selVms.length));
       const innerWidth = innerCols * NODE_W + (innerCols - 1) * COL_GAP;
       const azureW = innerWidth + PADDING_X * 2;
       const azureH = PADDING_TOP + vmHeight + PADDING_BOTTOM;
@@ -664,8 +667,8 @@ export default function NetworkVisualize() {
       });
 
       selVms.forEach((vm, idx) => {
-        const col = idx % COLS;
-        const row = Math.floor(idx / COLS);
+        const col = idx % AZURE_COLS;
+        const row = Math.floor(idx / AZURE_COLS);
         const status = (vm.status ?? "unknown").toLowerCase();
         const borderColor =
           status === "running" ? "#10b981" : status === "stopped" ? "#ef4444" : "#0ea5e9";
@@ -728,12 +731,17 @@ export default function NetworkVisualize() {
   }, [savedLayout]);
 
   // Apply saved positions on top of the auto-layout.
+  // The Azure container is auto-sized to fit its currently selected VM
+  // children — never apply a stale saved width/height to it, otherwise the
+  // border could fail to encircle newly-added VMs.
+  const AUTO_SIZED_CONTAINERS = new Set(["container-azure"]);
   const hydratedNodes = useMemo<Node[]>(() => {
     return computed.nodes.map((n) => {
       const saved = savedById.get(n.id);
       if (!saved) return n;
       const next: Node = { ...n, position: { x: saved.x, y: saved.y } };
-      if (saved.width != null || saved.height != null) {
+      const allowSize = !AUTO_SIZED_CONTAINERS.has(n.id);
+      if (allowSize && (saved.width != null || saved.height != null)) {
         next.style = {
           ...n.style,
           ...(saved.width != null ? { width: saved.width } : {}),

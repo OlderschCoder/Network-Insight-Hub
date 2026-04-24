@@ -1,0 +1,217 @@
+{
+  "count": 35,
+  "data": [
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/AD-SC01",
+      "location": "centralus",
+      "name": "AD-SC01",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/CiscoDirectoryConnector",
+      "location": "centralus",
+      "name": "CiscoDirectoryConnector",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/COMPRESSORPT2",
+      "location": "centralus",
+      "name": "COMPRESSORPT2",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/EntraCloudConnect",
+      "location": "centralus",
+      "name": "EntraCloudConnect",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/Goverlan",
+      "location": "centralus",
+      "name": "Goverlan",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/GSYNC0",
+      "location": "centralus",
+      "name": "GSYNC0",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/KEYSTONE",
+      "location": "centralus",
+      "name": "KEYSTONE",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/lucas-flare",
+      "location": "centralus",
+      "name": "lucas-flare",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/LUCAS-KALI",
+      "location": "centralus",
+      "name": "LUCAS-KALI",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/MFS0",
+      "location": "centralus",
+      "name": "MFS0",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/netedit",
+      "location": "centralus",
+      "name": "netedit",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/New-TrendMicroA",
+      "location": "centralus",
+      "name": "New-TrendMicroA",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/ONERING16",
+      "location": "centralus",
+      "name": "ONERING16",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/PRNTSP2",
+      "location": "centralus",
+      "name": "PRNTSP2",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/PTEC2",
+      "location": "centralus",
+      "name": "PTEC2",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/SalonIRIS",
+      "location": "centralus",
+      "name": "SalonIRIS",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/SCCCMFS01",
+      "location": "centralus",
+      "name": "SCCCMFS01",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/SteamPT-License-Server",
+      "location": "centralus",
+      "name": "SteamPT-License-Server",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/Syslog-Forwarder",
+      "location": "centralus",
+      "name": "Syslog-Forwarder",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/TRACDAT2",
+      "location": "centralus",
+      "name": "TRACDAT2",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/TRENDV1SVCGW",
+      "location": "centralus",
+      "name": "TRENDV1SVCGW",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/WAC",
+      "location": "centralus",
+      "name": "WAC",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/WDS-New",
+      "location": "centralus",
+      "name": "WDS-New",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/WEB",
+      "location": "centralus",
+      "name": "WEB",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2",
+      "location": "centralus",
+      "name": "WEB-LIVE2",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WSUS",
+      "location": "centralus",
+      "name": "WSUS",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/XMAIL16-New",
+      "location": "centralus",
+      "name": "XMAIL16-New",
+      "resourceGroup": "hybr0d-network"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/virtualMachines/Hybrid-testVm01",
+      "location": "centralus",
+      "name": "Hybrid-testVm01",
+      "resourceGroup": "rg-prod-centralus"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/virtualMachines/KMS",
+      "location": "centralus",
+      "name": "KMS",
+      "resourceGroup": "rg-prod-centralus"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/OITJUMP02",
+      "location": "centralus",
+      "name": "OITJUMP02",
+      "resourceGroup": "rg-prod-centralus"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/virtualMachines/PROD-IIS-WEB01",
+      "location": "centralus",
+      "name": "PROD-IIS-WEB01",
+      "resourceGroup": "rg-prod-centralus"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/virtualMachines/Test-1",
+      "location": "centralus",
+      "name": "Test-1",
+      "resourceGroup": "rg-prod-centralus"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/sccc_domain_services/providers/Microsoft.Compute/virtualMachines/AzADC001",
+      "location": "centralus",
+      "name": "AzADC001",
+      "resourceGroup": "sccc_domain_services"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_Domain_services/providers/Microsoft.Compute/virtualMachines/IIS-VM",
+      "location": "centralus",
+      "name": "IIS-VM",
+      "resourceGroup": "sccc_domain_services"
+    },
+    {
+      "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/test/providers/Microsoft.Compute/virtualMachines/test-gateway",
+      "location": "centralus",
+      "name": "test-gateway",
+      "resourceGroup": "test"
+    }
+  ],
+  "skip_token": null,
+  "total_records": 35
+}
