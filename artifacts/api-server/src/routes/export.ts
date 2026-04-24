@@ -170,9 +170,37 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
 
     if (report.includeGoalProgress && data.goalProgress.length > 0) {
       const gSheet = workbook.addWorksheet("Goal Progress");
-      gSheet.addRow(["Goal", "Linked Projects", "Active", "Avg Progress %"]);
+      gSheet.addRow([
+        "Goal",
+        "Project",
+        "Status",
+        "Progress at Week Start %",
+        "Progress Now %",
+        "Week Delta %",
+      ]);
       for (const g of data.goalProgress) {
-        gSheet.addRow([g.title, g.projectCount, g.activeProjectCount, g.avgProgress]);
+        // Roll-up summary row per goal
+        const sumSign = g.sumWeekDelta > 0 ? "+" : "";
+        gSheet.addRow([
+          g.title,
+          `(${g.projectCount} project${g.projectCount === 1 ? "" : "s"}, ${g.activeProjectCount} active)`,
+          "",
+          "",
+          `${g.avgProgress}% avg`,
+          `${sumSign}${g.sumWeekDelta} (avg ${sumSign}${g.avgWeekDelta}%)`,
+        ]);
+        // Per-project breakdown so the workbook reflects week-scoped detail
+        for (const p of g.projects) {
+          const pSign = p.weekDelta > 0 ? "+" : "";
+          gSheet.addRow([
+            "",
+            p.title,
+            p.status,
+            p.weekStartProgress,
+            p.progress,
+            `${pSign}${p.weekDelta}`,
+          ]);
+        }
       }
     }
 

@@ -437,17 +437,18 @@ export default function ReportDetail() {
       {(() => {
         const tasksIncluded = (selectedItemIds === null ? items.length : selectedItemIds.length)
           + customTasks.length;
-        const ticketsIncluded = (ticketsResponse as any)?.tickets?.length ?? 0;
+        const ticketsList = (ticketsResponse as { tickets?: unknown[] } | undefined)?.tickets;
+        const ticketsIncluded = Array.isArray(ticketsList) ? ticketsList.length : 0;
         const projectsIncluded = projectIds.length;
         const aarsIncluded =
           selectedAarIds === null
-            ? (extras as any)?.afterActionReports?.length ?? 0
+            ? extras?.afterActionReports?.length ?? 0
             : selectedAarIds.length;
         const maintIncluded =
           selectedMaintenanceIds === null
-            ? (extras as any)?.maintenance?.length ?? 0
+            ? extras?.maintenance?.length ?? 0
             : selectedMaintenanceIds.length;
-        const goalCount = includeGoalProgress ? (extras as any)?.goalProgress?.length ?? 0 : 0;
+        const goalCount = includeGoalProgress ? extras?.goalProgress?.length ?? 0 : 0;
         const risksIncluded = includeOpenRisks ? risks.length : 0;
         const Item = ({ label, n, on = true }: { label: string; n: number; on?: boolean }) => (
           <div className={`flex items-center justify-between text-sm py-1 ${on ? "" : "opacity-50"}`}>
@@ -769,9 +770,18 @@ export default function ReportDetail() {
 
       {/* Post-Incident Reviews this week */}
       {(() => {
-        const aars: any[] = (extras as any)?.afterActionReports ?? [];
+        type AarItem = {
+          id: number;
+          title: string;
+          severity: string;
+          status: string;
+          building?: string | null;
+          authorName: string;
+          incident?: string | null;
+        };
+        const aars = (extras?.afterActionReports ?? []) as unknown as AarItem[];
         if (aars.length === 0) return null;
-        const allIds = aars.map((a) => a.id as number);
+        const allIds = aars.map((a) => a.id);
         const current = selectedAarIds ?? allIds;
         return (
           <Card>
@@ -829,9 +839,19 @@ export default function ReportDetail() {
 
       {/* Network Maintenance windows this week */}
       {(() => {
-        const maint: any[] = (extras as any)?.maintenance ?? [];
+        type MaintItem = {
+          id: string;
+          body: string;
+          authorName: string;
+          createdAt?: string | null;
+          windowStart?: string | null;
+          windowEnd?: string | null;
+          switchHostname: string;
+          switchBuilding: string;
+        };
+        const maint = (extras?.maintenance ?? []) as unknown as MaintItem[];
         if (maint.length === 0) return null;
-        const allIds = maint.map((m) => m.id as string);
+        const allIds = maint.map((m) => m.id);
         const current = selectedMaintenanceIds ?? allIds;
         return (
           <Card>
@@ -885,15 +905,35 @@ export default function ReportDetail() {
 
       {/* Goal Progress */}
       {(() => {
-        const goals: any[] = (extras as any)?.goalProgress ?? [];
+        type GoalProject = {
+          id: number;
+          title: string;
+          status: string;
+          progress: number;
+          weekStartProgress: number;
+          weekDelta: number;
+        };
+        type GoalItem = {
+          id: number;
+          title: string;
+          status: string;
+          projectCount: number;
+          activeProjectCount: number;
+          avgProgress: number;
+          avgWeekDelta: number;
+          sumWeekDelta: number;
+          projects: GoalProject[];
+        };
+        const goals = (extras?.goalProgress ?? []) as unknown as GoalItem[];
         if (goals.length === 0) return null;
+        const fmtDelta = (n: number) => `${n > 0 ? "+" : ""}${n}`;
         return (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
                   <Target className="h-4 w-4 text-green-600" />
-                  Department Goals — Progress ({goals.length})
+                  Department Goals — Progress this week ({goals.length})
                 </span>
                 {canEdit && (
                   <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
@@ -907,7 +947,7 @@ export default function ReportDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {goals.map((g) => (
                   <li key={g.id} className="border rounded p-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -919,8 +959,46 @@ export default function ReportDetail() {
                     </div>
                     <div className="flex items-center gap-3 mt-2">
                       <Progress value={g.avgProgress} className="h-2 flex-1" />
-                      <span className="text-xs text-muted-foreground w-10 text-right">{g.avgProgress}%</span>
+                      <span className="text-xs text-muted-foreground w-16 text-right">
+                        {g.avgProgress}% avg
+                      </span>
                     </div>
+                    <div className="text-xs mt-1">
+                      <span
+                        className={
+                          g.sumWeekDelta > 0
+                            ? "text-green-600 font-medium"
+                            : g.sumWeekDelta < 0
+                              ? "text-red-600 font-medium"
+                              : "text-muted-foreground"
+                        }
+                      >
+                        This week: {fmtDelta(g.sumWeekDelta)} pts (avg {fmtDelta(g.avgWeekDelta)}%)
+                      </span>
+                    </div>
+                    {g.projects.some((p) => p.weekDelta !== 0) && (
+                      <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground border-t pt-2">
+                        {g.projects
+                          .filter((p) => p.weekDelta !== 0)
+                          .map((p) => (
+                            <li key={p.id} className="flex items-center gap-2">
+                              <span className="flex-1 truncate">{p.title}</span>
+                              <span className="font-mono">
+                                {p.weekStartProgress}% → {p.progress}%
+                              </span>
+                              <span
+                                className={
+                                  p.weekDelta > 0
+                                    ? "text-green-600 font-medium w-12 text-right"
+                                    : "text-red-600 font-medium w-12 text-right"
+                                }
+                              >
+                                {fmtDelta(p.weekDelta)}%
+                              </span>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>

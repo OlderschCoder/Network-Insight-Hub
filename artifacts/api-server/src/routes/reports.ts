@@ -245,8 +245,10 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
 // Supplemental data for the report editor:
 //   - afterActionReports: PIRs that occurred (or were resolved/created) within the report week
 //   - maintenance: network maintenance windows scheduled/logged within the report week
-//   - goalProgress: CURRENT snapshot of department-goal progress (NOT week-scoped — strategic
-//     objectives accumulate over time, so the snapshot is what's surfaced in the report).
+//     (included if createdAt OR windowStart OR windowEnd falls in week — OR semantics)
+//   - goalProgress: WEEK-SCOPED deltas for department goals derived from the report's linked
+//     projects (or all projects if the report has no projectIds). Per project: progress at
+//     week start (last progressLog entry on or before weekStart, or 0) vs current progress.
 // Restricted to CIO since this aggregates organization-wide operational detail intended for
 // report authoring.
 router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
@@ -300,12 +302,19 @@ router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
     switchId: number;
   };
   const maintenance: MaintRow[] = [];
+  const inWeekDateStr = (s?: string | null) => {
+    if (!s) return false;
+    const d = s.slice(0, 10);
+    return d >= weekStartStr && d < weekEndStr;
+  };
   for (const sw of switches) {
     for (const log of sw.maintenanceLog ?? []) {
-      const refDate = log.windowStart || log.createdAt;
-      if (!refDate) continue;
-      const d = refDate.slice(0, 10);
-      if (d >= weekStartStr && d < weekEndStr) {
+      // OR semantics: include if any of createdAt, windowStart, or windowEnd falls in the week
+      if (
+        inWeekDateStr(log.createdAt) ||
+        inWeekDateStr(log.windowStart) ||
+        inWeekDateStr(log.windowEnd)
+      ) {
         maintenance.push({
           id: log.id,
           body: log.body,
@@ -322,18 +331,50 @@ router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
   }
   maintenance.sort((a, b) => (a.windowStart || a.createdAt).localeCompare(b.windowStart || b.createdAt));
 
-  // Goal progress (per strategic objective: linked projects + avg progress)
+  // Goal progress — week-scoped deltas, restricted to report-linked projects when present.
   const allObjectives = await db.select().from(strategicObjectivesTable);
   const allProjects = await db.select().from(projectsTable);
+  const reportProjectIds = Array.isArray(report.projectIds) ? (report.projectIds as number[]) : [];
+  const projectScope = reportProjectIds.length > 0
+    ? allProjects.filter((p) => reportProjectIds.includes(p.id))
+    : allProjects;
+  const projectWeekDelta = (p: typeof allProjects[number]) => {
+    const log = Array.isArray(p.progressLog)
+      ? (p.progressLog as { date: string; value: number }[])
+      : [];
+    const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
+    let startVal = 0;
+    for (const e of sorted) {
+      if (e.date <= weekStart.toISOString()) startVal = e.value;
+      else break;
+    }
+    const endVal = p.progress ?? 0;
+    return { startVal, delta: endVal - startVal };
+  };
   const goalProgress = allObjectives
     .filter((o) => o.status !== "archived")
     .map((o) => {
-      const linked = allProjects.filter((p) =>
+      const linked = projectScope.filter((p) =>
         Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
       );
       const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");
       const avgProgress = linked.length > 0
         ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
+        : 0;
+      const projectsWithDelta = linked.map((p) => {
+        const d = projectWeekDelta(p);
+        return {
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          progress: p.progress ?? 0,
+          weekStartProgress: d.startVal,
+          weekDelta: d.delta,
+        };
+      });
+      const sumWeekDelta = projectsWithDelta.reduce((s, p) => s + p.weekDelta, 0);
+      const avgWeekDelta = projectsWithDelta.length > 0
+        ? Math.round(sumWeekDelta / projectsWithDelta.length)
         : 0;
       return {
         id: o.id,
@@ -342,11 +383,12 @@ router.get("/:id/extras", requireAuth, requireCIO, async (req: any, res) => {
         projectCount: linked.length,
         activeProjectCount: active.length,
         avgProgress,
-        projects: linked.map((p) => ({
-          id: p.id, title: p.title, status: p.status, progress: p.progress ?? 0,
-        })),
+        avgWeekDelta,
+        sumWeekDelta,
+        projects: projectsWithDelta,
       };
-    });
+    })
+    .filter((g) => g.projectCount > 0);
 
   return res.json({
     weekOf: report.weekOf,

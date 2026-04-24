@@ -197,14 +197,28 @@ router.post(
         }).from(networkSwitchesTable),
       ]);
 
-      // Filter maintenance windows to the date range
+      // Filter maintenance windows to the date range — OR semantics on
+      // createdAt / windowStart / windowEnd so a window qualifies if any one
+      // date falls in the range.
       const startStr = start.toISOString().slice(0, 10);
       const endStr = end.toISOString().slice(0, 10);
-      const maintenanceWindows: any[] = [];
+      const inRange = (s?: string | null) => {
+        if (!s) return false;
+        const d = s.slice(0, 10);
+        return d >= startStr && d <= endStr;
+      };
+      type MaintenanceWindow = {
+        switch: string;
+        building: string;
+        author: string;
+        windowStart: string | null;
+        windowEnd: string | null;
+        body: string;
+      };
+      const maintenanceWindows: MaintenanceWindow[] = [];
       for (const sw of switchesData) {
         for (const log of sw.maintenanceLog ?? []) {
-          const d = (log.windowStart || log.createdAt || "").slice(0, 10);
-          if (d >= startStr && d <= endStr) {
+          if (inRange(log.createdAt) || inRange(log.windowStart) || inRange(log.windowEnd)) {
             maintenanceWindows.push({
               switch: sw.hostname,
               building: sw.building,
@@ -217,16 +231,57 @@ router.post(
         }
       }
 
-      // Goal progress derived from projects → objectives
+      // Per-project date-range delta: progress at startDate (last progressLog
+      // entry on/before startStr, else 0) vs current progress.
+      const allProjectsForGoals = await db
+        .select({
+          id: projectsTable.id,
+          title: projectsTable.title,
+          status: projectsTable.status,
+          progress: projectsTable.progress,
+          progressLog: projectsTable.progressLog,
+          strategicObjectiveIds: projectsTable.strategicObjectiveIds,
+        })
+        .from(projectsTable);
+      const startIso = new Date(startStr + "T00:00:00.000Z").toISOString();
+      const projectRangeDelta = (p: typeof allProjectsForGoals[number]) => {
+        const log = Array.isArray(p.progressLog)
+          ? (p.progressLog as { date: string; value: number }[])
+          : [];
+        const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
+        let startVal = 0;
+        for (const e of sorted) {
+          if (e.date <= startIso) startVal = e.value;
+          else break;
+        }
+        const endVal = p.progress ?? 0;
+        return { startVal, delta: endVal - startVal };
+      };
+
+      // Goal progress derived from projects → objectives, with date-range deltas.
       const goalProgress = objectivesData
         .filter((o) => o.status !== "archived")
         .map((o) => {
-          const linked = projectsData.filter((p) =>
+          const linked = allProjectsForGoals.filter((p) =>
             Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
           );
           const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");
           const avgProgress = linked.length > 0
             ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
+            : 0;
+          const projectsWithDelta = linked.map((p) => {
+            const d = projectRangeDelta(p);
+            return {
+              title: p.title,
+              status: p.status,
+              progressAtStart: d.startVal,
+              progressNow: p.progress ?? 0,
+              rangeDelta: d.delta,
+            };
+          });
+          const sumRangeDelta = projectsWithDelta.reduce((s, p) => s + p.rangeDelta, 0);
+          const avgRangeDelta = projectsWithDelta.length > 0
+            ? Math.round(sumRangeDelta / projectsWithDelta.length)
             : 0;
           return {
             goal: o.title,
@@ -234,8 +289,12 @@ router.post(
             linkedProjects: linked.length,
             activeProjects: active.length,
             avgProgress,
+            avgRangeDelta,
+            sumRangeDelta,
+            projects: projectsWithDelta,
           };
-        });
+        })
+        .filter((g) => g.linkedProjects > 0);
 
       const operationalData = {
         period: { startDate, endDate },

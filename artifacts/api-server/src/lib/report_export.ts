@@ -179,15 +179,27 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     : report.selectedAfterActionIds;
   const selectedAars = allWeekAars.filter((a) => selAarIds.includes(a.id));
 
-  // Maintenance windows in the week
+  // Maintenance windows in the week — OR semantics on createdAt / windowStart / windowEnd.
   const switches = await db.select().from(networkSwitchesTable);
-  const allMaint: any[] = [];
+  type MaintLog = NonNullable<typeof switches[number]["maintenanceLog"]>[number];
+  type EnrichedMaint = MaintLog & {
+    switchHostname: string;
+    switchBuilding: string;
+    switchId: number;
+  };
+  const allMaint: EnrichedMaint[] = [];
+  const inWeekDateStr = (s?: string | null) => {
+    if (!s) return false;
+    const d = s.slice(0, 10);
+    return d >= weekStartStr && d < weekEndStr;
+  };
   for (const sw of switches) {
     for (const log of sw.maintenanceLog ?? []) {
-      const refDate = log.windowStart || log.createdAt;
-      if (!refDate) continue;
-      const d = refDate.slice(0, 10);
-      if (d >= weekStartStr && d < weekEndStr) {
+      if (
+        inWeekDateStr(log.createdAt) ||
+        inWeekDateStr(log.windowStart) ||
+        inWeekDateStr(log.windowEnd)
+      ) {
         allMaint.push({
           ...log,
           switchHostname: sw.hostname,
@@ -208,7 +220,12 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
   // progressAtWeekEnd = current progress value. Delta = end - start.
   const allObjectives = await db.select().from(strategicObjectivesTable);
   const allProjectsForGoals = await db.select().from(projectsTable);
-  const weekEndIso = new Date(weekEndStr + "T23:59:59.999Z").toISOString();
+  // Scope goal progress to the report's linked projects when present so the report's
+  // Goal Progress section reflects only what's surfaced in the report itself.
+  const reportProjectIds = Array.isArray(report.projectIds) ? (report.projectIds as number[]) : [];
+  const projectScope = reportProjectIds.length > 0
+    ? allProjectsForGoals.filter((p) => reportProjectIds.includes(p.id))
+    : allProjectsForGoals;
   const weekStartIso = new Date(weekStartStr + "T00:00:00.000Z").toISOString();
   function projectWeekDelta(p: typeof allProjectsForGoals[number]) {
     const log = Array.isArray(p.progressLog) ? (p.progressLog as { date: string; value: number }[]) : [];
@@ -223,7 +240,7 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
   const goalProgress = allObjectives
     .filter((o) => o.status !== "archived")
     .map((o) => {
-      const linked = allProjectsForGoals.filter((p) =>
+      const linked = projectScope.filter((p) =>
         Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
       );
       const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");

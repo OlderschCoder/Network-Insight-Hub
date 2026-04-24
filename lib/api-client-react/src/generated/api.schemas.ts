@@ -153,6 +153,8 @@ export interface Report {
   selectedItemIds?: number[];
   selectedAfterActionIds?: number[] | null;
   selectedMaintenanceIds?: string[] | null;
+  /** IDs of projects linked to this report. */
+  projectIds?: number[];
   includeGoalProgress?: boolean;
   includeOpenRisks?: boolean;
   emailRecipients?: string[];

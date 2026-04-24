@@ -236,6 +236,10 @@ export const ListReportsResponseItem = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  projectIds: zod
+    .array(zod.number())
+    .optional()
+    .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
@@ -281,6 +285,10 @@ export const GetReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  projectIds: zod
+    .array(zod.number())
+    .optional()
+    .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
@@ -328,6 +336,10 @@ export const UpdateReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  projectIds: zod
+    .array(zod.number())
+    .optional()
+    .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
@@ -432,6 +444,10 @@ export const FinalizeReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  projectIds: zod
+    .array(zod.number())
+    .optional()
+    .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),

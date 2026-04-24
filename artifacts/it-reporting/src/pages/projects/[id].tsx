@@ -547,7 +547,7 @@ export default function ProjectDetail() {
       </Card>
 
       {(() => {
-        const linkedReports = ((allReports ?? []) as any[]).filter(
+        const linkedReports = (allReports ?? []).filter(
           (r) => Array.isArray(r.projectIds) && r.projectIds.includes(id),
         );
         if (linkedReports.length === 0) return null;
@@ -561,7 +561,7 @@ export default function ProjectDetail() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-1.5">
-                {linkedReports.map((r: any) => (
+                {linkedReports.map((r) => (
                   <li key={r.id}>
                     <Link href={`/reports/${r.id}`}>
                       <span className="text-sm hover:underline cursor-pointer">
