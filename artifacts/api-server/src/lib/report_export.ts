@@ -282,7 +282,10 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
         sumWeekDelta,
         projects: projectsWithDelta,
       };
-    });
+    })
+    // Match the on-screen extras endpoint: only include goals that have at least
+    // one linked project in scope, so DOCX/PDF/XLSX exports stay WYSIWYG.
+    .filter((g) => g.projectCount > 0);
 
   // Open risks
   const openRisks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));

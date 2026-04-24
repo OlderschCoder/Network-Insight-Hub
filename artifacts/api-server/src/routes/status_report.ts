@@ -381,13 +381,15 @@ Contract Valid Until: [date]
 - If accountInfo fields are empty, write "[To be provided]" rather than fabricating.
 
 # Required data inputs (use them all — do not omit a section because data is light)
-- \`logEntries\` and \`weeklyReports\`: drive On-going Projects / Services and Recent Wins / Challenges.
-- \`tasksAndLogItems\` (open log items / tasks): include forward-looking ones in Key Actions / Decisions.
-- \`projects\`: cite project name, status, and progress in On-going Projects / Services. Use the per-project deltas in \`departmentGoals.projects[]\` (weekStartProgress → progress, weekDelta) to describe momentum during the period.
-- \`departmentGoals\` (with \`avgRangeDelta\`, \`sumRangeDelta\`): briefly summarize movement against strategic objectives in On-going Projects / Services or Recent Wins (e.g., "Modernize Network advanced +12 pts this period").
-- \`networkMaintenance\`: mention notable maintenance windows (host, building, time) under On-going Projects / Services or Service Level Metrics.
-- \`afterActionReports\` / PIRs: summarize incidents and learnings in Recent Wins / Challenges.
-- \`risks\`: open risks belong in Key Actions / Decisions and (if material) Challenges.`;
+The user message contains an \`operationalData\` JSON object with these top-level keys — reference them by name:
+- \`entries\` (categorized log entries from the period) and \`weeklyReports\` (finalized status reports): drive On-going Projects / Services and Recent Wins / Challenges.
+- \`completedTasks\` (closed log items): use these to support delivery / wins claims and inform Key Actions / Decisions where in-progress.
+- \`projects\` (each with title, status, progress, alignedDepartmentGoals): cite project name, status, and progress in On-going Projects / Services.
+- \`departmentGoals\` (each item: \`goal\`, \`linkedProjects\`, \`activeProjects\`, \`avgProgress\`, \`avgRangeDelta\`, \`sumRangeDelta\`, and per-project rows under \`projects[]\` with \`progressAtStart\` → \`progressNow\` and \`rangeDelta\`): summarize movement against strategic objectives, e.g., "Modernize Network advanced +12 pts this period (avg +6%)".
+- \`networkMaintenance\` (switch host, building, window times, notes): mention notable maintenance windows in On-going Projects / Services or Service Level Metrics.
+- \`afterActionReports\` (PIRs with severity, incident, resolution, lessonsLearned): summarize incidents and learnings in Recent Wins / Challenges.
+- \`openRisksAndIssues\`, \`mitigatedRisks\`, \`closedRisks\`: open ones belong in Key Actions / Decisions and (if material) Challenges; mitigated/closed support Recent Wins.
+- \`ticketStats\` (helpdesk volume + categories): use for Service Level Metrics.`;
 
       const userPrompt = `Generate the Managed Services Status Report from the following operational data:\n\n${JSON.stringify(operationalData, null, 2)}`;
 

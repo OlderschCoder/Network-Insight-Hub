@@ -149,13 +149,19 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
 
     if (data.selectedAars.length > 0) {
       const aarSheet = workbook.addWorksheet("Post-Incident Reviews");
-      aarSheet.addRow(["ID", "Title", "Severity", "Status", "Author", "Building", "Incident Date", "Resolved", "Resolution"]);
+      aarSheet.addRow([
+        "ID", "Title", "Severity", "Status", "Author", "Building",
+        "Incident Date", "Resolved",
+        "Incident Summary", "Resolution", "Lessons Learned",
+      ]);
       for (const a of data.selectedAars) {
         aarSheet.addRow([
           a.id, a.title, a.severity, a.status, a.authorName, a.building ?? "",
           a.incidentDate?.toISOString?.() ?? "",
           a.resolvedAt?.toISOString?.() ?? "",
+          a.incident ?? "",
           a.resolution ?? "",
+          a.lessonsLearned ?? "",
         ]);
       }
     }
