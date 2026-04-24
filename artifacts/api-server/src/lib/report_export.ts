@@ -287,8 +287,14 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     // one linked project in scope, so DOCX/PDF/XLSX exports stay WYSIWYG.
     .filter((g) => g.projectCount > 0);
 
-  // Open risks
-  const openRisks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));
+  // Open risks — apply per-row selection if report.selectedRiskIds is set.
+  // null/undefined => include all open risks (legacy behavior).
+  // Empty array => include none.
+  const allOpenRisks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));
+  const selectedRiskIds = report.selectedRiskIds;
+  const openRisks = Array.isArray(selectedRiskIds)
+    ? allOpenRisks.filter((r) => selectedRiskIds.includes(r.id))
+    : allOpenRisks;
 
   return {
     report,

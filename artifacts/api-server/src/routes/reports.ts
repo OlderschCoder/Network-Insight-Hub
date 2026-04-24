@@ -230,6 +230,7 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     projectIds: z.array(z.number()).optional(),
     selectedAfterActionIds: z.array(z.number()).nullable().optional(),
     selectedMaintenanceIds: z.array(z.string()).nullable().optional(),
+    selectedRiskIds: z.array(z.number()).nullable().optional(),
     includeGoalProgress: z.boolean().optional(),
     includeOpenRisks: z.boolean().optional(),
     emailRecipients: z.array(z.string().email()).optional(),

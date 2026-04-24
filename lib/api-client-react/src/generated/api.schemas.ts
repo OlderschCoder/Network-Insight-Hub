@@ -153,6 +153,10 @@ export interface Report {
   selectedItemIds?: number[];
   selectedAfterActionIds?: number[] | null;
   selectedMaintenanceIds?: string[] | null;
+  /** Open risk IDs explicitly included in this report. null = include all open risks
+in the export (default behavior). Empty array = include none.
+ */
+  selectedRiskIds?: number[] | null;
   /** IDs of projects linked to this report. */
   projectIds?: number[];
   includeGoalProgress?: boolean;
@@ -197,6 +201,7 @@ export interface UpdateReportBody {
   selectedItemIds?: number[] | null;
   selectedAfterActionIds?: number[] | null;
   selectedMaintenanceIds?: string[] | null;
+  selectedRiskIds?: number[] | null;
   includeGoalProgress?: boolean;
   includeOpenRisks?: boolean;
   emailRecipients?: string[];

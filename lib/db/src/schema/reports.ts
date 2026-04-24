@@ -19,6 +19,7 @@ export const reportsTable = pgTable("reports", {
   projectIds: json("project_ids").$type<number[]>().default([]),
   selectedAfterActionIds: json("selected_after_action_ids").$type<number[] | null>().default(null),
   selectedMaintenanceIds: json("selected_maintenance_ids").$type<string[] | null>().default(null),
+  selectedRiskIds: json("selected_risk_ids").$type<number[] | null>().default(null),
   includeGoalProgress: boolean("include_goal_progress").notNull().default(true),
   includeOpenRisks: boolean("include_open_risks").notNull().default(true),
   emailRecipients: json("email_recipients").$type<string[]>().default([]),

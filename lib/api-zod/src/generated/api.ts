@@ -236,6 +236,12 @@ export const ListReportsResponseItem = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  selectedRiskIds: zod
+    .array(zod.number())
+    .nullish()
+    .describe(
+      "Open risk IDs explicitly included in this report. null = include all open risks\nin the export (default behavior). Empty array = include none.\n",
+    ),
   projectIds: zod
     .array(zod.number())
     .optional()
@@ -285,6 +291,12 @@ export const GetReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  selectedRiskIds: zod
+    .array(zod.number())
+    .nullish()
+    .describe(
+      "Open risk IDs explicitly included in this report. null = include all open risks\nin the export (default behavior). Empty array = include none.\n",
+    ),
   projectIds: zod
     .array(zod.number())
     .optional()
@@ -317,6 +329,7 @@ export const UpdateReportBody = zod.object({
   selectedItemIds: zod.array(zod.number()).nullish(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  selectedRiskIds: zod.array(zod.number()).nullish(),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string().email()).optional(),
@@ -336,6 +349,12 @@ export const UpdateReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  selectedRiskIds: zod
+    .array(zod.number())
+    .nullish()
+    .describe(
+      "Open risk IDs explicitly included in this report. null = include all open risks\nin the export (default behavior). Empty array = include none.\n",
+    ),
   projectIds: zod
     .array(zod.number())
     .optional()
@@ -444,6 +463,12 @@ export const FinalizeReportResponse = zod.object({
   selectedItemIds: zod.array(zod.number()).optional(),
   selectedAfterActionIds: zod.array(zod.number()).nullish(),
   selectedMaintenanceIds: zod.array(zod.string()).nullish(),
+  selectedRiskIds: zod
+    .array(zod.number())
+    .nullish()
+    .describe(
+      "Open risk IDs explicitly included in this report. null = include all open risks\nin the export (default behavior). Empty array = include none.\n",
+    ),
   projectIds: zod
     .array(zod.number())
     .optional()

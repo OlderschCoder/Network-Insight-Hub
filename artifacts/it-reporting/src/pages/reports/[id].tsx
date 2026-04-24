@@ -80,6 +80,7 @@ export default function ReportDetail() {
   const [projectIds, setProjectIds] = useState<number[]>([]);
   const [selectedAarIds, setSelectedAarIds] = useState<number[] | null>(null);
   const [selectedMaintenanceIds, setSelectedMaintenanceIds] = useState<string[] | null>(null);
+  const [selectedRiskIds, setSelectedRiskIds] = useState<number[] | null>(null);
   const [includeGoalProgress, setIncludeGoalProgress] = useState(true);
   const [includeOpenRisks, setIncludeOpenRisks] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -105,6 +106,7 @@ export default function ReportDetail() {
       setProjectIds(Array.isArray(r.projectIds) ? r.projectIds : []);
       setSelectedAarIds(Array.isArray(r.selectedAfterActionIds) ? r.selectedAfterActionIds : null);
       setSelectedMaintenanceIds(Array.isArray(r.selectedMaintenanceIds) ? r.selectedMaintenanceIds : null);
+      setSelectedRiskIds(Array.isArray(r.selectedRiskIds) ? r.selectedRiskIds : null);
       setIncludeGoalProgress(r.includeGoalProgress !== false);
       setIncludeOpenRisks(r.includeOpenRisks !== false);
       setEmailRecipientsText(Array.isArray(r.emailRecipients) ? r.emailRecipients.join(", ") : "");
@@ -160,6 +162,14 @@ export default function ReportDetail() {
       : current.filter((x) => x !== mId);
     setSelectedMaintenanceIds(next);
     await persist({ selectedMaintenanceIds: next });
+  };
+  const toggleRisk = async (riskId: number, checked: boolean, allIds: number[]) => {
+    const current = selectedRiskIds ?? allIds;
+    const next = checked
+      ? Array.from(new Set([...current, riskId]))
+      : current.filter((x) => x !== riskId);
+    setSelectedRiskIds(next);
+    await persist({ selectedRiskIds: next });
   };
   const toggleIncludeGoals = async (v: boolean) => {
     setIncludeGoalProgress(v);
@@ -1030,9 +1040,18 @@ export default function ReportDetail() {
                 const proj = rk.projectId
                   ? ((allProjects ?? []) as any[]).find((p) => p.id === rk.projectId)
                   : null;
+                const allRiskIds = risks.map((x: any) => x.id);
+                const effectiveSelected = selectedRiskIds ?? allRiskIds;
+                const checked = effectiveSelected.includes(rk.id);
                 return (
                   <li key={rk.id} className="border rounded p-2 text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {canEdit && includeOpenRisks && (
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => toggleRisk(rk.id, v === true, allRiskIds)}
+                        />
+                      )}
                       <Badge variant="outline" className="text-[10px]">{rk.type}</Badge>
                       <Badge variant="outline" className="text-[10px]">{rk.severity}</Badge>
                       <span className="font-medium">{rk.title}</span>

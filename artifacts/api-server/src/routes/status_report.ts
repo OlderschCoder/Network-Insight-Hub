@@ -11,7 +11,7 @@ import {
   strategicObjectivesTable,
   networkSwitchesTable,
 } from "@workspace/db";
-import { and, gte, lte, sql } from "drizzle-orm";
+import { and, gte, lte, or, sql } from "drizzle-orm";
 
 const entries = entriesTable;
 const reports = reportsTable;
@@ -127,6 +127,9 @@ router.post(
             )
           ),
         db
+          // PIRs that occurred OR were resolved OR were created in the period
+          // (matches /reports/:id/extras semantics so AI narrative sees the same
+          // PIRs that show on the report card).
           .select({
             title: afterActionReports.title,
             incident: afterActionReports.incident,
@@ -140,13 +143,24 @@ router.post(
             preventionMeasures: afterActionReports.preventionMeasures,
             incidentDate: afterActionReports.incidentDate,
             resolvedAt: afterActionReports.resolvedAt,
+            createdAt: afterActionReports.createdAt,
           })
           .from(afterActionReports)
           .where(
-            and(
-              gte(afterActionReports.incidentDate, start),
-              lte(afterActionReports.incidentDate, end)
-            )
+            or(
+              and(
+                gte(afterActionReports.incidentDate, start),
+                lte(afterActionReports.incidentDate, end),
+              ),
+              and(
+                gte(afterActionReports.resolvedAt, start),
+                lte(afterActionReports.resolvedAt, end),
+              ),
+              and(
+                gte(afterActionReports.createdAt, start),
+                lte(afterActionReports.createdAt, end),
+              ),
+            ),
           ),
         db
           .select({
