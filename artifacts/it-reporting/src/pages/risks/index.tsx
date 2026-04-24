@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListRisks, useUpdateRisk } from "@workspace/api-client-react";
+import { useListRisks, useUpdateRisk, useListProjects } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,10 @@ export default function Risks() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: risks, isLoading } = useListRisks({});
+  const { data: projects } = useListProjects();
+  const projectMap = new Map<number, string>(
+    ((projects ?? []) as any[]).map((p) => [p.id, p.title]),
+  );
   const updateMutation = useUpdateRisk();
 
   const filtered = (risks ?? []).filter((r) => {
@@ -145,6 +149,16 @@ export default function Risks() {
                       <Badge variant={risk.status === "closed" || risk.status === "mitigated" ? "secondary" : "outline"}>
                         {risk.status}
                       </Badge>
+                      {(risk as any).projectId && projectMap.has((risk as any).projectId) && (
+                        <Link href={`/projects/${(risk as any).projectId}`}>
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-500/10 text-amber-300 border-amber-400/30 hover:bg-amber-500/20 cursor-pointer"
+                          >
+                            Blocking: {projectMap.get((risk as any).projectId)}
+                          </Badge>
+                        </Link>
+                      )}
                     </div>
                     <p className="font-medium">{risk.title}</p>
                     {risk.description && (

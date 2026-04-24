@@ -26,11 +26,18 @@ import { ITEM_TYPES } from "./EntryForm";
 
 type Props = {
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
 };
 
-export default function QuickAddItemDialog({ trigger }: Props) {
+export default function QuickAddItemDialog({ trigger, open: openProp, onOpenChange }: Props) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (v: boolean) => {
+    setOpenState(v);
+    onOpenChange?.(v);
+  };
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("task");

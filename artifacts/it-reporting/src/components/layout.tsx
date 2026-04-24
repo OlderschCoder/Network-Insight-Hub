@@ -16,6 +16,14 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
+import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ListChecks as ListChecksIcon, ShieldAlert as ShieldAlertIcon, Activity as ActivityIcon, Network as NetworkIcon } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
@@ -35,6 +43,48 @@ import {
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
 type NavGroup = { label: string; items: NavItem[] };
+
+function QuickAddMenu() {
+  const [taskOpen, setTaskOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Zap className="h-4 w-4 mr-2" />
+            Quick Add
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setTaskOpen(true)}>
+            <ListChecksIcon className="h-4 w-4 mr-2" />
+            Add Task
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/risks/new">
+              <ShieldAlertIcon className="h-4 w-4 mr-2" />
+              Add Risk / Issue
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/after-action/new">
+              <ActivityIcon className="h-4 w-4 mr-2" />
+              Add Post-Incident Review
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/network">
+              <NetworkIcon className="h-4 w-4 mr-2" />
+              Add Maintenance Note
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <QuickAddItemDialog open={taskOpen} onOpenChange={setTaskOpen} />
+
+    </>
+  );
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout, isCIO } = useAuth();
@@ -139,14 +189,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="h-12 border-b border-border flex items-center justify-between px-4 shrink-0 bg-card gap-2">
             <SidebarTrigger />
             <div className="flex items-center gap-2">
-              <QuickAddItemDialog
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Zap className="h-4 w-4 mr-2" />
-                    Quick Add
-                  </Button>
-                }
-              />
+              <QuickAddMenu />
               <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
                 <Button variant="outline" size="sm">
                   <Sparkles className="h-4 w-4 mr-2" />

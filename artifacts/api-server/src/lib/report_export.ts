@@ -37,7 +37,16 @@ export type ReportExportData = {
     projectCount: number;
     activeProjectCount: number;
     avgProgress: number;
-    projects: { id: number; title: string; status: string; progress: number }[];
+    avgWeekDelta: number;
+    sumWeekDelta: number;
+    projects: {
+      id: number;
+      title: string;
+      status: string;
+      progress: number;
+      weekStartProgress: number;
+      weekDelta: number;
+    }[];
   }>;
   openRisks: any[];
 };
@@ -194,9 +203,23 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     : report.selectedMaintenanceIds;
   const selectedMaintenance = allMaint.filter((m) => selMaintIds.includes(m.id));
 
-  // Goal progress
+  // Goal progress — week-scoped deltas computed from project progressLog.
+  // For each project: progressAtWeekStart = last log entry on/before weekStart (or 0 if none),
+  // progressAtWeekEnd = current progress value. Delta = end - start.
   const allObjectives = await db.select().from(strategicObjectivesTable);
   const allProjectsForGoals = await db.select().from(projectsTable);
+  const weekEndIso = new Date(weekEndStr + "T23:59:59.999Z").toISOString();
+  const weekStartIso = new Date(weekStartStr + "T00:00:00.000Z").toISOString();
+  function projectWeekDelta(p: typeof allProjectsForGoals[number]) {
+    const log = Array.isArray(p.progressLog) ? (p.progressLog as { date: string; value: number }[]) : [];
+    const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
+    let startVal = 0;
+    for (const e of sorted) {
+      if (e.date <= weekStartIso) startVal = e.value; else break;
+    }
+    const endVal = p.progress ?? 0;
+    return { startVal, endVal, delta: endVal - startVal };
+  }
   const goalProgress = allObjectives
     .filter((o) => o.status !== "archived")
     .map((o) => {
@@ -207,6 +230,19 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
       const avgProgress = linked.length > 0
         ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
         : 0;
+      const projectsWithDelta = linked.map((p) => {
+        const d = projectWeekDelta(p);
+        return {
+          id: p.id, title: p.title, status: p.status ?? "",
+          progress: p.progress ?? 0,
+          weekStartProgress: d.startVal,
+          weekDelta: d.delta,
+        };
+      });
+      const sumWeekDelta = projectsWithDelta.reduce((s, p) => s + p.weekDelta, 0);
+      const avgWeekDelta = projectsWithDelta.length > 0
+        ? Math.round(sumWeekDelta / projectsWithDelta.length)
+        : 0;
       return {
         id: o.id,
         title: o.title,
@@ -214,9 +250,9 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
         projectCount: linked.length,
         activeProjectCount: active.length,
         avgProgress,
-        projects: linked.map((p) => ({
-          id: p.id, title: p.title, status: p.status ?? "", progress: p.progress ?? 0,
-        })),
+        avgWeekDelta,
+        sumWeekDelta,
+        projects: projectsWithDelta,
       };
     });
 
@@ -326,6 +362,7 @@ export async function buildReportDocxBuffer(report: Report): Promise<Buffer> {
       p(`Author: ${a.authorName} · Status: ${a.status}${a.building ? ` · Building: ${a.building}` : ""}`);
       if (a.incident) p(a.incident);
       if (a.resolution) p(`Resolution: ${a.resolution}`);
+      if ((a as any).lessonsLearned) p(`Lessons learned: ${(a as any).lessonsLearned}`);
     }
     blank();
   }
@@ -344,11 +381,21 @@ export async function buildReportDocxBuffer(report: Report): Promise<Buffer> {
     blank();
   }
 
-  // Goal Progress
+  // Goal Progress (week-scoped delta)
   if (report.includeGoalProgress && data.goalProgress.length > 0) {
-    h2("Department Goals — Progress");
+    h2("Department Goals — Progress this week");
     for (const g of data.goalProgress) {
-      bullet(`${g.title} — ${g.activeProjectCount} active project${g.activeProjectCount === 1 ? "" : "s"}, avg progress ${g.avgProgress}%`);
+      const sign = g.sumWeekDelta > 0 ? "+" : "";
+      bullet(
+        `${g.title} — ${g.activeProjectCount} active project${g.activeProjectCount === 1 ? "" : "s"}, ` +
+        `avg progress ${g.avgProgress}% (${sign}${g.avgWeekDelta}% this week, total ${sign}${g.sumWeekDelta} pts)`,
+      );
+      for (const proj of g.projects) {
+        if (proj.weekDelta !== 0) {
+          const ps = proj.weekDelta > 0 ? "+" : "";
+          p(`    • ${proj.title}: ${proj.weekStartProgress}% → ${proj.progress}% (${ps}${proj.weekDelta}%)`);
+        }
+      }
     }
     blank();
   }
@@ -452,6 +499,7 @@ export function buildReportPdfSections(data: ReportExportData): PdfSection[] {
       sections.push({ kind: "kv", label: "Author", value: `${a.authorName} · Status: ${a.status}${a.building ? ` · Building: ${a.building}` : ""}` });
       if (a.incident) sections.push({ kind: "paragraph", text: a.incident });
       if (a.resolution) sections.push({ kind: "kv", label: "Resolution", value: a.resolution });
+      if ((a as any).lessonsLearned) sections.push({ kind: "kv", label: "Lessons learned", value: (a as any).lessonsLearned });
     }
   }
 
@@ -469,9 +517,24 @@ export function buildReportPdfSections(data: ReportExportData): PdfSection[] {
   }
 
   if (report.includeGoalProgress && data.goalProgress.length > 0) {
-    sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Department Goals — Progress" });
+    sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Department Goals — Progress this week" });
     for (const g of data.goalProgress) {
-      sections.push({ kind: "bullet", text: `${g.title} — ${g.activeProjectCount} active project${g.activeProjectCount === 1 ? "" : "s"}, avg progress ${g.avgProgress}%` });
+      const sign = g.sumWeekDelta > 0 ? "+" : "";
+      sections.push({
+        kind: "bullet",
+        text:
+          `${g.title} — ${g.activeProjectCount} active project${g.activeProjectCount === 1 ? "" : "s"}, ` +
+          `avg progress ${g.avgProgress}% (${sign}${g.avgWeekDelta}% this week, total ${sign}${g.sumWeekDelta} pts)`,
+      });
+      for (const proj of g.projects) {
+        if (proj.weekDelta !== 0) {
+          const ps = proj.weekDelta > 0 ? "+" : "";
+          sections.push({
+            kind: "paragraph",
+            text: `    ${proj.title}: ${proj.weekStartProgress}% → ${proj.progress}% (${ps}${proj.weekDelta}%)`,
+          });
+        }
+      }
     }
   }
 

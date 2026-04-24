@@ -509,6 +509,11 @@ export const ProjectStatus = {
   cancelled: "cancelled",
 } as const;
 
+export type ProjectProgressLogItem = {
+  date: string;
+  value: number;
+};
+
 export interface Project {
   id: number;
   title: string;
@@ -518,6 +523,8 @@ export interface Project {
   targetDate?: string | null;
   newEstimatedDate?: string | null;
   attachments?: ProjectAttachment[];
+  /** History of progress changes for week-scoped delta calculations. */
+  progressLog?: ProjectProgressLogItem[];
   strategicObjectiveIds?: number[];
   assignees?: ProjectAssignee[];
   risks?: Risk[];

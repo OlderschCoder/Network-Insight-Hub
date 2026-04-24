@@ -719,6 +719,17 @@ export const ListProjectsResponseItem = zod.object({
       }),
     )
     .optional(),
+  progressLog: zod
+    .array(
+      zod.object({
+        date: zod.string(),
+        value: zod.number(),
+      }),
+    )
+    .optional()
+    .describe(
+      "History of progress changes for week-scoped delta calculations.",
+    ),
   strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(
@@ -816,6 +827,17 @@ export const GetProjectResponse = zod.object({
       }),
     )
     .optional(),
+  progressLog: zod
+    .array(
+      zod.object({
+        date: zod.string(),
+        value: zod.number(),
+      }),
+    )
+    .optional()
+    .describe(
+      "History of progress changes for week-scoped delta calculations.",
+    ),
   strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(
@@ -912,6 +934,17 @@ export const UpdateProjectResponse = zod.object({
       }),
     )
     .optional(),
+  progressLog: zod
+    .array(
+      zod.object({
+        date: zod.string(),
+        value: zod.number(),
+      }),
+    )
+    .optional()
+    .describe(
+      "History of progress changes for week-scoped delta calculations.",
+    ),
   strategicObjectiveIds: zod.array(zod.number()).optional(),
   assignees: zod
     .array(

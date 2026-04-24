@@ -114,8 +114,15 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     return res.status(400).json({ error: "Validation error", details: parsed.error.issues });
   }
   const { assigneeIds, ...data } = parsed.data;
+  const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const updates: any = { ...data, updatedAt: new Date() };
+  if (typeof data.progress === "number" && data.progress !== existing.progress) {
+    const log = Array.isArray(existing.progressLog) ? existing.progressLog : [];
+    updates.progressLog = [...log, { date: new Date().toISOString(), value: data.progress }];
+  }
   const [project] = await db.update(projectsTable)
-    .set({ ...data, updatedAt: new Date() })
+    .set(updates)
     .where(eq(projectsTable.id, id))
     .returning();
   if (!project) return res.status(404).json({ error: "Not found" });

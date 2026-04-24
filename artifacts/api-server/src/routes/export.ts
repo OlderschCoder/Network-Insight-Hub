@@ -102,7 +102,9 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
     summarySheet.addRow(["Linked Projects", data.linkedProjects.length]);
     summarySheet.addRow(["Post-Incident Reviews", data.selectedAars.length]);
     summarySheet.addRow(["Network Maintenance Windows", data.selectedMaintenance.length]);
-    summarySheet.addRow(["Open Risks", data.openRisks.length]);
+    if (report.includeOpenRisks) {
+      summarySheet.addRow(["Open Risks", data.openRisks.length]);
+    }
     summarySheet.addRow([]);
     if (report.summary) { summarySheet.addRow(["Summary"]); summarySheet.addRow([report.summary]); summarySheet.addRow([]); }
     if (report.accomplishments) { summarySheet.addRow(["Accomplishments"]); summarySheet.addRow([report.accomplishments]); summarySheet.addRow([]); }

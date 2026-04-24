@@ -258,14 +258,23 @@ router.post(
         mitigatedRisks: risksData.filter((r) => r.status === "mitigated"),
         closedRisks: risksData.filter((r) => r.status === "closed"),
         afterActionReports: aarData,
-        projects: projectsData.map((p) => ({
-          title: p.title,
-          status: p.status,
-          progress: p.progress,
-          targetDate: p.targetDate,
-          newEstimatedDate: p.newEstimatedDate,
-          description: p.description,
-        })),
+        projects: projectsData.map((p) => {
+          const objIds = Array.isArray(p.strategicObjectiveIds)
+            ? (p.strategicObjectiveIds as number[])
+            : [];
+          const alignedGoals = objectivesData
+            .filter((o) => objIds.includes(o.id))
+            .map((o) => o.title);
+          return {
+            title: p.title,
+            status: p.status,
+            progress: p.progress,
+            targetDate: p.targetDate,
+            newEstimatedDate: p.newEstimatedDate,
+            description: p.description,
+            alignedDepartmentGoals: alignedGoals,
+          };
+        }),
         departmentGoals: goalProgress,
         networkMaintenance: maintenanceWindows,
       };

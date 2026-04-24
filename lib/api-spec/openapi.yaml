@@ -1974,6 +1974,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProjectAttachment"
+        progressLog:
+          type: array
+          description: History of progress changes for week-scoped delta calculations.
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              value:
+                type: integer
+            required: [date, value]
         strategicObjectiveIds:
           type: array
           items:

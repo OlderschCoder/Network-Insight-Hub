@@ -6,6 +6,7 @@ import {
   useDeleteProject,
   useListUsers,
   useListStrategicObjectives,
+  useListReports,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +45,7 @@ export default function ProjectDetail() {
   const { data: project, isLoading } = useGetProject(id);
   const { data: users } = useListUsers();
   const { data: objectives } = useListStrategicObjectives();
+  const { data: allReports } = useListReports({});
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
 
@@ -543,6 +545,40 @@ export default function ProjectDetail() {
           )}
         </CardContent>
       </Card>
+
+      {(() => {
+        const linkedReports = ((allReports ?? []) as any[]).filter(
+          (r) => Array.isArray(r.projectIds) && r.projectIds.includes(id),
+        );
+        if (linkedReports.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Included in Reports ({linkedReports.length})</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Weekly reports that reference this project.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5">
+                {linkedReports.map((r: any) => (
+                  <li key={r.id}>
+                    <Link href={`/reports/${r.id}`}>
+                      <span className="text-sm hover:underline cursor-pointer">
+                        Week of {r.weekOf}
+                        {r.title ? ` — ${r.title}` : ""}
+                        <Badge variant="outline" className="ml-2 text-[10px]">
+                          {r.status}
+                        </Badge>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {risks.length > 0 && (
         <Card>

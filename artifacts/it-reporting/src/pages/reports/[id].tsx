@@ -433,6 +433,49 @@ export default function ReportDetail() {
         <MetricCard label="Tickets Resolved" value={agg.totalTickets ?? 0} />
       </div>
 
+      {/* Included in this export — preview */}
+      {(() => {
+        const tasksIncluded = (selectedItemIds === null ? items.length : selectedItemIds.length)
+          + customTasks.length;
+        const ticketsIncluded = (ticketsResponse as any)?.tickets?.length ?? 0;
+        const projectsIncluded = projectIds.length;
+        const aarsIncluded =
+          selectedAarIds === null
+            ? (extras as any)?.afterActionReports?.length ?? 0
+            : selectedAarIds.length;
+        const maintIncluded =
+          selectedMaintenanceIds === null
+            ? (extras as any)?.maintenance?.length ?? 0
+            : selectedMaintenanceIds.length;
+        const goalCount = includeGoalProgress ? (extras as any)?.goalProgress?.length ?? 0 : 0;
+        const risksIncluded = includeOpenRisks ? risks.length : 0;
+        const Item = ({ label, n, on = true }: { label: string; n: number; on?: boolean }) => (
+          <div className={`flex items-center justify-between text-sm py-1 ${on ? "" : "opacity-50"}`}>
+            <span>{label}</span>
+            <span className="font-mono">{on ? n : "—"}</span>
+          </div>
+        );
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Included in this Export</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                What will appear when you download a PDF/Word/Excel or email this report.
+              </p>
+            </CardHeader>
+            <CardContent className="grid sm:grid-cols-2 gap-x-6">
+              <Item label="Tasks" n={tasksIncluded} />
+              <Item label="Helpdesk tickets resolved" n={ticketsIncluded} />
+              <Item label="Projects" n={projectsIncluded} />
+              <Item label="Post-Incident Reviews" n={aarsIncluded} />
+              <Item label="Network maintenance windows" n={maintIncluded} />
+              <Item label="Department goals" n={goalCount} on={includeGoalProgress} />
+              <Item label="Open risks &amp; issues" n={risksIncluded} on={includeOpenRisks} />
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* CIO narrative */}
       <Card>
         <CardHeader><CardTitle>Executive Summary</CardTitle></CardHeader>
@@ -905,19 +948,34 @@ export default function ReportDetail() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {risks.map((rk: any) => (
-                <li key={rk.id} className="border rounded p-2 text-sm">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className="text-[10px]">{rk.type}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{rk.severity}</Badge>
-                    <span className="font-medium">{rk.title}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">{rk.userName}</span>
-                  </div>
-                  {rk.description && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{rk.description}</p>
-                  )}
-                </li>
-              ))}
+              {risks.map((rk: any) => {
+                const proj = rk.projectId
+                  ? ((allProjects ?? []) as any[]).find((p) => p.id === rk.projectId)
+                  : null;
+                return (
+                  <li key={rk.id} className="border rounded p-2 text-sm">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-[10px]">{rk.type}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{rk.severity}</Badge>
+                      <span className="font-medium">{rk.title}</span>
+                      {proj && (
+                        <Link href={`/projects/${proj.id}`}>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-400/30 hover:bg-amber-500/20 cursor-pointer"
+                          >
+                            Blocking: {proj.title}
+                          </Badge>
+                        </Link>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-auto">{rk.userName}</span>
+                    </div>
+                    {rk.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{rk.description}</p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </CardContent>
         </Card>
