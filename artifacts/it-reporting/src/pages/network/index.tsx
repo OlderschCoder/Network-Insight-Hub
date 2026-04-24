@@ -459,6 +459,333 @@ function entriesToMarkdown(owner: MaintenanceOwner, entries: MaintenanceLogEntry
   return lines.join("\n");
 }
 
+type CombinedMaintenanceRow = {
+  switchHostname: string;
+  switchBuilding: string;
+  switchIp: string;
+  entry: MaintenanceLogEntry;
+};
+
+function collectSwitchEntries(switches: NetworkSwitch[]): CombinedMaintenanceRow[] {
+  const rows: CombinedMaintenanceRow[] = [];
+  for (const sw of switches) {
+    for (const entry of sw.maintenanceLog ?? []) {
+      rows.push({
+        switchHostname: sw.hostname,
+        switchBuilding: sw.building ?? "",
+        switchIp: sw.ipAddress ?? "",
+        entry,
+      });
+    }
+  }
+  rows.sort((a, b) => {
+    const at = a.entry.createdAt ? new Date(a.entry.createdAt).getTime() : 0;
+    const bt = b.entry.createdAt ? new Date(b.entry.createdAt).getTime() : 0;
+    return bt - at;
+  });
+  return rows;
+}
+
+function combinedRowsToCsv(rows: CombinedMaintenanceRow[]): string {
+  const header = [
+    "switch",
+    "building",
+    "ip_address",
+    "author",
+    "created_at",
+    "edited_at",
+    "window_start",
+    "window_end",
+    "body",
+  ];
+  const lines = rows.map((r) =>
+    [
+      r.switchHostname,
+      r.switchBuilding,
+      r.switchIp,
+      r.entry.authorName,
+      r.entry.createdAt ?? "",
+      r.entry.editedAt ?? "",
+      r.entry.windowStart ?? "",
+      r.entry.windowEnd ?? "",
+      r.entry.body,
+    ]
+      .map((v) => csvEscape(String(v ?? "")))
+      .join(","),
+  );
+  return [header.join(","), ...lines].join("\n");
+}
+
+function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
+  const lines: string[] = [];
+  lines.push(`# Maintenance log — all switches`);
+  lines.push(`*${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${new Date().toLocaleString()}*`);
+  lines.push("");
+  if (!rows.length) {
+    lines.push("_No entries match the current filters._");
+    return lines.join("\n");
+  }
+  // Group by switch for readability.
+  const grouped = new Map<string, CombinedMaintenanceRow[]>();
+  for (const r of rows) {
+    const key = r.switchHostname;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(r);
+  }
+  const switchNames = Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b));
+  for (const name of switchNames) {
+    const group = grouped.get(name)!;
+    const first = group[0];
+    const subtitle = [first.switchIp, first.switchBuilding].filter(Boolean).join(" · ");
+    lines.push(`## ${name}`);
+    if (subtitle) lines.push(`*${subtitle}*`);
+    lines.push("");
+    for (const { entry: e } of group) {
+      lines.push(`### ${formatLogTimestamp(e.createdAt)} — ${e.authorName}`);
+      if (e.windowStart || e.windowEnd) {
+        lines.push(
+          `*Window: ${formatLogTimestamp(e.windowStart)}${e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}*`,
+        );
+      }
+      if (e.editedAt) lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
+      lines.push("");
+      lines.push(e.body);
+      lines.push("");
+    }
+  }
+  return lines.join("\n");
+}
+
+function ExportAllMaintenanceDialog({
+  switches,
+  open,
+  onOpenChange,
+}: {
+  switches: NetworkSwitch[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [author, setAuthor] = useState<string>("__all__");
+  const [building, setBuilding] = useState<string>("__all__");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+
+  const allRows = useMemo(() => collectSwitchEntries(switches), [switches]);
+
+  const authors = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of allRows) seen.add(r.entry.authorName ?? "Unknown");
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [allRows]);
+
+  const buildings = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of allRows) {
+      const b = r.switchBuilding || "Unassigned";
+      seen.add(b);
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [allRows]);
+
+  const filtered = useMemo(() => {
+    const fromTs = from ? new Date(from).getTime() : null;
+    const toTs = to ? new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+    const q = search.trim().toLowerCase();
+    return allRows.filter((r) => {
+      const e = r.entry;
+      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
+      if (building !== "__all__") {
+        const b = r.switchBuilding || "Unassigned";
+        if (b !== building) return false;
+      }
+      const created = e.createdAt ? new Date(e.createdAt).getTime() : null;
+      if (fromTs != null && (created == null || created < fromTs)) return false;
+      if (toTs != null && (created == null || created > toTs)) return false;
+      if (q) {
+        const hay = [e.body, e.authorName, r.switchHostname, r.switchBuilding, r.switchIp]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allRows, author, building, from, to, search]);
+
+  const reset = () => {
+    setAuthor("__all__");
+    setBuilding("__all__");
+    setFrom("");
+    setTo("");
+    setSearch("");
+  };
+
+  const stamp = () => new Date().toISOString().slice(0, 10);
+  const exportCsv = () =>
+    downloadBlob(
+      `network-maintenance-${stamp()}.csv`,
+      "text/csv;charset=utf-8",
+      combinedRowsToCsv(filtered),
+    );
+  const exportMd = () =>
+    downloadBlob(
+      `network-maintenance-${stamp()}.md`,
+      "text/markdown;charset=utf-8",
+      combinedRowsToMarkdown(filtered),
+    );
+
+  const switchesWithEntries = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of filtered) seen.add(r.switchHostname);
+    return seen.size;
+  }, [filtered]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Export maintenance log — all switches</DialogTitle>
+          <DialogDescription>
+            {allRows.length} total {allRows.length === 1 ? "entry" : "entries"} across{" "}
+            {switches.length} {switches.length === 1 ? "switch" : "switches"}. Filter, then export
+            CSV or Markdown.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Building
+            <Select value={building} onValueChange={setBuilding}>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder="All buildings" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All buildings</SelectItem>
+                {buildings.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Author
+            <Select value={author} onValueChange={setAuthor}>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder="All authors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All authors</SelectItem>
+                {authors.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            From
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-8 text-xs mt-1"
+            />
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            To
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-8 text-xs mt-1"
+            />
+          </label>
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Search
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="hostname, body…"
+              className="h-8 text-xs mt-1"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {filtered.length} of {allRows.length} {allRows.length === 1 ? "entry" : "entries"}
+            {filtered.length > 0 && ` · ${switchesWithEntries} ${switchesWithEntries === 1 ? "switch" : "switches"}`}
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={reset}>
+            <X className="h-3 w-3 mr-1" /> Reset filters
+          </Button>
+        </div>
+
+        <ScrollArea className="max-h-[40vh] pr-2 border rounded">
+          {filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-8 text-center">
+              No entries match the current filters.
+            </p>
+          ) : (
+            <div className="divide-y">
+              {filtered.slice(0, 50).map((r) => (
+                <div key={`${r.switchHostname}-${r.entry.id}`} className="px-2 py-1.5">
+                  <div className="flex flex-wrap items-center gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span className="font-mono normal-case tracking-normal text-xs text-foreground/90">
+                      {r.switchHostname}
+                    </span>
+                    {r.switchBuilding && (
+                      <span className="normal-case tracking-normal">{r.switchBuilding}</span>
+                    )}
+                    <span className="font-semibold normal-case tracking-normal text-foreground/80">
+                      {r.entry.authorName}
+                    </span>
+                    <span>{formatLogTimestamp(r.entry.createdAt)}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5 line-clamp-3">
+                    {r.entry.body}
+                  </p>
+                </div>
+              ))}
+              {filtered.length > 50 && (
+                <p className="text-[10px] text-muted-foreground italic px-2 py-1.5">
+                  Showing first 50 of {filtered.length}. Export to see them all.
+                </p>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={exportCsv}
+            disabled={!filtered.length}
+          >
+            <Download className="h-3 w-3 mr-1" /> Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={exportMd}
+            disabled={!filtered.length}
+          >
+            <FileDown className="h-3 w-3 mr-1" /> Export Markdown
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MaintenanceHistoryDialog({
   owner,
   entries,
@@ -1154,6 +1481,7 @@ function CampusMapPanel() {
 export default function Network() {
   const [search, setSearch] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
+  const [exportAllOpen, setExportAllOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const askAI = (prompt: string) => {
     setPendingPrompt(prompt);
@@ -1209,6 +1537,19 @@ export default function Network() {
               <Workflow className="h-4 w-4 mr-2" /> Visualizer
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExportAllOpen(true)}
+            disabled={isLoading}
+          >
+            <FileDown className="h-4 w-4 mr-2" /> Export maintenance log
+          </Button>
+          <ExportAllMaintenanceDialog
+            switches={allSwitches}
+            open={exportAllOpen}
+            onOpenChange={setExportAllOpen}
+          />
           <AskAIPanel
             open={aiOpen}
             onOpenChange={setAiOpen}
