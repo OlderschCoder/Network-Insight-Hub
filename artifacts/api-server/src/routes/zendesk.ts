@@ -125,6 +125,130 @@ router.get("/my-open", requireAuth, async (req: any, res) => {
   }
 });
 
+interface ZendeskComment {
+  id: number;
+  author_id: number;
+  body: string;
+  plain_body?: string;
+  public: boolean;
+  created_at: string;
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max).trimEnd() + "…";
+}
+
+router.get("/ticket/:id/timeline", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) {
+    return res.status(503).json({ error: "Zendesk not configured" });
+  }
+  const ticketId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(ticketId)) {
+    return res.status(400).json({ error: "Invalid ticket id" });
+  }
+  try {
+    // Authorization: only the ticket's current assignee may pull the
+    // transcript (enforced below after we look up the ticket).
+    const email = (req.user?.email || "").trim();
+    const zendeskEmail = (req.user?.zendeskEmail || "").trim();
+    const lookupEmail = zendeskEmail || email;
+    if (!lookupEmail) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    type UsersResp = { users: ZendeskUser[] };
+    const usersResp = await zget<UsersResp>(
+      cfg,
+      `users/search.json?query=${encodeURIComponent(`email:${lookupEmail}`)}`,
+    );
+    const me = usersResp.users?.[0];
+    if (!me) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    type TicketResp = {
+      ticket: {
+        id: number;
+        assignee_id: number | null;
+        requester_id: number | null;
+        submitter_id: number | null;
+        collaborator_ids?: number[];
+        follower_ids?: number[];
+        email_cc_ids?: number[];
+      };
+    };
+    let ticket: TicketResp["ticket"];
+    try {
+      const tdata = await zget<TicketResp>(cfg, `tickets/${ticketId}.json`);
+      ticket = tdata.ticket;
+    } catch (err: any) {
+      if (/Zendesk 404/.test(err?.message || "")) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      throw err;
+    }
+    // Restrict to the ticket's current assignee. The Start Review flow only
+    // surfaces tickets assigned to the caller, so this is the minimum
+    // authorization needed for the feature.
+    if (ticket.assignee_id !== me.id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    type CommentsResp = { comments: ZendeskComment[] };
+    const data = await zget<CommentsResp>(
+      cfg,
+      `tickets/${ticketId}/comments.json?sort_order=asc`,
+    );
+    // Only include public comments in the prefilled transcript so internal
+    // agent notes are never copied into a review document by accident.
+    const comments = (data.comments || []).filter((c) => c.public);
+
+    const authorIds = Array.from(new Set(comments.map((c) => c.author_id)));
+    const authorMap = new Map<number, ZendeskUser>();
+    if (authorIds.length > 0) {
+      const usersData = await zget<{ users: ZendeskUser[] }>(
+        cfg,
+        `users/show_many.json?ids=${authorIds.join(",")}`,
+      );
+      for (const u of usersData.users) authorMap.set(u.id, u);
+    }
+
+    const PER_COMMENT_MAX = 800;
+    const TOTAL_MAX = 6000;
+    const lines: string[] = [];
+    let totalLen = 0;
+    let truncatedCount = 0;
+    for (const c of comments) {
+      const author = authorMap.get(c.author_id);
+      const authorName = author?.name || `User ${c.author_id}`;
+      const ts = c.created_at || "";
+      const body = (c.plain_body || c.body || "").trim().replace(/\r\n/g, "\n");
+      const block = `[${ts}] ${authorName}:\n${truncate(body, PER_COMMENT_MAX)}`;
+      if (totalLen + block.length > TOTAL_MAX) {
+        truncatedCount = comments.length - lines.length;
+        break;
+      }
+      lines.push(block);
+      totalLen += block.length + 2;
+    }
+    let timeline = lines.join("\n\n");
+    if (truncatedCount > 0) {
+      timeline += `\n\n… (${truncatedCount} earlier/later comment${
+        truncatedCount === 1 ? "" : "s"
+      } omitted — see Zendesk for full thread)`;
+    }
+    return res.json({
+      ticketId,
+      commentCount: comments.length,
+      includedCount: lines.length,
+      timeline,
+    });
+  } catch (e: any) {
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
 router.get("/status", requireAuth, async (_req, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {

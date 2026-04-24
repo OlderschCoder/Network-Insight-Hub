@@ -41,6 +41,8 @@ export default function NewAfterAction() {
   const prefillOutcome = params.get("outcome") ?? "success";
   const sourcePath = params.get("source") ?? "";
   const sourceLabel = params.get("sourceLabel") ?? "";
+  const prefillTimeline = params.get("timeline") ?? "";
+  const zendeskTicketId = params.get("zendeskTicketId") ?? "";
 
   const {
     register,
@@ -54,7 +56,7 @@ export default function NewAfterAction() {
       incidentDate: prefillIncidentDate,
       outcome: prefillOutcome,
       summary: prefillSummary,
-      timeline: "",
+      timeline: prefillTimeline,
       whatWentWell: "",
       whatWentPoorly: "",
       actionItems: "",
@@ -64,7 +66,36 @@ export default function NewAfterAction() {
   useEffect(() => {
     if (prefillTitle) setValue("title", prefillTitle);
     if (prefillSummary) setValue("summary", prefillSummary);
-  }, [prefillTitle, prefillSummary, setValue]);
+    if (prefillTimeline) setValue("timeline", prefillTimeline);
+  }, [prefillTitle, prefillSummary, prefillTimeline, setValue]);
+
+  useEffect(() => {
+    if (!zendeskTicketId) return;
+    const initial = (prefillTimeline || "").trim();
+    if (initial.length > 0) return;
+    const token = localStorage.getItem("auth_token");
+    let cancelled = false;
+    fetch(
+      `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
+        zendeskTicketId,
+      )}/timeline`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    )
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok || !body.timeline) return;
+        // Don't clobber edits the user has already started while we waited.
+        const current = (watch("timeline") || "").trim();
+        if (current.length > 0) return;
+        setValue("timeline", body.timeline);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zendeskTicketId]);
 
   const outcome = watch("outcome");
 

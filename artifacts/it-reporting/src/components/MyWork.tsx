@@ -159,6 +159,7 @@ function MyZendeskTickets() {
                 source: t.url,
                 sourceLabel: `Zendesk #${t.id}`,
                 incidentDate: (t.createdAt || "").slice(0, 10),
+                zendeskTicketId: String(t.id),
               });
               return (
                 <div
