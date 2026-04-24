@@ -746,6 +746,7 @@ export interface Vlan {
   subnet?: string;
   gateway?: string;
   notes?: string;
+  maintenanceLog: MaintenanceLogEntry[];
   createdAt?: string;
 }
 

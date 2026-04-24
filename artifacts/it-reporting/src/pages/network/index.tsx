@@ -5,7 +5,11 @@ import {
   useAddSwitchMaintenanceLogEntry,
   useUpdateSwitchMaintenanceLogEntry,
   useDeleteSwitchMaintenanceLogEntry,
+  useAddVlanMaintenanceLogEntry,
+  useUpdateVlanMaintenanceLogEntry,
+  useDeleteVlanMaintenanceLogEntry,
   getListSwitchesQueryKey,
+  getListVlansQueryKey,
 } from "@workspace/api-client-react";
 import type { NetworkSwitch, Vlan, MaintenanceLogEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -147,18 +151,68 @@ function canManageEntry(user: { id?: number; role?: string } | null, entry: Main
   return !!user.role && MAINTENANCE_EDIT_ROLES.has(user.role);
 }
 
+type MaintenanceOwner = {
+  kind: "switch" | "vlan";
+  id: number;
+  // Short identifier used in toast titles, dialog headers, etc. (e.g. "sw-aa144-a48", "VLAN 773 — EpworthBuilding").
+  displayName: string;
+  // Filename-safe slug for CSV / Markdown exports.
+  fileSlug: string;
+  // Optional second line shown in the history dialog (e.g. IP / building or subnet / building).
+  subtitle?: string;
+};
+
+function switchOwner(sw: NetworkSwitch): MaintenanceOwner {
+  return {
+    kind: "switch",
+    id: sw.id,
+    displayName: sw.hostname,
+    fileSlug: sw.hostname.replace(/[^a-z0-9._-]+/gi, "_"),
+    subtitle: [sw.ipAddress, sw.building].filter(Boolean).join(" · ") || undefined,
+  };
+}
+
+function vlanOwner(vlan: Vlan): MaintenanceOwner {
+  const display = `VLAN ${vlan.vlanId} — ${vlan.name}`;
+  return {
+    kind: "vlan",
+    id: vlan.id,
+    displayName: display,
+    fileSlug: `vlan-${vlan.vlanId}-${vlan.name}`.replace(/[^a-z0-9._-]+/gi, "_"),
+    subtitle: [vlan.subnet, vlan.building].filter(Boolean).join(" · ") || undefined,
+  };
+}
+
+function useOwnerMaintenanceMutations(kind: MaintenanceOwner["kind"]) {
+  const addSwitch = useAddSwitchMaintenanceLogEntry();
+  const updateSwitch = useUpdateSwitchMaintenanceLogEntry();
+  const deleteSwitch = useDeleteSwitchMaintenanceLogEntry();
+  const addVlan = useAddVlanMaintenanceLogEntry();
+  const updateVlan = useUpdateVlanMaintenanceLogEntry();
+  const deleteVlan = useDeleteVlanMaintenanceLogEntry();
+  return kind === "switch"
+    ? { add: addSwitch, update: updateSwitch, remove: deleteSwitch }
+    : { add: addVlan, update: updateVlan, remove: deleteVlan };
+}
+
+function ownerListQueryKey(kind: MaintenanceOwner["kind"]) {
+  // Drop the params element so we invalidate every variation of the list query.
+  return kind === "switch"
+    ? getListSwitchesQueryKey().slice(0, 1)
+    : getListVlansQueryKey().slice(0, 1);
+}
+
 function MaintenanceLogEntryRow({
-  sw,
+  owner,
   entry,
 }: {
-  sw: NetworkSwitch;
+  owner: MaintenanceOwner;
   entry: MaintenanceLogEntry;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const updateEntry = useUpdateSwitchMaintenanceLogEntry();
-  const deleteEntry = useDeleteSwitchMaintenanceLogEntry();
+  const { update: updateEntry, remove: deleteEntry } = useOwnerMaintenanceMutations(owner.kind);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const toLocalInput = (iso: string | null | undefined) => {
@@ -181,15 +235,15 @@ function MaintenanceLogEntryRow({
     setEditing(true);
   };
 
-  const refreshSwitches = () =>
-    queryClient.invalidateQueries({ queryKey: getListSwitchesQueryKey().slice(0, 1) });
+  const refreshOwners = () =>
+    queryClient.invalidateQueries({ queryKey: ownerListQueryKey(owner.kind) });
 
   const saveEdit = async () => {
     if (!body.trim()) return;
     try {
       const toIso = (s: string) => (s ? new Date(s).toISOString() : null);
       await updateEntry.mutateAsync({
-        id: sw.id,
+        id: owner.id,
         entryId: entry.id,
         data: {
           body: body.trim(),
@@ -197,8 +251,8 @@ function MaintenanceLogEntryRow({
           windowEnd: toIso(windowEnd),
         },
       });
-      await refreshSwitches();
-      toast({ title: "Maintenance note updated", description: sw.hostname });
+      await refreshOwners();
+      toast({ title: "Maintenance note updated", description: owner.displayName });
       setEditing(false);
     } catch (e: any) {
       toast({
@@ -211,9 +265,9 @@ function MaintenanceLogEntryRow({
 
   const doDelete = async () => {
     try {
-      await deleteEntry.mutateAsync({ id: sw.id, entryId: entry.id });
-      await refreshSwitches();
-      toast({ title: "Maintenance note deleted", description: sw.hostname });
+      await deleteEntry.mutateAsync({ id: owner.id, entryId: entry.id });
+      await refreshOwners();
+      toast({ title: "Maintenance note deleted", description: owner.displayName });
       setConfirmDelete(false);
     } catch (e: any) {
       toast({
@@ -325,7 +379,7 @@ function MaintenanceLogEntryRow({
             <AlertDialogTitle>Delete this maintenance note?</AlertDialogTitle>
             <AlertDialogDescription>
               The note will be hidden from the maintenance log on{" "}
-              <span className="font-mono">{sw.hostname}</span>. This can't be undone from the UI.
+              <span className="font-mono">{owner.displayName}</span>. This can't be undone from the UI.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -365,11 +419,11 @@ function csvEscape(value: string | null | undefined): string {
   return s;
 }
 
-function entriesToCsv(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): string {
-  const header = ["switch", "author", "created_at", "edited_at", "window_start", "window_end", "body"];
+function entriesToCsv(owner: MaintenanceOwner, entries: MaintenanceLogEntry[]): string {
+  const header = [owner.kind, "author", "created_at", "edited_at", "window_start", "window_end", "body"];
   const rows = entries.map((e) =>
     [
-      sw.hostname,
+      owner.displayName,
       e.authorName,
       e.createdAt ?? "",
       e.editedAt ?? "",
@@ -381,10 +435,10 @@ function entriesToCsv(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): string
   return [header.join(","), ...rows].join("\n");
 }
 
-function entriesToMarkdown(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): string {
+function entriesToMarkdown(owner: MaintenanceOwner, entries: MaintenanceLogEntry[]): string {
   const lines: string[] = [];
-  lines.push(`# Maintenance log — ${sw.hostname}`);
-  if (sw.ipAddress) lines.push(`*${sw.ipAddress}${sw.building ? ` · ${sw.building}` : ""}*`);
+  lines.push(`# Maintenance log — ${owner.displayName}`);
+  if (owner.subtitle) lines.push(`*${owner.subtitle}*`);
   lines.push("");
   if (!entries.length) {
     lines.push("_No entries match the current filters._");
@@ -406,12 +460,12 @@ function entriesToMarkdown(sw: NetworkSwitch, entries: MaintenanceLogEntry[]): s
 }
 
 function MaintenanceHistoryDialog({
-  sw,
+  owner,
   entries,
   open,
   onOpenChange,
 }: {
-  sw: NetworkSwitch;
+  owner: MaintenanceOwner;
   entries: MaintenanceLogEntry[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -454,16 +508,16 @@ function MaintenanceHistoryDialog({
     setSearch("");
   };
 
-  const safeName = sw.hostname.replace(/[^a-z0-9._-]+/gi, "_");
-  const exportCsv = () => downloadBlob(`${safeName}-maintenance.csv`, "text/csv;charset=utf-8", entriesToCsv(sw, filtered));
+  const exportCsv = () =>
+    downloadBlob(`${owner.fileSlug}-maintenance.csv`, "text/csv;charset=utf-8", entriesToCsv(owner, filtered));
   const exportMd = () =>
-    downloadBlob(`${safeName}-maintenance.md`, "text/markdown;charset=utf-8", entriesToMarkdown(sw, filtered));
+    downloadBlob(`${owner.fileSlug}-maintenance.md`, "text/markdown;charset=utf-8", entriesToMarkdown(owner, filtered));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="font-mono">{sw.hostname} — maintenance history</DialogTitle>
+          <DialogTitle className="font-mono">{owner.displayName} — maintenance history</DialogTitle>
           <DialogDescription>
             {entries.length} total {entries.length === 1 ? "entry" : "entries"}. Filter, search, or export the log.
           </DialogDescription>
@@ -523,7 +577,7 @@ function MaintenanceHistoryDialog({
           ) : (
             <div className="space-y-1.5">
               {filtered.map((e) => (
-                <MaintenanceLogEntryRow key={e.id} sw={sw} entry={e} />
+                <MaintenanceLogEntryRow key={e.id} owner={owner} entry={e} />
               ))}
             </div>
           )}
@@ -542,7 +596,13 @@ function MaintenanceHistoryDialog({
   );
 }
 
-function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: MaintenanceLogEntry[] }) {
+function MaintenanceLogList({
+  owner,
+  entries,
+}: {
+  owner: MaintenanceOwner;
+  entries: MaintenanceLogEntry[];
+}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   if (!entries?.length) return null;
   const visible = entries.slice(0, 3);
@@ -550,7 +610,7 @@ function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: Maint
   return (
     <div className="w-full mt-2 space-y-1.5">
       {visible.map((e) => (
-        <MaintenanceLogEntryRow key={e.id} sw={sw} entry={e} />
+        <MaintenanceLogEntryRow key={e.id} owner={owner} entry={e} />
       ))}
       <Button
         variant="ghost"
@@ -563,7 +623,7 @@ function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: Maint
         {hiddenCount > 0 && ` (${entries.length} total, ${hiddenCount} older)`}
       </Button>
       <MaintenanceHistoryDialog
-        sw={sw}
+        owner={owner}
         entries={entries}
         open={historyOpen}
         onOpenChange={setHistoryOpen}
@@ -572,13 +632,19 @@ function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: Maint
   );
 }
 
-function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
+function MaintenanceNotesEditor({
+  owner,
+  hasHistory,
+}: {
+  owner: MaintenanceOwner;
+  hasHistory: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState("");
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
   const queryClient = useQueryClient();
-  const addEntry = useAddSwitchMaintenanceLogEntry();
+  const { add: addEntry } = useOwnerMaintenanceMutations(owner.kind);
   const { toast } = useToast();
 
   const reset = () => {
@@ -592,7 +658,7 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
     try {
       const toIso = (s: string) => (s ? new Date(s).toISOString() : null);
       await addEntry.mutateAsync({
-        id: sw.id,
+        id: owner.id,
         data: {
           body: body.trim(),
           windowStart: toIso(windowStart),
@@ -600,9 +666,9 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
         },
       });
       await queryClient.invalidateQueries({
-        queryKey: getListSwitchesQueryKey().slice(0, 1),
+        queryKey: ownerListQueryKey(owner.kind),
       });
-      toast({ title: "Maintenance note added", description: sw.hostname });
+      toast({ title: "Maintenance note added", description: owner.displayName });
       reset();
       setEditing(false);
     } catch (e: any) {
@@ -615,7 +681,6 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
   };
 
   if (!editing) {
-    const hasHistory = (sw.maintenanceLog?.length ?? 0) > 0;
     return (
       <Button
         variant="outline"
@@ -685,6 +750,8 @@ function SwitchNotesEditor({ sw }: { sw: NetworkSwitch }) {
 }
 
 function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: string) => void }) {
+  const owner = switchOwner(sw);
+  const log = sw.maintenanceLog ?? [];
   return (
     <div className="border-b last:border-b-0 py-2 px-1">
       <div className="flex items-start justify-between gap-3">
@@ -699,9 +766,9 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
           {sw.status ?? "unknown"}
         </Badge>
       </div>
-      <MaintenanceLogList sw={sw} entries={sw.maintenanceLog ?? []} />
+      <MaintenanceLogList owner={owner} entries={log} />
       <div className="flex flex-wrap gap-2 mt-2">
-        <SwitchNotesEditor sw={sw} />
+        <MaintenanceNotesEditor owner={owner} hasHistory={log.length > 0} />
         <Link href={switchPostIncidentHref(sw)}>
           <Button variant="outline" size="sm" className="h-7 text-xs">
             <Activity className="h-3 w-3 mr-1" />
@@ -725,6 +792,8 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
 }
 
 function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => void }) {
+  const owner = vlanOwner(vlan);
+  const log = vlan.maintenanceLog ?? [];
   return (
     <div className="border-b last:border-b-0 py-2 px-1">
       <div className="flex items-start justify-between gap-3">
@@ -744,7 +813,9 @@ function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => 
           {vlan.type ?? "other"}
         </Badge>
       </div>
+      <MaintenanceLogList owner={owner} entries={log} />
       <div className="flex flex-wrap gap-2 mt-2">
+        <MaintenanceNotesEditor owner={owner} hasHistory={log.length > 0} />
         <Link href={vlanPostIncidentHref(vlan)}>
           <Button variant="outline" size="sm" className="h-7 text-xs">
             <Activity className="h-3 w-3 mr-1" />

@@ -1608,6 +1608,19 @@ export const ListVlansResponseItem = zod.object({
   subnet: zod.string().optional(),
   gateway: zod.string().optional(),
   notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
   createdAt: zod.coerce.date().optional(),
 });
 export const ListVlansResponse = zod.array(ListVlansResponseItem);
@@ -1621,6 +1634,119 @@ export const CreateVlanBody = zod.object({
   subnet: zod.string().optional(),
   gateway: zod.string().optional(),
   notes: zod.string().optional(),
+});
+
+/**
+ * @summary Append a maintenance-log entry to a VLAN
+ */
+export const AddVlanMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddVlanMaintenanceLogEntryBody = zod.object({
+  body: zod.string(),
+  windowStart: zod.coerce.date().nullish(),
+  windowEnd: zod.coerce.date().nullish(),
+});
+
+export const AddVlanMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  vlanId: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  building: zod.string(),
+  type: zod.enum(["data", "voice", "ospf", "management", "security", "other"]),
+  subnet: zod.string().optional(),
+  gateway: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  createdAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Edit a maintenance-log entry on a VLAN
+ */
+export const UpdateVlanMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+  entryId: zod.coerce.string(),
+});
+
+export const UpdateVlanMaintenanceLogEntryBody = zod.object({
+  body: zod.string(),
+  windowStart: zod.coerce.date().nullish(),
+  windowEnd: zod.coerce.date().nullish(),
+});
+
+export const UpdateVlanMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  vlanId: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  building: zod.string(),
+  type: zod.enum(["data", "voice", "ospf", "management", "security", "other"]),
+  subnet: zod.string().optional(),
+  gateway: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  createdAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a VLAN
+ */
+export const DeleteVlanMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+  entryId: zod.coerce.string(),
+});
+
+export const DeleteVlanMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  vlanId: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  building: zod.string(),
+  type: zod.enum(["data", "voice", "ospf", "management", "security", "other"]),
+  subnet: zod.string().optional(),
+  gateway: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  createdAt: zod.coerce.date().optional(),
 });
 
 export const ListAfterActionReportsQueryParams = zod.object({

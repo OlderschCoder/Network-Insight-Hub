@@ -5364,6 +5364,296 @@ export const useCreateVlan = <
   return useMutation(getCreateVlanMutationOptions(options));
 };
 
+/**
+ * @summary Append a maintenance-log entry to a VLAN
+ */
+export const getAddVlanMaintenanceLogEntryUrl = (id: number) => {
+  return `/api/network/vlans/${id}/maintenance-log`;
+};
+
+export const addVlanMaintenanceLogEntry = async (
+  id: number,
+  createMaintenanceLogEntryBody: CreateMaintenanceLogEntryBody,
+  options?: RequestInit,
+): Promise<Vlan> => {
+  return customFetch<Vlan>(getAddVlanMaintenanceLogEntryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMaintenanceLogEntryBody),
+  });
+};
+
+export const getAddVlanMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>,
+    TError,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>,
+  TError,
+  { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+  TContext
+> => {
+  const mutationKey = ["addVlanMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addVlanMaintenanceLogEntry(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddVlanMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>
+>;
+export type AddVlanMaintenanceLogEntryMutationBody =
+  BodyType<CreateMaintenanceLogEntryBody>;
+export type AddVlanMaintenanceLogEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Append a maintenance-log entry to a VLAN
+ */
+export const useAddVlanMaintenanceLogEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>,
+    TError,
+    { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addVlanMaintenanceLogEntry>>,
+  TError,
+  { id: number; data: BodyType<CreateMaintenanceLogEntryBody> },
+  TContext
+> => {
+  return useMutation(getAddVlanMaintenanceLogEntryMutationOptions(options));
+};
+
+/**
+ * @summary Edit a maintenance-log entry on a VLAN
+ */
+export const getUpdateVlanMaintenanceLogEntryUrl = (
+  id: number,
+  entryId: string,
+) => {
+  return `/api/network/vlans/${id}/maintenance-log/${entryId}`;
+};
+
+export const updateVlanMaintenanceLogEntry = async (
+  id: number,
+  entryId: string,
+  updateMaintenanceLogEntryBody: UpdateMaintenanceLogEntryBody,
+  options?: RequestInit,
+): Promise<Vlan> => {
+  return customFetch<Vlan>(getUpdateVlanMaintenanceLogEntryUrl(id, entryId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMaintenanceLogEntryBody),
+  });
+};
+
+export const getUpdateVlanMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>,
+    TError,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>,
+  TError,
+  {
+    id: number;
+    entryId: string;
+    data: BodyType<UpdateMaintenanceLogEntryBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["updateVlanMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    }
+  > = (props) => {
+    const { id, entryId, data } = props ?? {};
+
+    return updateVlanMaintenanceLogEntry(id, entryId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateVlanMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>
+>;
+export type UpdateVlanMaintenanceLogEntryMutationBody =
+  BodyType<UpdateMaintenanceLogEntryBody>;
+export type UpdateVlanMaintenanceLogEntryMutationError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Edit a maintenance-log entry on a VLAN
+ */
+export const useUpdateVlanMaintenanceLogEntry = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>,
+    TError,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateVlanMaintenanceLogEntry>>,
+  TError,
+  {
+    id: number;
+    entryId: string;
+    data: BodyType<UpdateMaintenanceLogEntryBody>;
+  },
+  TContext
+> => {
+  return useMutation(getUpdateVlanMaintenanceLogEntryMutationOptions(options));
+};
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a VLAN
+ */
+export const getDeleteVlanMaintenanceLogEntryUrl = (
+  id: number,
+  entryId: string,
+) => {
+  return `/api/network/vlans/${id}/maintenance-log/${entryId}`;
+};
+
+export const deleteVlanMaintenanceLogEntry = async (
+  id: number,
+  entryId: string,
+  options?: RequestInit,
+): Promise<Vlan> => {
+  return customFetch<Vlan>(getDeleteVlanMaintenanceLogEntryUrl(id, entryId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteVlanMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>,
+    TError,
+    { id: number; entryId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>,
+  TError,
+  { id: number; entryId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteVlanMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>,
+    { id: number; entryId: string }
+  > = (props) => {
+    const { id, entryId } = props ?? {};
+
+    return deleteVlanMaintenanceLogEntry(id, entryId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteVlanMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>
+>;
+
+export type DeleteVlanMaintenanceLogEntryMutationError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a VLAN
+ */
+export const useDeleteVlanMaintenanceLogEntry = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>,
+    TError,
+    { id: number; entryId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteVlanMaintenanceLogEntry>>,
+  TError,
+  { id: number; entryId: string },
+  TContext
+> => {
+  return useMutation(getDeleteVlanMaintenanceLogEntryMutationOptions(options));
+};
+
 export const getListAfterActionReportsUrl = (
   params?: ListAfterActionReportsParams,
 ) => {

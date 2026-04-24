@@ -1,6 +1,7 @@
-import { pgTable, serial, integer, text, varchar, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import type { MaintenanceLogEntry } from "./network_switches";
 
 export const vlansTable = pgTable("vlans", {
   id: serial("id").primaryKey(),
@@ -12,6 +13,7 @@ export const vlansTable = pgTable("vlans", {
   subnet: varchar("subnet", { length: 100 }),
   gateway: varchar("gateway", { length: 50 }),
   notes: text("notes"),
+  maintenanceLog: jsonb("maintenance_log").$type<MaintenanceLogEntry[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

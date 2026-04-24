@@ -1319,6 +1319,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Vlan"
+  /network/vlans/{id}/maintenance-log:
+    post:
+      operationId: addVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Append a maintenance-log entry to a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+  /network/vlans/{id}/maintenance-log/{entryId}:
+    patch:
+      operationId: updateVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Edit a maintenance-log entry on a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Soft-delete a maintenance-log entry on a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # AFTER-ACTION REPORTS
   /after-action:
@@ -2653,10 +2752,14 @@ components:
           type: string
         notes:
           type: string
+        maintenanceLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceLogEntry"
         createdAt:
           type: string
           format: date-time
-      required: [id, vlanId, name, building, type]
+      required: [id, vlanId, name, building, type, maintenanceLog]
 
     CreateVlanBody:
       type: object

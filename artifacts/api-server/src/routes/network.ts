@@ -23,8 +23,8 @@ function visibleMaintenanceLog(log: unknown): MaintenanceLogEntry[] {
   return (log as MaintenanceLogEntry[]).filter((e) => !e?.deletedAt);
 }
 
-function withVisibleMaintenanceLog<T extends { maintenanceLog?: unknown }>(sw: T): T {
-  return { ...sw, maintenanceLog: visibleMaintenanceLog(sw.maintenanceLog) };
+function withVisibleMaintenanceLog<T extends { maintenanceLog?: unknown }>(row: T): T {
+  return { ...row, maintenanceLog: visibleMaintenanceLog(row.maintenanceLog) };
 }
 
 function canEditMaintenanceEntry(user: any, entry: MaintenanceLogEntry): boolean {
@@ -244,7 +244,7 @@ router.get("/vlans", requireAuth, async (req: any, res) => {
       ? await db.select().from(vlansTable).where(and(...conditions)).orderBy(vlansTable.vlanId)
       : await db.select().from(vlansTable).orderBy(vlansTable.vlanId);
   }
-  return res.json(vlans);
+  return res.json(vlans.map(withVisibleMaintenanceLog));
 });
 
 router.post("/vlans", requireAuth, async (req: any, res) => {
@@ -261,7 +261,107 @@ router.post("/vlans", requireAuth, async (req: any, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [vlan] = await db.insert(vlansTable).values(parsed.data).returning();
-  return res.status(201).json(vlan);
+  return res.status(201).json(withVisibleMaintenanceLog(vlan));
+});
+
+router.post("/vlans/:id/maintenance-log", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const entry: MaintenanceLogEntry = {
+    id: crypto.randomUUID(),
+    body: parsed.data.body,
+    authorId: req.user?.id ?? null,
+    authorName: req.user?.name ?? req.user?.email ?? "Unknown",
+    createdAt: new Date().toISOString(),
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+  };
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const nextLog = [entry, ...log];
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+router.patch("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to edit this entry" });
+  }
+
+  const updated: MaintenanceLogEntry = {
+    ...log[idx],
+    body: parsed.data.body,
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+    editedAt: new Date().toISOString(),
+  };
+  const nextLog = log.slice();
+  nextLog[idx] = updated;
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+router.delete("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to delete this entry" });
+  }
+
+  const nextLog = log.slice();
+  nextLog[idx] = { ...log[idx], deletedAt: new Date().toISOString() };
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
 });
 
 // ----- AI Network Engineer chat -----
