@@ -1204,6 +1204,8 @@ export const ListSwitchesResponseItem = zod.object({
       createdAt: zod.coerce.date(),
       windowStart: zod.coerce.date().nullish(),
       windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
     }),
   ),
   location: zod.string().optional(),
@@ -1246,6 +1248,8 @@ export const GetSwitchResponse = zod.object({
       createdAt: zod.coerce.date(),
       windowStart: zod.coerce.date().nullish(),
       windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
     }),
   ),
   location: zod.string().optional(),
@@ -1287,6 +1291,8 @@ export const UpdateSwitchResponse = zod.object({
       createdAt: zod.coerce.date(),
       windowStart: zod.coerce.date().nullish(),
       windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
     }),
   ),
   location: zod.string().optional(),
@@ -1326,6 +1332,86 @@ export const AddSwitchMaintenanceLogEntryResponse = zod.object({
       createdAt: zod.coerce.date(),
       windowStart: zod.coerce.date().nullish(),
       windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  location: zod.string().optional(),
+  lastSeen: zod.coerce.date().optional(),
+  createdAt: zod.coerce.date().optional(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Edit a maintenance-log entry on a switch
+ */
+export const UpdateSwitchMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+  entryId: zod.coerce.string(),
+});
+
+export const UpdateSwitchMaintenanceLogEntryBody = zod.object({
+  body: zod.string(),
+  windowStart: zod.coerce.date().nullish(),
+  windowEnd: zod.coerce.date().nullish(),
+});
+
+export const UpdateSwitchMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  hostname: zod.string(),
+  building: zod.string(),
+  ipAddress: zod.string(),
+  model: zod.string().optional(),
+  status: zod.enum(["online", "offline", "unknown"]),
+  configFile: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
+    }),
+  ),
+  location: zod.string().optional(),
+  lastSeen: zod.coerce.date().optional(),
+  createdAt: zod.coerce.date().optional(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a switch
+ */
+export const DeleteSwitchMaintenanceLogEntryParams = zod.object({
+  id: zod.coerce.number(),
+  entryId: zod.coerce.string(),
+});
+
+export const DeleteSwitchMaintenanceLogEntryResponse = zod.object({
+  id: zod.number(),
+  hostname: zod.string(),
+  building: zod.string(),
+  ipAddress: zod.string(),
+  model: zod.string().optional(),
+  status: zod.enum(["online", "offline", "unknown"]),
+  configFile: zod.string().optional(),
+  notes: zod.string().optional(),
+  maintenanceLog: zod.array(
+    zod.object({
+      id: zod.string(),
+      body: zod.string(),
+      authorId: zod.number().nullish(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      windowStart: zod.coerce.date().nullish(),
+      windowEnd: zod.coerce.date().nullish(),
+      editedAt: zod.coerce.date().nullish(),
+      deletedAt: zod.coerce.date().nullish(),
     }),
   ),
   location: zod.string().optional(),

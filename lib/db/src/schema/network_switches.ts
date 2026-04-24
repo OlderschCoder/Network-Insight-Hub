@@ -10,6 +10,8 @@ export type MaintenanceLogEntry = {
   createdAt: string;
   windowStart?: string | null;
   windowEnd?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export const networkSwitchesTable = pgTable("network_switches", {

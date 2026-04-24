@@ -1030,6 +1030,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}/maintenance-log/{entryId}:
+    patch:
+      operationId: updateSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Edit a maintenance-log entry on a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Soft-delete a maintenance-log entry on a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /network/vlans:
     get:
       operationId: listVlans
@@ -2180,7 +2255,30 @@ components:
           type: string
           format: date-time
           nullable: true
+        editedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
       required: [id, body, authorName, createdAt]
+
+    UpdateMaintenanceLogEntryBody:
+      type: object
+      properties:
+        body:
+          type: string
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+      required: [body]
 
     CreateMaintenanceLogEntryBody:
       type: object

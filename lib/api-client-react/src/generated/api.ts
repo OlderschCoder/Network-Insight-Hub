@@ -63,6 +63,7 @@ import type {
   StrategicObjective,
   StrategicObjectiveBody,
   UpdateLogItemBody,
+  UpdateMaintenanceLogEntryBody,
   UpdateProcessBody,
   UpdateReportBody,
   UpdateRiskBody,
@@ -4300,6 +4301,218 @@ export const useAddSwitchMaintenanceLogEntry = <
   TContext
 > => {
   return useMutation(getAddSwitchMaintenanceLogEntryMutationOptions(options));
+};
+
+/**
+ * @summary Edit a maintenance-log entry on a switch
+ */
+export const getUpdateSwitchMaintenanceLogEntryUrl = (
+  id: number,
+  entryId: string,
+) => {
+  return `/api/network/switches/${id}/maintenance-log/${entryId}`;
+};
+
+export const updateSwitchMaintenanceLogEntry = async (
+  id: number,
+  entryId: string,
+  updateMaintenanceLogEntryBody: UpdateMaintenanceLogEntryBody,
+  options?: RequestInit,
+): Promise<NetworkSwitch> => {
+  return customFetch<NetworkSwitch>(
+    getUpdateSwitchMaintenanceLogEntryUrl(id, entryId),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateMaintenanceLogEntryBody),
+    },
+  );
+};
+
+export const getUpdateSwitchMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>,
+    TError,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>,
+  TError,
+  {
+    id: number;
+    entryId: string;
+    data: BodyType<UpdateMaintenanceLogEntryBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["updateSwitchMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    }
+  > = (props) => {
+    const { id, entryId, data } = props ?? {};
+
+    return updateSwitchMaintenanceLogEntry(id, entryId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateSwitchMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>
+>;
+export type UpdateSwitchMaintenanceLogEntryMutationBody =
+  BodyType<UpdateMaintenanceLogEntryBody>;
+export type UpdateSwitchMaintenanceLogEntryMutationError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Edit a maintenance-log entry on a switch
+ */
+export const useUpdateSwitchMaintenanceLogEntry = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>,
+    TError,
+    {
+      id: number;
+      entryId: string;
+      data: BodyType<UpdateMaintenanceLogEntryBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateSwitchMaintenanceLogEntry>>,
+  TError,
+  {
+    id: number;
+    entryId: string;
+    data: BodyType<UpdateMaintenanceLogEntryBody>;
+  },
+  TContext
+> => {
+  return useMutation(
+    getUpdateSwitchMaintenanceLogEntryMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a switch
+ */
+export const getDeleteSwitchMaintenanceLogEntryUrl = (
+  id: number,
+  entryId: string,
+) => {
+  return `/api/network/switches/${id}/maintenance-log/${entryId}`;
+};
+
+export const deleteSwitchMaintenanceLogEntry = async (
+  id: number,
+  entryId: string,
+  options?: RequestInit,
+): Promise<NetworkSwitch> => {
+  return customFetch<NetworkSwitch>(
+    getDeleteSwitchMaintenanceLogEntryUrl(id, entryId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteSwitchMaintenanceLogEntryMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>,
+    TError,
+    { id: number; entryId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>,
+  TError,
+  { id: number; entryId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteSwitchMaintenanceLogEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>,
+    { id: number; entryId: string }
+  > = (props) => {
+    const { id, entryId } = props ?? {};
+
+    return deleteSwitchMaintenanceLogEntry(id, entryId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteSwitchMaintenanceLogEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>
+>;
+
+export type DeleteSwitchMaintenanceLogEntryMutationError =
+  ErrorType<ErrorResponse>;
+
+/**
+ * @summary Soft-delete a maintenance-log entry on a switch
+ */
+export const useDeleteSwitchMaintenanceLogEntry = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>,
+    TError,
+    { id: number; entryId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteSwitchMaintenanceLogEntry>>,
+  TError,
+  { id: number; entryId: string },
+  TContext
+> => {
+  return useMutation(
+    getDeleteSwitchMaintenanceLogEntryMutationOptions(options),
+  );
 };
 
 /**

@@ -614,6 +614,8 @@ export interface MaintenanceLogEntry {
   createdAt: string;
   windowStart?: string | null;
   windowEnd?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
 }
 
 export interface NetworkSwitch {
@@ -630,6 +632,12 @@ export interface NetworkSwitch {
   lastSeen?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface UpdateMaintenanceLogEntryBody {
+  body: string;
+  windowStart?: string | null;
+  windowEnd?: string | null;
 }
 
 export interface CreateMaintenanceLogEntryBody {

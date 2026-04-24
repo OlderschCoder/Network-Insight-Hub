@@ -11,6 +11,23 @@ import path from "path";
 
 const router = Router();
 
+const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
+
+function visibleMaintenanceLog(log: unknown): MaintenanceLogEntry[] {
+  if (!Array.isArray(log)) return [];
+  return (log as MaintenanceLogEntry[]).filter((e) => !e?.deletedAt);
+}
+
+function withVisibleMaintenanceLog<T extends { maintenanceLog?: unknown }>(sw: T): T {
+  return { ...sw, maintenanceLog: visibleMaintenanceLog(sw.maintenanceLog) };
+}
+
+function canEditMaintenanceEntry(user: any, entry: MaintenanceLogEntry): boolean {
+  if (!user) return false;
+  if (entry.authorId != null && entry.authorId === user.id) return true;
+  return MAINTENANCE_EDIT_ROLES.has(user.role);
+}
+
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -55,7 +72,7 @@ router.get("/switches", requireAuth, async (req: any, res) => {
       ? await db.select().from(networkSwitchesTable).where(and(...conditions)).orderBy(networkSwitchesTable.building)
       : await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
   }
-  return res.json(switches);
+  return res.json(switches.map(withVisibleMaintenanceLog));
 });
 
 router.post("/switches", requireAuth, async (req: any, res) => {
@@ -79,7 +96,7 @@ router.get("/switches/:id", requireAuth, async (req, res) => {
   const id = parseInt(req.params.id);
   const [sw] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
   if (!sw) return res.status(404).json({ error: "Not found" });
-  return res.json(sw);
+  return res.json(withVisibleMaintenanceLog(sw));
 });
 
 router.patch("/switches/:id", requireAuth, async (req: any, res) => {
@@ -133,7 +150,73 @@ router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) 
     .set({ maintenanceLog: nextLog, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id))
     .returning();
-  return res.json(sw);
+  return res.json(withVisibleMaintenanceLog(sw));
+});
+
+router.patch("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to edit this entry" });
+  }
+
+  const updated: MaintenanceLogEntry = {
+    ...log[idx],
+    body: parsed.data.body,
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+    editedAt: new Date().toISOString(),
+  };
+  const nextLog = log.slice();
+  nextLog[idx] = updated;
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(sw));
+});
+
+router.delete("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to delete this entry" });
+  }
+
+  const nextLog = log.slice();
+  nextLog[idx] = { ...log[idx], deletedAt: new Date().toISOString() };
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(sw));
 });
 
 router.get("/vlans", requireAuth, async (req: any, res) => {

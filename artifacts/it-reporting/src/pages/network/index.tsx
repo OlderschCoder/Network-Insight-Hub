@@ -3,11 +3,24 @@ import {
   useListSwitches,
   useListVlans,
   useAddSwitchMaintenanceLogEntry,
+  useUpdateSwitchMaintenanceLogEntry,
+  useDeleteSwitchMaintenanceLogEntry,
   getListSwitchesQueryKey,
 } from "@workspace/api-client-react";
 import type { NetworkSwitch, Vlan, MaintenanceLogEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Server, Network as NetworkIcon, Workflow, Building2,
   Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
-  Activity, Wrench, Save,
+  Activity, Wrench, Save, Pencil, Trash2, X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -120,36 +133,243 @@ function formatLogTimestamp(iso: string | null | undefined): string {
   }
 }
 
-function MaintenanceLogList({ entries }: { entries: MaintenanceLogEntry[] }) {
+const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
+
+function canManageEntry(user: { id?: number; role?: string } | null, entry: MaintenanceLogEntry) {
+  if (!user) return false;
+  if (entry.authorId != null && entry.authorId === user.id) return true;
+  return !!user.role && MAINTENANCE_EDIT_ROLES.has(user.role);
+}
+
+function MaintenanceLogEntryRow({
+  sw,
+  entry,
+}: {
+  sw: NetworkSwitch;
+  entry: MaintenanceLogEntry;
+}) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const updateEntry = useUpdateSwitchMaintenanceLogEntry();
+  const deleteEntry = useDeleteSwitchMaintenanceLogEntry();
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const toLocalInput = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const tzMs = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzMs).toISOString().slice(0, 16);
+  };
+  const [body, setBody] = useState(entry.body);
+  const [windowStart, setWindowStart] = useState(toLocalInput(entry.windowStart));
+  const [windowEnd, setWindowEnd] = useState(toLocalInput(entry.windowEnd));
+
+  const allowed = canManageEntry(user, entry);
+
+  const startEditing = () => {
+    setBody(entry.body);
+    setWindowStart(toLocalInput(entry.windowStart));
+    setWindowEnd(toLocalInput(entry.windowEnd));
+    setEditing(true);
+  };
+
+  const refreshSwitches = () =>
+    queryClient.invalidateQueries({ queryKey: getListSwitchesQueryKey().slice(0, 1) });
+
+  const saveEdit = async () => {
+    if (!body.trim()) return;
+    try {
+      const toIso = (s: string) => (s ? new Date(s).toISOString() : null);
+      await updateEntry.mutateAsync({
+        id: sw.id,
+        entryId: entry.id,
+        data: {
+          body: body.trim(),
+          windowStart: toIso(windowStart),
+          windowEnd: toIso(windowEnd),
+        },
+      });
+      await refreshSwitches();
+      toast({ title: "Maintenance note updated", description: sw.hostname });
+      setEditing(false);
+    } catch (e: any) {
+      toast({
+        title: "Couldn't save changes",
+        description: e?.message ?? "Try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const doDelete = async () => {
+    try {
+      await deleteEntry.mutateAsync({ id: sw.id, entryId: entry.id });
+      await refreshSwitches();
+      toast({ title: "Maintenance note deleted", description: sw.hostname });
+      setConfirmDelete(false);
+    } catch (e: any) {
+      toast({
+        title: "Couldn't delete note",
+        description: e?.message ?? "Try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="text-xs border-l-2 border-primary/40 pl-2 py-1 bg-muted/30 rounded-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span className="font-semibold text-foreground/80 normal-case tracking-normal text-xs">
+          {entry.authorName}
+        </span>
+        <span>{formatLogTimestamp(entry.createdAt)}</span>
+        {(entry.windowStart || entry.windowEnd) && !editing && (
+          <span className="text-amber-300 normal-case tracking-normal">
+            window: {formatLogTimestamp(entry.windowStart)}
+            {entry.windowEnd ? ` → ${formatLogTimestamp(entry.windowEnd)}` : ""}
+          </span>
+        )}
+        {entry.editedAt && (
+          <span className="italic normal-case tracking-normal text-muted-foreground/70">
+            edited {formatLogTimestamp(entry.editedAt)}
+          </span>
+        )}
+        {allowed && !editing && (
+          <span className="ml-auto flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 px-1 text-[10px]"
+              onClick={startEditing}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 px-1 text-[10px] text-red-300 hover:text-red-200"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete
+            </Button>
+          </span>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="mt-1 space-y-2">
+          <Textarea
+            rows={3}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="text-xs"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Window start (optional)
+              <Input
+                type="datetime-local"
+                value={windowStart}
+                onChange={(e) => setWindowStart(e.target.value)}
+                className="h-7 text-xs mt-1"
+              />
+            </label>
+            <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Window end (optional)
+              <Input
+                type="datetime-local"
+                value={windowEnd}
+                onChange={(e) => setWindowEnd(e.target.value)}
+                className="h-7 text-xs mt-1"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={saveEdit}
+              disabled={updateEntry.isPending || !body.trim()}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {updateEntry.isPending ? "Saving…" : "Save changes"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() => setEditing(false)}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+      )}
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this maintenance note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The note will be hidden from the maintenance log on{" "}
+              <span className="font-mono">{sw.hostname}</span>. This can't be undone from the UI.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteEntry.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                doDelete();
+              }}
+              disabled={deleteEntry.isPending}
+              className="bg-red-600 hover:bg-red-500 text-white"
+            >
+              {deleteEntry.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function MaintenanceLogList({ sw, entries }: { sw: NetworkSwitch; entries: MaintenanceLogEntry[] }) {
+  const [showAll, setShowAll] = useState(false);
   if (!entries?.length) return null;
-  const recent = entries.slice(0, 3);
-  const remaining = entries.length - recent.length;
+  const visible = showAll ? entries : entries.slice(0, 3);
+  const hiddenCount = entries.length - visible.length;
   return (
     <div className="w-full mt-2 space-y-1.5">
-      {recent.map((e) => (
-        <div
-          key={e.id}
-          className="text-xs border-l-2 border-primary/40 pl-2 py-1 bg-muted/30 rounded-sm"
-        >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-            <span className="font-semibold text-foreground/80 normal-case tracking-normal text-xs">
-              {e.authorName}
-            </span>
-            <span>{formatLogTimestamp(e.createdAt)}</span>
-            {(e.windowStart || e.windowEnd) && (
-              <span className="text-amber-300 normal-case tracking-normal">
-                window: {formatLogTimestamp(e.windowStart)}
-                {e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}
-              </span>
-            )}
-          </div>
-          <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5">{e.body}</p>
-        </div>
+      {visible.map((e) => (
+        <MaintenanceLogEntryRow key={e.id} sw={sw} entry={e} />
       ))}
-      {remaining > 0 && (
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-          + {remaining} older {remaining === 1 ? "entry" : "entries"}
-        </p>
+      {hiddenCount > 0 && !showAll && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+          onClick={() => setShowAll(true)}
+        >
+          + Show {hiddenCount} older {hiddenCount === 1 ? "entry" : "entries"}
+        </Button>
+      )}
+      {showAll && entries.length > 3 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+          onClick={() => setShowAll(false)}
+        >
+          Show fewer
+        </Button>
       )}
     </div>
   );
@@ -282,7 +502,7 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
           {sw.status ?? "unknown"}
         </Badge>
       </div>
-      <MaintenanceLogList entries={sw.maintenanceLog ?? []} />
+      <MaintenanceLogList sw={sw} entries={sw.maintenanceLog ?? []} />
       <div className="flex flex-wrap gap-2 mt-2">
         <SwitchNotesEditor sw={sw} />
         <Link href={switchPostIncidentHref(sw)}>
