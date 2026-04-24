@@ -46,7 +46,11 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `risks` — id, userId, type (risk/issue/design), severity, status, title, description, mitigation
 - `network_switches` — id, hostname, building, ipAddress, model, status, configFile, notes
 - `vlans` — id, vlanId, name, description, building, type, subnet, gateway
+- `network_layout_positions` — nodeId (PK), x, y, width, height, updatedAt, updatedBy. Shared React Flow positions for the network diagram (one row per node, last writer wins).
+- `azure_vms` — id, name, resourceGroup, subscription, location, size, os, privateIp, publicIp, vnet, subnet, status, purpose, notes, owner, createdBy
 - `after_action_reports` — id, userId, title, incidentDate, outcome, summary, timeline, whatWentWell, whatWentPoorly, actionItems
+- `projects` — id, title, description, status, progress (0-100), targetDate, newEstimatedDate, attachments (json), progressLog (json), pendingDecisions (json), strategicObjectiveIds (json), createdBy
+- `project_assignees` — projectId + userId composite PK
 
 ## API Routes
 
@@ -60,6 +64,11 @@ All routes under `/api/`:
 - `GET/POST/PUT /reports` — weekly reports; `POST /reports/:id/finalize` (CIO)
 - `GET/POST/PUT /risks` — risks, issues, design suggestions
 - `GET /network/switches`, `GET /network/vlans` — network reference
+- `GET/PUT /network/layout` — saved React Flow node positions (PUT auth, DELETE CIO-only)
+- `DELETE /reports/:id` — delete a report (CIO)
+- `GET /reports/:id/tickets` — Zendesk-resolved tickets for the report's week
+- `GET/POST/PATCH/DELETE /projects` — project CRUD with assignees, attachments, decisions, progress log
+- `GET/POST/PATCH/DELETE /azure-vms` — Azure VM inventory (write ops CIO-only)
 - `GET/POST/PUT /after-action` — after-action reports
 - `GET /dashboard/summary`, `/activity`, `/week-status`
 - `GET /export/report/:id/docx`, `/export/report/:id/xlsx`

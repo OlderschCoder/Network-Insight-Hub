@@ -1,15 +1,26 @@
-import { useMemo, useRef, useState } from "react";
-import { useListSwitches, useListVlans } from "@workspace/api-client-react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import {
+  useListSwitches,
+  useListVlans,
+  useGetNetworkLayout,
+  useSaveNetworkLayout,
+  useClearNetworkLayout,
+} from "@workspace/api-client-react";
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   type Node,
   type Edge,
+  type NodeDragHandler,
+  useNodesState,
+  useEdgesState,
   getNodesBounds,
   getViewportForBounds,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { useToast } from "@/hooks/use-toast";
+import { RotateCcw } from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -74,7 +85,7 @@ export default function NetworkVisualize() {
     return next;
   };
 
-  const { nodes, edges } = useMemo(() => {
+  const computed = useMemo(() => {
     const selSwitches = switches.filter((s) => selectedSwitchIds.has(s.id));
     const selVlans = vlans.filter((v) => selectedVlanIds.has(v.id));
 
@@ -559,6 +570,102 @@ export default function NetworkVisualize() {
     return { nodes, edges };
   }, [switches, vlans, selectedSwitchIds, selectedVlanIds]);
 
+  // ---- Layout persistence -------------------------------------------------
+  // Saved per-node positions (shared across users) override the auto-layout
+  // so the diagram remembers manual arrangement between visits.
+  const { toast } = useToast();
+  const { data: savedLayout = [], refetch: refetchLayout } = useGetNetworkLayout();
+  const saveLayoutMutation = useSaveNetworkLayout();
+  const clearLayoutMutation = useClearNetworkLayout();
+
+  const savedById = useMemo(() => {
+    const map = new Map<string, { x: number; y: number; width?: number | null; height?: number | null }>();
+    for (const p of savedLayout as any[]) {
+      map.set(p.nodeId, { x: p.x, y: p.y, width: p.width, height: p.height });
+    }
+    return map;
+  }, [savedLayout]);
+
+  // Apply saved positions on top of the auto-layout.
+  const hydratedNodes = useMemo<Node[]>(() => {
+    return computed.nodes.map((n) => {
+      const saved = savedById.get(n.id);
+      if (!saved) return n;
+      const next: Node = { ...n, position: { x: saved.x, y: saved.y } };
+      if (saved.width != null || saved.height != null) {
+        next.style = {
+          ...n.style,
+          ...(saved.width != null ? { width: saved.width } : {}),
+          ...(saved.height != null ? { height: saved.height } : {}),
+        };
+      }
+      return next;
+    });
+  }, [computed.nodes, savedById]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(hydratedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(computed.edges);
+
+  // Re-sync local state when underlying data or saved layout changes.
+  useEffect(() => {
+    setNodes(hydratedNodes);
+  }, [hydratedNodes, setNodes]);
+  useEffect(() => {
+    setEdges(computed.edges);
+  }, [computed.edges, setEdges]);
+
+  // Persist the dragged node's position. React Flow gives us the node in the
+  // *parent's* coordinate space when it has parentNode, which matches what we
+  // store and re-apply.
+  const handleNodeDragStop = useCallback<NodeDragHandler>(
+    (_evt, node) => {
+      const w =
+        typeof node.style?.width === "number" ? (node.style.width as number) : undefined;
+      const h =
+        typeof node.style?.height === "number" ? (node.style.height as number) : undefined;
+      saveLayoutMutation.mutate(
+        {
+          data: {
+            positions: [
+              {
+                nodeId: node.id,
+                x: node.position.x,
+                y: node.position.y,
+                ...(w != null ? { width: w } : {}),
+                ...(h != null ? { height: h } : {}),
+              },
+            ],
+          },
+        },
+        {
+          onError: (err: any) => {
+            toast({
+              title: "Couldn't save layout",
+              description: err?.message ?? "Try again in a moment.",
+              variant: "destructive",
+            });
+          },
+        },
+      );
+    },
+    [saveLayoutMutation, toast],
+  );
+
+  const handleResetLayout = useCallback(async () => {
+    if (!confirm("Reset the diagram to the automatic layout? This affects everyone.")) return;
+    try {
+      await clearLayoutMutation.mutateAsync({ data: {} });
+      await refetchLayout();
+      toast({ title: "Layout reset", description: "Auto-layout restored." });
+    } catch (err: any) {
+      toast({
+        title: "Reset failed",
+        description: err?.message ?? "Try again.",
+        variant: "destructive",
+      });
+    }
+  }, [clearLayoutMutation, refetchLayout, toast]);
+
   const totalSelected = selectedSwitchIds.size + selectedVlanIds.size;
 
   // Buildings tab data: list every distinct (normalized) building with its
@@ -893,19 +1000,37 @@ export default function NetworkVisualize() {
         </div>
 
         <Card>
-          <CardHeader className="py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm">Diagram</CardTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  disabled={totalSelected === 0}
-                >
-                  <Download className="h-3 w-3" /> Export
-                </Button>
-              </DropdownMenuTrigger>
+          <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Diagram
+              {savedById.size > 0 && (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  Custom layout · {savedById.size} saved
+                </Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={handleResetLayout}
+                disabled={savedById.size === 0 || clearLayoutMutation.isPending}
+                title="Restore the auto-layout for everyone"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset layout
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    disabled={totalSelected === 0}
+                  >
+                    <Download className="h-3 w-3" /> Export
+                  </Button>
+                </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => exportImage("png")}>
                   PNG image (.png)
@@ -916,8 +1041,9 @@ export default function NetworkVisualize() {
                 <DropdownMenuItem onClick={exportDrawio}>
                   draw.io / diagrams.net (.drawio)
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div ref={flowWrapperRef} style={{ height: "70vh" }} className="bg-slate-950 rounded-b-lg">
@@ -929,6 +1055,9 @@ export default function NetworkVisualize() {
                 <ReactFlow
                   nodes={nodes}
                   edges={edges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onNodeDragStop={handleNodeDragStop}
                   fitView
                   fitViewOptions={{ padding: 0.2 }}
                   minZoom={0.2}

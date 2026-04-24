@@ -1,8 +1,13 @@
 import { Router } from "express";
-import { db, networkSwitchesTable, vlansTable } from "@workspace/db";
+import {
+  db,
+  networkSwitchesTable,
+  vlansTable,
+  networkLayoutPositionsTable,
+} from "@workspace/db";
 import type { MaintenanceLogEntry } from "@workspace/db";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { eq, and, or, ilike, desc, inArray, sql } from "drizzle-orm";
+import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import crypto from "crypto";
 import OpenAI from "openai";
@@ -368,6 +373,89 @@ Guidelines for your answers:
     console.error("[network ai-chat]", err);
     return res.status(500).json({ error: err?.message || "AI request failed" });
   }
+});
+
+// ---- Network diagram layout (shared across team) --------------------------
+// Stores the dragged x/y of each React Flow node id so the network visualizer
+// remembers manual positioning between visits / users.
+
+router.get("/layout", requireAuth, async (_req, res) => {
+  const rows = await db.select().from(networkLayoutPositionsTable);
+  return res.json(
+    rows.map((r) => ({
+      nodeId: r.nodeId,
+      x: r.x,
+      y: r.y,
+      width: r.width ?? null,
+      height: r.height ?? null,
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+  );
+});
+
+const layoutPutSchema = z.object({
+  positions: z
+    .array(
+      z.object({
+        nodeId: z.string().min(1).max(255),
+        x: z.number().finite(),
+        y: z.number().finite(),
+        width: z.number().finite().optional().nullable(),
+        height: z.number().finite().optional().nullable(),
+      }),
+    )
+    .min(1)
+    .max(2000),
+});
+
+router.put("/layout", requireAuth, async (req: any, res) => {
+  const parsed = layoutPutSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const userId = req.user?.id ?? null;
+  const now = new Date();
+
+  const values = parsed.data.positions.map((p) => ({
+    nodeId: p.nodeId,
+    x: p.x,
+    y: p.y,
+    width: p.width ?? null,
+    height: p.height ?? null,
+    updatedAt: now,
+    updatedBy: userId,
+  }));
+
+  await db
+    .insert(networkLayoutPositionsTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: networkLayoutPositionsTable.nodeId,
+      set: {
+        x: sql`excluded.x`,
+        y: sql`excluded.y`,
+        width: sql`excluded.width`,
+        height: sql`excluded.height`,
+        updatedAt: sql`excluded.updated_at`,
+        updatedBy: sql`excluded.updated_by`,
+      },
+    });
+  return res.json({ saved: values.length });
+});
+
+const layoutDeleteSchema = z.object({
+  nodeIds: z.array(z.string().min(1)).optional(),
+});
+
+router.delete("/layout", requireAuth, requireCIO, async (req, res) => {
+  const parsed = layoutDeleteSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  if (parsed.data.nodeIds && parsed.data.nodeIds.length > 0) {
+    await db
+      .delete(networkLayoutPositionsTable)
+      .where(inArray(networkLayoutPositionsTable.nodeId, parsed.data.nodeIds));
+  } else {
+    await db.delete(networkLayoutPositionsTable);
+  }
+  return res.json({ ok: true });
 });
 
 export default router;

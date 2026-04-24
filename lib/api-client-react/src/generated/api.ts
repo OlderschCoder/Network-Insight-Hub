@@ -21,6 +21,10 @@ import type {
   AfterActionReport,
   AggregateReport,
   AuthResponse,
+  AzureVm,
+  AzureVmInput,
+  ClearNetworkLayout200,
+  ClearNetworkLayoutBody,
   CreateAfterActionBody,
   CreateEntryBody,
   CreateLogItemBody,
@@ -31,6 +35,7 @@ import type {
   CreateSwitchBody,
   CreateVlanBody,
   DashboardSummary,
+  DeleteAzureVm200,
   DeleteProject200,
   DeleteReport200,
   DeleteStrategicObjective200,
@@ -42,6 +47,7 @@ import type {
   GetRecentActivityParams,
   HealthStatus,
   ListAfterActionReportsParams,
+  ListAzureVmsParams,
   ListEntriesParams,
   ListLogItemsParams,
   ListProcessesParams,
@@ -51,6 +57,7 @@ import type {
   ListVlansParams,
   LogItem,
   LoginBody,
+  NetworkLayoutPosition,
   NetworkSwitch,
   Process,
   Project,
@@ -60,6 +67,8 @@ import type {
   ReportExtras,
   ReportTicketsResponse,
   Risk,
+  SaveNetworkLayout200,
+  SaveNetworkLayoutBody,
   StrategicObjective,
   StrategicObjectiveBody,
   UpdateLogItemBody,
@@ -3082,6 +3091,425 @@ export const useDeleteProject = <
   return useMutation(getDeleteProjectMutationOptions(options));
 };
 
+/**
+ * @summary List Azure VMs (with optional search)
+ */
+export const getListAzureVmsUrl = (params?: ListAzureVmsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/azure-vms?${stringifiedParams}`
+    : `/api/azure-vms`;
+};
+
+export const listAzureVms = async (
+  params?: ListAzureVmsParams,
+  options?: RequestInit,
+): Promise<AzureVm[]> => {
+  return customFetch<AzureVm[]>(getListAzureVmsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAzureVmsQueryKey = (params?: ListAzureVmsParams) => {
+  return [`/api/azure-vms`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAzureVmsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAzureVms>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAzureVmsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAzureVms>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAzureVmsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAzureVms>>> = ({
+    signal,
+  }) => listAzureVms(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAzureVms>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAzureVmsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAzureVms>>
+>;
+export type ListAzureVmsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List Azure VMs (with optional search)
+ */
+
+export function useListAzureVms<
+  TData = Awaited<ReturnType<typeof listAzureVms>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAzureVmsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAzureVms>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAzureVmsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create an Azure VM record
+ */
+export const getCreateAzureVmUrl = () => {
+  return `/api/azure-vms`;
+};
+
+export const createAzureVm = async (
+  azureVmInput: AzureVmInput,
+  options?: RequestInit,
+): Promise<AzureVm> => {
+  return customFetch<AzureVm>(getCreateAzureVmUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(azureVmInput),
+  });
+};
+
+export const getCreateAzureVmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAzureVm>>,
+    TError,
+    { data: BodyType<AzureVmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAzureVm>>,
+  TError,
+  { data: BodyType<AzureVmInput> },
+  TContext
+> => {
+  const mutationKey = ["createAzureVm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAzureVm>>,
+    { data: BodyType<AzureVmInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAzureVm(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAzureVmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAzureVm>>
+>;
+export type CreateAzureVmMutationBody = BodyType<AzureVmInput>;
+export type CreateAzureVmMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create an Azure VM record
+ */
+export const useCreateAzureVm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAzureVm>>,
+    TError,
+    { data: BodyType<AzureVmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAzureVm>>,
+  TError,
+  { data: BodyType<AzureVmInput> },
+  TContext
+> => {
+  return useMutation(getCreateAzureVmMutationOptions(options));
+};
+
+export const getGetAzureVmUrl = (id: number) => {
+  return `/api/azure-vms/${id}`;
+};
+
+export const getAzureVm = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AzureVm> => {
+  return customFetch<AzureVm>(getGetAzureVmUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAzureVmQueryKey = (id: number) => {
+  return [`/api/azure-vms/${id}`] as const;
+};
+
+export const getGetAzureVmQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAzureVm>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAzureVm>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAzureVmQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAzureVm>>> = ({
+    signal,
+  }) => getAzureVm(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureVm>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAzureVmQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAzureVm>>
+>;
+export type GetAzureVmQueryError = ErrorType<unknown>;
+
+export function useGetAzureVm<
+  TData = Awaited<ReturnType<typeof getAzureVm>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAzureVm>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAzureVmQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateAzureVmUrl = (id: number) => {
+  return `/api/azure-vms/${id}`;
+};
+
+export const updateAzureVm = async (
+  id: number,
+  azureVmInput: AzureVmInput,
+  options?: RequestInit,
+): Promise<AzureVm> => {
+  return customFetch<AzureVm>(getUpdateAzureVmUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(azureVmInput),
+  });
+};
+
+export const getUpdateAzureVmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAzureVm>>,
+    TError,
+    { id: number; data: BodyType<AzureVmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAzureVm>>,
+  TError,
+  { id: number; data: BodyType<AzureVmInput> },
+  TContext
+> => {
+  const mutationKey = ["updateAzureVm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAzureVm>>,
+    { id: number; data: BodyType<AzureVmInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAzureVm(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAzureVmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAzureVm>>
+>;
+export type UpdateAzureVmMutationBody = BodyType<AzureVmInput>;
+export type UpdateAzureVmMutationError = ErrorType<unknown>;
+
+export const useUpdateAzureVm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAzureVm>>,
+    TError,
+    { id: number; data: BodyType<AzureVmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAzureVm>>,
+  TError,
+  { id: number; data: BodyType<AzureVmInput> },
+  TContext
+> => {
+  return useMutation(getUpdateAzureVmMutationOptions(options));
+};
+
+export const getDeleteAzureVmUrl = (id: number) => {
+  return `/api/azure-vms/${id}`;
+};
+
+export const deleteAzureVm = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteAzureVm200> => {
+  return customFetch<DeleteAzureVm200>(getDeleteAzureVmUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAzureVmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAzureVm>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAzureVm>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAzureVm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAzureVm>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteAzureVm(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAzureVmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAzureVm>>
+>;
+
+export type DeleteAzureVmMutationError = ErrorType<unknown>;
+
+export const useDeleteAzureVm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAzureVm>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAzureVm>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteAzureVmMutationOptions(options));
+};
+
 export const getListStrategicObjectivesUrl = () => {
   return `/api/strategic-objectives`;
 };
@@ -4513,6 +4941,253 @@ export const useDeleteSwitchMaintenanceLogEntry = <
   return useMutation(
     getDeleteSwitchMaintenanceLogEntryMutationOptions(options),
   );
+};
+
+/**
+ * @summary Get saved positions for the network diagram
+ */
+export const getGetNetworkLayoutUrl = () => {
+  return `/api/network/layout`;
+};
+
+export const getNetworkLayout = async (
+  options?: RequestInit,
+): Promise<NetworkLayoutPosition[]> => {
+  return customFetch<NetworkLayoutPosition[]>(getGetNetworkLayoutUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetNetworkLayoutQueryKey = () => {
+  return [`/api/network/layout`] as const;
+};
+
+export const getGetNetworkLayoutQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNetworkLayout>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkLayout>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetNetworkLayoutQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getNetworkLayout>>
+  > = ({ signal }) => getNetworkLayout({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkLayout>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNetworkLayoutQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNetworkLayout>>
+>;
+export type GetNetworkLayoutQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get saved positions for the network diagram
+ */
+
+export function useGetNetworkLayout<
+  TData = Awaited<ReturnType<typeof getNetworkLayout>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkLayout>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNetworkLayoutQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Upsert positions for one or more diagram nodes
+ */
+export const getSaveNetworkLayoutUrl = () => {
+  return `/api/network/layout`;
+};
+
+export const saveNetworkLayout = async (
+  saveNetworkLayoutBody: SaveNetworkLayoutBody,
+  options?: RequestInit,
+): Promise<SaveNetworkLayout200> => {
+  return customFetch<SaveNetworkLayout200>(getSaveNetworkLayoutUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveNetworkLayoutBody),
+  });
+};
+
+export const getSaveNetworkLayoutMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveNetworkLayout>>,
+    TError,
+    { data: BodyType<SaveNetworkLayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveNetworkLayout>>,
+  TError,
+  { data: BodyType<SaveNetworkLayoutBody> },
+  TContext
+> => {
+  const mutationKey = ["saveNetworkLayout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveNetworkLayout>>,
+    { data: BodyType<SaveNetworkLayoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveNetworkLayout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveNetworkLayoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveNetworkLayout>>
+>;
+export type SaveNetworkLayoutMutationBody = BodyType<SaveNetworkLayoutBody>;
+export type SaveNetworkLayoutMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Upsert positions for one or more diagram nodes
+ */
+export const useSaveNetworkLayout = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveNetworkLayout>>,
+    TError,
+    { data: BodyType<SaveNetworkLayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveNetworkLayout>>,
+  TError,
+  { data: BodyType<SaveNetworkLayoutBody> },
+  TContext
+> => {
+  return useMutation(getSaveNetworkLayoutMutationOptions(options));
+};
+
+/**
+ * @summary Clear saved positions (all, or a specific subset)
+ */
+export const getClearNetworkLayoutUrl = () => {
+  return `/api/network/layout`;
+};
+
+export const clearNetworkLayout = async (
+  clearNetworkLayoutBody?: ClearNetworkLayoutBody,
+  options?: RequestInit,
+): Promise<ClearNetworkLayout200> => {
+  return customFetch<ClearNetworkLayout200>(getClearNetworkLayoutUrl(), {
+    ...options,
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(clearNetworkLayoutBody),
+  });
+};
+
+export const getClearNetworkLayoutMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearNetworkLayout>>,
+    TError,
+    { data: BodyType<ClearNetworkLayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearNetworkLayout>>,
+  TError,
+  { data: BodyType<ClearNetworkLayoutBody> },
+  TContext
+> => {
+  const mutationKey = ["clearNetworkLayout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearNetworkLayout>>,
+    { data: BodyType<ClearNetworkLayoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return clearNetworkLayout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearNetworkLayoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearNetworkLayout>>
+>;
+export type ClearNetworkLayoutMutationBody = BodyType<ClearNetworkLayoutBody>;
+export type ClearNetworkLayoutMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clear saved positions (all, or a specific subset)
+ */
+export const useClearNetworkLayout = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearNetworkLayout>>,
+    TError,
+    { data: BodyType<ClearNetworkLayoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearNetworkLayout>>,
+  TError,
+  { data: BodyType<ClearNetworkLayoutBody> },
+  TContext
+> => {
+  return useMutation(getClearNetworkLayoutMutationOptions(options));
 };
 
 /**

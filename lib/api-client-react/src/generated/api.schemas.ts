@@ -666,6 +666,65 @@ export interface CreateSwitchBody {
   location?: string;
 }
 
+export interface NetworkLayoutPosition {
+  nodeId: string;
+  x: number;
+  y: number;
+  width?: number | null;
+  height?: number | null;
+  updatedAt?: string;
+}
+
+export type SaveNetworkLayoutBodyPositionsItem = {
+  nodeId: string;
+  x: number;
+  y: number;
+  width?: number | null;
+  height?: number | null;
+};
+
+export interface SaveNetworkLayoutBody {
+  positions: SaveNetworkLayoutBodyPositionsItem[];
+}
+
+export interface AzureVm {
+  id: number;
+  name: string;
+  resourceGroup?: string | null;
+  subscription?: string | null;
+  location?: string | null;
+  size?: string | null;
+  os?: string | null;
+  privateIp?: string | null;
+  publicIp?: string | null;
+  vnet?: string | null;
+  subnet?: string | null;
+  status: string;
+  purpose?: string | null;
+  notes?: string | null;
+  owner?: string | null;
+  createdBy?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AzureVmInput {
+  name: string;
+  resourceGroup?: string | null;
+  subscription?: string | null;
+  location?: string | null;
+  size?: string | null;
+  os?: string | null;
+  privateIp?: string | null;
+  publicIp?: string | null;
+  vnet?: string | null;
+  subnet?: string | null;
+  status?: string;
+  purpose?: string | null;
+  notes?: string | null;
+  owner?: string | null;
+}
+
 export type VlanType = (typeof VlanType)[keyof typeof VlanType];
 
 export const VlanType = {
@@ -933,6 +992,14 @@ export type DeleteProject200 = {
   success?: boolean;
 };
 
+export type ListAzureVmsParams = {
+  q?: string;
+};
+
+export type DeleteAzureVm200 = {
+  ok?: boolean;
+};
+
 export type DeleteStrategicObjective200 = {
   success?: boolean;
 };
@@ -961,6 +1028,18 @@ export const ListSwitchesStatus = {
   offline: "offline",
   unknown: "unknown",
 } as const;
+
+export type SaveNetworkLayout200 = {
+  saved?: number;
+};
+
+export type ClearNetworkLayoutBody = {
+  nodeIds?: string[];
+};
+
+export type ClearNetworkLayout200 = {
+  ok?: boolean;
+};
 
 export type ListVlansParams = {
   q?: string;

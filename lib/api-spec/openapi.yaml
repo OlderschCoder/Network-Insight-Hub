@@ -734,6 +734,111 @@ paths:
                     type: boolean
 
   # STRATEGIC OBJECTIVES
+  /azure-vms:
+    get:
+      operationId: listAzureVms
+      tags: [azure-vms]
+      summary: List Azure VMs (with optional search)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: VMs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AzureVm"
+    post:
+      operationId: createAzureVm
+      tags: [azure-vms]
+      summary: Create an Azure VM record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AzureVmInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+  /azure-vms/{id}:
+    get:
+      operationId: getAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+    patch:
+      operationId: updateAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AzureVmInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+    delete:
+      operationId: deleteAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
   /strategic-objectives:
     get:
       operationId: listStrategicObjectives
@@ -1105,6 +1210,71 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /network/layout:
+    get:
+      operationId: getNetworkLayout
+      tags: [network]
+      summary: Get saved positions for the network diagram
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetworkLayoutPosition"
+    put:
+      operationId: saveNetworkLayout
+      tags: [network]
+      summary: Upsert positions for one or more diagram nodes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveNetworkLayoutBody"
+      responses:
+        "200":
+          description: Number of positions saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved:
+                    type: integer
+    delete:
+      operationId: clearNetworkLayout
+      tags: [network]
+      summary: Clear saved positions (all, or a specific subset)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nodeIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
   /network/vlans:
     get:
       operationId: listVlans
@@ -2316,6 +2486,150 @@ components:
         location:
           type: string
       required: [hostname, building, ipAddress]
+
+    NetworkLayoutPosition:
+      type: object
+      properties:
+        nodeId:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+          nullable: true
+        height:
+          type: number
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required: [nodeId, x, y]
+
+    SaveNetworkLayoutBody:
+      type: object
+      properties:
+        positions:
+          type: array
+          items:
+            type: object
+            properties:
+              nodeId:
+                type: string
+              x:
+                type: number
+              y:
+                type: number
+              width:
+                type: number
+                nullable: true
+              height:
+                type: number
+                nullable: true
+            required: [nodeId, x, y]
+      required: [positions]
+
+    AzureVm:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        subscription:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        os:
+          type: string
+          nullable: true
+        privateIp:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        vnet:
+          type: string
+          nullable: true
+        subnet:
+          type: string
+          nullable: true
+        status:
+          type: string
+        purpose:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        createdBy:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, status, createdAt, updatedAt]
+
+    AzureVmInput:
+      type: object
+      properties:
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        subscription:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        os:
+          type: string
+          nullable: true
+        privateIp:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        vnet:
+          type: string
+          nullable: true
+        subnet:
+          type: string
+          nullable: true
+        status:
+          type: string
+        purpose:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+      required: [name]
 
     Vlan:
       type: object

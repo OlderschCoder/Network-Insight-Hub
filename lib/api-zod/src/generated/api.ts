@@ -1034,6 +1034,130 @@ export const DeleteProjectResponse = zod.object({
   success: zod.boolean().optional(),
 });
 
+/**
+ * @summary List Azure VMs (with optional search)
+ */
+export const ListAzureVmsQueryParams = zod.object({
+  q: zod.coerce.string().optional(),
+});
+
+export const ListAzureVmsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  subscription: zod.string().nullish(),
+  location: zod.string().nullish(),
+  size: zod.string().nullish(),
+  os: zod.string().nullish(),
+  privateIp: zod.string().nullish(),
+  publicIp: zod.string().nullish(),
+  vnet: zod.string().nullish(),
+  subnet: zod.string().nullish(),
+  status: zod.string(),
+  purpose: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  owner: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListAzureVmsResponse = zod.array(ListAzureVmsResponseItem);
+
+/**
+ * @summary Create an Azure VM record
+ */
+export const CreateAzureVmBody = zod.object({
+  name: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  subscription: zod.string().nullish(),
+  location: zod.string().nullish(),
+  size: zod.string().nullish(),
+  os: zod.string().nullish(),
+  privateIp: zod.string().nullish(),
+  publicIp: zod.string().nullish(),
+  vnet: zod.string().nullish(),
+  subnet: zod.string().nullish(),
+  status: zod.string().optional(),
+  purpose: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  owner: zod.string().nullish(),
+});
+
+export const GetAzureVmParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAzureVmResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  subscription: zod.string().nullish(),
+  location: zod.string().nullish(),
+  size: zod.string().nullish(),
+  os: zod.string().nullish(),
+  privateIp: zod.string().nullish(),
+  publicIp: zod.string().nullish(),
+  vnet: zod.string().nullish(),
+  subnet: zod.string().nullish(),
+  status: zod.string(),
+  purpose: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  owner: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdateAzureVmParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAzureVmBody = zod.object({
+  name: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  subscription: zod.string().nullish(),
+  location: zod.string().nullish(),
+  size: zod.string().nullish(),
+  os: zod.string().nullish(),
+  privateIp: zod.string().nullish(),
+  publicIp: zod.string().nullish(),
+  vnet: zod.string().nullish(),
+  subnet: zod.string().nullish(),
+  status: zod.string().optional(),
+  purpose: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  owner: zod.string().nullish(),
+});
+
+export const UpdateAzureVmResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  subscription: zod.string().nullish(),
+  location: zod.string().nullish(),
+  size: zod.string().nullish(),
+  os: zod.string().nullish(),
+  privateIp: zod.string().nullish(),
+  publicIp: zod.string().nullish(),
+  vnet: zod.string().nullish(),
+  subnet: zod.string().nullish(),
+  status: zod.string(),
+  purpose: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  owner: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteAzureVmParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteAzureVmResponse = zod.object({
+  ok: zod.boolean().optional(),
+});
+
 export const ListStrategicObjectivesResponseItem = zod.object({
   id: zod.number(),
   title: zod.string(),
@@ -1418,6 +1542,49 @@ export const DeleteSwitchMaintenanceLogEntryResponse = zod.object({
   lastSeen: zod.coerce.date().optional(),
   createdAt: zod.coerce.date().optional(),
   updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Get saved positions for the network diagram
+ */
+export const GetNetworkLayoutResponseItem = zod.object({
+  nodeId: zod.string(),
+  x: zod.number(),
+  y: zod.number(),
+  width: zod.number().nullish(),
+  height: zod.number().nullish(),
+  updatedAt: zod.coerce.date().optional(),
+});
+export const GetNetworkLayoutResponse = zod.array(GetNetworkLayoutResponseItem);
+
+/**
+ * @summary Upsert positions for one or more diagram nodes
+ */
+export const SaveNetworkLayoutBody = zod.object({
+  positions: zod.array(
+    zod.object({
+      nodeId: zod.string(),
+      x: zod.number(),
+      y: zod.number(),
+      width: zod.number().nullish(),
+      height: zod.number().nullish(),
+    }),
+  ),
+});
+
+export const SaveNetworkLayoutResponse = zod.object({
+  saved: zod.number().optional(),
+});
+
+/**
+ * @summary Clear saved positions (all, or a specific subset)
+ */
+export const ClearNetworkLayoutBody = zod.object({
+  nodeIds: zod.array(zod.string()).optional(),
+});
+
+export const ClearNetworkLayoutResponse = zod.object({
+  ok: zod.boolean().optional(),
 });
 
 /**
