@@ -1,0 +1,3680 @@
+[
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migrate1d602lsa28895.blob.core.windows.net"
+      }
+    },
+    "etag": "\"7\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2a_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/AD-SC01",
+    "identity": {
+      "principalId": "32c46514-42ad-4321-a039-2a76fbd283bf",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-C1-F3-B2",
+    "name": "AD-SC01",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-AD-SC01-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.34",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/AD-SC01/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/AD-SC01/extensions/HealthExtension",
+        "location": "centralus",
+        "name": "HealthExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.ManagedServices",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "intervalInSeconds": 5,
+          "numberOfProbes": 1,
+          "port": 80,
+          "protocol": "http",
+          "requestPath": "/"
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "ApplicationHealthWindows"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/AD-SC01/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-d0436ee9-25d4-46e5-aa17-30fdeeefb0b4/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-30T09%3A27%3A17.2873578Z&sep=b&sig=GlNT%2FNQPDVpeEbHiocPd0WepOd8tHY62rCFsjy%2FrxZY%3D\" \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-d0436ee9-25d4-46e5-aa17-30fdeeefb0b4/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-30T09%3A27%3A17.2873578Z&sep=b&sig=GlNT%2FNQPDVpeEbHiocPd0WepOd8tHY62rCFsjy%2FrxZY%3D\"",
+          "fileUris": [
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-d0436ee9-25d4-46e5-aa17-30fdeeefb0b4/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-30T09%3A27%3A17.2873578Z&sep=b&sig=GlNT%2FNQPDVpeEbHiocPd0WepOd8tHY62rCFsjy%2FrxZY%3D",
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-d0436ee9-25d4-46e5-aa17-30fdeeefb0b4/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-30T09%3A27%3A17.2873578Z&sep=b&sig=GlNT%2FNQPDVpeEbHiocPd0WepOd8tHY62rCFsjy%2FrxZY%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/AD-SC01/extensions/Microsoft.Insights.VMDiagnosticsSettings",
+        "location": "centralus",
+        "name": "Microsoft.Insights.VMDiagnosticsSettings",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Diagnostics",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "StorageAccount": "scccdomainservices9e76",
+          "WadCfg": {
+            "DiagnosticMonitorConfiguration": {
+              "DiagnosticInfrastructureLogs": {
+                "scheduledTransferLogLevelFilter": "Error"
+              },
+              "Metrics": {
+                "MetricAggregation": [
+                  {
+                    "scheduledTransferPeriod": "PT1H"
+                  },
+                  {
+                    "scheduledTransferPeriod": "PT1M"
+                  }
+                ],
+                "resourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/hybr0d-network/providers/Microsoft.Compute/virtualMachines/AD-SC01"
+              },
+              "PerformanceCounters": {
+                "PerformanceCounterConfiguration": [
+                  {
+                    "counterSpecifier": "\\Processor Information(_Total)\\% Processor Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\Processor Information(_Total)\\% Privileged Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\Processor Information(_Total)\\% User Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\Processor Information(_Total)\\Processor Frequency",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\System\\Processes",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Process(_Total)\\Thread Count",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Process(_Total)\\Handle Count",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\System\\System Up Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\System\\Context Switches/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "CountPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\System\\Processor Queue Length",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\% Committed Bytes In Use",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Available Bytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Committed Bytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Cache Bytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Pool Paged Bytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Pool Nonpaged Bytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Bytes"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Pages/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "CountPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Memory\\Page Faults/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "CountPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Process(_Total)\\Working Set",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Process(_Total)\\Working Set - Private",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Read Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\% Disk Write Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\% Idle Time",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Bytes/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Read Bytes/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Write Bytes/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Transfers/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Reads/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Disk Writes/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk sec/Transfer",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk sec/Read",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk sec/Write",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk Queue Length",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk Read Queue Length",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Avg. Disk Write Queue Length",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\% Free Space",
+                    "sampleRate": "PT60S",
+                    "unit": "Percent"
+                  },
+                  {
+                    "counterSpecifier": "\\LogicalDisk(_Total)\\Free Megabytes",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Bytes Total/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Bytes Sent/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Bytes Received/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Packets/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Packets Sent/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Packets Received/sec",
+                    "sampleRate": "PT60S",
+                    "unit": "BytesPerSecond"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Packets Outbound Errors",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  },
+                  {
+                    "counterSpecifier": "\\Network Interface(*)\\Packets Received Errors",
+                    "sampleRate": "PT60S",
+                    "unit": "Count"
+                  }
+                ],
+                "scheduledTransferPeriod": "PT1M"
+              },
+              "WindowsEventLog": {
+                "DataSource": [
+                  {
+                    "name": "Application!*[System[(Level = 1 or Level = 2 or Level = 3)]]"
+                  },
+                  {
+                    "name": "Security!*[System[band(Keywords,4503599627370496)]]"
+                  },
+                  {
+                    "name": "System!*[System[(Level = 1 or Level = 2 or Level = 3)]]"
+                  }
+                ],
+                "scheduledTransferPeriod": "PT1M"
+              },
+              "overallQuotaInMB": 5120
+            }
+          }
+        },
+        "typeHandlerVersion": "1.5",
+        "typePropertiesType": "IaaSDiagnostics"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 44,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/AD-SC01-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "AD-SC01-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-11-30T01:22:07.320658+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "94839538-f25d-4bb5-8e66-b6a24c064ba2"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"2\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/CiscoDirectoryConnector",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-35-7F-B6",
+    "name": "CiscoDirectoryConnector",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/ciscodirectoryconnector816_z1",
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "ITADMIN",
+      "allowExtensionOperations": true,
+      "computerName": "CiscoDirectoryConnector",
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": false,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "patchMode": "ImageDefault"
+        },
+        "provisionVMAgent": true
+      },
+      "requireGuestProvisionSignal": true,
+      "secrets": []
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.22",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/CiscoDirectoryConnector/extensions/enablevmAccess",
+        "location": "centralus",
+        "name": "enablevmAccess",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.OSTCExtensions",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.5",
+        "typePropertiesType": "VMAccessForLinux"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/CiscoDirectoryConnector/extensions/HealthExtension",
+        "location": "centralus",
+        "name": "HealthExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.ManagedServices",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "intervalInSeconds": 5,
+          "numberOfProbes": 1,
+          "port": 80,
+          "protocol": "http",
+          "requestPath": "/"
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "ApplicationHealthLinux"
+      }
+    ],
+    "securityProfile": {
+      "securityType": "TrustedLaunch",
+      "uefiSettings": {
+        "secureBootEnabled": true,
+        "vTpmEnabled": true
+      }
+    },
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "24.04.202509170",
+        "offer": "ubuntu-24_04-lts",
+        "publisher": "canonical",
+        "sku": "server",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 1024,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/disks/CiscoDirectoryConnector_OsDisk_1_f447ce4b3e2446b1acbf2e6e9df232d8",
+          "resourceGroup": "SCCC_DOMAIN_SERVICES",
+          "storageAccountType": "StandardSSD_LRS"
+        },
+        "name": "CiscoDirectoryConnector_OsDisk_1_f447ce4b3e2446b1acbf2e6e9df232d8",
+        "osType": "Linux"
+      }
+    },
+    "timeCreated": "2025-09-25T19:41:29.8310228+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "8246d204-9d77-4dc8-8c20-2c128a1462d6",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"11\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_B2ms"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/COMPRESSORPT2",
+    "identity": {
+      "principalId": "42f6b8d1-02bd-421d-a15d-97cffc4a75b5",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A5-EC-02",
+    "name": "COMPRESSORPT2",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-COMPRESSORPT2-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.18",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/COMPRESSORPT2/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/COMPRESSORPT2/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-a681df50-6609-42b6-80ba-e5884ed7fc9f/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-17T11%3A34%3A51.8537957Z&sep=b&sig=mw2jimmbg7PyVyO%2BQbc1lP3%2BH8DmDUCUxantnx9ftQw%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-a681df50-6609-42b6-80ba-e5884ed7fc9f/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-17T11%3A34%3A51.8537957Z&sep=b&sig=mw2jimmbg7PyVyO%2BQbc1lP3%2BH8DmDUCUxantnx9ftQw%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-a681df50-6609-42b6-80ba-e5884ed7fc9f/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-17T11%3A34%3A51.8537957Z&sep=b&sig=mw2jimmbg7PyVyO%2BQbc1lP3%2BH8DmDUCUxantnx9ftQw%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-a681df50-6609-42b6-80ba-e5884ed7fc9f/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-17T11%3A34%3A51.8537957Z&sep=b&sig=mw2jimmbg7PyVyO%2BQbc1lP3%2BH8DmDUCUxantnx9ftQw%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 48,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/COMPRESSORPT2-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "COMPRESSORPT2-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-17T03:31:42.2744617+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "811acb7c-3056-4785-9a79-f5373ffb5453"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"3\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_F2s_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/EntraCloudConnect",
+    "identity": {
+      "principalId": "64868fe4-c0f7-41bf-95fc-a3ea88bd9267",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A5-23-4B",
+    "name": "EntraCloudConnect",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-EntraCloudConnect-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.15",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/EntraCloudConnect/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/EntraCloudConnect-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "EntraCloudConnect-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-10T05:31:12.1145902+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "d3975908-19e1-4947-b6db-a75a7b179a11"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"6\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS11-1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/Goverlan",
+    "identity": {
+      "principalId": "0eddb885-a6a4-4f43-91c6-7a1aa23e1f85",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-35-AF-2D",
+    "name": "Goverlan",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-Goverlan-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.16",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/Goverlan/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/Goverlan/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2019Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-676569cd-7f64-4c73-a62b-ba092ff740a7/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-12T19%3A01%3A57.9059334Z&sig=wANCAArN8dNM77q79u7ynuaT4tUuIkGeB%2BsTEkpQp2E%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-676569cd-7f64-4c73-a62b-ba092ff740a7/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-12T19%3A01%3A57.9059334Z&sig=wANCAArN8dNM77q79u7ynuaT4tUuIkGeB%2BsTEkpQp2E%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-676569cd-7f64-4c73-a62b-ba092ff740a7/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-12T19%3A01%3A57.9059334Z&sig=wANCAArN8dNM77q79u7ynuaT4tUuIkGeB%2BsTEkpQp2E%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-676569cd-7f64-4c73-a62b-ba092ff740a7/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-12T19%3A01%3A57.9059334Z&sig=wANCAArN8dNM77q79u7ynuaT4tUuIkGeB%2BsTEkpQp2E%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 224,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/Goverlan-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "Goverlan-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-12T10:59:17.256651+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "447245e1-b395-4404-a3b8-fd88edcdac67"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_B2ms"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/GSYNC0",
+    "identity": {
+      "principalId": "25547327-1d4f-4a7a-94a1-c94f8787e265",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A5-81-1E",
+    "name": "GSYNC0",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-GSYNC0-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.21",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/GSYNC0/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/GSYNC0/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2019Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-2a7f1918-73f0-4486-a946-9e6088a7f8d4/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A37%3A21.9249858Z&sep=b&sig=gG8ucZlrsUbt5cnj9MIS00u%2FTbGNDblvrdDaAuwvJlo%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-2a7f1918-73f0-4486-a946-9e6088a7f8d4/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A37%3A21.9249858Z&sep=b&sig=gG8ucZlrsUbt5cnj9MIS00u%2FTbGNDblvrdDaAuwvJlo%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-2a7f1918-73f0-4486-a946-9e6088a7f8d4/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A37%3A21.9249858Z&sep=b&sig=gG8ucZlrsUbt5cnj9MIS00u%2FTbGNDblvrdDaAuwvJlo%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-2a7f1918-73f0-4486-a946-9e6088a7f8d4/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A37%3A21.9249858Z&sep=b&sig=gG8ucZlrsUbt5cnj9MIS00u%2FTbGNDblvrdDaAuwvJlo%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 40,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/GSYNC0-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "GSYNC0-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-18T04:33:10.1794723+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "73ad8f62-d400-4c05-ad8a-b5f230632144"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"6\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_B2ms"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/KEYSTONE",
+    "identity": {
+      "principalId": "63f82fc2-5008-40fa-90e1-4f5ffce63c82",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "60-45-BD-33-B4-2D",
+    "name": "KEYSTONE",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-KEYSTONE-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.20",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/KEYSTONE/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/KEYSTONE/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2016Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c903278b-5d28-4c06-ae64-82bc718dbe5b/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A51%3A20.5407242Z&sep=b&sig=g%2F82tpDzRQ2QpyfSZVjvU8oBfEjgHAwy9ZBSi5nCEgY%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c903278b-5d28-4c06-ae64-82bc718dbe5b/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A51%3A20.5407242Z&sep=b&sig=g%2F82tpDzRQ2QpyfSZVjvU8oBfEjgHAwy9ZBSi5nCEgY%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c903278b-5d28-4c06-ae64-82bc718dbe5b/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A51%3A20.5407242Z&sep=b&sig=g%2F82tpDzRQ2QpyfSZVjvU8oBfEjgHAwy9ZBSi5nCEgY%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c903278b-5d28-4c06-ae64-82bc718dbe5b/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-09-18T12%3A51%3A20.5407242Z&sep=b&sig=g%2F82tpDzRQ2QpyfSZVjvU8oBfEjgHAwy9ZBSi5nCEgY%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 65,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/KEYSTONE-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "KEYSTONE-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-18T04:33:10.0856062+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "e6fedfd9-23e4-4f9b-84cc-4dbc51f618e0"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"4\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D4as_v5"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/lucas-flare",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-4D-5A-9C",
+    "name": "lucas-flare",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/nic-lucas-flare-00",
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.28",
+    "provisioningState": "Succeeded",
+    "publicIps": "4.150.203.199",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 300,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/lucas-flare-OSdisk-01",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "lucas-flare-OSdisk-01",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-10-06T08:11:44.0874713+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "fa9f075c-91b1-4b93-aaa6-a31a7cb21df8"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"3\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS3_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/LUCAS-KALI",
+    "location": "centralus",
+    "macAddresses": "00-22-48-45-84-BC,00-22-48-45-8D-87,00-22-48-45-8A-1C",
+    "name": "LUCAS-KALI",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-LUCAS-KALI-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        },
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-LUCAS-KALI-01",
+          "primary": false,
+          "resourceGroup": "Hybr0d-Network"
+        },
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-LUCAS-KALI-02",
+          "primary": false,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.10,10.0.0.11,10.0.0.12",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 256,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/LUCAS-KALI-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "LUCAS-KALI-OSdisk-00",
+        "osType": "Linux"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-02T12:15:25.9567426+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "e7483f6b-109f-4320-825b-7e859663ed61"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migrate1d602lsa28895.blob.core.windows.net"
+      }
+    },
+    "etag": "\"6\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2ds_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/MFS0",
+    "identity": {
+      "principalId": "eb58223b-7604-4728-ae88-d89a8965bb13",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-C1-E4-98,7C-ED-8D-C1-E2-E7",
+    "name": "MFS0",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-MFS0-01",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        },
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-MFS0-00",
+          "primary": false,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.32,10.0.0.33",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/MFS0/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/MFS0/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-b3df3e8c-4d08-47fc-9213-ffb11212155c/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-29T13%3A25%3A13.3456791Z&sep=b&sig=Rq16azCnmrMKcP95Ff68ZFu%2Bwa909oXfXUuMjGi3lNk%3D\" \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-b3df3e8c-4d08-47fc-9213-ffb11212155c/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-29T13%3A25%3A13.3456791Z&sep=b&sig=Rq16azCnmrMKcP95Ff68ZFu%2Bwa909oXfXUuMjGi3lNk%3D\"",
+          "fileUris": [
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-b3df3e8c-4d08-47fc-9213-ffb11212155c/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-29T13%3A25%3A13.3456791Z&sep=b&sig=Rq16azCnmrMKcP95Ff68ZFu%2Bwa909oXfXUuMjGi3lNk%3D",
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-b3df3e8c-4d08-47fc-9213-ffb11212155c/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-29T13%3A25%3A13.3456791Z&sep=b&sig=Rq16azCnmrMKcP95Ff68ZFu%2Bwa909oXfXUuMjGi3lNk%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 3584,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/MFS0-datadisk-00",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "MFS0-datadisk-00",
+          "toBeDetached": false
+        },
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 2048,
+          "lun": 1,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/MFS0-datadisk-00-cf2194b6-21ee-47e4-94c6-72173f21ffc3",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "MFS0-datadisk-00-cf2194b6-21ee-47e4-94c6-72173f21ffc3",
+          "toBeDetached": false
+        },
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 2048,
+          "lun": 2,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/MFS0-datadisk-00-40290077-d056-463c-9b7f-297acbc00071",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "MFS0-datadisk-00-40290077-d056-463c-9b7f-297acbc00071",
+          "toBeDetached": false
+        }
+      ],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 40,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/MFS0-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "MFS0-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-11-29T05:15:24.4526013+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "06a6f998-05bf-478b-b627-dda04d9ac5b4"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"2\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_A1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/netedit",
+    "identity": {
+      "principalId": "df3ceaed-61fc-42a9-87dd-f359c51f7fae",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "60-45-BD-32-EE-B6",
+    "name": "netedit",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-netedit-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.14",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/netedit/extensions/AzureMonitorLinuxAgent",
+        "location": "centralus",
+        "name": "AzureMonitorLinuxAgent",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.6",
+        "typePropertiesType": "AzureMonitorLinuxAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 128,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/netedit-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "netedit-OSdisk-00",
+        "osType": "Linux"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-10T05:21:25.1483506+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "cd03257c-4132-4f87-8da5-51d38fd6ac2e"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"3\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v3"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/New-TrendMicroA",
+    "identity": {
+      "principalId": "acf7a7df-1e73-445d-a38b-6a0f39784532",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A6-8F-B7",
+    "name": "New-TrendMicroA",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Delete",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/new-trendmicroa640_z1",
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "azureuser",
+      "allowExtensionOperations": true,
+      "computerName": "New-TrendMicroA",
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "patchMode": "ImageDefault"
+        },
+        "provisionVMAgent": true,
+        "ssh": {
+          "publicKeys": [
+            {
+              "keyData": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDL9Ny5u9QER1OufSOHVlgsna1r8ouk2fnGuUa8lBbi2vy7WgKQQgrr5fgoWpM6rai9jqWPvYoQsVhnVhzKVqJ5FjF6AXMJu7CnlD+b+RJJMoTPJyqlTXQIZ1zaitRm5ZVBKOLBI/oKXUJByOV43uNRwnUGIK3WX2K945lFxZdTGxprHsgmBDD7mnEweV5iJPG0Bst2HwpEw5RdJuI631z2sr8Ywffo+mMajdfqUZRMajNdoTAyaxjKOg6d2Kcqb7sHXS3rZMCD/uV15gS92h8qS1Ek1xDl+Nhw0Vz2o03i/ZI+f/1OUTtWoyB2+5a643eYta/cgI9Fb0ijijqqxF1MrG3w/w5b7RACuS3OwAy2BOUWAO4Nnqislgsisn25Q/ojPdO49dQ3qRUwGSqF2YetCc3SuxfC8kMypjeruFIt0ldphVnNkIHYiaehlb1xrTaAuIVLOJfqze7rEyABe8KxlJBPYjNnU2DT4r4Tx/B5so4nyCEJJMwojHH2IWMqCb0= generated-by-azure",
+              "path": "/home/azureuser/.ssh/authorized_keys"
+            }
+          ]
+        }
+      },
+      "requireGuestProvisionSignal": true,
+      "secrets": []
+    },
+    "plan": {
+      "name": "service-gateway-appliance-azure-image",
+      "product": "service-gateway-appliance-preview-vm",
+      "publisher": "trendmicro"
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.38",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/New-TrendMicroA/extensions/AzureMonitorLinuxAgent",
+        "location": "centralus",
+        "name": "AzureMonitorLinuxAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorLinuxAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "FromImage",
+          "deleteOption": "Detach",
+          "diskSizeGB": 256,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/New-TrendMicroA_lun_0_2_a9c4a4ec4b3c4421b26c4e8d73f74afe",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Premium_LRS"
+          },
+          "name": "New-TrendMicroA_lun_0_2_a9c4a4ec4b3c4421b26c4e8d73f74afe",
+          "toBeDetached": false,
+          "writeAcceleratorEnabled": false
+        }
+      ],
+      "imageReference": {
+        "exactVersion": "2.22.0",
+        "offer": "service-gateway-appliance-preview-vm",
+        "publisher": "trendmicro",
+        "sku": "service-gateway-appliance-azure-image",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 256,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/New-TrendMicroA_OsDisk_1_ac4fa81f88204bd09f6ac94e3457f3d0",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "New-TrendMicroA_OsDisk_1_ac4fa81f88204bd09f6ac94e3457f3d0",
+        "osType": "Linux"
+      }
+    },
+    "timeCreated": "2026-01-17T22:42:30.640399+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "30c05941-8fb8-4ae3-b372-d62107e7525f",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"10\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2a_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/ONERING16",
+    "identity": {
+      "principalId": "9a53ef3e-1284-458d-a6c0-5a7e2eb4d18a",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-1E-52-89-95-2D",
+    "name": "ONERING16",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-ONERING16-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.23",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/ONERING16/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/ONERING16/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2019Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c1283cc2-9788-46ab-97de-6bf9ae95a031/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A24%3A44.1352500Z&sep=b&sig=akKGSqwggLzJZ3lJc9TsqNibKE8iFMWrJdu88GGpwG8%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c1283cc2-9788-46ab-97de-6bf9ae95a031/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A24%3A44.1352500Z&sep=b&sig=akKGSqwggLzJZ3lJc9TsqNibKE8iFMWrJdu88GGpwG8%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c1283cc2-9788-46ab-97de-6bf9ae95a031/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A24%3A44.1352500Z&sep=b&sig=akKGSqwggLzJZ3lJc9TsqNibKE8iFMWrJdu88GGpwG8%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-c1283cc2-9788-46ab-97de-6bf9ae95a031/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A24%3A44.1352500Z&sep=b&sig=akKGSqwggLzJZ3lJc9TsqNibKE8iFMWrJdu88GGpwG8%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/ONERING16-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "ONERING16-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-10-01T05:21:04.9755581+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "76daf3e1-149c-4955-9349-d7db13656cab"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migrate1d602lsa28895.blob.core.windows.net"
+      }
+    },
+    "etag": "\"11\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2ds_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PRNTSP2",
+    "identity": {
+      "principalId": "0272bb02-f2d8-4edd-a28d-0a682149720f",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-06-D7-AD",
+    "name": "PRNTSP2",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-PRNTSP2-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.30",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PRNTSP2/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PRNTSP2/extensions/HealthExtension",
+        "location": "centralus",
+        "name": "HealthExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.ManagedServices",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "intervalInSeconds": 5,
+          "numberOfProbes": 1,
+          "port": 80,
+          "protocol": "http",
+          "requestPath": "/"
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "ApplicationHealthWindows"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PRNTSP2/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-689ada99-cdc7-4f1a-94df-03465725a74d/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-27T10%3A51%3A34.3129228Z&sep=b&sig=b774bkNGlAuoPL47Q1uvpgbVoBYXwbHRB6Y02pGZ2sc%3D\" \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-689ada99-cdc7-4f1a-94df-03465725a74d/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-27T10%3A51%3A34.3129228Z&sep=b&sig=b774bkNGlAuoPL47Q1uvpgbVoBYXwbHRB6Y02pGZ2sc%3D\"",
+          "fileUris": [
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-689ada99-cdc7-4f1a-94df-03465725a74d/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-27T10%3A51%3A34.3129228Z&sep=b&sig=b774bkNGlAuoPL47Q1uvpgbVoBYXwbHRB6Y02pGZ2sc%3D",
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-689ada99-cdc7-4f1a-94df-03465725a74d/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-27T10%3A51%3A34.3129228Z&sep=b&sig=b774bkNGlAuoPL47Q1uvpgbVoBYXwbHRB6Y02pGZ2sc%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 512,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/PRNTSP2-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "PRNTSP2-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-11-27T02:42:47.0295081+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "38cee84f-456f-403c-a0c5-0318e61afdec"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PTEC2",
+    "identity": {
+      "principalId": "63ce58ad-704f-4e50-b218-edf3783c6221",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-4D-A8-37",
+    "name": "PTEC2",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-PTEC2-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.24",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PTEC2/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/PTEC2/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-61fce7a2-3525-4015-befb-5862d2944c26/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A32%3A23.5897179Z&sep=b&sig=ioivLl5sUKJRZk7qbxFct6wUi5FGOODt%2F0rArDhxkRo%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-61fce7a2-3525-4015-befb-5862d2944c26/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A32%3A23.5897179Z&sep=b&sig=ioivLl5sUKJRZk7qbxFct6wUi5FGOODt%2F0rArDhxkRo%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-61fce7a2-3525-4015-befb-5862d2944c26/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A32%3A23.5897179Z&sep=b&sig=ioivLl5sUKJRZk7qbxFct6wUi5FGOODt%2F0rArDhxkRo%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-61fce7a2-3525-4015-befb-5862d2944c26/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-01T13%3A32%3A23.5897179Z&sep=b&sig=ioivLl5sUKJRZk7qbxFct6wUi5FGOODt%2F0rArDhxkRo%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 48,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/PTEC2-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "PTEC2-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-10-01T05:27:12.6601461+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "d345c772-8ed7-456a-b7ce-3987203c7e0d"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2ds_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SalonIRIS",
+    "identity": {
+      "principalId": "fc49a810-5e7c-40d5-b99a-53b52176ddfd",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-C1-65-65",
+    "name": "SalonIRIS",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-SalonIRIS-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.36",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SalonIRIS/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SalonIRIS/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2022Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-bc3368ae-7d83-43ff-a7f2-f79f219fdc23/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-12-09T11%3A23%3A18.1900554Z&sig=UHbvYFsLizgCZkec8FP%2Bl2m2YeRiDXfRO%2B0Z1Ib2DYY%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-bc3368ae-7d83-43ff-a7f2-f79f219fdc23/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-12-09T11%3A23%3A18.1900554Z&sig=UHbvYFsLizgCZkec8FP%2Bl2m2YeRiDXfRO%2B0Z1Ib2DYY%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-bc3368ae-7d83-43ff-a7f2-f79f219fdc23/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-12-09T11%3A23%3A18.1900554Z&sig=UHbvYFsLizgCZkec8FP%2Bl2m2YeRiDXfRO%2B0Z1Ib2DYY%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-bc3368ae-7d83-43ff-a7f2-f79f219fdc23/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-12-09T11%3A23%3A18.1900554Z&sig=UHbvYFsLizgCZkec8FP%2Bl2m2YeRiDXfRO%2B0Z1Ib2DYY%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/SalonIRIS-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "SalonIRIS-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-12-09T03:20:33.3994872+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "b301f0ad-c712-4a94-8a33-97a3cd5b22f6"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"13\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_B2ms"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SCCCMFS01",
+    "identity": {
+      "principalId": "1486d766-6bce-4384-971c-166ff5567c0b",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "60-45-BD-2D-96-DF",
+    "name": "SCCCMFS01",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/scccmfs0156_z1",
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "Admin01",
+      "allowExtensionOperations": true,
+      "computerName": "SCCCMFS01",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "enableHotpatching": false,
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "plan": {
+      "name": "windows-server-2022-datacenter",
+      "product": "windows-server-2022-datacenter",
+      "publisher": "tidalmediainc"
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.8",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SCCCMFS01/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "0dc0ef8e-d227-4a1d-bc57-bfb9dba8a4ba",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SCCCMFS01/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SCCCMFS01",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 50,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/share",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Premium_LRS"
+          },
+          "name": "share",
+          "toBeDetached": false,
+          "writeAcceleratorEnabled": false
+        }
+      ],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "1.0.0",
+        "offer": "windows-server-2022-datacenter",
+        "publisher": "tidalmediainc",
+        "sku": "windows-server-2022-datacenter",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 127,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/disks/SCCCMFS01_OsDisk_1_68ae195f106a426f91dffecf94417e05",
+          "resourceGroup": "HYBR0D-NETWORK",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "SCCCMFS01_OsDisk_1_68ae195f106a426f91dffecf94417e05",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2025-08-11T17:19:37.3774724+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "e9ec9324-4b38-464a-9042-d3c918d4ffc6",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"3\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2as_v5"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SteamPT-License-Server",
+    "identity": {
+      "principalId": "af198e26-43bd-4ee1-b0d5-0083d87dbcef",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-2E-65-3D",
+    "name": "SteamPT-License-Server",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-SteamPT-License-Server-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.13",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SteamPT-License-Server/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "961775de-5c53-4570-b5de-5dc92edd7f6b",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SteamPT-License-Server/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/SteamPT-License-Server",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/SteamPT-License-Server-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "SteamPT-License-Server-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-02T12:17:36.3150552+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "b76a9b62-b4e6-464d-85e6-31a38eed3ac1"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"2\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_A2_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/Syslog-Forwarder",
+    "identity": {
+      "principalId": "d6f4d6a5-8cc0-4007-b7ab-31166e8594b0",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-97-BE-B2",
+    "name": "Syslog-Forwarder",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-Syslog-Forwarder-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.37",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/Syslog-Forwarder/extensions/AzureMonitorLinuxAgent",
+        "location": "centralus",
+        "name": "AzureMonitorLinuxAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.6",
+        "typePropertiesType": "AzureMonitorLinuxAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 100,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/Syslog-Forwarder-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "Syslog-Forwarder-OSdisk-00",
+        "osType": "Linux"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-12-18T00:23:02.3047914+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "76f8755a-c663-4623-abbc-58abe40f5d65"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"7\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_A2_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/TRACDAT2",
+    "identity": {
+      "principalId": "6904227b-647d-4bd9-9e82-876f1c0a37b2",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A5-FE-00",
+    "name": "TRACDAT2",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-TRACDAT2-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.25",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/TRACDAT2/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/TRACDAT2/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2016Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-f0f7c9f3-09ec-4d7c-8b51-2de0b816323c/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-03T12%3A25%3A07.3555278Z&sep=b&sig=0Zdk6wD1gsDpNno37a5Owrum7PPvqNwskWTTKlvZTMM%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-f0f7c9f3-09ec-4d7c-8b51-2de0b816323c/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-03T12%3A25%3A07.3555278Z&sep=b&sig=0Zdk6wD1gsDpNno37a5Owrum7PPvqNwskWTTKlvZTMM%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-f0f7c9f3-09ec-4d7c-8b51-2de0b816323c/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-03T12%3A25%3A07.3555278Z&sep=b&sig=0Zdk6wD1gsDpNno37a5Owrum7PPvqNwskWTTKlvZTMM%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-f0f7c9f3-09ec-4d7c-8b51-2de0b816323c/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-03T12%3A25%3A07.3555278Z&sep=b&sig=0Zdk6wD1gsDpNno37a5Owrum7PPvqNwskWTTKlvZTMM%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 50,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/TRACDAT2-datadisk-00",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "TRACDAT2-datadisk-00",
+          "toBeDetached": false
+        }
+      ],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 80,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/TRACDAT2-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "TRACDAT2-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-10-03T03:55:56.8741762+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "3567cbd1-cb8d-4e91-a79e-21958877cdca"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"4\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v3"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/TRENDV1SVCGW",
+    "identity": {
+      "principalId": "dfe8540b-c748-427a-89b0-dc6585b624e5",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "00-22-48-46-55-AE",
+    "name": "TRENDV1SVCGW",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-TRENDV1SVCGW-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.19",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/TRENDV1SVCGW/extensions/AzureMonitorLinuxAgent",
+        "location": "centralus",
+        "name": "AzureMonitorLinuxAgent",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.6",
+        "typePropertiesType": "AzureMonitorLinuxAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 256,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/TRENDV1SVCGW-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "TRENDV1SVCGW-OSdisk-00",
+        "osType": "Linux"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-17T04:00:12.4335474+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "8faeb010-49e0-4a2b-8301-dc975d79a3bd"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"4\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v3"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WAC",
+    "identity": {
+      "principalId": "cdb7f9ae-8459-4b1a-914d-13208bf4748e",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Client",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-3E-9F-53",
+    "name": "WAC",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/wac163_z1",
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "kami",
+      "allowExtensionOperations": true,
+      "computerName": "WAC",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "enableHotpatching": false,
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.35",
+    "provisioningState": "Succeeded",
+    "publicIps": "20.80.72.179",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WAC/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "19045.6456.251117",
+        "offer": "Windows-10",
+        "publisher": "MicrosoftWindowsDesktop",
+        "sku": "win10-22h2-ent-g2",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 127,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/WAC_OsDisk_1_49a97a8f53b14bd19155439c7f7f19b8",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "WAC_OsDisk_1_49a97a8f53b14bd19155439c7f7f19b8",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2025-12-06T17:36:46.3628433+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "ae98ff35-8714-4ba9-a645-1514cf56315e",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"2\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2as_v5"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WDS-New",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-37-15-CA",
+    "name": "WDS-New",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/nic-WDS-New-00",
+          "primary": true,
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.7",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "f4b4f327-3f82-4ac4-b54b-f7c681b93869",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WDS-New/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/WDS-New",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 256,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/WDS-New-datadisk-01",
+            "resourceGroup": "RG-Prod-CentralUS",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "WDS-New-datadisk-01",
+          "toBeDetached": false
+        }
+      ],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/WDS-New-OSdisk-00",
+          "resourceGroup": "RG-Prod-CentralUS",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "WDS-New-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-08-07T03:40:56.9837486+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "0fbe7d66-2605-4876-b4c9-c1cb7db84e82"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migrate1d602lsa28895.blob.core.windows.net"
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_A2_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB",
+    "identity": {
+      "principalId": "f903d47c-c4c1-4fb6-bf27-f71057c8fc90",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-22-48-4A-D3-EE",
+    "name": "WEB",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-WEB-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.26",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2019Upgrade \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-87f5dd40-8f2b-4f69-b6e5-52a2ae889787/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-15T13%3A02%3A25.7800410Z&sep=b&sig=c6%2BUgtxipdGvMV3y8c3BmIcymwspSAs5H9r93vYEvKI%3D\" \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-87f5dd40-8f2b-4f69-b6e5-52a2ae889787/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-15T13%3A02%3A25.7800410Z&sep=b&sig=c6%2BUgtxipdGvMV3y8c3BmIcymwspSAs5H9r93vYEvKI%3D\"",
+          "fileUris": [
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-87f5dd40-8f2b-4f69-b6e5-52a2ae889787/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-15T13%3A02%3A25.7800410Z&sep=b&sig=c6%2BUgtxipdGvMV3y8c3BmIcymwspSAs5H9r93vYEvKI%3D",
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-87f5dd40-8f2b-4f69-b6e5-52a2ae889787/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-15T13%3A02%3A25.7800410Z&sep=b&sig=c6%2BUgtxipdGvMV3y8c3BmIcymwspSAs5H9r93vYEvKI%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 56,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/WEB-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "WEB-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-11-15T04:55:10.8046447+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "62401832-f33c-42b5-8a38-bd6752eab996"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"6\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2as_v5"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2",
+    "identity": {
+      "principalId": "85551830-884c-486a-9335-41fb0181714d",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A5-67-1A,00-0D-3A-A5-6A-2C",
+    "name": "WEB-LIVE2",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-WEB-LIVE2-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        },
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-WEB-LIVE2-01",
+          "primary": false,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.27,10.0.0.29",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2/extensions/AdminCenter",
+        "location": "centralus",
+        "name": "AdminCenter",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.AdminCenter",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "port": "6516",
+          "salt": "840070440058094002001000042000"
+        },
+        "typeHandlerVersion": "0.0",
+        "typePropertiesType": "AdminCenter"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2/extensions/enablevmAccess",
+        "location": "centralus",
+        "name": "enablevmAccess",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "userName": "ITAdmin"
+        },
+        "typeHandlerVersion": "2.0",
+        "typePropertiesType": "VMAccessAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WEB-LIVE2/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2016Upgrade \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-84fd82fe-b6ce-4a61-8953-e610bc56744c/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-16T14%3A08%3A58.1990082Z&sig=FmE1dGvsjaCxLZ53aEc0Rh0hTXzIuVzzdTqipEDhgxw%3D\" \"https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-84fd82fe-b6ce-4a61-8953-e610bc56744c/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-16T14%3A08%3A58.1990082Z&sig=FmE1dGvsjaCxLZ53aEc0Rh0hTXzIuVzzdTqipEDhgxw%3D\"",
+          "fileUris": [
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-84fd82fe-b6ce-4a61-8953-e610bc56744c/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-16T14%3A08%3A58.1990082Z&sig=FmE1dGvsjaCxLZ53aEc0Rh0hTXzIuVzzdTqipEDhgxw%3D",
+            "https://migratestoragecentral.blob.core.windows.net/osupgradecontainer-84fd82fe-b6ce-4a61-8953-e610bc56744c/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-10-16T14%3A08%3A58.1990082Z&sig=FmE1dGvsjaCxLZ53aEc0Rh0hTXzIuVzzdTqipEDhgxw%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 128,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/WEB-LIVE2-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "WEB-LIVE2-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-10-16T05:13:45.9332756+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "3f89448a-b07f-4719-adf8-7513abab37eb"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"10\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS11-1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WSUS",
+    "identity": {
+      "principalId": "c9b2f4ba-68e9-43ff-bd2c-722e8eeb6f01",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-92-85-DB",
+    "name": "WSUS",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-WSUS-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.17",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/WSUS/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      }
+    ],
+    "securityProfile": {
+      "securityType": "TrustedLaunch",
+      "uefiSettings": {
+        "secureBootEnabled": false,
+        "vTpmEnabled": true
+      }
+    },
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 512,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/WSUS-datadisk-00",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "WSUS-datadisk-00",
+          "toBeDetached": false
+        }
+      ],
+      "diskControllerType": "SCSI",
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 100,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/WSUS-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "WSUS-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-09-12T11:16:11.1317288+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "0f1930d8-dd89-48ec-beb3-c3dc2486038a"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migrate1d602lsa28895.blob.core.windows.net"
+      }
+    },
+    "etag": "\"8\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D4as_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/XMAIL16-New",
+    "identity": {
+      "principalId": "db625d0e-84da-4447-b12a-593585e3e2c5",
+      "tenantId": "b88f2663-5600-40a5-a4d2-294302a50efc",
+      "type": "SystemAssigned"
+    },
+    "location": "centralus",
+    "macAddresses": "60-45-BD-30-47-ED",
+    "name": "XMAIL16-New",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/nic-XMAIL16-New-00",
+          "primary": true,
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.31",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "HYBR0D-NETWORK",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/XMAIL16-New/extensions/AdminCenter",
+        "location": "centralus",
+        "name": "AdminCenter",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.AdminCenter",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "port": "6516",
+          "salt": "0001082506551718304697480000059"
+        },
+        "typeHandlerVersion": "0.0",
+        "typePropertiesType": "AdminCenter"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/XMAIL16-New/extensions/AzureMonitorWindowsAgent",
+        "location": "centralus",
+        "name": "AzureMonitorWindowsAgent",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.Monitor",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "AzureMonitorWindowsAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/XMAIL16-New/extensions/enablevmAccess",
+        "location": "centralus",
+        "name": "enablevmAccess",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "userName": "ITADMIN"
+        },
+        "typeHandlerVersion": "2.0",
+        "typePropertiesType": "VMAccessAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/HYBR0D-NETWORK/providers/Microsoft.Compute/virtualMachines/XMAIL16-New/extensions/InplaceOSUpgrade",
+        "location": "centralus",
+        "name": "InplaceOSUpgrade",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "HYBR0D-NETWORK",
+        "settings": {
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OSUpgradeScriptV1.ps1 server2019Upgrade \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-a7b4dfd9-9615-4f2e-ae6e-441a4c802b82/OSUpgradeMonitoringOutput.json?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-28T03%3A53%3A59.6380501Z&sep=b&sig=X7Ivf7CRl8zKlkgTrkSGtsj%2Fw2wfyZPHL0Hqs0kE15c%3D\" \"https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-a7b4dfd9-9615-4f2e-ae6e-441a4c802b82/OSUpgradeMonitoringLogs.txt?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-28T03%3A53%3A59.6380501Z&sep=b&sig=X7Ivf7CRl8zKlkgTrkSGtsj%2Fw2wfyZPHL0Hqs0kE15c%3D\"",
+          "fileUris": [
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-a7b4dfd9-9615-4f2e-ae6e-441a4c802b82/OSUpgradeScriptV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-28T03%3A53%3A59.6380501Z&sep=b&sig=X7Ivf7CRl8zKlkgTrkSGtsj%2Fw2wfyZPHL0Hqs0kE15c%3D",
+            "https://migrate1d602lsa28895.blob.core.windows.net/osupgradecontainer-a7b4dfd9-9615-4f2e-ae6e-441a4c802b82/OSUpgradePeriodicTaskV1.ps1?sv=2015-04-05&ss=bfqt&srt=sco&sp=racupwdl&se=2025-11-28T03%3A53%3A59.6380501Z&sep=b&sig=X7Ivf7CRl8zKlkgTrkSGtsj%2Fw2wfyZPHL0Hqs0kE15c%3D"
+          ]
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [
+        {
+          "caching": "None",
+          "createOption": "Attach",
+          "deleteOption": "Detach",
+          "diskSizeGB": 80,
+          "lun": 0,
+          "managedDisk": {
+            "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/XMAIL16-New-datadisk-00",
+            "resourceGroup": "Hybr0d-Network",
+            "storageAccountType": "Standard_LRS"
+          },
+          "name": "XMAIL16-New-datadisk-00",
+          "toBeDetached": false
+        }
+      ],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 228,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Compute/disks/XMAIL16-New-OSdisk-00",
+          "resourceGroup": "Hybr0d-Network",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "XMAIL16-New-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-11-27T19:11:40.5707477+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "96b6379b-d962-482d-98ac-698c223cf431"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Hybrid-testVm01",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-2E-73-8D",
+    "name": "Hybrid-testVm01",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/hybrid-testvm01132_z1",
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "Oculusit",
+      "allowExtensionOperations": true,
+      "computerName": "Hybrid-testVm01",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "enableHotpatching": false,
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.9",
+    "provisioningState": "Succeeded",
+    "publicIps": "172.202.115.228",
+    "resourceGroup": "RG-PROD-CENTRALUS",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Hybrid-testVm01/extensions/AzureNetworkWatcherExtension",
+        "location": "centralus",
+        "name": "AzureNetworkWatcherExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.NetworkWatcher",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {},
+        "typeHandlerVersion": "1.4",
+        "typePropertiesType": "NetworkWatcherAgentWindows"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "4c68183e-ad8e-44c8-a2c0-6b0f2621b13c",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Hybrid-testVm01/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Hybrid-testVm01",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "17763.7558.250705",
+        "offer": "WindowsServer",
+        "publisher": "MicrosoftWindowsServer",
+        "sku": "2019-datacenter-gensecond",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 127,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/Hybrid-testVm01_OsDisk_1_baa21fcb743244f8a9b33b8905635d4f",
+          "resourceGroup": "RG-Prod-CentralUS",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "Hybrid-testVm01_OsDisk_1_baa21fcb743244f8a9b33b8905635d4f",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2025-07-31T17:17:03.8043224+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "59c1bdb8-1eff-457f-9206-e9b1bce145fc",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"12\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_A1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/KMS",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-37-E1-11",
+    "name": "KMS",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/nic-KMS-00",
+          "primary": true,
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.4",
+    "provisioningState": "Succeeded",
+    "publicIps": "132.196.97.226",
+    "resourceGroup": "RG-PROD-CENTRALUS",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "a36dbe32-fcd2-4110-878b-818b599f2f5e",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/KMS/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/KMS",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "diskSizeGB": 64,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/KMS-OSdisk-00",
+          "resourceGroup": "RG-Prod-CentralUS",
+          "storageAccountType": "Standard_LRS"
+        },
+        "name": "KMS-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-08-06T14:20:43.9302384+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "87669e3a-17fc-45ab-b1a3-6263f11164bc"
+  },
+  {
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://migratestoragecentral.blob.core.windows.net"
+      }
+    },
+    "etag": "\"42\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D4s_v4"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/OITJUMP02",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-A4-E0-82,00-0D-3A-3E-B6-92",
+    "name": "OITJUMP02",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/OITJUMP02_V_104",
+          "primary": true,
+          "resourceGroup": "RG-Prod-CentralUS"
+        },
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/nic-OITJUMP02-00",
+          "primary": false,
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "powerState": "VM deallocated",
+    "privateIps": "10.40.1.248,10.40.1.4",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "RG-PROD-CENTRALUS",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "76e5854d-26a1-432d-8116-5e166cc979dc",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/OITJUMP02/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/OITJUMP02",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "Attach",
+        "deleteOption": "Detach",
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/OITJUMP02-OSdisk-00",
+          "resourceGroup": "RG-Prod-CentralUS"
+        },
+        "name": "OITJUMP02-OSdisk-00",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-05-12T18:56:29.6973273+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "415df5fc-217c-4bdf-8da5-82c6a51593a2"
+  },
+  {
+    "etag": "\"2\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v5"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/PROD-IIS-WEB01",
+    "location": "centralus",
+    "macAddresses": "00-22-48-43-C7-34",
+    "name": "PROD-IIS-WEB01",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/nic-PROD-IIS-WEB01",
+          "primary": true,
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "scccadmin",
+      "allowExtensionOperations": true,
+      "computerName": "PROD-IIS-WEB01",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "powerState": "VM running",
+    "privateIps": "10.110.1.4",
+    "provisioningState": "Succeeded",
+    "publicIps": "130.131.156.14",
+    "resourceGroup": "RG-PROD-CENTRALUS",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/PROD-IIS-WEB01/extensions/CustomScriptExtension",
+        "location": "centralus",
+        "name": "CustomScriptExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "commandToExecute": "powershell -ExecutionPolicy Bypass -Command \"Install-WindowsFeature Web-Server -IncludeManagementTools; iisreset\""
+        },
+        "typeHandlerVersion": "1.10",
+        "typePropertiesType": "CustomScriptExtension"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "imageReference": {
+        "exactVersion": "20348.4529.251205",
+        "offer": "WindowsServer",
+        "publisher": "MicrosoftWindowsServer",
+        "sku": "2022-datacenter",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Detach",
+        "diskSizeGB": 127,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Compute/disks/osdisk-PROD-IIS-WEB01",
+          "resourceGroup": "RG-Prod-CentralUS",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "osdisk-PROD-IIS-WEB01",
+        "osType": "Windows"
+      }
+    },
+    "tags": {},
+    "timeCreated": "2025-12-29T21:27:40.0274615+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "878ca1eb-6f3b-4f60-8576-095de5f7affa"
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "billingProfile": {
+      "maxPrice": -1.0
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"18\"",
+    "evictionPolicy": "Deallocate",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_DS1_v2"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Test-1",
+    "location": "centralus",
+    "macAddresses": "00-0D-3A-3F-CA-23",
+    "name": "Test-1",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-Prod-CentralUS/providers/Microsoft.Network/networkInterfaces/test-1885_z1",
+          "resourceGroup": "RG-Prod-CentralUS"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "ITAdmin",
+      "allowExtensionOperations": true,
+      "computerName": "Test-1",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "automaticByPlatformSettings": {
+            "rebootSetting": "IfRequired"
+          },
+          "enableHotpatching": true,
+          "patchMode": "AutomaticByPlatform"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "powerState": "VM deallocated",
+    "priority": "Spot",
+    "privateIps": "10.0.0.6",
+    "provisioningState": "Succeeded",
+    "publicIps": "",
+    "resourceGroup": "RG-PROD-CENTRALUS",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Test-1/extensions/AdminCenter",
+        "location": "centralus",
+        "name": "AdminCenter",
+        "provisioningState": "Failed",
+        "publisher": "Microsoft.AdminCenter",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "port": "6516",
+          "salt": "000000068870000009003561000"
+        },
+        "typeHandlerVersion": "0.0",
+        "typePropertiesType": "AdminCenter"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "fcbc3fe1-a716-4cd4-a68a-11bd004772ef",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Test-1/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "RG-PROD-CENTRALUS",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/virtualMachines/Test-1",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "securityProfile": {
+      "securityType": "TrustedLaunch",
+      "uefiSettings": {
+        "secureBootEnabled": true,
+        "vTpmEnabled": true
+      }
+    },
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "20348.3932.250706",
+        "offer": "WindowsServer",
+        "publisher": "MicrosoftWindowsServer",
+        "sku": "2022-datacenter-azure-edition-core",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/RG-PROD-CENTRALUS/providers/Microsoft.Compute/disks/Test-1_OsDisk_1_8d73969573f84402977c91c9f2da1f2f",
+          "resourceGroup": "RG-PROD-CENTRALUS"
+        },
+        "name": "Test-1_OsDisk_1_8d73969573f84402977c91c9f2da1f2f",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2025-07-15T20:56:31.652205+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "a594eec2-fdb0-4543-a2b6-8896ed8cae6f",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"5\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v3"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-33-0C-6D",
+    "name": "AzADC001",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_Domain_services/providers/Microsoft.Network/networkInterfaces/azadc001321_z1",
+          "resourceGroup": "SCCC_Domain_services"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "azadmin",
+      "allowExtensionOperations": true,
+      "computerName": "AzADC001",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "enableVMAgentPlatformUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "enableHotpatching": false,
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.6",
+    "provisioningState": "Succeeded",
+    "publicIps": "40.67.170.222",
+    "resourceGroup": "SCCC_DOMAIN_SERVICES",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001/extensions/AzureNetworkWatcherExtension",
+        "location": "centralus",
+        "name": "AzureNetworkWatcherExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.NetworkWatcher",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {},
+        "typeHandlerVersion": "1.4",
+        "typePropertiesType": "NetworkWatcherAgentWindows"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001/extensions/enablevmAccess",
+        "location": "centralus",
+        "name": "enablevmAccess",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "userName": "azadmin"
+        },
+        "typeHandlerVersion": "2.0",
+        "typePropertiesType": "VMAccessAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": false,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001/extensions/HealthExtension",
+        "location": "centralus",
+        "name": "HealthExtension",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.ManagedServices",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "intervalInSeconds": 5,
+          "numberOfProbes": 1,
+          "port": 80,
+          "protocol": "http",
+          "requestPath": "/"
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "ApplicationHealthWindows"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "919c8deb-7009-4d7b-86f5-413130eb9b9b",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/AzADC001",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "securityProfile": {
+      "securityType": "TrustedLaunch",
+      "uefiSettings": {
+        "secureBootEnabled": true,
+        "vTpmEnabled": true
+      }
+    },
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "20348.2849.241102",
+        "offer": "WindowsServer",
+        "publisher": "MicrosoftWindowsServer",
+        "sku": "2022-datacenter-azure-edition",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 512,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_Domain_services/providers/Microsoft.Compute/disks/AzADC001_OsDisk_1_a97d3e38d1124a5986a4979029971099",
+          "resourceGroup": "SCCC_Domain_services",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "AzADC001_OsDisk_1_a97d3e38d1124a5986a4979029971099",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2024-12-02T23:38:29.5831206+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "faed815b-ed59-418c-b23e-0152412a7be6",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"8\"",
+    "fqdns": "itsccc.centralus.cloudapp.azure.com",
+    "hardwareProfile": {
+      "vmSize": "Standard_B2ms"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/IIS-VM",
+    "licenseType": "Windows_Server",
+    "location": "centralus",
+    "macAddresses": "60-45-BD-37-FD-25",
+    "name": "IIS-VM",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "deleteOption": "Detach",
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_Domain_services/providers/Microsoft.Network/networkInterfaces/iis-vm950_z1",
+          "resourceGroup": "SCCC_Domain_services"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "azureadmin",
+      "allowExtensionOperations": true,
+      "computerName": "IIS-VM",
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": {
+        "enableAutomaticUpdates": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "enableHotpatching": false,
+          "patchMode": "AutomaticByOS"
+        },
+        "provisionVMAgent": true
+      }
+    },
+    "plan": {
+      "name": "windows-server-2022-datacenter",
+      "product": "windows-server-2022-datacenter",
+      "publisher": "tidalmediainc"
+    },
+    "powerState": "VM running",
+    "privateIps": "10.0.0.8",
+    "provisioningState": "Succeeded",
+    "publicIps": "52.173.23.138",
+    "resourceGroup": "SCCC_DOMAIN_SERVICES",
+    "resources": [
+      {
+        "autoUpgradeMinorVersion": true,
+        "enableAutomaticUpgrade": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/IIS-VM/extensions/AdminCenter",
+        "location": "centralus",
+        "name": "AdminCenter",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.AdminCenter",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "port": "6516",
+          "salt": "0830811600610000039003508000027590"
+        },
+        "typeHandlerVersion": "0.0",
+        "typePropertiesType": "AdminCenter"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/IIS-VM/extensions/enablevmAccess",
+        "location": "centralus",
+        "name": "enablevmAccess",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Compute",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "userName": "ITADMIN"
+        },
+        "typeHandlerVersion": "2.0",
+        "typePropertiesType": "VMAccessAgent"
+      },
+      {
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "8caf8712-3c9b-4d33-bf6a-9fcffa5b5d02",
+        "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/IIS-VM/extensions/MDE.Windows",
+        "location": "centralus",
+        "name": "MDE.Windows",
+        "provisioningState": "Succeeded",
+        "publisher": "Microsoft.Azure.AzureDefenderForServers",
+        "resourceGroup": "SCCC_DOMAIN_SERVICES",
+        "settings": {
+          "autoUpdate": true,
+          "azureResourceId": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_DOMAIN_SERVICES/providers/Microsoft.Compute/virtualMachines/IIS-VM",
+          "forceReOnboarding": false,
+          "vNextEnabled": true
+        },
+        "typeHandlerVersion": "1.0",
+        "typePropertiesType": "MDE.Windows"
+      }
+    ],
+    "storageProfile": {
+      "dataDisks": [],
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "exactVersion": "1.0.0",
+        "offer": "windows-server-2022-datacenter",
+        "publisher": "tidalmediainc",
+        "sku": "windows-server-2022-datacenter",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 127,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/SCCC_Domain_services/providers/Microsoft.Compute/disks/IIS-VM_OsDisk_1_fa3e753179564bec93c96dfed9f11298",
+          "resourceGroup": "SCCC_Domain_services",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "IIS-VM_OsDisk_1_fa3e753179564bec93c96dfed9f11298",
+        "osType": "Windows"
+      }
+    },
+    "timeCreated": "2025-02-06T17:40:42.118718+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "3ea10d41-183d-4b8b-ba1c-fce174281028",
+    "zones": [
+      "1"
+    ]
+  },
+  {
+    "additionalCapabilities": {
+      "hibernationEnabled": false,
+      "ultraSSDEnabled": true
+    },
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true
+      }
+    },
+    "etag": "\"8\"",
+    "fqdns": "",
+    "hardwareProfile": {
+      "vmSize": "Standard_D2s_v3"
+    },
+    "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/TEST/providers/Microsoft.Compute/virtualMachines/test-gateway",
+    "location": "centralus",
+    "macAddresses": "7C-ED-8D-0A-20-8C",
+    "name": "test-gateway",
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/Hybr0d-Network/providers/Microsoft.Network/networkInterfaces/test-gateway139_z1",
+          "resourceGroup": "Hybr0d-Network"
+        }
+      ]
+    },
+    "osProfile": {
+      "adminUsername": "kami",
+      "allowExtensionOperations": true,
+      "computerName": "test-gateway",
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": true,
+        "patchSettings": {
+          "assessmentMode": "ImageDefault",
+          "patchMode": "ImageDefault"
+        },
+        "provisionVMAgent": true,
+        "ssh": {
+          "publicKeys": [
+            {
+              "keyData": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEUQUUGLW9XLrwZ3doQ7YQuPuAtKR5cMJD52gGc5FNHc generated-by-azure",
+              "path": "/home/kami/.ssh/authorized_keys"
+            }
+          ]
+        }
+      },
+      "requireGuestProvisionSignal": true,
+      "secrets": []
+    },
+    "plan": {
+      "name": "openvpnas",
+      "product": "openvpnas",
+      "publisher": "openvpn"
+    },
+    "powerState": "VM running",
+    "privateIps": "10.2.0.4",
+    "provisioningState": "Succeeded",
+    "publicIps": "128.203.233.52",
+    "resourceGroup": "TEST",
+    "storageProfile": {
+      "dataDisks": [],
+      "imageReference": {
+        "exactVersion": "2.11.03",
+        "offer": "openvpnas",
+        "publisher": "openvpn",
+        "sku": "openvpnas",
+        "version": "latest"
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 30,
+        "managedDisk": {
+          "id": "/subscriptions/1d602111-1398-40e7-9555-baf6a406975d/resourceGroups/TEST/providers/Microsoft.Compute/disks/test-gateway_OsDisk_1_0ebbb7c27fab4710b24153cea7a35d99",
+          "resourceGroup": "TEST",
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": "test-gateway_OsDisk_1_0ebbb7c27fab4710b24153cea7a35d99",
+        "osType": "Linux"
+      }
+    },
+    "timeCreated": "2025-10-03T20:55:15.8927154+00:00",
+    "type": "Microsoft.Compute/virtualMachines",
+    "vmId": "04be5ff8-eeee-4aec-9e33-05e6a517eeab",
+    "zones": [
+      "1"
+    ]
+  }
+]
