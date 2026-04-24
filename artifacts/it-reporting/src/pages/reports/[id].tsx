@@ -187,7 +187,7 @@ export default function ReportDetail() {
           subject: emailSubject.trim() || undefined,
           message: emailMessage.trim() || undefined,
           format: emailFormat,
-        } as any,
+        },
       });
       toast({ title: "Report emailed", description: `Sent to ${recipients.length} recipient${recipients.length === 1 ? "" : "s"}` });
       setEmailOpen(false);
@@ -215,7 +215,7 @@ export default function ReportDetail() {
       : current.filter((x) => x !== itemId);
     setSelectedItemIds(next);
     try {
-      await updateMutation.mutateAsync({ id, data: { selectedItemIds: next } as any });
+      await updateMutation.mutateAsync({ id, data: { selectedItemIds: next } });
       queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
     } catch (e: any) {
       toast({ title: "Could not save selection", description: e?.message, variant: "destructive" });

@@ -390,7 +390,7 @@ export async function buildReportDocxBuffer(report: Report): Promise<Buffer> {
       p(`Author: ${a.authorName} · Status: ${a.status}${a.building ? ` · Building: ${a.building}` : ""}`);
       if (a.incident) p(a.incident);
       if (a.resolution) p(`Resolution: ${a.resolution}`);
-      if ((a as any).lessonsLearned) p(`Lessons learned: ${(a as any).lessonsLearned}`);
+      if (a.lessonsLearned) p(`Lessons learned: ${a.lessonsLearned}`);
     }
     blank();
   }
@@ -527,7 +527,7 @@ export function buildReportPdfSections(data: ReportExportData): PdfSection[] {
       sections.push({ kind: "kv", label: "Author", value: `${a.authorName} · Status: ${a.status}${a.building ? ` · Building: ${a.building}` : ""}` });
       if (a.incident) sections.push({ kind: "paragraph", text: a.incident });
       if (a.resolution) sections.push({ kind: "kv", label: "Resolution", value: a.resolution });
-      if ((a as any).lessonsLearned) sections.push({ kind: "kv", label: "Lessons learned", value: (a as any).lessonsLearned });
+      if (a.lessonsLearned) sections.push({ kind: "kv", label: "Lessons learned", value: a.lessonsLearned });
     }
   }
 

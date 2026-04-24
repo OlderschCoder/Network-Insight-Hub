@@ -1,6 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
-import { useLogout } from "@workspace/api-client-react";
+import { useLogout, useListSwitches, useAddSwitchMaintenanceLogEntry } from "@workspace/api-client-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -44,8 +57,153 @@ import {
 type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
+function QuickAddMaintenanceDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { data: switches = [] } = useListSwitches({});
+  const [search, setSearch] = useState("");
+  const [switchId, setSwitchId] = useState<number | null>(null);
+  const [body, setBody] = useState("");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const createMutation = useAddSwitchMaintenanceLogEntry();
+
+  const filtered = switches.filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      s.hostname.toLowerCase().includes(q) ||
+      (s.building ?? "").toLowerCase().includes(q) ||
+      (s.location ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const reset = () => {
+    setSearch("");
+    setSwitchId(null);
+    setBody("");
+    setWindowStart("");
+    setWindowEnd("");
+  };
+
+  const submit = async () => {
+    if (!switchId || !body.trim()) {
+      toast({ title: "Pick a switch and enter a note", variant: "destructive" });
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        id: switchId,
+        data: {
+          body: body.trim(),
+          windowStart: windowStart || undefined,
+          windowEnd: windowEnd || undefined,
+        },
+      });
+      toast({ title: "Maintenance note added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/network/switches"] });
+      reset();
+      onOpenChange(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add note";
+      toast({ title: "Could not save note", description: msg, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Maintenance Note</DialogTitle>
+          <DialogDescription>
+            Pick a switch, then describe the maintenance window or change.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Switch</Label>
+            <Input
+              placeholder="Search by hostname, building, or location"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="border rounded mt-1 max-h-40 overflow-auto">
+              {filtered.length === 0 ? (
+                <p className="text-xs text-muted-foreground p-2">No matching switches.</p>
+              ) : (
+                filtered.slice(0, 50).map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => setSwitchId(s.id)}
+                    className={`w-full text-left text-xs px-2 py-1 hover:bg-muted ${
+                      switchId === s.id ? "bg-muted font-medium" : ""
+                    }`}
+                  >
+                    {s.hostname}
+                    {s.building ? ` · ${s.building}` : ""}
+                    {s.location ? ` · ${s.location}` : ""}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Window start (optional)</Label>
+              <Input
+                type="datetime-local"
+                value={windowStart}
+                onChange={(e) => setWindowStart(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Window end (optional)</Label>
+              <Input
+                type="datetime-local"
+                value={windowEnd}
+                onChange={(e) => setWindowEnd(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Note</Label>
+            <Textarea
+              rows={3}
+              placeholder="What changed, what was the impact, what should the team know?"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={!switchId || !body.trim() || createMutation.isPending}>
+            {createMutation.isPending ? "Saving…" : "Add note"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function QuickAddMenu() {
   const [taskOpen, setTaskOpen] = useState(false);
+  const [maintOpen, setMaintOpen] = useState(false);
   return (
     <>
       <DropdownMenu>
@@ -69,19 +227,17 @@ function QuickAddMenu() {
           <DropdownMenuItem asChild>
             <Link href="/after-action/new">
               <ActivityIcon className="h-4 w-4 mr-2" />
-              Add Post-Incident Review
+              Start Post-Incident Review
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/network">
-              <NetworkIcon className="h-4 w-4 mr-2" />
-              Add Maintenance Note
-            </Link>
+          <DropdownMenuItem onSelect={() => setMaintOpen(true)}>
+            <NetworkIcon className="h-4 w-4 mr-2" />
+            Add Maintenance Note
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <QuickAddItemDialog open={taskOpen} onOpenChange={setTaskOpen} />
-
+      <QuickAddMaintenanceDialog open={maintOpen} onOpenChange={setMaintOpen} />
     </>
   );
 }

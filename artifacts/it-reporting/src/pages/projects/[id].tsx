@@ -547,9 +547,10 @@ export default function ProjectDetail() {
       </Card>
 
       {(() => {
-        const linkedReports = (allReports ?? []).filter(
-          (r) => Array.isArray(r.projectIds) && r.projectIds.includes(id),
-        );
+        const linkedReports = (allReports ?? [])
+          .filter((r) => Array.isArray(r.projectIds) && r.projectIds.includes(id))
+          .slice()
+          .sort((a, b) => (b.weekOf ?? "").localeCompare(a.weekOf ?? ""));
         if (linkedReports.length === 0) return null;
         return (
           <Card>
