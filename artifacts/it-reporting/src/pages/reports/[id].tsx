@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   useGetReport,
   useUpdateReport,
@@ -36,6 +37,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReportDetail() {
+  const confirm = useConfirm();
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
   const { isCIO } = useAuth();
@@ -252,7 +254,11 @@ export default function ReportDetail() {
   };
 
   const handleFinalize = async () => {
-    if (!confirm("Finalize this report? This locks it from further edits.")) return;
+    if (!(await confirm({
+      title: "Finalize this report?",
+      description: "This locks it from further edits.",
+      confirmText: "Finalize",
+    }))) return;
     try {
       if (dirty) await updateMutation.mutateAsync({ id, data: draft });
       await finalizeMutation.mutateAsync({ id });

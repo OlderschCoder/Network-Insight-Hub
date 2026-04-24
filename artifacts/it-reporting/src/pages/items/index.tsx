@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   useListLogItems,
   useDeleteLogItem,
@@ -39,6 +40,7 @@ const weekStartFor = (dateStr: string) =>
   format(startOfISOWeek(new Date(dateStr + "T00:00:00")), "yyyy-MM-dd");
 
 export default function ItemsPage() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [weekOf, setWeekOf] = useState<string>(weekStartFor(todayCentral()));
   const { data: items, isLoading } = useListLogItems({ weekOf });
@@ -49,7 +51,11 @@ export default function ItemsPage() {
   const list = items ?? [];
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this item?")) return;
+    if (!(await confirm({
+      title: "Delete this item?",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     await deleteMutation.mutateAsync({ id });
     queryClient.invalidateQueries({ queryKey: ["/api/log-items"] });
   };

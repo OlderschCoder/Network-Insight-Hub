@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useListEntries, useDeleteEntry } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,7 @@ const categoryColor: Record<string, string> = {
 };
 
 export default function Entries() {
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -35,7 +37,11 @@ export default function Entries() {
   });
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this entry?")) return;
+    if (!(await confirm({
+      title: "Delete this entry?",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     await deleteMutation.mutateAsync({ id });
     queryClient.invalidateQueries({ queryKey: ["/api/entries"] });
   };

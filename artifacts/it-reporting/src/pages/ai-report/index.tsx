@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Sparkles, Send, Copy, Download } from "lucide-react";
+import { Loader2, Sparkles, Send, Copy, Download, Trash2 } from "lucide-react";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
 
@@ -353,17 +353,57 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
     "Which incidents are still open in the after-action reports?",
   ];
 
+  const handleCopyTranscript = async () => {
+    if (messages.length === 0) {
+      toast({ title: "Nothing to copy yet" });
+      return;
+    }
+    const text = messages
+      .map((m) => `${m.role === "user" ? "You" : "Assistant"}: ${m.content}`)
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Transcript copied" });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
+
+  const handleClear = () => {
+    if (messages.length === 0) return;
+    setMessages([]);
+    toast({ title: "Chat cleared" });
+  };
+
   return (
     <Card className="h-[calc(100vh-220px)] flex flex-col">
       <CardHeader className="border-b shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <CardTitle>Ask the IT Data</CardTitle>
             <CardDescription>
               The AI has read access to entries, risks, after-action reports, and network inventory.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopyTranscript}
+              disabled={messages.length === 0}
+              title="Copy transcript"
+            >
+              <Copy className="h-4 w-4 mr-1" /> Copy
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              disabled={messages.length === 0}
+              title="Clear chat"
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Clear
+            </Button>
             <Label className="text-xs text-muted-foreground">Lookback days:</Label>
             <Input
               type="number"

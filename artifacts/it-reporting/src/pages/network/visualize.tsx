@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   useListSwitches,
   useListVlans,
@@ -52,6 +53,7 @@ const statusFill: Record<string, string> = {
 };
 
 export default function NetworkVisualize() {
+  const confirm = useConfirm();
   const { data: switches = [] } = useListSwitches({});
   const { data: vlans = [] } = useListVlans({});
   const { data: azureVms = [] } = useListAzureVms({});
@@ -801,7 +803,12 @@ export default function NetworkVisualize() {
   );
 
   const handleResetLayout = useCallback(async () => {
-    if (!confirm("Reset the diagram to the automatic layout? This affects everyone.")) return;
+    if (!(await confirm({
+      title: "Reset the diagram?",
+      description: "Restores the automatic layout. This affects everyone viewing the diagram.",
+      confirmText: "Reset",
+      destructive: true,
+    }))) return;
     try {
       await clearLayoutMutation.mutateAsync({ data: {} });
       await refetchLayout();

@@ -58,6 +58,36 @@ export const GetMeResponse = zod.object({
 });
 
 /**
+ * @summary Request a password reset link
+ */
+export const ForgotPasswordBody = zod.object({
+  email: zod.string().email(),
+});
+
+export const ForgotPasswordResponse = zod.object({
+  ok: zod.boolean(),
+  emailConfigured: zod.boolean().optional(),
+  resetUrl: zod
+    .string()
+    .optional()
+    .describe("Only included when SMTP is not configured."),
+});
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const resetPasswordBodyPasswordMin = 6;
+
+export const ResetPasswordBody = zod.object({
+  token: zod.string(),
+  password: zod.string().min(resetPasswordBodyPasswordMin),
+});
+
+export const ResetPasswordResponse = zod.object({
+  ok: zod.boolean().optional(),
+});
+
+/**
  * @summary List all users (CIO only)
  */
 export const ListUsersResponseItem = zod.object({
@@ -542,6 +572,8 @@ export const GetAggregateReportResponse = zod.object({
         relatedBuilding: zod.string().optional(),
         relatedDevice: zod.string().optional(),
         sharedWith: zod.array(zod.string()).optional(),
+        projectId: zod.number().nullish(),
+        archivedAt: zod.coerce.date().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date().optional(),
       }),
@@ -553,6 +585,10 @@ export const ListRisksQueryParams = zod.object({
   status: zod.enum(["open", "mitigated", "closed"]).optional(),
   severity: zod.enum(["low", "medium", "high", "critical"]).optional(),
   type: zod.enum(["risk", "issue", "suggestion"]).optional(),
+  includeArchived: zod.coerce
+    .string()
+    .optional()
+    .describe("When set, archived items are returned alongside active ones."),
 });
 
 export const ListRisksResponseItem = zod.object({
@@ -571,6 +607,8 @@ export const ListRisksResponseItem = zod.object({
   relatedBuilding: zod.string().optional(),
   relatedDevice: zod.string().optional(),
   sharedWith: zod.array(zod.string()).optional(),
+  projectId: zod.number().nullish(),
+  archivedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date().optional(),
 });
@@ -610,6 +648,8 @@ export const GetRiskResponse = zod.object({
   relatedBuilding: zod.string().optional(),
   relatedDevice: zod.string().optional(),
   sharedWith: zod.array(zod.string()).optional(),
+  projectId: zod.number().nullish(),
+  archivedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date().optional(),
 });
@@ -649,6 +689,77 @@ export const UpdateRiskResponse = zod.object({
   relatedBuilding: zod.string().optional(),
   relatedDevice: zod.string().optional(),
   sharedWith: zod.array(zod.string()).optional(),
+  projectId: zod.number().nullish(),
+  archivedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Permanently delete a risk (CIO only)
+ */
+export const DeleteRiskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteRiskResponse = zod.object({
+  ok: zod.boolean().optional(),
+});
+
+/**
+ * @summary Archive a risk (hides from default list)
+ */
+export const ArchiveRiskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ArchiveRiskResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  userName: zod.string().optional(),
+  type: zod.enum(["risk", "issue", "suggestion"]),
+  severity: zod.enum(["low", "medium", "high", "critical"]),
+  probability: zod.enum(["low", "medium", "high", "critical"]).optional(),
+  category: zod.string().optional(),
+  status: zod.enum(["open", "mitigated", "closed"]),
+  title: zod.string(),
+  description: zod.string(),
+  impact: zod.string().optional(),
+  mitigation: zod.string().optional(),
+  relatedBuilding: zod.string().optional(),
+  relatedDevice: zod.string().optional(),
+  sharedWith: zod.array(zod.string()).optional(),
+  projectId: zod.number().nullish(),
+  archivedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Restore an archived risk
+ */
+export const UnarchiveRiskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UnarchiveRiskResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  userName: zod.string().optional(),
+  type: zod.enum(["risk", "issue", "suggestion"]),
+  severity: zod.enum(["low", "medium", "high", "critical"]),
+  probability: zod.enum(["low", "medium", "high", "critical"]).optional(),
+  category: zod.string().optional(),
+  status: zod.enum(["open", "mitigated", "closed"]),
+  title: zod.string(),
+  description: zod.string(),
+  impact: zod.string().optional(),
+  mitigation: zod.string().optional(),
+  relatedBuilding: zod.string().optional(),
+  relatedDevice: zod.string().optional(),
+  sharedWith: zod.array(zod.string()).optional(),
+  projectId: zod.number().nullish(),
+  archivedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date().optional(),
 });
@@ -800,6 +911,8 @@ export const ListProjectsResponseItem = zod.object({
         relatedBuilding: zod.string().optional(),
         relatedDevice: zod.string().optional(),
         sharedWith: zod.array(zod.string()).optional(),
+        projectId: zod.number().nullish(),
+        archivedAt: zod.coerce.date().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date().optional(),
       }),
@@ -908,6 +1021,8 @@ export const GetProjectResponse = zod.object({
         relatedBuilding: zod.string().optional(),
         relatedDevice: zod.string().optional(),
         sharedWith: zod.array(zod.string()).optional(),
+        projectId: zod.number().nullish(),
+        archivedAt: zod.coerce.date().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date().optional(),
       }),
@@ -1015,6 +1130,8 @@ export const UpdateProjectResponse = zod.object({
         relatedBuilding: zod.string().optional(),
         relatedDevice: zod.string().optional(),
         sharedWith: zod.array(zod.string()).optional(),
+        projectId: zod.number().nullish(),
+        archivedAt: zod.coerce.date().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date().optional(),
       }),
@@ -1874,6 +1991,34 @@ export const ExportReportDocxParams = zod.object({
  * @summary Download report as Excel spreadsheet
  */
 export const ExportReportXlsxParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Download a Process Library entry as PDF
+ */
+export const ExportProcessPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Download a Process Library entry as Word document
+ */
+export const ExportProcessDocxParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Download a project as PDF
+ */
+export const ExportProjectPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Download a project as Word document
+ */
+export const ExportProjectDocxParams = zod.object({
   id: zod.coerce.number(),
 });
 

@@ -9,6 +9,9 @@ import NotFound from "@/pages/not-found";
 
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
+import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 import Dashboard from "@/pages/dashboard";
 import Entries from "@/pages/entries/index";
 import NewEntry from "@/pages/entries/new";
@@ -20,6 +23,7 @@ import ReportDetail from "@/pages/reports/[id]";
 import Risks from "@/pages/risks/index";
 import NewRisk from "@/pages/risks/new";
 import EditRisk from "@/pages/risks/edit";
+import RiskDetail from "@/pages/risks/[id]";
 import Network from "@/pages/network/index";
 import NetworkVisualize from "@/pages/network/visualize";
 import AfterAction from "@/pages/after-action/index";
@@ -77,6 +81,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       
@@ -98,6 +104,7 @@ function Router() {
       <Route path="/risks" component={() => <ProtectedRoute component={Risks} />} />
       <Route path="/risks/new" component={() => <ProtectedRoute component={NewRisk} />} />
       <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />
+      <Route path="/risks/:id" component={() => <ProtectedRoute component={RiskDetail} />} />
       
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
@@ -126,7 +133,9 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <Router />
+            <ConfirmDialogProvider>
+              <Router />
+            </ConfirmDialogProvider>
           </AuthProvider>
         </WouterRouter>
         <Toaster />

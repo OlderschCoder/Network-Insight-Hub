@@ -1,5 +1,15 @@
 import { Router } from "express";
-import { db, reportsTable, entriesTable, risksTable, usersTable, afterActionReportsTable } from "@workspace/db";
+import {
+  db,
+  reportsTable,
+  entriesTable,
+  risksTable,
+  usersTable,
+  afterActionReportsTable,
+  processesTable,
+  projectsTable,
+  projectAssigneesTable,
+} from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
@@ -486,6 +496,184 @@ router.get("/risks/pdf", requireAuth, async (req: any, res) => {
     filename: `risk-register-${scope}.pdf`,
     sections,
   });
+});
+
+// ---- Process Library exports -----------------------------------------------
+async function loadProcess(id: number) {
+  const [proc] = await db.select().from(processesTable).where(eq(processesTable.id, id));
+  if (!proc) return null;
+  const [author] = await db.select().from(usersTable).where(eq(usersTable.id, proc.createdBy));
+  return { proc, authorName: author?.name ?? "Unknown" };
+}
+
+router.get("/process/:id/pdf", requireAuth, async (req: any, res) => {
+  try {
+    const loaded = await loadProcess(parseInt(req.params.id));
+    if (!loaded) return res.status(404).json({ error: "Not found" });
+    const { proc, authorName } = loaded;
+    const sections: PdfSection[] = [
+      { kind: "kv", label: "Category", value: proc.category ?? "general" },
+      { kind: "kv", label: "Author", value: authorName },
+      { kind: "kv", label: "Last updated", value: proc.updatedAt.toLocaleString() },
+    ];
+    if (proc.tags && proc.tags.length > 0) {
+      sections.push({ kind: "kv", label: "Tags", value: proc.tags.join(", ") });
+    }
+    if (proc.summary) {
+      sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Summary" }, { kind: "paragraph", text: proc.summary });
+    }
+    sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Procedure" });
+    for (const sec of markdownToPdfSections(proc.content || "")) sections.push(sec);
+    return streamPdf(res, {
+      title: proc.title,
+      subtitle: "SCCC IT — Process Library",
+      filename: `process-${proc.slug || proc.id}.pdf`,
+      sections,
+    });
+  } catch (err: any) {
+    console.error("Process PDF export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
+  }
+});
+
+router.get("/process/:id/docx", requireAuth, async (req: any, res) => {
+  try {
+    const loaded = await loadProcess(parseInt(req.params.id));
+    if (!loaded) return res.status(404).json({ error: "Not found" });
+    const { proc, authorName } = loaded;
+    const blocks: Array<{ heading?: string; level?: 1 | 2 | 3; text?: string; bullets?: string[] }> = [
+      {
+        text: `Category: ${proc.category ?? "general"}\nAuthor: ${authorName}\nLast updated: ${proc.updatedAt.toLocaleString()}` +
+          (proc.tags?.length ? `\nTags: ${proc.tags.join(", ")}` : ""),
+      },
+    ];
+    if (proc.summary) blocks.push({ heading: "Summary", level: 2, text: proc.summary });
+    blocks.push({ heading: "Procedure", level: 2 });
+    for (const b of markdownToBlocks(proc.content || "")) blocks.push(b);
+    const buf = await buildDocxBuffer(proc.title, blocks);
+    return sendDocx(res, buf, `process-${proc.slug || proc.id}.docx`);
+  } catch (err: any) {
+    console.error("Process DOCX export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
+  }
+});
+
+// ---- Project exports --------------------------------------------------------
+async function loadProject(id: number) {
+  const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!proj) return null;
+  const assigneeRows = await db
+    .select({ userId: projectAssigneesTable.userId, name: usersTable.name, email: usersTable.email })
+    .from(projectAssigneesTable)
+    .leftJoin(usersTable, eq(usersTable.id, projectAssigneesTable.userId))
+    .where(eq(projectAssigneesTable.projectId, id));
+  return { proj, assignees: assigneeRows };
+}
+
+function projectStatusLabel(s: string) {
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+router.get("/project/:id/pdf", requireAuth, async (req: any, res) => {
+  try {
+    const loaded = await loadProject(parseInt(req.params.id));
+    if (!loaded) return res.status(404).json({ error: "Not found" });
+    const { proj, assignees } = loaded;
+    const sections: PdfSection[] = [
+      { kind: "kv", label: "Status", value: projectStatusLabel(proj.status) },
+      { kind: "kv", label: "Progress", value: `${proj.progress ?? 0}%` },
+      { kind: "kv", label: "Target date", value: proj.targetDate ?? "—" },
+      ...(proj.newEstimatedDate
+        ? [{ kind: "kv" as const, label: "New estimated date", value: proj.newEstimatedDate }]
+        : []),
+      { kind: "kv", label: "Team", value: assignees.length ? assignees.map((a) => a.name ?? "Unknown").join(", ") : "Unassigned" },
+    ];
+    if (proj.description) {
+      sections.push(
+        { kind: "spacer" },
+        { kind: "heading", level: 2, text: "Description" },
+        { kind: "paragraph", text: proj.description },
+      );
+    }
+    const decisions = proj.pendingDecisions ?? [];
+    if (decisions.length > 0) {
+      sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Decisions" });
+      for (const d of decisions) {
+        sections.push({ kind: "heading", level: 3, text: `${d.status === "decided" ? "✓" : "•"} ${d.title}` });
+        if (d.description) sections.push({ kind: "paragraph", text: d.description });
+        if (d.status === "decided" && d.decidedBy) {
+          sections.push({ kind: "kv", label: "Decided by", value: `${d.decidedBy}${d.decidedAt ? " on " + new Date(d.decidedAt).toLocaleDateString() : ""}` });
+        }
+      }
+    }
+    const attachments = proj.attachments ?? [];
+    if (attachments.length > 0) {
+      sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Attachments" });
+      for (const a of attachments) {
+        sections.push({ kind: "bullet", text: `${a.name} — ${a.url}` });
+      }
+    }
+    const log = proj.progressLog ?? [];
+    if (log.length > 0) {
+      sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Progress history" });
+      for (const e of log) {
+        sections.push({ kind: "bullet", text: `${e.date}: ${e.value}%` });
+      }
+    }
+    return streamPdf(res, {
+      title: proj.title,
+      subtitle: "SCCC IT — Project",
+      filename: `project-${proj.id}.pdf`,
+      sections,
+    });
+  } catch (err: any) {
+    console.error("Project PDF export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
+  }
+});
+
+router.get("/project/:id/docx", requireAuth, async (req: any, res) => {
+  try {
+    const loaded = await loadProject(parseInt(req.params.id));
+    if (!loaded) return res.status(404).json({ error: "Not found" });
+    const { proj, assignees } = loaded;
+    const blocks: Array<{ heading?: string; level?: 1 | 2 | 3; text?: string; bullets?: string[] }> = [
+      {
+        text:
+          `Status: ${projectStatusLabel(proj.status)}\n` +
+          `Progress: ${proj.progress ?? 0}%\n` +
+          `Target date: ${proj.targetDate ?? "—"}` +
+          (proj.newEstimatedDate ? `\nNew estimated date: ${proj.newEstimatedDate}` : "") +
+          `\nTeam: ${assignees.length ? assignees.map((a) => a.name ?? "Unknown").join(", ") : "Unassigned"}`,
+      },
+    ];
+    if (proj.description) blocks.push({ heading: "Description", level: 2, text: proj.description });
+    const decisions = proj.pendingDecisions ?? [];
+    if (decisions.length > 0) {
+      blocks.push({ heading: "Decisions", level: 2 });
+      for (const d of decisions) {
+        const lines: string[] = [`${d.status === "decided" ? "[Decided] " : "[Pending] "}${d.title}`];
+        if (d.description) lines.push(d.description);
+        if (d.status === "decided" && d.decidedBy) {
+          lines.push(`Decided by ${d.decidedBy}${d.decidedAt ? " on " + new Date(d.decidedAt).toLocaleDateString() : ""}`);
+        }
+        blocks.push({ text: lines.join("\n") });
+      }
+    }
+    const attachments = proj.attachments ?? [];
+    if (attachments.length > 0) {
+      blocks.push({ heading: "Attachments", level: 2, bullets: attachments.map((a) => `${a.name} — ${a.url}`) });
+    }
+    const log = proj.progressLog ?? [];
+    if (log.length > 0) {
+      blocks.push({ heading: "Progress history", level: 2, bullets: log.map((e) => `${e.date}: ${e.value}%`) });
+    }
+    const buf = await buildDocxBuffer(proj.title, blocks);
+    return sendDocx(res, buf, `project-${proj.id}.docx`);
+  } catch (err: any) {
+    console.error("Project DOCX export failed:", err);
+    return res.status(500).json({ error: "Export failed", message: err?.message });
+  }
 });
 
 router.post("/report/:id/zendesk", requireAuth, requireCIO, async (req: any, res) => {

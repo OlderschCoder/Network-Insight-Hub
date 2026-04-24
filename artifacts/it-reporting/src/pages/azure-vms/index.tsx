@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useListAzureVms,
   useCreateAzureVm,
@@ -24,7 +24,49 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Cloud, Plus, Pencil, Trash2, Search, Server } from "lucide-react";
+import { Cloud, Plus, Pencil, Trash2, Search, Server, Download, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 25;
+
+const CSV_COLUMNS: { key: keyof AzureVm; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "resourceGroup", label: "Resource Group" },
+  { key: "subscription", label: "Subscription" },
+  { key: "location", label: "Location" },
+  { key: "size", label: "Size" },
+  { key: "os", label: "OS" },
+  { key: "privateIp", label: "Private IP" },
+  { key: "publicIp", label: "Public IP" },
+  { key: "vnet", label: "VNet" },
+  { key: "subnet", label: "Subnet" },
+  { key: "status", label: "Status" },
+  { key: "owner", label: "Owner" },
+  { key: "purpose", label: "Purpose" },
+  { key: "notes", label: "Notes" },
+];
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(rows: AzureVm[]) {
+  const header = CSV_COLUMNS.map((c) => csvCell(c.label)).join(",");
+  const lines = rows.map((vm) =>
+    CSV_COLUMNS.map((c) => csvCell((vm as any)[c.key])).join(","),
+  );
+  const csv = [header, ...lines].join("\r\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `azure-vms-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 type VmFormState = {
   name: string;
@@ -114,6 +156,7 @@ export default function AzureVmsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<VmFormState>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<AzureVm | null>(null);
+  const [page, setPage] = useState(0);
 
   const { data: vms = [], isLoading, refetch } = useListAzureVms({});
   const createMut = useCreateAzureVm();
@@ -129,6 +172,17 @@ export default function AzureVmsPage() {
         .some((s) => (s as string).toLowerCase().includes(q)),
     );
   }, [vms, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageRows = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -221,14 +275,25 @@ export default function AzureVmsPage() {
                   : "Read-only — only the CIO can add or edit VMs."}
               </CardDescription>
             </div>
-            <div className="relative w-72 max-w-full">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, RG, IP, owner…"
-                className="pl-8"
-              />
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative w-72 max-w-full">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search name, RG, IP, owner…"
+                  className="pl-8"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadCsv(filtered)}
+                disabled={filtered.length === 0}
+                title={`Export ${filtered.length} VM${filtered.length === 1 ? "" : "s"} to CSV`}
+              >
+                <Download className="h-4 w-4 mr-2" /> Export CSV
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -258,7 +323,7 @@ export default function AzureVmsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((vm) => (
+                  {pageRows.map((vm) => (
                     <TableRow key={vm.id}>
                       <TableCell>
                         <div className="font-medium">{vm.name}</div>
@@ -306,6 +371,36 @@ export default function AzureVmsPage() {
                   ))}
                 </TableBody>
               </Table>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-3 pt-3 text-sm text-muted-foreground">
+                  <div>
+                    Showing {safePage * PAGE_SIZE + 1}–
+                    {Math.min(filtered.length, safePage * PAGE_SIZE + PAGE_SIZE)} of{" "}
+                    {filtered.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={safePage === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                    </Button>
+                    <span>
+                      Page {safePage + 1} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={safePage >= totalPages - 1}
+                    >
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -14,12 +14,32 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Pencil, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, Pencil, Save, Trash2, X, Printer, FileText, FileType2 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { PROCESS_CATEGORIES } from "./index";
+
+const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function downloadExport(url: string, filename: string) {
+  const res = await fetch(url, { headers: authHeaders(), credentials: "include" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
 
 export default function ProcessDetail() {
   const { id: idStr } = useParams<{ id: string }>();
@@ -28,10 +48,12 @@ export default function ProcessDetail() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { user, isCIO } = useAuth();
+  const confirmDialog = useConfirm();
 
   const { data: process, isLoading } = useGetProcess(id);
   const updateMutation = useUpdateProcess();
   const deleteMutation = useDeleteProcess();
+  const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
 
   const p = process as any;
   const canEdit = !!p && (isCIO || p.createdBy === user?.id);
@@ -96,7 +118,12 @@ export default function ProcessDetail() {
   };
 
   const remove = async () => {
-    if (!confirm(`Delete "${p.title}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog({
+      title: `Delete "${p?.title ?? "this process"}"?`,
+      description: "This cannot be undone.",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     try {
       await deleteMutation.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: ["/api/processes"] });
@@ -104,6 +131,18 @@ export default function ProcessDetail() {
       setLocation("/processes");
     } catch (e: any) {
       toast({ title: "Delete failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const handleExport = async (kind: "pdf" | "docx") => {
+    setExporting(kind);
+    try {
+      const safe = (p?.title ?? "process").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
+      await downloadExport(`${API_BASE}/export/process/${id}/${kind}`, `${safe}.${kind}`);
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -142,12 +181,37 @@ export default function ProcessDetail() {
             {p.updatedByName && p.updatedByName !== p.createdByName ? ` by ${p.updatedByName}` : ""}
           </p>
         </div>
+        {!editing && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
+              <Printer className="h-4 w-4 mr-2" /> Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("pdf")}
+              disabled={exporting !== null}
+              className="print:hidden"
+            >
+              <FileText className="h-4 w-4 mr-2" /> {exporting === "pdf" ? "Exporting…" : "PDF"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("docx")}
+              disabled={exporting !== null}
+              className="print:hidden"
+            >
+              <FileType2 className="h-4 w-4 mr-2" /> {exporting === "docx" ? "Exporting…" : "Word"}
+            </Button>
+          </>
+        )}
         {canEdit && !editing && (
           <>
-            <Button variant="outline" size="sm" onClick={startEditing}>
+            <Button variant="outline" size="sm" onClick={startEditing} className="print:hidden">
               <Pencil className="h-4 w-4 mr-2" /> Edit
             </Button>
-            <Button variant="outline" size="sm" onClick={remove} disabled={deleteMutation.isPending}>
+            <Button variant="outline" size="sm" onClick={remove} disabled={deleteMutation.isPending} className="print:hidden">
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </Button>
           </>

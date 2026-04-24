@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   useListStrategicObjectives,
   useCreateStrategicObjective,
@@ -26,6 +27,7 @@ type SO = {
 };
 
 export default function StrategicObjectivesIndex() {
+  const confirm = useConfirm();
   const { isCIO } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -111,7 +113,14 @@ export default function StrategicObjectivesIndex() {
     const msg = linked.length > 0
       ? `Delete this objective? It is currently linked to ${linked.length} project${linked.length === 1 ? "" : "s"}; those projects will keep working but lose this alignment.`
       : "Delete this objective?";
-    if (!window.confirm(msg)) return;
+    if (!(await confirm({
+      title: "Delete this objective?",
+      description: linked.length > 0
+        ? `It is currently linked to ${linked.length} project${linked.length === 1 ? "" : "s"}; those projects will keep working but lose this alignment.`
+        : undefined,
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     try {
       await deleteMutation.mutateAsync({ id });
       invalidate();

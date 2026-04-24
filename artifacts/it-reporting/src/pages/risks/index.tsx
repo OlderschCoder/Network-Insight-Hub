@@ -125,7 +125,7 @@ export default function Risks() {
             >
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/risks/${risk.id}`} className="flex-1 min-w-0 cursor-pointer">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <Badge variant="outline" className={typeColor[risk.type ?? "risk"] ?? ""}>
                         {risk.type ?? "risk"}
@@ -169,7 +169,7 @@ export default function Risks() {
                     <p className="text-xs text-muted-foreground mt-2">
                       {format(new Date(risk.createdAt), "MMM d, yyyy")}
                     </p>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-1 shrink-0">
                     {(user?.role === "cio" || (risk as any).userId === user?.id) && (
                       <Link href={`/risks/${risk.id}/edit`}>

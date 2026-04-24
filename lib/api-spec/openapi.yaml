@@ -117,6 +117,72 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           description: Unauthorized
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request a password reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: OK (always 200 to avoid leaking account existence)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  emailConfigured:
+                    type: boolean
+                  resetUrl:
+                    type: string
+                    description: Only included when SMTP is not configured.
+                required: [ok]
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Set a new password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # USERS
   /users:
@@ -488,6 +554,11 @@ paths:
           schema:
             type: string
             enum: [risk, issue, suggestion]
+        - name: includeArchived
+          in: query
+          description: When set, archived items are returned alongside active ones.
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -545,6 +616,66 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateRiskBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+    delete:
+      operationId: deleteRisk
+      tags: [risks]
+      summary: Permanently delete a risk (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+  /risks/{id}/archive:
+    post:
+      operationId: archiveRisk
+      tags: [risks]
+      summary: Archive a risk (hides from default list)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+  /risks/{id}/unarchive:
+    post:
+      operationId: unarchiveRisk
+      tags: [risks]
+      summary: Restore an archived risk
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: OK
@@ -1537,6 +1668,82 @@ paths:
               schema:
                 type: string
                 format: binary
+  /export/process/{id}/pdf:
+    get:
+      operationId: exportProcessPdf
+      tags: [export]
+      summary: Download a Process Library entry as PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /export/process/{id}/docx:
+    get:
+      operationId: exportProcessDocx
+      tags: [export]
+      summary: Download a Process Library entry as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /export/project/{id}/pdf:
+    get:
+      operationId: exportProjectPdf
+      tags: [export]
+      summary: Download a project as PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /export/project/{id}/docx:
+    get:
+      operationId: exportProjectDocx
+      tags: [export]
+      summary: Download a project as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
   /export/report/{id}/zendesk:
     post:
       operationId: sendReportToZendesk
@@ -2098,6 +2305,13 @@ components:
           type: array
           items:
             type: string
+        projectId:
+          type: integer
+          nullable: true
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time

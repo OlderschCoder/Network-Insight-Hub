@@ -19,12 +19,32 @@ import { Progress } from "@/components/ui/progress";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, Trash2, Plus, X, Link as LinkIcon, ExternalLink } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Plus, X, Link as LinkIcon, ExternalLink, Printer, FileText, FileType2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+
+const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function downloadExport(url: string, filename: string) {
+  const res = await fetch(url, { headers: authHeaders(), credentials: "include" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
 
 const statusLabel: Record<string, string> = {
   planning: "Planning",
@@ -40,7 +60,9 @@ export default function ProjectDetail() {
   const { isCIO } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
   const [, setLocation] = useLocation();
+  const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
 
   const { data: project, isLoading } = useGetProject(id);
   const { data: users } = useListUsers();
@@ -187,7 +209,12 @@ export default function ProjectDetail() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this project? This cannot be undone.")) return;
+    if (!(await confirmDialog({
+      title: "Delete this project?",
+      description: "This cannot be undone.",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     try {
       await deleteMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -195,6 +222,18 @@ export default function ProjectDetail() {
       setLocation("/projects");
     } catch (e: any) {
       toast({ title: "Delete failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const handleExport = async (kind: "pdf" | "docx") => {
+    setExporting(kind);
+    try {
+      const safe = (p?.title ?? "project").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
+      await downloadExport(`${API_BASE}/export/project/${id}/${kind}`, `${safe}.${kind}`);
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -216,12 +255,23 @@ export default function ProjectDetail() {
         <Badge variant="outline">{statusLabel[p.status] ?? p.status}</Badge>
       </div>
 
-      {isCIO && (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 print:hidden">
+        {isCIO && (
           <Button onClick={handleSave} disabled={updateMutation.isPending || !dirty}>
             <Save className="h-4 w-4 mr-2" />
             {dirty ? "Save Changes" : "Saved"}
           </Button>
+        )}
+        <Button variant="outline" onClick={() => window.print()}>
+          <Printer className="h-4 w-4 mr-2" /> Print
+        </Button>
+        <Button variant="outline" onClick={() => handleExport("pdf")} disabled={exporting !== null}>
+          <FileText className="h-4 w-4 mr-2" /> {exporting === "pdf" ? "Exporting…" : "PDF"}
+        </Button>
+        <Button variant="outline" onClick={() => handleExport("docx")} disabled={exporting !== null}>
+          <FileType2 className="h-4 w-4 mr-2" /> {exporting === "docx" ? "Exporting…" : "Word"}
+        </Button>
+        {isCIO && (
           <Button
             variant="outline"
             className="text-destructive"
@@ -230,8 +280,8 @@ export default function ProjectDetail() {
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <Card>
         <CardHeader><CardTitle>Details</CardTitle></CardHeader>
@@ -593,7 +643,7 @@ export default function ProjectDetail() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="text-[10px]">{rk.type}</Badge>
                     <Badge variant="outline" className="text-[10px]">{rk.severity}</Badge>
-                    <Link href={`/risks/${rk.id}/edit`}>
+                    <Link href={`/risks/${rk.id}`}>
                       <span className="font-medium hover:underline cursor-pointer">{rk.title}</span>
                     </Link>
                     {rk.userName && (

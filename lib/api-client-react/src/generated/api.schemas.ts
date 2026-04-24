@@ -314,6 +314,8 @@ export interface Risk {
   relatedBuilding?: string;
   relatedDevice?: string;
   sharedWith?: string[];
+  projectId?: number | null;
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -922,6 +924,27 @@ export interface WeekStatus {
   submissions: WeekStatusSubmissionsItem[];
 }
 
+export type ForgotPasswordBody = {
+  email: string;
+};
+
+export type ForgotPassword200 = {
+  ok: boolean;
+  emailConfigured?: boolean;
+  /** Only included when SMTP is not configured. */
+  resetUrl?: string;
+};
+
+export type ResetPasswordBody = {
+  token: string;
+  /** @minLength 6 */
+  password: string;
+};
+
+export type ResetPassword200 = {
+  ok?: boolean;
+};
+
 export type ListEntriesParams = {
   userId?: number;
   /**
@@ -955,6 +978,10 @@ export type ListRisksParams = {
   status?: ListRisksStatus;
   severity?: ListRisksSeverity;
   type?: ListRisksType;
+  /**
+   * When set, archived items are returned alongside active ones.
+   */
+  includeArchived?: string;
 };
 
 export type ListRisksStatus =
@@ -983,6 +1010,10 @@ export const ListRisksType = {
   issue: "issue",
   suggestion: "suggestion",
 } as const;
+
+export type DeleteRisk200 = {
+  ok?: boolean;
+};
 
 export type ListProcessesParams = {
   category?: string;

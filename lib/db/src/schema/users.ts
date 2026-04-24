@@ -10,6 +10,8 @@ export const usersTable = pgTable("users", {
   role: varchar("role", { length: 50 }).notNull().default("helpdesk"),
   department: varchar("department", { length: 255 }),
   zendeskEmail: varchar("zendesk_email", { length: 255 }),
+  passwordResetToken: varchar("password_reset_token", { length: 128 }),
+  passwordResetExpires: timestamp("password_reset_expires"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

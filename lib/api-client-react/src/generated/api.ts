@@ -38,11 +38,14 @@ import type {
   DeleteAzureVm200,
   DeleteProject200,
   DeleteReport200,
+  DeleteRisk200,
   DeleteStrategicObjective200,
   EmailReportBody,
   EmailReportResponse,
   Entry,
   ErrorResponse,
+  ForgotPassword200,
+  ForgotPasswordBody,
   GetAggregateReportParams,
   GetRecentActivityParams,
   HealthStatus,
@@ -66,6 +69,8 @@ import type {
   Report,
   ReportExtras,
   ReportTicketsResponse,
+  ResetPassword200,
+  ResetPasswordBody,
   Risk,
   SaveNetworkLayout200,
   SaveNetworkLayoutBody,
@@ -481,6 +486,178 @@ export function useGetMe<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Request a password reset link
+ */
+export const getForgotPasswordUrl = () => {
+  return `/api/auth/forgot-password`;
+};
+
+export const forgotPassword = async (
+  forgotPasswordBody: ForgotPasswordBody,
+  options?: RequestInit,
+): Promise<ForgotPassword200> => {
+  return customFetch<ForgotPassword200>(getForgotPasswordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(forgotPasswordBody),
+  });
+};
+
+export const getForgotPasswordMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof forgotPassword>>,
+    TError,
+    { data: BodyType<ForgotPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof forgotPassword>>,
+  TError,
+  { data: BodyType<ForgotPasswordBody> },
+  TContext
+> => {
+  const mutationKey = ["forgotPassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof forgotPassword>>,
+    { data: BodyType<ForgotPasswordBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return forgotPassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ForgotPasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof forgotPassword>>
+>;
+export type ForgotPasswordMutationBody = BodyType<ForgotPasswordBody>;
+export type ForgotPasswordMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a password reset link
+ */
+export const useForgotPassword = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof forgotPassword>>,
+    TError,
+    { data: BodyType<ForgotPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof forgotPassword>>,
+  TError,
+  { data: BodyType<ForgotPasswordBody> },
+  TContext
+> => {
+  return useMutation(getForgotPasswordMutationOptions(options));
+};
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const getResetPasswordUrl = () => {
+  return `/api/auth/reset-password`;
+};
+
+export const resetPassword = async (
+  resetPasswordBody: ResetPasswordBody,
+  options?: RequestInit,
+): Promise<ResetPassword200> => {
+  return customFetch<ResetPassword200>(getResetPasswordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(resetPasswordBody),
+  });
+};
+
+export const getResetPasswordMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPassword>>,
+    TError,
+    { data: BodyType<ResetPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: BodyType<ResetPasswordBody> },
+  TContext
+> => {
+  const mutationKey = ["resetPassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetPassword>>,
+    { data: BodyType<ResetPasswordBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return resetPassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetPasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetPassword>>
+>;
+export type ResetPasswordMutationBody = BodyType<ResetPasswordBody>;
+export type ResetPasswordMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const useResetPassword = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPassword>>,
+    TError,
+    { data: BodyType<ResetPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: BodyType<ResetPasswordBody> },
+  TContext
+> => {
+  return useMutation(getResetPasswordMutationOptions(options));
+};
 
 /**
  * @summary List all users (CIO only)
@@ -2296,6 +2473,258 @@ export const useUpdateRisk = <
   TContext
 > => {
   return useMutation(getUpdateRiskMutationOptions(options));
+};
+
+/**
+ * @summary Permanently delete a risk (CIO only)
+ */
+export const getDeleteRiskUrl = (id: number) => {
+  return `/api/risks/${id}`;
+};
+
+export const deleteRisk = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteRisk200> => {
+  return customFetch<DeleteRisk200>(getDeleteRiskUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteRiskMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteRisk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteRisk>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteRisk(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteRiskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteRisk>>
+>;
+
+export type DeleteRiskMutationError = ErrorType<void>;
+
+/**
+ * @summary Permanently delete a risk (CIO only)
+ */
+export const useDeleteRisk = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteRiskMutationOptions(options));
+};
+
+/**
+ * @summary Archive a risk (hides from default list)
+ */
+export const getArchiveRiskUrl = (id: number) => {
+  return `/api/risks/${id}/archive`;
+};
+
+export const archiveRisk = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Risk> => {
+  return customFetch<Risk>(getArchiveRiskUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getArchiveRiskMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["archiveRisk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveRisk>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return archiveRisk(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveRiskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveRisk>>
+>;
+
+export type ArchiveRiskMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Archive a risk (hides from default list)
+ */
+export const useArchiveRisk = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof archiveRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getArchiveRiskMutationOptions(options));
+};
+
+/**
+ * @summary Restore an archived risk
+ */
+export const getUnarchiveRiskUrl = (id: number) => {
+  return `/api/risks/${id}/unarchive`;
+};
+
+export const unarchiveRisk = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Risk> => {
+  return customFetch<Risk>(getUnarchiveRiskUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getUnarchiveRiskMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["unarchiveRisk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveRisk>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return unarchiveRisk(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveRiskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveRisk>>
+>;
+
+export type UnarchiveRiskMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Restore an archived risk
+ */
+export const useUnarchiveRisk = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveRisk>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveRisk>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getUnarchiveRiskMutationOptions(options));
 };
 
 export const getListProcessesUrl = (params?: ListProcessesParams) => {
@@ -6160,6 +6589,354 @@ export function useExportReportXlsx<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getExportReportXlsxQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a Process Library entry as PDF
+ */
+export const getExportProcessPdfUrl = (id: number) => {
+  return `/api/export/process/${id}/pdf`;
+};
+
+export const exportProcessPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportProcessPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportProcessPdfQueryKey = (id: number) => {
+  return [`/api/export/process/${id}/pdf`] as const;
+};
+
+export const getExportProcessPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportProcessPdf>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProcessPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportProcessPdfQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportProcessPdf>>
+  > = ({ signal }) => exportProcessPdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportProcessPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportProcessPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportProcessPdf>>
+>;
+export type ExportProcessPdfQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download a Process Library entry as PDF
+ */
+
+export function useExportProcessPdf<
+  TData = Awaited<ReturnType<typeof exportProcessPdf>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProcessPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportProcessPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a Process Library entry as Word document
+ */
+export const getExportProcessDocxUrl = (id: number) => {
+  return `/api/export/process/${id}/docx`;
+};
+
+export const exportProcessDocx = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportProcessDocxUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportProcessDocxQueryKey = (id: number) => {
+  return [`/api/export/process/${id}/docx`] as const;
+};
+
+export const getExportProcessDocxQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportProcessDocx>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProcessDocx>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportProcessDocxQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportProcessDocx>>
+  > = ({ signal }) => exportProcessDocx(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportProcessDocx>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportProcessDocxQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportProcessDocx>>
+>;
+export type ExportProcessDocxQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download a Process Library entry as Word document
+ */
+
+export function useExportProcessDocx<
+  TData = Awaited<ReturnType<typeof exportProcessDocx>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProcessDocx>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportProcessDocxQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a project as PDF
+ */
+export const getExportProjectPdfUrl = (id: number) => {
+  return `/api/export/project/${id}/pdf`;
+};
+
+export const exportProjectPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportProjectPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportProjectPdfQueryKey = (id: number) => {
+  return [`/api/export/project/${id}/pdf`] as const;
+};
+
+export const getExportProjectPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportProjectPdf>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProjectPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportProjectPdfQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportProjectPdf>>
+  > = ({ signal }) => exportProjectPdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportProjectPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportProjectPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportProjectPdf>>
+>;
+export type ExportProjectPdfQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download a project as PDF
+ */
+
+export function useExportProjectPdf<
+  TData = Awaited<ReturnType<typeof exportProjectPdf>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProjectPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportProjectPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a project as Word document
+ */
+export const getExportProjectDocxUrl = (id: number) => {
+  return `/api/export/project/${id}/docx`;
+};
+
+export const exportProjectDocx = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportProjectDocxUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportProjectDocxQueryKey = (id: number) => {
+  return [`/api/export/project/${id}/docx`] as const;
+};
+
+export const getExportProjectDocxQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportProjectDocx>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProjectDocx>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportProjectDocxQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportProjectDocx>>
+  > = ({ signal }) => exportProjectDocx(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportProjectDocx>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportProjectDocxQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportProjectDocx>>
+>;
+export type ExportProjectDocxQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download a project as Word document
+ */
+
+export function useExportProjectDocx<
+  TData = Awaited<ReturnType<typeof exportProjectDocx>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportProjectDocx>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportProjectDocxQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

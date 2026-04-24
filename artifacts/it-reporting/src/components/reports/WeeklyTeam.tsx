@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useListReports, useCreateReport, useDeleteReport } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { todayCentral, isoMondayCentral } from "@/lib/dates";
 
 export default function WeeklyTeam() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [, setLocation] = useLocation();
   const { isCIO } = useAuth();
   const { toast } = useToast();
@@ -28,7 +30,12 @@ export default function WeeklyTeam() {
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm("Delete this report? This cannot be undone.")) return;
+    if (!(await confirm({
+      title: "Delete this report?",
+      description: "This cannot be undone.",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     try {
       await deleteMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: ["/api/reports"] });

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { useListProjects, useDeleteProject } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +30,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function ProjectsIndex() {
+  const confirm = useConfirm();
   const { isCIO } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,7 +51,12 @@ export default function ProjectsIndex() {
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm("Delete this project? This cannot be undone.")) return;
+    if (!(await confirm({
+      title: "Delete this project?",
+      description: "This cannot be undone.",
+      confirmText: "Delete",
+      destructive: true,
+    }))) return;
     try {
       await deleteMutation.mutateAsync({ id });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });

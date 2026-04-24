@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, risksTable, usersTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
 
@@ -12,11 +12,14 @@ async function enrichRisk(risk: any) {
 }
 
 router.get("/", requireAuth, async (req: any, res) => {
-  const { status, severity, type } = req.query;
+  const { status, severity, type, includeArchived } = req.query;
   let conditions: any[] = [];
   if (status) conditions.push(eq(risksTable.status, status as string));
   if (severity) conditions.push(eq(risksTable.severity, severity as string));
   if (type) conditions.push(eq(risksTable.type, type as string));
+  // By default, archived items are hidden from the list view. Pass
+  // ?includeArchived=1 to see them (e.g., from a "Show archived" toggle).
+  if (!includeArchived) conditions.push(isNull(risksTable.archivedAt));
 
   const risks = conditions.length > 0
     ? await db.select().from(risksTable).where(and(...conditions)).orderBy(desc(risksTable.createdAt))
@@ -84,6 +87,51 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
   const [risk] = await db.update(risksTable).set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(risksTable.id, id)).returning();
   return res.json(await enrichRisk(risk));
+});
+
+// Archive / unarchive — kept distinct from delete so the audit trail survives.
+// Author or CIO may archive; only CIO may permanently delete.
+router.post("/:id/archive", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(risksTable).where(eq(risksTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  if (req.user.role !== "cio" && existing.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const [risk] = await db
+    .update(risksTable)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(eq(risksTable.id, id))
+    .returning();
+  return res.json(await enrichRisk(risk));
+});
+
+router.post("/:id/unarchive", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(risksTable).where(eq(risksTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  if (req.user.role !== "cio" && existing.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const [risk] = await db
+    .update(risksTable)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(eq(risksTable.id, id))
+    .returning();
+  return res.json(await enrichRisk(risk));
+});
+
+router.delete("/:id", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const [existing] = await db.select().from(risksTable).where(eq(risksTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const isAuthor = existing.userId === req.user.id;
+  const isCio = req.user.role === "cio";
+  if (!isAuthor && !isCio) {
+    return res.status(403).json({ error: "Only the author or CIO can delete this risk" });
+  }
+  await db.delete(risksTable).where(eq(risksTable.id, id));
+  return res.json({ ok: true });
 });
 
 export default router;
