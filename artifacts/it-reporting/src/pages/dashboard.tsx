@@ -1,7 +1,8 @@
 import { useGetDashboardSummary, useGetRecentActivity, useGetWeekStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText } from "lucide-react";
+import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText, AlertCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
 import { ZendeskResolved } from "@/components/ZendeskResolved";
@@ -19,9 +20,17 @@ export default function Dashboard() {
 }
 
 function CIODashboard() {
-  const { data: summary } = useGetDashboardSummary();
+  const {
+    data: summary,
+    isError: isSummaryError,
+    refetch: refetchSummary,
+    isFetching: isSummaryFetching,
+  } = useGetDashboardSummary();
   const { data: recentActivity } = useGetRecentActivity({ limit: 10 });
   const { data: weekStatus } = useGetWeekStatus();
+
+  const summaryValue = (value: number | undefined) =>
+    isSummaryError ? "—" : value ?? 0;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -44,6 +53,28 @@ function CIODashboard() {
 
       <QuoteOfDay />
 
+      {isSummaryError && (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2 text-destructive">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>Couldn't load stats. The dashboard summary is temporarily unavailable.</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchSummary()}
+            disabled={isSummaryFetching}
+            className="self-start sm:self-auto"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSummaryFetching ? "animate-spin" : ""}`} />
+            {isSummaryFetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -51,9 +82,11 @@ function CIODashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.thisWeekEntries || 0}</div>
+            <div className="text-2xl font-bold">{summaryValue(summary?.thisWeekEntries)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              From {summary?.thisWeekContributors || 0} contributors
+              {isSummaryError
+                ? "Couldn't load stats"
+                : `From ${summary?.thisWeekContributors || 0} contributors`}
             </p>
           </CardContent>
         </Card>
@@ -64,9 +97,11 @@ function CIODashboard() {
             <ShieldAlert className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.openRisks || 0}</div>
+            <div className="text-2xl font-bold">{summaryValue(summary?.openRisks)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {summary?.criticalRisks || 0} critical
+              {isSummaryError
+                ? "Couldn't load stats"
+                : `${summary?.criticalRisks || 0} critical`}
             </p>
           </CardContent>
         </Card>
@@ -77,9 +112,13 @@ function CIODashboard() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.onlineSwitches || 0} / {summary?.totalSwitches || 0}</div>
+            <div className="text-2xl font-bold">
+              {isSummaryError
+                ? "—"
+                : `${summary?.onlineSwitches || 0} / ${summary?.totalSwitches || 0}`}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Switches online
+              {isSummaryError ? "Couldn't load stats" : "Switches online"}
             </p>
           </CardContent>
         </Card>
@@ -90,9 +129,9 @@ function CIODashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.openAfterActions || 0}</div>
+            <div className="text-2xl font-bold">{summaryValue(summary?.openAfterActions)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Open incidents
+              {isSummaryError ? "Couldn't load stats" : "Open incidents"}
             </p>
           </CardContent>
         </Card>
