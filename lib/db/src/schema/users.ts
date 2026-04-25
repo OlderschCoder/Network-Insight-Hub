@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const usersTable = pgTable("users", {
   role: varchar("role", { length: 50 }).notNull().default("helpdesk"),
   department: varchar("department", { length: 255 }),
   zendeskEmail: varchar("zendesk_email", { length: 255 }),
+  isActive: boolean("is_active").notNull().default(true),
   passwordResetToken: varchar("password_reset_token", { length: 128 }),
   passwordResetExpires: timestamp("password_reset_expires"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

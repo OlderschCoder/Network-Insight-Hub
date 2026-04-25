@@ -1,50 +1,69 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useRegister } from "@workspace/api-client-react";
-import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email(),
+  email: z.string().email().refine((e) => e.toLowerCase().endsWith("@sccc.edu"), {
+    message: "Only @sccc.edu email addresses are allowed",
+  }),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["cio", "helpdesk", "network", "security"]),
   department: z.string().optional(),
 });
 
 export default function Register() {
   const registerMutation = useRegister();
-  const { login } = useAuth();
-  const [, setLocation] = useLocation();
+  const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", password: "", role: "helpdesk", department: "" },
+    defaultValues: { name: "", email: "", password: "", department: "" },
   });
 
   const onSubmit = async (data: z.infer<typeof schema>) => {
     try {
-      const res = await registerMutation.mutateAsync({ data });
-      login(res.token, res.user);
+      await registerMutation.mutateAsync({ data });
+      setSubmitted(true);
     } catch (e: any) {
       toast.error(e.message || "Failed to register");
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Account Pending Approval</CardTitle>
+            <CardDescription>Your request has been received</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>Your account has been created and is <strong>pending approval</strong> by a CIO administrator.</p>
+            <p>You will be able to log in once your account has been activated. Please contact your IT administrator if you need urgent access.</p>
+          </CardContent>
+          <CardFooter className="flex justify-center border-t p-4">
+            <Link href="/login" className="text-primary hover:underline text-sm">Back to login</Link>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Register Account</CardTitle>
-          <CardDescription>Join the SCCC IT Hub</CardDescription>
+          <CardDescription>Join the SCCC IT Hub — SCCC staff only</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -84,29 +103,6 @@ export default function Register() {
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="helpdesk">Help Desk</SelectItem>
-                        <SelectItem value="network">Network Engineer</SelectItem>
-                        <SelectItem value="security">Security Engineer</SelectItem>
-                        <SelectItem value="cio">CIO</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

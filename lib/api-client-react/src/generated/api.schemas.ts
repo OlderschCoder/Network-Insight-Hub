@@ -29,25 +29,20 @@ export interface User {
   name: string;
   role: UserRole;
   department?: string;
+  isActive?: boolean;
   createdAt?: string;
 }
-
-export type RegisterBodyRole =
-  (typeof RegisterBodyRole)[keyof typeof RegisterBodyRole];
-
-export const RegisterBodyRole = {
-  cio: "cio",
-  helpdesk: "helpdesk",
-  network: "network",
-  security: "security",
-} as const;
 
 export interface RegisterBody {
   email: string;
   password: string;
   name: string;
-  role: RegisterBodyRole;
   department?: string;
+}
+
+export interface RegisterResponse {
+  user: User;
+  message: string;
 }
 
 export interface LoginBody {
@@ -74,6 +69,7 @@ export interface UpdateUserBody {
   name?: string;
   role?: UpdateUserBodyRole;
   department?: string;
+  isActive?: boolean;
 }
 
 export type EntryCategory = (typeof EntryCategory)[keyof typeof EntryCategory];

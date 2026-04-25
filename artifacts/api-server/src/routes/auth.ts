@@ -20,6 +20,14 @@ export function getUserIdFromToken(token: string): number | null {
   return sessions.get(token) ?? null;
 }
 
+export function invalidateUserSessions(userId: number): void {
+  for (const [token, uid] of sessions.entries()) {
+    if (uid === userId) {
+      sessions.delete(token);
+    }
+  }
+}
+
 export async function requireAuth(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -33,6 +41,10 @@ export async function requireAuth(req: any, res: any, next: any) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) {
     return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (!user.isActive) {
+    sessions.delete(token);
+    return res.status(401).json({ error: "Account is deactivated" });
   }
   req.user = user;
   next();
@@ -55,22 +67,26 @@ router.post("/register", async (req, res) => {
     email: z.string().email(),
     password: z.string().min(6),
     name: z.string().min(1),
-    role: z.enum(["cio", "helpdesk", "network", "security", "network_engineer", "security_engineer", "staff"]).optional().default("helpdesk"),
     department: z.string().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", message: parsed.error.message });
   }
-  const { email, password, name, role, department } = parsed.data;
+  const { email, password, name, department } = parsed.data;
+  if (!email.toLowerCase().endsWith("@sccc.edu")) {
+    return res.status(403).json({ error: "Registration is restricted to SCCC staff. Use your @sccc.edu email address." });
+  }
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
   if (existing.length > 0) {
     return res.status(400).json({ error: "Email already registered" });
   }
   const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db.insert(usersTable).values({ email, passwordHash, name, role, department }).returning();
-  const token = createToken(user.id);
-  return res.status(201).json({ user: formatUser(user), token });
+  const [user] = await db.insert(usersTable).values({ email, passwordHash, name, role: "helpdesk", department, isActive: false }).returning();
+  return res.status(201).json({
+    user: formatUser(user),
+    message: "Your account has been created and is pending approval by a CIO administrator. You will be able to log in once your account is activated.",
+  });
 });
 
 router.post("/login", async (req, res) => {
@@ -90,6 +106,9 @@ router.post("/login", async (req, res) => {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
     return res.status(401).json({ error: "Invalid credentials" });
+  }
+  if (!user.isActive) {
+    return res.status(401).json({ error: "Account is deactivated" });
   }
   const token = createToken(user.id);
   return res.json({ user: formatUser(user), token });
