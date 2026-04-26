@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import type { MaintenanceLogEntry } from "@workspace/db";
 import { eq, and, or, ilike, desc, inArray, sql } from "drizzle-orm";
-import { requireAuth, requireCIO } from "./auth";
+import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
 import crypto from "crypto";
 import OpenAI from "openai";
@@ -80,7 +80,7 @@ router.get("/switches", requireAuth, async (req: any, res) => {
   return res.json(switches.map(withVisibleMaintenanceLog));
 });
 
-router.post("/switches", requireAuth, async (req: any, res) => {
+router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const schema = z.object({
     hostname: z.string().min(1),
     building: z.string().min(1),
@@ -104,7 +104,7 @@ router.get("/switches/:id", requireAuth, async (req, res) => {
   return res.json(withVisibleMaintenanceLog(sw));
 });
 
-router.patch("/switches/:id", requireAuth, async (req: any, res) => {
+router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const id = parseInt(req.params.id);
   const schema = z.object({
     hostname: z.string().optional(),
@@ -247,7 +247,7 @@ router.get("/vlans", requireAuth, async (req: any, res) => {
   return res.json(vlans.map(withVisibleMaintenanceLog));
 });
 
-router.post("/vlans", requireAuth, async (req: any, res) => {
+router.post("/vlans", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const schema = z.object({
     vlanId: z.number().int(),
     name: z.string().min(1),

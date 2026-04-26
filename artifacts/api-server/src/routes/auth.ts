@@ -57,6 +57,14 @@ export function requireCIO(req: any, res: any, next: any) {
   next();
 }
 
+export function requireNetworkAdmin(req: any, res: any, next: any) {
+  const allowedRoles = ["cio", "network", "network_engineer"];
+  if (!allowedRoles.includes(req.user?.role)) {
+    return res.status(403).json({ error: "Network administrator access required" });
+  }
+  next();
+}
+
 function formatUser(user: any) {
   const { passwordHash: _, ...rest } = user;
   return rest;
