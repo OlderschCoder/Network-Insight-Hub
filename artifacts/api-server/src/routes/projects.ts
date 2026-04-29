@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, projectsTable, projectAssigneesTable, usersTable, risksTable } from "@workspace/db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 
@@ -57,8 +57,27 @@ async function enrichProject(id: number) {
   return { ...project, assignees, risks, createdByName };
 }
 
-router.get("/", requireAuth, async (_req, res) => {
-  const projects = await db.select().from(projectsTable).orderBy(desc(projectsTable.createdAt));
+router.get("/", requireAuth, async (req: any, res) => {
+  const isCIO = req.user?.role === "cio";
+  const userId: number = req.user.id;
+
+  let projects;
+  if (isCIO) {
+    projects = await db.select().from(projectsTable).orderBy(desc(projectsTable.createdAt));
+  } else {
+    const assignedRows = await db
+      .select({ projectId: projectAssigneesTable.projectId })
+      .from(projectAssigneesTable)
+      .where(eq(projectAssigneesTable.userId, userId));
+    const assignedIds = assignedRows.map((r) => r.projectId);
+    if (assignedIds.length === 0) return res.json([]);
+    projects = await db
+      .select()
+      .from(projectsTable)
+      .where(inArray(projectsTable.id, assignedIds))
+      .orderBy(desc(projectsTable.createdAt));
+  }
+
   if (projects.length === 0) return res.json([]);
   const ids = projects.map((p) => p.id);
   const allAssignees = await db
@@ -79,8 +98,24 @@ router.get("/", requireAuth, async (_req, res) => {
   );
 });
 
-router.get("/:id", requireAuth, async (req, res) => {
+router.get("/:id", requireAuth, async (req: any, res) => {
   const id = parseInt(req.params.id);
+  const isCIO = req.user?.role === "cio";
+  const userId: number = req.user.id;
+
+  if (!isCIO) {
+    const [assignee] = await db
+      .select()
+      .from(projectAssigneesTable)
+      .where(
+        and(
+          eq(projectAssigneesTable.projectId, id),
+          eq(projectAssigneesTable.userId, userId),
+        ),
+      );
+    if (!assignee) return res.status(403).json({ error: "Access denied" });
+  }
+
   const data = await enrichProject(id);
   if (!data) return res.status(404).json({ error: "Not found" });
   return res.json(data);
