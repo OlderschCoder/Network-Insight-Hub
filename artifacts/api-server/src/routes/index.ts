@@ -17,6 +17,7 @@ import processesRouter from "./processes";
 import projectsRouter from "./projects";
 import strategicObjectivesRouter from "./strategic_objectives";
 import azureVmsRouter from "./azure_vms";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use("/processes", processesRouter);
 router.use("/projects", projectsRouter);
 router.use("/strategic-objectives", strategicObjectivesRouter);
 router.use("/azure-vms", azureVmsRouter);
+router.use("/analytics", analyticsRouter);
 
 export default router;

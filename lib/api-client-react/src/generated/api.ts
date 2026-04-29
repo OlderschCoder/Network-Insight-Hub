@@ -21,7 +21,6 @@ import type {
   AfterActionReport,
   AggregateReport,
   AuthResponse,
-  RegisterResponse,
   AzureVm,
   AzureVmInput,
   ClearNetworkLayout200,
@@ -49,6 +48,7 @@ import type {
   ForgotPasswordBody,
   GetAggregateReportParams,
   GetRecentActivityParams,
+  GetUsageAnalyticsParams,
   HealthStatus,
   ListAfterActionReportsParams,
   ListAzureVmsParams,
@@ -67,6 +67,7 @@ import type {
   Project,
   ProjectBody,
   RegisterBody,
+  RegisterResponse,
   Report,
   ReportExtras,
   ReportTicketsResponse,
@@ -83,6 +84,7 @@ import type {
   UpdateReportBody,
   UpdateRiskBody,
   UpdateUserBody,
+  UsageAnalytics,
   User,
   Vlan,
   WeekStatus,
@@ -7359,6 +7361,103 @@ export function useGetWeekStatus<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetWeekStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary CIO-only usage analytics — who is using which features and how much.
+ */
+export const getGetUsageAnalyticsUrl = (params?: GetUsageAnalyticsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/analytics/usage?${stringifiedParams}`
+    : `/api/analytics/usage`;
+};
+
+export const getUsageAnalytics = async (
+  params?: GetUsageAnalyticsParams,
+  options?: RequestInit,
+): Promise<UsageAnalytics> => {
+  return customFetch<UsageAnalytics>(getGetUsageAnalyticsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetUsageAnalyticsQueryKey = (
+  params?: GetUsageAnalyticsParams,
+) => {
+  return [`/api/analytics/usage`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetUsageAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUsageAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetUsageAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getUsageAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetUsageAnalyticsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getUsageAnalytics>>
+  > = ({ signal }) => getUsageAnalytics(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUsageAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetUsageAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUsageAnalytics>>
+>;
+export type GetUsageAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary CIO-only usage analytics — who is using which features and how much.
+ */
+
+export function useGetUsageAnalytics<
+  TData = Awaited<ReturnType<typeof getUsageAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetUsageAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getUsageAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetUsageAnalyticsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

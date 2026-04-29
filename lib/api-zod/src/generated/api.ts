@@ -21,7 +21,6 @@ export const RegisterBody = zod.object({
   email: zod.string(),
   password: zod.string(),
   name: zod.string(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]),
   department: zod.string().optional(),
 });
 
@@ -38,8 +37,17 @@ export const LoginResponse = zod.object({
     id: zod.number(),
     email: zod.string(),
     name: zod.string(),
-    role: zod.enum(["cio", "helpdesk", "network", "security"]),
+    role: zod.enum([
+      "cio",
+      "helpdesk",
+      "network",
+      "security",
+      "network_engineer",
+      "security_engineer",
+      "staff",
+    ]),
     department: zod.string().optional(),
+    isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
   token: zod.string(),
@@ -52,8 +60,17 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]),
+  role: zod.enum([
+    "cio",
+    "helpdesk",
+    "network",
+    "security",
+    "network_engineer",
+    "security_engineer",
+    "staff",
+  ]),
   department: zod.string().optional(),
+  isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
 
@@ -94,8 +111,17 @@ export const ListUsersResponseItem = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]),
+  role: zod.enum([
+    "cio",
+    "helpdesk",
+    "network",
+    "security",
+    "network_engineer",
+    "security_engineer",
+    "staff",
+  ]),
   department: zod.string().optional(),
+  isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
@@ -108,8 +134,17 @@ export const GetUserResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]),
+  role: zod.enum([
+    "cio",
+    "helpdesk",
+    "network",
+    "security",
+    "network_engineer",
+    "security_engineer",
+    "staff",
+  ]),
   department: zod.string().optional(),
+  isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
 
@@ -119,16 +154,36 @@ export const UpdateUserParams = zod.object({
 
 export const UpdateUserBody = zod.object({
   name: zod.string().optional(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]).optional(),
+  role: zod
+    .enum([
+      "cio",
+      "helpdesk",
+      "network",
+      "security",
+      "network_engineer",
+      "security_engineer",
+      "staff",
+    ])
+    .optional(),
   department: zod.string().optional(),
+  isActive: zod.boolean().optional(),
 });
 
 export const UpdateUserResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
-  role: zod.enum(["cio", "helpdesk", "network", "security"]),
+  role: zod.enum([
+    "cio",
+    "helpdesk",
+    "network",
+    "security",
+    "network_engineer",
+    "security_engineer",
+    "staff",
+  ]),
   department: zod.string().optional(),
+  isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
 
@@ -2124,6 +2179,79 @@ export const GetWeekStatusResponse = zod.object({
       userRole: zod.string(),
       entryCount: zod.number(),
       isSubmitted: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary CIO-only usage analytics — who is using which features and how much.
+ */
+export const getUsageAnalyticsQueryDaysDefault = 30;
+export const getUsageAnalyticsQueryDaysMax = 365;
+
+export const GetUsageAnalyticsQueryParams = zod.object({
+  days: zod.coerce
+    .number()
+    .min(1)
+    .max(getUsageAnalyticsQueryDaysMax)
+    .default(getUsageAnalyticsQueryDaysDefault)
+    .describe("Look-back window in days (1-365). Default 30."),
+});
+
+export const GetUsageAnalyticsResponse = zod.object({
+  range: zod.object({
+    days: zod.number(),
+    start: zod.coerce.date(),
+    end: zod.coerce.date(),
+  }),
+  summary: zod.object({
+    totalContributions: zod.number(),
+    activeContributors: zod.number(),
+    totalUsers: zod.number(),
+  }),
+  perUser: zod.array(
+    zod.object({
+      userId: zod.number(),
+      name: zod.string(),
+      email: zod.string(),
+      role: zod.string(),
+      isActive: zod.boolean(),
+      counts: zod.object({
+        entries: zod.number(),
+        risks: zod.number(),
+        processes: zod.number(),
+        projects: zod.number(),
+        reports: zod.number(),
+        afterActions: zod.number(),
+        items: zod.number(),
+        azureVms: zod.number(),
+        objectives: zod.number(),
+      }),
+      total: zod.number(),
+    }),
+  ),
+  featureTotals: zod.object({
+    entries: zod.number(),
+    risks: zod.number(),
+    processes: zod.number(),
+    projects: zod.number(),
+    reports: zod.number(),
+    afterActions: zod.number(),
+    items: zod.number(),
+    azureVms: zod.number(),
+    objectives: zod.number(),
+  }),
+  roleBreakdown: zod.array(
+    zod.object({
+      role: zod.string(),
+      users: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  dailyActivity: zod.array(
+    zod.object({
+      day: zod.string(),
+      count: zod.number(),
     }),
   ),
 });

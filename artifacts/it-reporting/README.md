@@ -112,6 +112,7 @@ You see everything above, plus:
 |---|---|
 | **Projects** (`/projects`) | Create new projects with **+ New Project**, edit any field, link risks, assign team members, and delete projects you no longer need. Use **Print / PDF / Word** on a project detail page to share an executive snapshot. |
 | **Department Goals** (`/strategic-objectives`) | Create, rename, archive, or delete strategic objectives. Each project can be linked to one or more objectives. |
+| **Usage Analytics** (`/analytics`) | See **who is using what and how much** across the department. Pick a window (last 7 / 30 / 90 / 180 / 365 days) to see total contributions, active contributors, top contributor, most-used area, a daily activity chart, top-features and top-contributors charts, an activity-by-role table, and a sortable per-user breakdown across every feature (Weekly Log, Risks, Processes, Projects, Reports, Post-Incident Reviews, My Tasks, Azure VMs, Goals). Use **Export CSV** to download the per-user breakdown for the selected window. |
 | **Admin** (`/admin`) | Manage users — add new staff, change roles (CIO / Network Engineer / Security Engineer / Help Desk / Staff), or deactivate accounts when someone leaves. |
 
 ### Your home page is different

@@ -55,7 +55,7 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
 
   const updates: any = { ...parsed.data, updatedAt: new Date() };
 
-  if (isCIO && parsed.data.isActive === false) {
+  if (isCIO && (parsed.data as { isActive?: boolean }).isActive === false) {
     invalidateUserSessions(id);
   }
 

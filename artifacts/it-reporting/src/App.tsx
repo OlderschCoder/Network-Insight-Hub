@@ -39,6 +39,7 @@ import NewProject from "@/pages/projects/new";
 import ProjectDetail from "@/pages/projects/[id]";
 import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
 import AzureVms from "@/pages/azure-vms/index";
+import AnalyticsPage from "@/pages/analytics/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/processes/:id" component={() => <ProtectedRoute component={ProcessDetail} />} />
 
       <Route path="/admin" component={() => <ProtectedRoute component={Admin} adminOnly={true} />} />
+      <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} adminOnly={true} />} />
 
       <Route component={NotFound} />
     </Switch>

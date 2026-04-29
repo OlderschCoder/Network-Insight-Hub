@@ -21,6 +21,9 @@ export const UserRole = {
   helpdesk: "helpdesk",
   network: "network",
   security: "security",
+  network_engineer: "network_engineer",
+  security_engineer: "security_engineer",
+  staff: "staff",
 } as const;
 
 export interface User {
@@ -63,6 +66,9 @@ export const UpdateUserBodyRole = {
   helpdesk: "helpdesk",
   network: "network",
   security: "security",
+  network_engineer: "network_engineer",
+  security_engineer: "security_engineer",
+  staff: "staff",
 } as const;
 
 export interface UpdateUserBody {
@@ -923,6 +929,60 @@ export interface WeekStatus {
   submissions: WeekStatusSubmissionsItem[];
 }
 
+export interface UsageFeatureCounts {
+  entries: number;
+  risks: number;
+  processes: number;
+  projects: number;
+  reports: number;
+  afterActions: number;
+  items: number;
+  azureVms: number;
+  objectives: number;
+}
+
+export interface UsagePerUser {
+  userId: number;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  counts: UsageFeatureCounts;
+  total: number;
+}
+
+export interface UsageRoleBreakdown {
+  role: string;
+  users: number;
+  total: number;
+}
+
+export interface UsageDailyPoint {
+  day: string;
+  count: number;
+}
+
+export type UsageAnalyticsRange = {
+  days: number;
+  start: string;
+  end: string;
+};
+
+export type UsageAnalyticsSummary = {
+  totalContributions: number;
+  activeContributors: number;
+  totalUsers: number;
+};
+
+export interface UsageAnalytics {
+  range: UsageAnalyticsRange;
+  summary: UsageAnalyticsSummary;
+  perUser: UsagePerUser[];
+  featureTotals: UsageFeatureCounts;
+  roleBreakdown: UsageRoleBreakdown[];
+  dailyActivity: UsageDailyPoint[];
+}
+
 export type ForgotPasswordBody = {
   email: string;
 };
@@ -1096,4 +1156,13 @@ export type ListAfterActionReportsParams = {
 
 export type GetRecentActivityParams = {
   limit?: number;
+};
+
+export type GetUsageAnalyticsParams = {
+  /**
+   * Look-back window in days (1-365). Default 30.
+   * @minimum 1
+   * @maximum 365
+   */
+  days?: number;
 };

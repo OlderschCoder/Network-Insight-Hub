@@ -53,6 +53,7 @@ import {
   LogOut,
   Zap,
   Cloud,
+  BarChart3,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
@@ -289,6 +290,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     items: [
       { href: "/projects", label: "Projects", icon: Briefcase },
       { href: "/strategic-objectives", label: "Department Goals", icon: Target },
+      { href: "/analytics", label: "Usage Analytics", icon: BarChart3 },
       { href: "/admin", label: "Admin", icon: Users },
     ],
   };

@@ -64,7 +64,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/RegisterResponse"
         "400":
           description: Bad request
           content:
@@ -1839,6 +1839,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/WeekStatus"
 
+  # ANALYTICS
+  /analytics/usage:
+    get:
+      operationId: getUsageAnalytics
+      tags: [analytics]
+      summary: CIO-only usage analytics — who is using which features and how much.
+      parameters:
+        - name: days
+          in: query
+          description: Look-back window in days (1-365). Default 30.
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAnalytics"
+
 components:
   schemas:
     HealthStatus:
@@ -1868,9 +1891,11 @@ components:
           type: string
         role:
           type: string
-          enum: [cio, helpdesk, network, security]
+          enum: [cio, helpdesk, network, security, network_engineer, security_engineer, staff]
         department:
           type: string
+        isActive:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -1885,12 +1910,18 @@ components:
           type: string
         name:
           type: string
-        role:
-          type: string
-          enum: [cio, helpdesk, network, security]
         department:
           type: string
-      required: [email, password, name, role]
+      required: [email, password, name]
+
+    RegisterResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required: [user, message]
 
     LoginBody:
       type: object
@@ -1917,9 +1948,11 @@ components:
           type: string
         role:
           type: string
-          enum: [cio, helpdesk, network, security]
+          enum: [cio, helpdesk, network, security, network_engineer, security_engineer, staff]
         department:
           type: string
+        isActive:
+          type: boolean
 
     Entry:
       type: object
@@ -3191,3 +3224,107 @@ components:
                 type: boolean
             required: [userId, userName, userRole, entryCount, isSubmitted]
       required: [weekOf, isFinalized, submissions]
+
+    UsageFeatureCounts:
+      type: object
+      properties:
+        entries:
+          type: integer
+        risks:
+          type: integer
+        processes:
+          type: integer
+        projects:
+          type: integer
+        reports:
+          type: integer
+        afterActions:
+          type: integer
+        items:
+          type: integer
+        azureVms:
+          type: integer
+        objectives:
+          type: integer
+      required:
+        [entries, risks, processes, projects, reports, afterActions, items, azureVms, objectives]
+
+    UsagePerUser:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        isActive:
+          type: boolean
+        counts:
+          $ref: "#/components/schemas/UsageFeatureCounts"
+        total:
+          type: integer
+      required: [userId, name, email, role, isActive, counts, total]
+
+    UsageRoleBreakdown:
+      type: object
+      properties:
+        role:
+          type: string
+        users:
+          type: integer
+        total:
+          type: integer
+      required: [role, users, total]
+
+    UsageDailyPoint:
+      type: object
+      properties:
+        day:
+          type: string
+        count:
+          type: integer
+      required: [day, count]
+
+    UsageAnalytics:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            days:
+              type: integer
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+          required: [days, start, end]
+        summary:
+          type: object
+          properties:
+            totalContributions:
+              type: integer
+            activeContributors:
+              type: integer
+            totalUsers:
+              type: integer
+          required: [totalContributions, activeContributors, totalUsers]
+        perUser:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsagePerUser"
+        featureTotals:
+          $ref: "#/components/schemas/UsageFeatureCounts"
+        roleBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageRoleBreakdown"
+        dailyActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageDailyPoint"
+      required: [range, summary, perUser, featureTotals, roleBreakdown, dailyActivity]
