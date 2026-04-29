@@ -44,7 +44,6 @@ externalPort = 3001
 [userenv.shared]
 ZENDESK_SUBDOMAIN = "sccc"
 ZENDESK_EMAIL = "mark.bojeun@sccc.edu"
-ZENDESK_API_TOKEN = "wgK3x6CeKHRe14ip42pQ8CzwhtYLU2vEQkIscsGr"
 
 [nix]
 channel = "stable-25_05"
