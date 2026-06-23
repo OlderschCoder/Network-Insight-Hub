@@ -40,6 +40,7 @@ import ProjectDetail from "@/pages/projects/[id]";
 import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
 import AzureVms from "@/pages/azure-vms/index";
 import AnalyticsPage from "@/pages/analytics/index";
+import DesignSystem from "@/pages/design-system/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +81,8 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
 function Router() {
   return (
     <Switch>
+      <Route path="/design-system" component={DesignSystem} />
+
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />

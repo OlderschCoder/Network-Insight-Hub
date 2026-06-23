@@ -64,6 +64,19 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* SCCC Brand Design System — registered so utilities like bg-forest, text-brand, border-line work */
+  --color-forest: var(--forest);
+  --color-forest-2: var(--forest-2);
+  --color-brand: var(--brand-accent);
+  --color-brand-soft: var(--brand-accent-soft);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --radius-brand: var(--brand-radius);
+  --shadow-brand: var(--brand-shadow);
 }
 
 /* LIGHT MODE */
@@ -116,6 +129,20 @@
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
+
+  /* SCCC Brand Design System — raw values */
+  --forest: #14361F;
+  --forest-2: #1B4332;
+  --brand-accent: #2FAE6B;
+  --brand-accent-soft: #6FD6A6;
+  --paper: #F6F8F7;
+  --surface: #FFFFFF;
+  --ink: #0B1220;
+  --ink-muted: #5A6472;
+  --line: #E5E8EC;
+  --brand-radius: 10px;
+  --brand-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+
   --radius: .5rem; /* 8px */
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);

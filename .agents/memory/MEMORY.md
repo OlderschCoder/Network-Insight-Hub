@@ -1,0 +1,1 @@
+- [it-reporting frontend](it-reporting-frontend.md) — Tailwind v4 CSS-first (no tailwind.config.js); brand design system in src/components/system/, additive to shadcn tokens.

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brand Systems — Dr. Mark Bojeun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#0b0e14;color:#e6e8ec;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:56px 24px 80px}
+  .doc-head{margin-bottom:8px;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#8b93a3}
+  .doc-title{font-family:'Playfair Display',serif;font-size:42px;font-weight:700;letter-spacing:-.01em;margin-bottom:10px}
+  .doc-sub{color:#9aa3b2;max-width:640px;margin-bottom:48px}
+
+  .system{border-radius:18px;overflow:hidden;margin-bottom:40px;border:1px solid rgba(255,255,255,.06)}
+  .sys-banner{padding:40px 40px 34px}
+  .eyebrow{font-size:12px;letter-spacing:.24em;text-transform:uppercase;font-weight:600;opacity:.85}
+  .sys-name{font-size:34px;font-weight:700;letter-spacing:-.01em;margin:10px 0 6px}
+  .sys-tag{opacity:.7;font-size:15px}
+  .sys-body{padding:34px 40px 40px;background:#10151e}
+
+  .row{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:30px}
+  .swatch{flex:1;min-width:120px;border-radius:12px;height:88px;display:flex;align-items:flex-end;padding:10px 12px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.08)}
+  .swatch small{display:block;font-weight:400;opacity:.75;font-size:11px}
+
+  .label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#7f8798;margin-bottom:14px;font-weight:600}
+  .type-block{margin-bottom:30px}
+
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.demo{grid-template-columns:1fr}.doc-title{font-size:34px}}
+  .card{border-radius:14px;padding:22px;border:1px solid}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-weight:600;font-size:14px;border:1px solid transparent;cursor:pointer}
+  .btn-ghost{background:transparent}
+  .badge{display:inline-flex;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600}
+  .stat{font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+  pre{background:#070a0f;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;overflow-x:auto;font-size:12.5px;line-height:1.7;color:#c4ccd9;margin-top:8px}
+  pre .v{color:#7fd1a8}
+  pre .k{color:#8aa9d6}
+
+  /* ---------- PERSONAL: Mark Bojeun ---------- */
+  .mb .sys-banner{background:linear-gradient(135deg,#0e1626 0%,#1a2540 100%)}
+  .mb .eyebrow{color:#c6a15b}
+  .mb .sys-name{font-family:'Playfair Display',serif;color:#f2f0ea}
+  .mb .sys-tag{color:#aeb6c6}
+  .mb .display{font-family:'Playfair Display',serif}
+  .mb .card{background:#0e1626;border-color:#243049}
+  .mb .card h4{font-family:'Playfair Display',serif;font-weight:600;font-size:19px;margin-bottom:6px;color:#f2f0ea}
+  .mb .card p{color:#9aa6b8;font-size:14px}
+  .mb .btn-primary{background:#c6a15b;color:#10151e}
+  .mb .btn-ghost{border-color:#3a4663;color:#e6e8ec}
+  .mb .badge{background:rgba(198,161,91,.16);color:#d8be86}
+  .mb .stat{color:#c6a15b}
+
+  /* ---------- SCCC ---------- */
+  .sccc .sys-banner{background:linear-gradient(135deg,#0f2f1c 0%,#1b4332 100%)}
+  .sccc .eyebrow{color:#6fd6a6}
+  .sccc .sys-name{color:#fff;font-weight:700}
+  .sccc .sys-tag{color:#bcd8c8}
+  .sccc .sys-body{background:#f6f8f7;color:#0b1220}
+  .sccc .label{color:#5a6472}
+  .sccc .card{background:#fff;border-color:#e5e8ec}
+  .sccc .card h4{font-weight:600;font-size:18px;margin-bottom:6px;color:#0b1220}
+  .sccc .card p{color:#5a6472;font-size:14px}
+  .sccc .btn-primary{background:#2fae6b;color:#fff}
+  .sccc .btn-ghost{border-color:#cfd6dc;color:#0b1220}
+  .sccc .badge{background:rgba(47,174,107,.14);color:#1b7a4b}
+  .sccc .stat{color:#1b7a4b}
+  .sccc pre{background:#0d1f16;color:#cfe7da}
+
+  /* maker mark */
+  .mark{display:flex;align-items:center;gap:12px;margin-top:6px}
+  .monogram{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;font-family:'Playfair Display',serif;font-weight:700;font-size:16px}
+  .mb .monogram{background:#c6a15b;color:#10151e}
+  .sccc .monogram{background:#1b4332;color:#6fd6a6}
+  .mark-txt{font-size:13px}
+  .mb .mark-txt{color:#9aa6b8}
+  .sccc .mark-txt{color:#5a6472}
+
+  .note{background:#10151e;border:1px solid rgba(255,255,255,.07);border-left:3px solid #c6a15b;border-radius:10px;padding:18px 22px;color:#aeb6c6;font-size:14px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="doc-head">Brand Systems</div>
+  <div class="doc-title">Two houses, one signature</div>
+  <p class="doc-sub">A ready-to-use look for everything you build. Personal projects wear the <strong style="color:#c6a15b">Mark Bojeun</strong> identity; Seward projects wear the <strong style="color:#6fd6a6">SCCC</strong> identity. Both share the same bones — type scale, spacing, components — so any AI tool can apply them consistently, and both carry your maker's mark.</p>
+
+  <!-- ========== PERSONAL ========== -->
+  <section class="system mb">
+    <div class="sys-banner">
+      <div class="eyebrow">Personal Brand</div>
+      <div class="sys-name">Dr. Mark Bojeun</div>
+      <div class="sys-tag">Leadership &amp; AI · executive, considered, premium</div>
+    </div>
+    <div class="sys-body">
+      <div class="label">Palette</div>
+      <div class="row">
+        <div class="swatch" style="background:#0e1626;color:#fff">Ink<small>#0E1626</small></div>
+        <div class="swatch" style="background:#1a2540;color:#fff">Surface<small>#1A2540</small></div>
+        <div class="swatch" style="background:#c6a15b;color:#10151e">Gold · accent<small>#C6A15B</small></div>
+        <div class="swatch" style="background:#d8be86;color:#10151e">Gold soft<small>#D8BE86</small></div>
+        <div class="swatch" style="background:#f4f1ea;color:#10151e">Paper<small>#F4F1EA</small></div>
+      </div>
+
+      <div class="type-block">
+        <div class="label">Type — Playfair Display + Inter</div>
+        <div class="display" style="font-size:38px;font-weight:700;letter-spacing:-.01em;color:#f2f0ea">Conscious influence.</div>
+        <div style="font-size:15px;color:#9aa6b8;margin-top:8px;max-width:560px">Body copy is Inter — clean and quiet so the serif headlines carry the personality. One accent (gold), used sparingly, signals what matters.</div>
+      </div>
+
+      <div class="label">Components</div>
+      <div class="demo">
+        <div class="card">
+          <h4>Awakening Leadership</h4>
+          <p>A grounded, strategic guide for leading with clarity and purpose.</p>
+          <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-primary">Order now</button>
+            <button class="btn btn-ghost">Learn more</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:8px;margin-bottom:14px"><span class="badge">Advisory</span><span class="badge">Speaking</span></div>
+          <div class="stat" style="font-size:40px">200+</div>
+          <p style="margin-top:2px">Leaders advised across higher-ed and enterprise.</p>
+          <div class="mark"><div class="monogram">MB</div><div class="mark-txt">Built by Dr. Mark Bojeun</div></div>
+        </div>
+      </div>
+
+      <pre><span class="k">:root</span> {
+  --ink: <span class="v">#0E1626</span>;        --surface: <span class="v">#1A2540</span>;
+  --accent: <span class="v">#C6A15B</span>;     --accent-soft: <span class="v">#D8BE86</span>;
+  --paper: <span class="v">#F4F1EA</span>;      --line: <span class="v">#243049</span>;
+  --text: <span class="v">#ECEFF4</span>;       --text-muted: <span class="v">#9AA6B8</span>;
+  --font-display: <span class="v">'Playfair Display', serif</span>;
+  --font-body: <span class="v">'Inter', sans-serif</span>;
+  --radius: <span class="v">10px</span>;          --shadow: <span class="v">0 4px 14px rgba(0,0,0,.18)</span>;
+}</pre>
+    </div>
+  </section>
+
+  <!-- ========== SCCC ========== -->
+  <section class="system sccc">
+    <div class="sys-banner">
+      <div class="eyebrow">Institutional · Work</div>
+      <div class="sys-name">Seward County Community College</div>
+      <div class="sys-tag">Saints green · clean, trustworthy, operational</div>
+    </div>
+    <div class="sys-body">
+      <div class="label">Palette</div>
+      <div class="row">
+        <div class="swatch" style="background:#14361f;color:#fff">Forest<small>#14361F</small></div>
+        <div class="swatch" style="background:#1b4332;color:#fff">Forest 2<small>#1B4332</small></div>
+        <div class="swatch" style="background:#2fae6b;color:#fff">Emerald · accent<small>#2FAE6B</small></div>
+        <div class="swatch" style="background:#6fd6a6;color:#0b1220">Mint soft<small>#6FD6A6</small></div>
+        <div class="swatch" style="background:#fff;color:#0b1220">Surface<small>#FFFFFF</small></div>
+      </div>
+
+      <div class="type-block">
+        <div class="label">Type — Inter throughout</div>
+        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;color:#0b1220">Built for Saints.</div>
+        <div style="font-size:15px;color:#5a6472;margin-top:8px;max-width:560px">Institutional tools should read as calm and reliable. One clean sans, tight headings, lots of white space, emerald used only for actions and live status.</div>
+      </div>
+
+      <div class="label">Components</div>
+      <div class="demo">
+        <div class="card">
+          <h4>Technology Support</h4>
+          <p>Your go-to resource for tech help, tools, and innovation.</p>
+          <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-primary">Get support</button>
+            <button class="btn btn-ghost">Browse services</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:8px;margin-bottom:14px"><span class="badge">● Operational</span><span class="badge">IT Infrastructure</span></div>
+          <div class="stat" style="font-size:40px">31 / 33</div>
+          <p style="margin-top:2px">Switches online · all systems nominal.</p>
+          <div class="mark"><div class="monogram">MB</div><div class="mark-txt">Built by Dr. Mark Bojeun · SCCC IT</div></div>
+        </div>
+      </div>
+
+      <pre><span class="k">:root</span> {
+  --forest: <span class="v">#14361F</span>;      --forest-2: <span class="v">#1B4332</span>;
+  --accent: <span class="v">#2FAE6B</span>;      --accent-soft: <span class="v">#6FD6A6</span>;
+  --bg: <span class="v">#F6F8F7</span>;          --surface: <span class="v">#FFFFFF</span>;
+  --text: <span class="v">#0B1220</span>;        --text-muted: <span class="v">#5A6472</span>;
+  --line: <span class="v">#E5E8EC</span>;
+  --font-display: <span class="v">'Inter', sans-serif</span>;
+  --font-body: <span class="v">'Inter', sans-serif</span>;
+  --radius: <span class="v">10px</span>;          --shadow: <span class="v">0 1px 2px rgba(0,0,0,.06)</span>;
+}</pre>
+    </div>
+  </section>
+
+  <div class="note">
+    <strong style="color:#d8be86">Your signature on everything:</strong> the <strong>MB monogram</strong> + a one-line footer credit (“Built by Dr. Mark Bojeun”). It changes color to suit the house — gold on personal, deep green on SCCC — but the mark and the type discipline are constant. That’s what makes a portfolio of 13 different apps feel like one author made them.
+  </div>
+</div>
+</body>
+</html>
