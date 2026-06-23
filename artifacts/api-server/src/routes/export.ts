@@ -758,6 +758,9 @@ router.post("/entry/:id/zendesk", requireAuth, async (req: any, res) => {
 
   const [entry] = await db.select().from(entriesTable).where(eq(entriesTable.id, id));
   if (!entry) return res.status(404).json({ error: "Not found" });
+  if (req.user.role !== "cio" && entry.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, entry.userId));
 
