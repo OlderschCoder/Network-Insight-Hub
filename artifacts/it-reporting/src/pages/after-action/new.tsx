@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type FormData = {
   title: string;
@@ -31,6 +32,7 @@ type FormData = {
 };
 
 export default function NewAfterAction() {
+  const confirm = useConfirm();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createMutation = useCreateAfterActionReport();
@@ -104,9 +106,12 @@ export default function NewAfterAction() {
     if (!zendeskTicketId || isRefreshing) return;
     const current = (watch("timeline") || "").trim();
     if (current.length > 0) {
-      const ok = window.confirm(
-        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
-      );
+      const ok = await confirm({
+        title: "Replace the current timeline?",
+        description:
+          "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost.",
+        confirmText: "Replace",
+      });
       if (!ok) return;
     }
     setIsRefreshing(true);
