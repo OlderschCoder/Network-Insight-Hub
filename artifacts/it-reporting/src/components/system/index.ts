@@ -24,3 +24,4 @@ export { Badge, StatusPill, badgeVariants } from "./Badge";
 export type { BadgeProps } from "./Badge";
 export { Stat } from "./Stat";
 export { Signature, Monogram } from "./Signature";
+export { Logo } from "./Logo";

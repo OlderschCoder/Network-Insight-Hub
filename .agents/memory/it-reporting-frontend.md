@@ -13,3 +13,7 @@ description: Styling/theming setup gotchas for the it-reporting React app and wh
   - The app ALSO has a separate shadcn token set (`--primary`, `--background`, etc.) driving `src/components/ui/*` and existing pages. The brand tokens are additive and do NOT remap the shadcn tokens, so existing pages stay visually unchanged until explicitly refactored.
 
 - Footer signature on brand pages: green "MB" monogram + "Built by Dr. Mark Bojeun · SCCC IT" (see `system/Signature.tsx`).
+
+- **Ground brand work in SCCC's REAL identity, not brief hex guesses.** SCCC (Saints, Liberal KS) institutional brand is GREEN: deep pine `#034638`, Saints emerald `#006747` (primary/links/actions), bright `#61CE70` (CTA/live), white bg, Lato typeface. Logo assets live in `src/assets/brand/` (`sccc-logo.png` color, `sccc-logo-white.png` for dark bg).
+  - **Why:** a brief once supplied generic emerald hexes and the app didn't feel like SCCC; the user pushed back. A web search even mis-reported "blue & gold" (that's the athletics secondary). The live site `sccc.edu` is the source of truth and is green.
+  - **How to apply:** for any SCCC branding, verify against `sccc.edu` (extract_branding) and use the green tokens + real logo. App currently uses Inter (per brief) though SCCC's actual font is Lato — switch only if asked.
