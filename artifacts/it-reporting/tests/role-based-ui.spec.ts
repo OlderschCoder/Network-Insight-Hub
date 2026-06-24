@@ -40,7 +40,9 @@ async function loginAndGoHome(page: Page, token: string) {
     } catch {}
   }, token);
   await page.goto("/");
-  await expect(page.getByText("SCCC IT HUB")).toBeVisible();
+  await expect(
+    page.getByAltText("Seward County Community College").first(),
+  ).toBeVisible();
 }
 
 test.describe("Role-based UI visibility", () => {
