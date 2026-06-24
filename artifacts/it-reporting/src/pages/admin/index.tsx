@@ -16,11 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Users, Shield } from "lucide-react";
 
 const roleColor: Record<string, string> = {
-  cio: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  network_engineer: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  security_engineer: "bg-red-500/20 text-red-300 border-red-500/30",
-  helpdesk: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  staff: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  cio: "bg-purple-500/10 text-purple-700 border-purple-200",
+  network_engineer: "bg-blue-500/10 text-blue-700 border-blue-200",
+  security_engineer: "bg-red-500/10 text-red-700 border-red-200",
+  helpdesk: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  staff: "bg-muted text-muted-foreground border-border",
 };
 
 const roleLabels: Record<string, string> = {

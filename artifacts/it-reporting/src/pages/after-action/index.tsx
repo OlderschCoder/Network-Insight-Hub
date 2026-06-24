@@ -7,9 +7,9 @@ import { format } from "date-fns";
 import { Plus, ChevronRight, FileText } from "lucide-react";
 
 const outcomeColor: Record<string, string> = {
-  success: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  partial: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  failure: "bg-red-500/20 text-red-300 border-red-500/30",
+  success: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  partial: "bg-amber-500/10 text-amber-700 border-amber-200",
+  failure: "bg-red-500/10 text-red-700 border-red-200",
 };
 
 export default function AfterAction() {

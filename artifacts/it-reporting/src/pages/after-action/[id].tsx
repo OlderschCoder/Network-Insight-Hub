@@ -16,10 +16,10 @@ import { ArrowLeft, Download, ExternalLink, Pencil, Save, X } from "lucide-react
 import { useEffect, useState } from "react";
 
 const severityColor: Record<string, string> = {
-  low: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  medium: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  high: "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  critical: "bg-red-500/20 text-red-300 border-red-500/30",
+  low: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  medium: "bg-amber-500/10 text-amber-700 border-amber-200",
+  high: "bg-orange-500/10 text-orange-700 border-orange-200",
+  critical: "bg-red-500/10 text-red-700 border-red-200",
 };
 
 const FIELDS: Array<{ key: string; label: string; rows?: number }> = [
@@ -127,7 +127,7 @@ export default function AfterActionDetail() {
             >
               <Badge
                 variant="outline"
-                className="bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30 cursor-pointer gap-1"
+                className="bg-sky-500/10 text-sky-700 border-sky-200 hover:bg-sky-500/10 cursor-pointer gap-1"
               >
                 Zendesk #{r.zendeskTicketId}
                 <ExternalLink className="h-3 w-3" />
@@ -136,7 +136,7 @@ export default function AfterActionDetail() {
           ) : (
             <Badge
               variant="outline"
-              className="bg-sky-500/20 text-sky-300 border-sky-500/30"
+              className="bg-sky-500/10 text-sky-700 border-sky-200"
               data-testid="badge-zendesk-ticket"
             >
               Zendesk #{r.zendeskTicketId}

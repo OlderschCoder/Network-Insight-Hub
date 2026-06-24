@@ -1065,7 +1065,7 @@ export default function ReportDetail() {
                         <Link href={`/projects/${proj.id}`}>
                           <Badge
                             variant="outline"
-                            className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-400/30 hover:bg-amber-500/20 cursor-pointer"
+                            className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-200 hover:bg-amber-500/10 cursor-pointer"
                           >
                             Blocking: {proj.title}
                           </Badge>

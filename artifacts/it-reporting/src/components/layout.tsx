@@ -28,6 +28,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { useState } from "react";
 import {
@@ -309,8 +310,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen bg-background w-full">
         <Sidebar className="border-r border-sidebar-border">
           <SidebarContent>
-            <div className="p-4 font-bold text-lg tracking-tight text-sidebar-foreground border-b border-sidebar-border">
-              SCCC IT HUB
+            <div className="p-4 border-b border-sidebar-border">
+              <Logo variant="white" className="h-7" />
             </div>
             {groups.map((group) => (
               <SidebarGroup key={group.label}>
@@ -358,8 +359,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-6 bg-background">
-            {children}
+          <div className="flex-1 overflow-auto bg-background">
+            <div className="p-6">{children}</div>
+            <footer className="border-t border-border px-6 py-4">
+              <Signature />
+            </footer>
           </div>
         </main>
       </div>

@@ -52,18 +52,18 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const statusColor: Record<string, string> = {
-  online: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  offline: "bg-red-500/20 text-red-300 border-red-500/30",
-  unknown: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  online: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  offline: "bg-red-500/10 text-red-700 border-red-200",
+  unknown: "bg-muted text-muted-foreground border-border",
 };
 
 const vlanTypeColor: Record<string, string> = {
-  data: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  voice: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  management: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  security: "bg-red-500/20 text-red-300 border-red-500/30",
-  ospf: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  other: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  data: "bg-blue-500/10 text-blue-700 border-blue-200",
+  voice: "bg-purple-500/10 text-purple-700 border-purple-200",
+  management: "bg-amber-500/10 text-amber-700 border-amber-200",
+  security: "bg-red-500/10 text-red-700 border-red-200",
+  ospf: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  other: "bg-muted text-muted-foreground border-border",
 };
 
 const matchSwitch = (s: NetworkSwitch, q: string) =>
@@ -286,7 +286,7 @@ function MaintenanceLogEntryRow({
         </span>
         <span>{formatLogTimestamp(entry.createdAt)}</span>
         {(entry.windowStart || entry.windowEnd) && !editing && (
-          <span className="text-amber-300 normal-case tracking-normal">
+          <span className="text-amber-700 normal-case tracking-normal">
             window: {formatLogTimestamp(entry.windowStart)}
             {entry.windowEnd ? ` → ${formatLogTimestamp(entry.windowEnd)}` : ""}
           </span>
@@ -310,7 +310,7 @@ function MaintenanceLogEntryRow({
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 px-1 text-[10px] text-red-300 hover:text-red-200"
+              className="h-5 px-1 text-[10px] text-red-700 hover:text-red-800"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="h-3 w-3 mr-1" />
@@ -1131,7 +1131,7 @@ function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => 
           </div>
           {vlan.description && <p className="text-xs text-muted-foreground mt-0.5">{vlan.description}</p>}
           {vlan.subnet && (
-            <p className="font-mono text-xs text-emerald-400 mt-0.5">
+            <p className="font-mono text-xs text-emerald-700 mt-0.5">
               {vlan.subnet}{vlan.gateway && ` via ${vlan.gateway}`}
             </p>
           )}
@@ -1289,7 +1289,7 @@ function AskAIPanel({
               </div>
             )}
             {error && (
-              <div className="text-xs text-red-400 border border-red-500/30 bg-red-500/10 rounded p-2">
+              <div className="text-xs text-red-700 border border-red-200 bg-red-500/10 rounded p-2">
                 {error}
               </div>
             )}
@@ -1336,7 +1336,7 @@ function CloudRemotePanel() {
           <AccordionItem value="azure" className="border rounded-md px-3 bg-card">
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
-                <Cloud className="h-4 w-4 text-sky-400" />
+                <Cloud className="h-4 w-4 text-sky-700" />
                 <span className="font-medium">Microsoft Azure — Hybrid-VNet (Central US)</span>
                 <Badge variant="outline" className="ml-auto text-xs">RG-Prod-CentralUS</Badge>
               </div>
@@ -1347,20 +1347,20 @@ function CloudRemotePanel() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VNet</p>
                   <p><span className="text-muted-foreground">Name:</span> <span className="font-mono">Hybrid-VNet</span></p>
                   <p><span className="text-muted-foreground">Region:</span> centralus</p>
-                  <p><span className="text-muted-foreground">Address space:</span> <span className="font-mono text-emerald-400">10.0.0.0/24, 10.3.0.0/27</span></p>
+                  <p><span className="text-muted-foreground">Address space:</span> <span className="font-mono text-emerald-700">10.0.0.0/24, 10.3.0.0/27</span></p>
                   <p><span className="text-muted-foreground">Peering:</span> none configured</p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key subnets</p>
-                  <p><span className="font-mono">GatewaySubnet</span> — <span className="font-mono text-emerald-400">10.0.0.224/27</span> (Hybrid-VPNGateway)</p>
-                  <p><span className="font-mono">Hybrid_default</span> — <span className="font-mono text-emerald-400">10.0.0.0/25</span> (workloads, NAT, PEs)</p>
+                  <p><span className="font-mono">GatewaySubnet</span> — <span className="font-mono text-emerald-700">10.0.0.224/27</span> (Hybrid-VPNGateway)</p>
+                  <p><span className="font-mono">Hybrid_default</span> — <span className="font-mono text-emerald-700">10.0.0.0/25</span> (workloads, NAT, PEs)</p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VPN</p>
                   <p><span className="font-mono">Hybrid-VPNGateway</span> — RouteBased, Gen2, Active/Active (VpnGw2AZ)</p>
                   <p><span className="font-mono">S2S-OnPrem</span> — Connected → <span className="font-mono">OnPrem-LNG</span></p>
                   <p><span className="font-mono">OnPrem-SNAT</span>: 10.1.0.0/24 → 172.20.1.0/26 (egress)</p>
-                  <p className="text-xs text-amber-400/80"><span className="font-mono">Azure_Ipsec</span> on VNG_NEW — <strong>NotConnected</strong> (separate path)</p>
+                  <p className="text-xs text-amber-700"><span className="font-mono">Azure_Ipsec</span> on VNG_NEW — <strong>NotConnected</strong> (separate path)</p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Routes (RT-To-Onprem)</p>
@@ -1382,7 +1382,7 @@ function CloudRemotePanel() {
                   <p className="text-xs font-mono">Hybrid-TEST01-vnet · 104_VNET · vnet-prod-web · vnet_NEW · aadds-vnet (SCCC_DOMAIN_SERVICES) · test-gateway-vnet · TestVM01-vnet · test-wsus-vnet</p>
                 </div>
               </div>
-              <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+              <div className="rounded border border-amber-200 bg-amber-500/5 p-3 text-xs text-muted-foreground">
                 Snapshot is point-in-time from the last <span className="font-mono">azure_visualizer.ps1</span> export.
                 Re-run that script (PowerShell, requires <span className="font-mono">az login</span> and the
                 <span className="font-mono"> resource-graph</span> extension) to refresh.
@@ -1393,7 +1393,7 @@ function CloudRemotePanel() {
           <AccordionItem value="west" className="border rounded-md px-3 bg-card">
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
-                <Radio className="h-4 w-4 text-amber-400" />
+                <Radio className="h-4 w-4 text-amber-700" />
                 <span className="font-medium">West Campus — IPsec site (172.25.0.0/21)</span>
                 <Badge variant="outline" className="ml-auto text-xs">VPN-only</Badge>
               </div>
@@ -1402,11 +1402,11 @@ function CloudRemotePanel() {
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded border bg-background/40 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Addressing</p>
-                  <p><span className="font-mono text-emerald-400">172.25.0.0/21</span> — West aggregate (FortiGate Phase 2 Vlan_910_915, Azure OnPrem-LNG)</p>
-                  <p><span className="font-mono">VLAN 910</span> — <span className="font-mono text-emerald-400">172.25.1.0/24</span> (West_17225_to_Azure)</p>
-                  <p><span className="font-mono">West_Wired</span> — <span className="font-mono text-emerald-400">172.25.0.0/24</span></p>
-                  <p><span className="font-mono">West_Wireless</span> — <span className="font-mono text-emerald-400">10.11.16.0/24</span></p>
-                  <p className="text-xs text-amber-400/80">FortiGate <span className="font-mono">West_All</span> may exclude 172.25.1.0/24 — Vlan_910 sources can miss policies that use it.</p>
+                  <p><span className="font-mono text-emerald-700">172.25.0.0/21</span> — West aggregate (FortiGate Phase 2 Vlan_910_915, Azure OnPrem-LNG)</p>
+                  <p><span className="font-mono">VLAN 910</span> — <span className="font-mono text-emerald-700">172.25.1.0/24</span> (West_17225_to_Azure)</p>
+                  <p><span className="font-mono">West_Wired</span> — <span className="font-mono text-emerald-700">172.25.0.0/24</span></p>
+                  <p><span className="font-mono">West_Wireless</span> — <span className="font-mono text-emerald-700">10.11.16.0/24</span></p>
+                  <p className="text-xs text-amber-700">FortiGate <span className="font-mono">West_All</span> may exclude 172.25.1.0/24 — Vlan_910 sources can miss policies that use it.</p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Connectivity</p>
@@ -1416,7 +1416,7 @@ function CloudRemotePanel() {
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tunnel runtime (last reviewed)</p>
-                  <p><span className="font-mono">West_FGT</span>: ~28 Phase 2 selectors, 14 up; <span className="text-amber-400">~240k TX errors flagged</span> — investigate MTU / path.</p>
+                  <p><span className="font-mono">West_FGT</span>: ~28 Phase 2 selectors, 14 up; <span className="text-amber-700">~240k TX errors flagged</span> — investigate MTU / path.</p>
                   <p><span className="font-mono">Azure-SCCC2</span>: 56 selectors, 33 up (not all SAs up at once is normal).</p>
                   <p>Phase 2 names: <span className="font-mono">West_17225_to_Azure</span> (172.25.1.0/24 → Azure), <span className="font-mono">Vlan_910_915</span> (172.25.0.0/21 → Azure).</p>
                 </div>
@@ -1433,7 +1433,7 @@ function CloudRemotePanel() {
           <AccordionItem value="epworth" className="border rounded-md px-3 bg-card">
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
-                <Radio className="h-4 w-4 text-emerald-400" />
+                <Radio className="h-4 w-4 text-emerald-700" />
                 <span className="font-medium">Epworth — dark fiber / OSPF site</span>
                 <Badge variant="outline" className="ml-auto text-xs">L2/L3 extended</Badge>
               </div>

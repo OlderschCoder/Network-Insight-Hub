@@ -13,23 +13,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 const severityColor: Record<string, string> = {
-  critical: "bg-red-600/20 text-red-300 border-red-500/30",
-  high: "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  medium: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-  low: "bg-green-500/20 text-green-300 border-green-500/30",
+  critical: "bg-red-500/10 text-red-700 border-red-200",
+  high: "bg-orange-500/10 text-orange-700 border-orange-200",
+  medium: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
+  low: "bg-green-500/10 text-green-700 border-green-200",
 };
 
 const typeColor: Record<string, string> = {
-  risk: "bg-red-500/10 text-red-400 border-red-400/20",
-  issue: "bg-amber-500/10 text-amber-400 border-amber-400/20",
-  design: "bg-blue-500/10 text-blue-400 border-blue-400/20",
+  risk: "bg-red-500/10 text-red-700 border-red-200",
+  issue: "bg-amber-500/10 text-amber-700 border-amber-200",
+  design: "bg-blue-500/10 text-blue-700 border-blue-200",
 };
 
 const probabilityColor: Record<string, string> = {
-  critical: "bg-purple-600/20 text-purple-300 border-purple-500/30",
-  high: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
-  medium: "bg-sky-500/20 text-sky-300 border-sky-500/30",
-  low: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  critical: "bg-purple-500/10 text-purple-700 border-purple-200",
+  high: "bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-200",
+  medium: "bg-sky-500/10 text-sky-700 border-sky-200",
+  low: "bg-muted text-muted-foreground border-border",
 };
 
 const catLabel = (val?: string) =>
@@ -153,7 +153,7 @@ export default function Risks() {
                         <Link href={`/projects/${(risk as any).projectId}`}>
                           <Badge
                             variant="outline"
-                            className="bg-amber-500/10 text-amber-300 border-amber-400/30 hover:bg-amber-500/20 cursor-pointer"
+                            className="bg-amber-500/10 text-amber-700 border-amber-200 hover:bg-amber-500/10 cursor-pointer"
                           >
                             Blocking: {projectMap.get((risk as any).projectId)}
                           </Badge>

@@ -14,11 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 const statusColor: Record<string, string> = {
-  planning: "bg-blue-500/15 text-blue-300 border-blue-400/30",
-  in_progress: "bg-amber-500/15 text-amber-300 border-amber-400/30",
-  on_hold: "bg-slate-500/15 text-slate-300 border-slate-400/30",
-  completed: "bg-green-500/15 text-green-300 border-green-400/30",
-  cancelled: "bg-red-500/15 text-red-300 border-red-400/30",
+  planning: "bg-blue-500/10 text-blue-700 border-blue-200",
+  in_progress: "bg-amber-500/10 text-amber-700 border-amber-200",
+  on_hold: "bg-muted text-muted-foreground border-border",
+  completed: "bg-green-500/10 text-green-700 border-green-200",
+  cancelled: "bg-red-500/10 text-red-700 border-red-200",
 };
 
 const statusLabel: Record<string, string> = {

@@ -53,7 +53,7 @@ export default function ForgotPassword() {
                 and your spam folder. The link is valid for one hour.
               </p>
               {submitted.resetUrl && (
-                <div className="rounded border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs">
+                <div className="rounded border border-yellow-200 bg-yellow-500/10 p-3 text-xs">
                   <p className="font-semibold mb-1">Email is not configured on this server.</p>
                   <p className="mb-2">
                     Use the link below directly to finish resetting your password:

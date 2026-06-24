@@ -25,10 +25,10 @@ import {
 } from "@/components/system";
 
 const tokens = [
-  { name: "forest (deep pine)", value: "#034638", className: "bg-forest", text: "text-white" },
-  { name: "forest-2", value: "#04553F", className: "bg-forest-2", text: "text-white" },
-  { name: "brand (Saints emerald)", value: "#006747", className: "bg-brand", text: "text-white" },
-  { name: "brand-soft (Saints green)", value: "#61CE70", className: "bg-brand-soft", text: "text-ink" },
+  { name: "forest", value: "#14361F", className: "bg-forest", text: "text-white" },
+  { name: "forest-2", value: "#1B4332", className: "bg-forest-2", text: "text-white" },
+  { name: "brand (emerald)", value: "#2FAE6B", className: "bg-brand", text: "text-white" },
+  { name: "brand-soft (mint)", value: "#6FD6A6", className: "bg-brand-soft", text: "text-ink" },
   { name: "paper (bg)", value: "#F6F8F7", className: "bg-paper", text: "text-ink" },
   { name: "surface", value: "#FFFFFF", className: "bg-surface", text: "text-ink" },
   { name: "ink (text)", value: "#0B1220", className: "bg-ink", text: "text-white" },

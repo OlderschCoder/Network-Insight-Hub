@@ -13,10 +13,10 @@ import { useAuth } from "@/context/AuthContext";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 
 const categoryColor: Record<string, string> = {
-  helpdesk: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  network: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  security: "bg-red-500/20 text-red-300 border-red-500/30",
-  general: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  helpdesk: "bg-blue-500/10 text-blue-700 border-blue-200",
+  network: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+  security: "bg-red-500/10 text-red-700 border-red-200",
+  general: "bg-muted text-muted-foreground border-border",
 };
 
 export default function Entries() {
