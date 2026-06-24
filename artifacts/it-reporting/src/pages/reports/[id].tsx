@@ -280,8 +280,10 @@ export default function ReportDetail() {
 
   const handleExport = async (type: "docx" | "xlsx" | "pdf") => {
     try {
+      const token = localStorage.getItem("auth_token");
       const res = await fetch(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, {
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
@@ -465,7 +467,9 @@ export default function ReportDetail() {
             ? extras?.maintenance?.length ?? 0
             : selectedMaintenanceIds.length;
         const goalCount = includeGoalProgress ? extras?.goalProgress?.length ?? 0 : 0;
-        const risksIncluded = includeOpenRisks ? risks.length : 0;
+        const risksIncluded = includeOpenRisks
+          ? (selectedRiskIds ? selectedRiskIds.length : risks.length)
+          : 0;
         const Item = ({ label, n, on = true }: { label: string; n: number; on?: boolean }) => (
           <div className={`flex items-center justify-between text-sm py-1 ${on ? "" : "opacity-50"}`}>
             <span>{label}</span>
