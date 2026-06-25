@@ -28,10 +28,33 @@ export default function AfterAction() {
   const updateMutation = useUpdateAfterActionReport();
   const { toast } = useToast();
   const [refreshingId, setRefreshingId] = useState<number | null>(null);
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+
+  const refreshOneTimeline = async (report: any) => {
+    const ticketId = report.zendeskTicketId;
+    const token = localStorage.getItem("auth_token");
+    const res = await fetch(
+      `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
+        String(ticketId),
+      )}/timeline`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.timeline) {
+      throw new Error(
+        (body && (body.error || body.message)) ||
+          "Zendesk did not return a timeline for this ticket.",
+      );
+    }
+    await updateMutation.mutateAsync({
+      id: report.id,
+      data: { timeline: body.timeline } as any,
+    });
+  };
 
   const handleRefreshTimeline = async (report: any) => {
     const ticketId = report.zendeskTicketId;
-    if (!ticketId || refreshingId !== null) return;
+    if (!ticketId || refreshingId !== null || isRefreshingAll) return;
     const current = (report.timeline || "").trim();
     if (current.length > 0) {
       const ok = window.confirm(
@@ -41,28 +64,7 @@ export default function AfterAction() {
     }
     setRefreshingId(report.id);
     try {
-      const token = localStorage.getItem("auth_token");
-      const res = await fetch(
-        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
-          String(ticketId),
-        )}/timeline`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-      );
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.timeline) {
-        toast({
-          title: "Couldn't refresh timeline",
-          description:
-            (body && (body.error || body.message)) ||
-            "Zendesk did not return a timeline for this ticket.",
-          variant: "destructive",
-        });
-        return;
-      }
-      await updateMutation.mutateAsync({
-        id: report.id,
-        data: { timeline: body.timeline } as any,
-      });
+      await refreshOneTimeline(report);
       await refetch();
       toast({
         title: "Timeline refreshed",
@@ -79,16 +81,76 @@ export default function AfterAction() {
     }
   };
 
+  const handleRefreshAll = async () => {
+    if (refreshingId !== null || isRefreshingAll) return;
+    const linked = (reports ?? []).filter((r) => (r as any).zendeskTicketId);
+    if (linked.length === 0) {
+      toast({
+        title: "Nothing to refresh",
+        description: "No post-incident reviews have a linked Zendesk ticket.",
+      });
+      return;
+    }
+    const ok = window.confirm(
+      `This will replace the Timeline on ${linked.length} review${
+        linked.length === 1 ? "" : "s"
+      } with the latest comments from Zendesk. Any edits you've made will be lost. Continue?`,
+    );
+    if (!ok) return;
+    setIsRefreshingAll(true);
+    let refreshed = 0;
+    let failed = 0;
+    try {
+      for (const report of linked) {
+        try {
+          await refreshOneTimeline(report);
+          refreshed += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      await refetch();
+      toast({
+        title: "Timelines refreshed",
+        description: `Refreshed ${refreshed} timeline${
+          refreshed === 1 ? "" : "s"
+        }${failed > 0 ? `, ${failed} failed` : ""}.`,
+        variant: failed > 0 ? "destructive" : undefined,
+      });
+    } finally {
+      setIsRefreshingAll(false);
+    }
+  };
+
+  const linkedCount = (reports ?? []).filter(
+    (r) => (r as any).zendeskTicketId,
+  ).length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Post-Incident Reviews</h1>
-        <Link href="/after-action/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Review
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {linkedCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleRefreshAll}
+              disabled={isRefreshingAll || refreshingId !== null}
+              data-testid="button-refresh-all-timelines"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isRefreshingAll ? "animate-spin" : ""}`}
+              />
+              {isRefreshingAll ? "Refreshing all…" : "Refresh all from Zendesk"}
+            </Button>
+          )}
+          <Link href="/after-action/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Review
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
