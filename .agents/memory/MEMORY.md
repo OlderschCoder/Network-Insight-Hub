@@ -1,1 +1,1 @@
-- [it-reporting frontend](it-reporting-frontend.md) — Tailwind v4 CSS-first theming; whole app re-themes via shadcn `:root` tokens in index.css; SCCC "Saints green" brief zip is canonical palette (not sccc.edu colors); action emerald darkened for AA.
+- [it-reporting frontend](it-reporting-frontend.md) — SCCC theming: whole app re-themes via shadcn `:root` tokens in index.css; brief-zip "Saints green" is canonical palette.

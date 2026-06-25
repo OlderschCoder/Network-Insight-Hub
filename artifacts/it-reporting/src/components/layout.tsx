@@ -55,6 +55,7 @@ import {
   Zap,
   Cloud,
   BarChart3,
+  Gauge,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
@@ -272,6 +273,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     items: [
       { href: "/network", label: "Network", icon: Network },
       { href: "/azure-vms", label: "Azure VMs", icon: Cloud },
+      { href: "/monitoring", label: "Monitoring", icon: Gauge },
       { href: "/processes", label: "Process Library", icon: BookOpen },
       { href: "/ai-report", label: "AI Assistant", icon: Sparkles },
     ],

@@ -39,6 +39,7 @@ import NewProject from "@/pages/projects/new";
 import ProjectDetail from "@/pages/projects/[id]";
 import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
 import AzureVms from "@/pages/azure-vms/index";
+import Monitoring from "@/pages/monitoring/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import DesignSystem from "@/pages/design-system/index";
 
@@ -113,6 +114,7 @@ function Router() {
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
       <Route path="/azure-vms" component={() => <ProtectedRoute component={AzureVms} />} />
+      <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />
       
       <Route path="/after-action" component={() => <ProtectedRoute component={AfterAction} />} />
       <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />
