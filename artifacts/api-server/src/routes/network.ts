@@ -419,6 +419,39 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
       inventoryText = "(No switches or VLANs have been entered yet.)";
     }
 
+    const RECENT_PER_DEVICE = 3;
+    const formatRecentEntries = (log: unknown): string => {
+      const entries = visibleMaintenanceLog(log)
+        .slice()
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+        .slice(0, RECENT_PER_DEVICE);
+      return entries
+        .map((e) => {
+          const when = e.createdAt ? e.createdAt.slice(0, 10) : "unknown date";
+          const who = e.authorName || "unknown";
+          const body = (e.body || "").replace(/\s+/g, " ").trim().slice(0, 280);
+          return `    • [${when}] ${who}: ${body}`;
+        })
+        .join("\n");
+    };
+
+    let maintenanceText = "";
+    for (const s of switches) {
+      const recent = formatRecentEntries(s.maintenanceLog);
+      if (recent) {
+        maintenanceText += `  ${s.hostname} (${s.ipAddress}):\n${recent}\n`;
+      }
+    }
+    for (const v of vlans) {
+      const recent = formatRecentEntries(v.maintenanceLog);
+      if (recent) {
+        maintenanceText += `  VLAN ${v.vlanId} ${v.name}:\n${recent}\n`;
+      }
+    }
+    if (!maintenanceText.trim()) {
+      maintenanceText = "(No maintenance log entries recorded yet.)";
+    }
+
     const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.
 
 You have direct knowledge of the SCCC campus map (provided as an image in the first user turn). Key context:
@@ -430,6 +463,9 @@ You have direct knowledge of the SCCC campus map (provided as an image in the fi
 
 Below is the **live network reference data** currently entered in this app (single source of truth — prefer this over your prior knowledge when they conflict):
 ${inventoryText}
+
+Below is the **recent maintenance log** — the most recent ${RECENT_PER_DEVICE} entries per switch and VLAN (oldest entries omitted). Use this to answer questions about recent changes, who worked on a device, and incident triage:
+${maintenanceText}
 
 Guidelines for your answers:
 - Be concise, technical, and direct — you are talking to other IT staff.
