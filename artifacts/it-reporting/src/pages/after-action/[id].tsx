@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ArrowLeft, Download, ExternalLink, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Pencil, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const severityColor: Record<string, string> = {
@@ -41,6 +41,7 @@ export default function AfterActionDetail() {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<any>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (report && !draft) setDraft({ ...report });
@@ -63,6 +64,62 @@ export default function AfterActionDetail() {
       URL.revokeObjectURL(url);
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const handleRefreshTimeline = async () => {
+    if (!report) return;
+    const ticketId = (report as any).zendeskTicketId;
+    if (!ticketId || isRefreshing) return;
+    const base: any = editing ? draft ?? report : report;
+    const current = (base.timeline || "").trim();
+    if (current.length > 0) {
+      const ok = window.confirm(
+        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
+      );
+      if (!ok) return;
+    }
+    setIsRefreshing(true);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
+          String(ticketId),
+        )}/timeline`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.timeline) {
+        toast({
+          title: "Couldn't refresh timeline",
+          description:
+            (body && (body.error || body.message)) ||
+            "Zendesk did not return a timeline for this ticket.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (editing) {
+        setDraft({ ...(draft ?? report), timeline: body.timeline });
+      } else {
+        await updateMutation.mutateAsync({
+          id,
+          data: { timeline: body.timeline } as any,
+        });
+        await refetch();
+      }
+      toast({
+        title: "Timeline refreshed",
+        description: `Pulled the latest comments from Zendesk ticket #${ticketId}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Couldn't refresh timeline",
+        description: e?.message ?? "Network request failed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -166,6 +223,19 @@ export default function AfterActionDetail() {
         <Button variant="outline" onClick={() => handleExport("docx")}>
           <Download className="h-4 w-4 mr-2" /> Export Word
         </Button>
+        {r.zendeskTicketId ? (
+          <Button
+            variant="outline"
+            onClick={handleRefreshTimeline}
+            disabled={isRefreshing}
+            data-testid="button-refresh-timeline"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing…" : "Refresh from Zendesk"}
+          </Button>
+        ) : null}
       </div>
 
       <Card>
