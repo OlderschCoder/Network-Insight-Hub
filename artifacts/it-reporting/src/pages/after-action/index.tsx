@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListAfterActionReports } from "@workspace/api-client-react";
+import {
+  useListAfterActionReports,
+  useUpdateAfterActionReport,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Plus, ChevronRight, FileText, Ticket, X } from "lucide-react";
+import { Plus, ChevronRight, FileText, Ticket, X, RefreshCw } from "lucide-react";
 
 const outcomeColor: Record<string, string> = {
   success: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -18,9 +22,62 @@ export default function AfterAction() {
   const [ticketInput, setTicketInput] = useState("");
   const parsedTicketId = parseInt(ticketInput.trim(), 10);
   const hasFilter = ticketInput.trim() !== "" && !Number.isNaN(parsedTicketId);
-  const { data: reports, isLoading } = useListAfterActionReports(
+  const { data: reports, isLoading, refetch } = useListAfterActionReports(
     hasFilter ? { zendeskTicketId: parsedTicketId } : {},
   );
+  const updateMutation = useUpdateAfterActionReport();
+  const { toast } = useToast();
+  const [refreshingId, setRefreshingId] = useState<number | null>(null);
+
+  const handleRefreshTimeline = async (report: any) => {
+    const ticketId = report.zendeskTicketId;
+    if (!ticketId || refreshingId !== null) return;
+    const current = (report.timeline || "").trim();
+    if (current.length > 0) {
+      const ok = window.confirm(
+        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
+      );
+      if (!ok) return;
+    }
+    setRefreshingId(report.id);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
+          String(ticketId),
+        )}/timeline`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.timeline) {
+        toast({
+          title: "Couldn't refresh timeline",
+          description:
+            (body && (body.error || body.message)) ||
+            "Zendesk did not return a timeline for this ticket.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await updateMutation.mutateAsync({
+        id: report.id,
+        data: { timeline: body.timeline } as any,
+      });
+      await refetch();
+      toast({
+        title: "Timeline refreshed",
+        description: `Pulled the latest comments from Zendesk ticket #${ticketId}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Couldn't refresh timeline",
+        description: e?.message ?? "Network request failed.",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -64,37 +121,58 @@ export default function AfterAction() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(reports ?? []).map((report) => (
-            <Link key={report.id} href={`/after-action/${report.id}`}>
-              <Card className="cursor-pointer hover:border-primary/50 transition-colors">
-                <CardContent className="py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="font-medium">{report.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(report.incidentDate ?? report.createdAt ?? Date.now()), "MMM d, yyyy")}
-                      </p>
+          {(reports ?? []).map((report) => {
+            const isRefreshing = refreshingId === report.id;
+            return (
+              <Link key={report.id} href={`/after-action/${report.id}`}>
+                <Card className="cursor-pointer hover:border-primary/50 transition-colors">
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="font-medium">{report.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(report.incidentDate ?? report.createdAt ?? Date.now()), "MMM d, yyyy")}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {report.zendeskTicketId && (
-                      <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/30">
-                        <Ticket className="h-3 w-3 mr-1" />
-                        Zendesk #{report.zendeskTicketId}
-                      </Badge>
-                    )}
-                    {(report as any).outcome && (
-                      <Badge variant="outline" className={outcomeColor[(report as any).outcome] ?? ""}>
-                        {(report as any).outcome}
-                      </Badge>
-                    )}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                    <div className="flex items-center gap-3">
+                      {report.zendeskTicketId && (
+                        <>
+                          <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/30">
+                            <Ticket className="h-3 w-3 mr-1" />
+                            Zendesk #{report.zendeskTicketId}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={refreshingId !== null}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRefreshTimeline(report);
+                            }}
+                            data-testid={`button-refresh-timeline-${report.id}`}
+                          >
+                            <RefreshCw
+                              className={`h-4 w-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`}
+                            />
+                            {isRefreshing ? "Refreshing…" : "Refresh from Zendesk"}
+                          </Button>
+                        </>
+                      )}
+                      {(report as any).outcome && (
+                        <Badge variant="outline" className={outcomeColor[(report as any).outcome] ?? ""}>
+                          {(report as any).outcome}
+                        </Badge>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
