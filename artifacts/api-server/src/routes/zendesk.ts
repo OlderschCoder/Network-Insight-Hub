@@ -42,7 +42,9 @@ async function zget<T>(cfg: ReturnType<typeof zendeskConfig>, path: string): Pro
   const r = await fetch(url, { headers: cfg.headers });
   if (!r.ok) {
     const body = await r.text();
-    throw new Error(`Zendesk ${r.status}: ${body.slice(0, 300)}`);
+    const err = new Error(`Zendesk ${r.status}: ${body.slice(0, 300)}`) as Error & { status?: number };
+    err.status = r.status;
+    throw err;
   }
   return (await r.json()) as T;
 }
@@ -270,6 +272,7 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
   if (!cfg) {
     return res.status(503).json({
       error: "Zendesk not configured",
+      code: "ZENDESK_NOT_CONFIGURED",
       message: "Set ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, and ZENDESK_API_TOKEN.",
     });
   }
@@ -392,7 +395,14 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
       breakdown,
     });
   } catch (e: any) {
-    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+    const upstream = e?.status;
+    if (upstream === 401 || upstream === 403) {
+      return res.status(502).json({
+        error: "Zendesk authentication failed",
+        code: "ZENDESK_AUTH",
+      });
+    }
+    return res.status(502).json({ error: "Zendesk API error", code: "ZENDESK_ERROR" });
   }
 });
 

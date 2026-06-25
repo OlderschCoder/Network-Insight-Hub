@@ -48,7 +48,10 @@ export function ZendeskResolved() {
         const body = await r.json().catch(() => null);
         if (cancelled) return;
         if (!r.ok) {
-          setErrorKind(r.status === 401 || r.status === 403 ? "auth" : "generic");
+          const code = body?.code;
+          setErrorKind(
+            code === "ZENDESK_AUTH" || code === "ZENDESK_NOT_CONFIGURED" ? "auth" : "generic",
+          );
           setData(null);
         } else {
           setData(body);
