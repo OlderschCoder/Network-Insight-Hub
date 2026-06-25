@@ -32,29 +32,29 @@ const roleLabel: Record<string, string> = {
 
 export function ZendeskResolved() {
   const [data, setData] = useState<Resp | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"auth" | "generic" | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState("7");
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setErrorKind(null);
     const token = localStorage.getItem("auth_token");
     fetch(`${import.meta.env.BASE_URL}api/zendesk/resolved-by-user?days=${days}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(async (r) => {
-        const body = await r.json();
+        const body = await r.json().catch(() => null);
         if (cancelled) return;
         if (!r.ok) {
-          setError(body.message || body.error || "Failed to load");
+          setErrorKind(r.status === 401 || r.status === 403 ? "auth" : "generic");
           setData(null);
         } else {
           setData(body);
         }
       })
-      .catch((e) => !cancelled && setError(e.message))
+      .catch(() => !cancelled && setErrorKind("generic"))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -91,7 +91,20 @@ export function ZendeskResolved() {
       </CardHeader>
       <CardContent>
         {loading && <div className="text-sm text-muted-foreground py-4">Loading from Zendesk...</div>}
-        {error && <div className="text-sm text-red-500 py-2">{error}</div>}
+        {errorKind === "auth" && (
+          <div className="text-sm text-muted-foreground py-3">
+            <p className="font-medium text-foreground">Zendesk isn't connected right now.</p>
+            <p className="mt-0.5">
+              Ticket stats are unavailable until the Zendesk API credentials are verified — an admin
+              needs to confirm API token access is enabled and the agent email/subdomain are correct.
+            </p>
+          </div>
+        )}
+        {errorKind === "generic" && (
+          <div className="text-sm text-muted-foreground py-3">
+            Couldn't load Zendesk ticket stats right now. Please try again later.
+          </div>
+        )}
         {data && data.breakdown.length === 0 && !loading && (
           <div className="text-sm text-muted-foreground py-4 text-center">
             No resolved tickets in this period.
