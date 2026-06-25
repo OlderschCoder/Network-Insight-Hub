@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation, Link, useSearch } from "wouter";
 import { useCreateAfterActionReport } from "@workspace/api-client-react";
 import type { CreateAfterActionBody } from "@workspace/api-client-react";
@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useConfirm } from "@/components/ConfirmDialog";
+import {
+  fetchZendeskTimeline,
+  useTimelineRefresh,
+} from "@/hooks/useTimelineRefresh";
 
 type FormData = {
   title: string;
@@ -32,7 +34,6 @@ type FormData = {
 };
 
 export default function NewAfterAction() {
-  const confirm = useConfirm();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createMutation = useCreateAfterActionReport();
@@ -46,8 +47,7 @@ export default function NewAfterAction() {
   const sourceLabel = params.get("sourceLabel") ?? "";
   const prefillTimeline = params.get("timeline") ?? "";
   const zendeskTicketId = params.get("zendeskTicketId") ?? "";
-  const { toast } = useToast();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { isRefreshing, refresh } = useTimelineRefresh();
 
   const {
     register,
@@ -78,22 +78,14 @@ export default function NewAfterAction() {
     if (!zendeskTicketId) return;
     const initial = (prefillTimeline || "").trim();
     if (initial.length > 0) return;
-    const token = localStorage.getItem("auth_token");
     let cancelled = false;
-    fetch(
-      `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
-        zendeskTicketId,
-      )}/timeline`,
-      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-    )
-      .then(async (r) => {
-        const body = await r.json().catch(() => ({}));
+    fetchZendeskTimeline(zendeskTicketId)
+      .then((timeline) => {
         if (cancelled) return;
-        if (!r.ok || !body.timeline) return;
         // Don't clobber edits the user has already started while we waited.
         const current = (watch("timeline") || "").trim();
         if (current.length > 0) return;
-        setValue("timeline", body.timeline);
+        setValue("timeline", timeline);
       })
       .catch(() => {});
     return () => {
@@ -103,52 +95,13 @@ export default function NewAfterAction() {
   }, [zendeskTicketId]);
 
   const handleRefreshTimeline = async () => {
-    if (!zendeskTicketId || isRefreshing) return;
-    const current = (watch("timeline") || "").trim();
-    if (current.length > 0) {
-      const ok = await confirm({
-        title: "Replace the current timeline?",
-        description:
-          "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost.",
-        confirmText: "Replace",
-      });
-      if (!ok) return;
-    }
-    setIsRefreshing(true);
-    try {
-      const token = localStorage.getItem("auth_token");
-      const r = await fetch(
-        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
-          zendeskTicketId,
-        )}/timeline`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-      );
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok || !body.timeline) {
-        toast({
-          title: "Couldn't refresh timeline",
-          description:
-            (body && (body.error || body.message)) ||
-            "Zendesk did not return a timeline for this ticket.",
-          variant: "destructive",
-        });
-        return;
-      }
-      setValue("timeline", body.timeline, { shouldDirty: true });
-      toast({
-        title: "Timeline refreshed",
-        description: `Pulled the latest comments from Zendesk ticket #${zendeskTicketId}.`,
-      });
-    } catch (err) {
-      toast({
-        title: "Couldn't refresh timeline",
-        description:
-          err instanceof Error ? err.message : "Network request failed.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
+    await refresh({
+      ticketId: zendeskTicketId,
+      currentTimeline: watch("timeline"),
+      apply: (timeline) => {
+        setValue("timeline", timeline, { shouldDirty: true });
+      },
+    });
   };
 
   const outcome = watch("outcome");

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { useTimelineRefresh } from "@/hooks/useTimelineRefresh";
 import { format } from "date-fns";
 import { Plus, ChevronRight, FileText, Ticket, X, RefreshCw } from "lucide-react";
 
@@ -26,100 +26,35 @@ export default function AfterAction() {
     hasFilter ? { zendeskTicketId: parsedTicketId } : {},
   );
   const updateMutation = useUpdateAfterActionReport();
-  const { toast } = useToast();
-  const [refreshingId, setRefreshingId] = useState<number | null>(null);
-  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const { isRefreshing, isRefreshingAll, activeKey, refresh, refreshMany } =
+    useTimelineRefresh();
 
-  const refreshOneTimeline = async (report: any) => {
-    const ticketId = report.zendeskTicketId;
-    const token = localStorage.getItem("auth_token");
-    const res = await fetch(
-      `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
-        String(ticketId),
-      )}/timeline`,
-      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-    );
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.timeline) {
-      throw new Error(
-        (body && (body.error || body.message)) ||
-          "Zendesk did not return a timeline for this ticket.",
-      );
-    }
+  const applyTimeline = (report: any) => async (timeline: string) => {
     await updateMutation.mutateAsync({
       id: report.id,
-      data: { timeline: body.timeline } as any,
+      data: { timeline } as any,
     });
   };
 
   const handleRefreshTimeline = async (report: any) => {
-    const ticketId = report.zendeskTicketId;
-    if (!ticketId || refreshingId !== null || isRefreshingAll) return;
-    const current = (report.timeline || "").trim();
-    if (current.length > 0) {
-      const ok = window.confirm(
-        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
-      );
-      if (!ok) return;
-    }
-    setRefreshingId(report.id);
-    try {
-      await refreshOneTimeline(report);
-      await refetch();
-      toast({
-        title: "Timeline refreshed",
-        description: `Pulled the latest comments from Zendesk ticket #${ticketId}.`,
-      });
-    } catch (e: any) {
-      toast({
-        title: "Couldn't refresh timeline",
-        description: e?.message ?? "Network request failed.",
-        variant: "destructive",
-      });
-    } finally {
-      setRefreshingId(null);
-    }
+    const ok = await refresh({
+      ticketId: report.zendeskTicketId,
+      currentTimeline: report.timeline,
+      apply: applyTimeline(report),
+      key: report.id,
+    });
+    if (ok) await refetch();
   };
 
   const handleRefreshAll = async () => {
-    if (refreshingId !== null || isRefreshingAll) return;
     const linked = (reports ?? []).filter((r) => (r as any).zendeskTicketId);
-    if (linked.length === 0) {
-      toast({
-        title: "Nothing to refresh",
-        description: "No post-incident reviews have a linked Zendesk ticket.",
-      });
-      return;
-    }
-    const ok = window.confirm(
-      `This will replace the Timeline on ${linked.length} review${
-        linked.length === 1 ? "" : "s"
-      } with the latest comments from Zendesk. Any edits you've made will be lost. Continue?`,
+    await refreshMany(
+      linked.map((report) => ({
+        ticketId: (report as any).zendeskTicketId,
+        apply: applyTimeline(report),
+      })),
     );
-    if (!ok) return;
-    setIsRefreshingAll(true);
-    let refreshed = 0;
-    let failed = 0;
-    try {
-      for (const report of linked) {
-        try {
-          await refreshOneTimeline(report);
-          refreshed += 1;
-        } catch {
-          failed += 1;
-        }
-      }
-      await refetch();
-      toast({
-        title: "Timelines refreshed",
-        description: `Refreshed ${refreshed} timeline${
-          refreshed === 1 ? "" : "s"
-        }${failed > 0 ? `, ${failed} failed` : ""}.`,
-        variant: failed > 0 ? "destructive" : undefined,
-      });
-    } finally {
-      setIsRefreshingAll(false);
-    }
+    if (linked.length > 0) await refetch();
   };
 
   const linkedCount = (reports ?? []).filter(
@@ -135,7 +70,7 @@ export default function AfterAction() {
             <Button
               variant="outline"
               onClick={handleRefreshAll}
-              disabled={isRefreshingAll || refreshingId !== null}
+              disabled={isRefreshing}
               data-testid="button-refresh-all-timelines"
             >
               <RefreshCw
@@ -184,7 +119,7 @@ export default function AfterAction() {
       ) : (
         <div className="space-y-3">
           {(reports ?? []).map((report) => {
-            const isRefreshing = refreshingId === report.id;
+            const isRowRefreshing = activeKey === report.id;
             return (
               <Link key={report.id} href={`/after-action/${report.id}`}>
                 <Card className="cursor-pointer hover:border-primary/50 transition-colors">
@@ -208,7 +143,7 @@ export default function AfterAction() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={refreshingId !== null}
+                            disabled={isRefreshing}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -217,9 +152,9 @@ export default function AfterAction() {
                             data-testid={`button-refresh-timeline-${report.id}`}
                           >
                             <RefreshCw
-                              className={`h-4 w-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`}
+                              className={`h-4 w-4 mr-1 ${isRowRefreshing ? "animate-spin" : ""}`}
                             />
-                            {isRefreshing ? "Refreshing…" : "Refresh from Zendesk"}
+                            {isRowRefreshing ? "Refreshing…" : "Refresh from Zendesk"}
                           </Button>
                         </>
                       )}

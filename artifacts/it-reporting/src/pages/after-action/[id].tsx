@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useTimelineRefresh } from "@/hooks/useTimelineRefresh";
 import { format } from "date-fns";
 import { ArrowLeft, Download, ExternalLink, Pencil, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -38,10 +39,10 @@ export default function AfterActionDetail() {
   const { data: report, isLoading, refetch } = useGetAfterActionReport(id);
   const updateMutation = useUpdateAfterActionReport();
   const { toast } = useToast();
+  const { isRefreshing, refresh } = useTimelineRefresh();
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<any>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (report && !draft) setDraft({ ...report });
@@ -70,57 +71,22 @@ export default function AfterActionDetail() {
   const handleRefreshTimeline = async () => {
     if (!report) return;
     const ticketId = (report as any).zendeskTicketId;
-    if (!ticketId || isRefreshing) return;
     const base: any = editing ? draft ?? report : report;
-    const current = (base.timeline || "").trim();
-    if (current.length > 0) {
-      const ok = window.confirm(
-        "This will replace the current Timeline with the latest comments from Zendesk. Any edits you've made will be lost. Continue?",
-      );
-      if (!ok) return;
-    }
-    setIsRefreshing(true);
-    try {
-      const token = localStorage.getItem("auth_token");
-      const res = await fetch(
-        `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
-          String(ticketId),
-        )}/timeline`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-      );
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || !body.timeline) {
-        toast({
-          title: "Couldn't refresh timeline",
-          description:
-            (body && (body.error || body.message)) ||
-            "Zendesk did not return a timeline for this ticket.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (editing) {
-        setDraft({ ...(draft ?? report), timeline: body.timeline });
-      } else {
-        await updateMutation.mutateAsync({
-          id,
-          data: { timeline: body.timeline } as any,
-        });
-        await refetch();
-      }
-      toast({
-        title: "Timeline refreshed",
-        description: `Pulled the latest comments from Zendesk ticket #${ticketId}.`,
-      });
-    } catch (e: any) {
-      toast({
-        title: "Couldn't refresh timeline",
-        description: e?.message ?? "Network request failed.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
+    await refresh({
+      ticketId,
+      currentTimeline: base.timeline,
+      apply: async (timeline) => {
+        if (editing) {
+          setDraft({ ...(draft ?? report), timeline });
+        } else {
+          await updateMutation.mutateAsync({
+            id,
+            data: { timeline } as any,
+          });
+          await refetch();
+        }
+      },
+    });
   };
 
   const handleSave = async () => {
