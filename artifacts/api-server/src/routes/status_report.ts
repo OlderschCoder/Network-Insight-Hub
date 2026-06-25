@@ -33,6 +33,39 @@ function parseDate(s: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function buildNetworkByBuilding(
+  switches: Array<Record<string, any>>,
+  vlans: Array<Record<string, any>>,
+) {
+  const map = new Map<string, { building: string; switches: any[]; vlans: any[] }>();
+  const ensure = (b: unknown) => {
+    const key = (typeof b === "string" && b.trim()) || "Unassigned";
+    if (!map.has(key)) map.set(key, { building: key, switches: [], vlans: [] });
+    return map.get(key)!;
+  };
+  for (const s of switches) {
+    ensure(s.building).switches.push({
+      hostname: s.hostname,
+      ipAddress: s.ipAddress ?? null,
+      model: s.model ?? null,
+      status: s.status ?? null,
+      location: s.location ?? null,
+      notes: s.notes ?? null,
+    });
+  }
+  for (const v of vlans) {
+    ensure(v.building).vlans.push({
+      vlanId: v.vlanId,
+      name: v.name,
+      type: v.type ?? null,
+      subnet: v.subnet ?? null,
+      gateway: v.gateway ?? null,
+      description: v.description ?? null,
+    });
+  }
+  return Array.from(map.values()).sort((a, b) => a.building.localeCompare(b.building));
+}
+
 router.post(
   "/generate",
   requireAuth,
@@ -495,7 +528,7 @@ router.post(
       since.setDate(since.getDate() - lookbackDays);
       const sinceStr = since.toISOString().slice(0, 10);
 
-      const [entriesData, risksData, aarData, switchCount, vlanCount] = await Promise.all([
+      const [entriesData, risksData, aarData, switchRows, vlanRows] = await Promise.all([
         db
           .select({
             category: entries.category,
@@ -532,9 +565,11 @@ router.post(
           .from(afterActionReports)
           .where(gte(afterActionReports.incidentDate, since))
           .limit(50),
-        db.execute(sql`SELECT COUNT(*)::int AS count FROM network_switches`),
-        db.execute(sql`SELECT COUNT(*)::int AS count FROM vlans`),
+        db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
+        db.select().from(vlansTable).orderBy(vlansTable.vlanId),
       ]);
+
+      const networkByBuilding = buildNetworkByBuilding(switchRows, vlanRows);
 
       const context = {
         lookbackDays,
@@ -542,14 +577,15 @@ router.post(
         risksAndIssues: risksData,
         afterActionReports: aarData,
         networkInventory: {
-          switches: (switchCount.rows[0] as any)?.count ?? 0,
-          vlans: (vlanCount.rows[0] as any)?.count ?? 0,
+          switchCount: switchRows.length,
+          vlanCount: vlanRows.length,
+          buildings: networkByBuilding,
         },
       };
 
-      const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to operational data: log entries, weekly reports, risks/issues/design suggestions, after-action reports, and network inventory (switches and VLANs).
+      const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to operational data: log entries, weekly reports, risks/issues/design suggestions, after-action reports, and the full network inventory — every switch and VLAN grouped by campus building, including IP addresses, models, status, subnets, and gateways.
 
-Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions. Be concise and professional. Cite specific entries, AARs, or risks by title/date when relevant. If the data does not support an answer, say so.
+Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions — including questions about the campus network such as which buildings contain which switches and VLANs, IP/subnet/gateway details, and device status. Be concise and professional. Cite specific entries, AARs, risks, buildings, switches, or VLANs by name when relevant. If the data does not support an answer, say so.
 
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;

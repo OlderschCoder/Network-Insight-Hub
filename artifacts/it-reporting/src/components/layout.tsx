@@ -311,7 +311,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className="mx-auto hidden w-full max-w-md items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/15 sm:flex"
         >
           <LayoutGrid className="h-4 w-4" />
-          <span>Jump to anything…</span>
+          <span>Menu — search or jump to any page</span>
           <kbd className="ml-auto inline-flex items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
             ⌘K
           </kbd>

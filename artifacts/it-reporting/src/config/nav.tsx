@@ -43,7 +43,7 @@ export function getNavGroups(isCIO: boolean): NavGroup[] {
   };
 
   const knowledge: NavGroup = {
-    label: "Knowledge",
+    label: "Systems & Tools",
     items: [
       { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network },
       { href: "/azure-vms", label: "Azure VMs", desc: "Cloud virtual machine inventory", icon: Cloud },
@@ -54,7 +54,7 @@ export function getNavGroups(isCIO: boolean): NavGroup[] {
   };
 
   const team: NavGroup = {
-    label: "Team",
+    label: "Reports & Records",
     items: [
       { href: "/risks", label: "Risks & Issues", desc: "Open risks, issues, and design notes", icon: ShieldAlert },
       { href: "/after-action", label: "Post-Incident Reviews", desc: "Document incidents and lessons", icon: Activity },

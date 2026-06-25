@@ -83,7 +83,10 @@ export function AppLauncher({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-[min(96vw,72rem)] p-0 gap-0 overflow-hidden border-border/60 bg-background/95 backdrop-blur-xl">
-        <DialogTitle className="sr-only">Launchpad — jump to anything</DialogTitle>
+        <div className="flex items-baseline gap-2 border-b border-border px-5 pt-4 pb-2">
+          <DialogTitle className="text-sm font-semibold">Menu</DialogTitle>
+          <span className="text-xs text-muted-foreground">search or browse every page below</span>
+        </div>
 
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <Search className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -92,8 +95,8 @@ export function AppLauncher({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Jump to anything…"
-            aria-label="Jump to anything"
+            placeholder="Search pages…"
+            aria-label="Search pages"
             className="flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden sm:inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
