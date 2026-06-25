@@ -1924,6 +1924,7 @@ export const DeleteVlanMaintenanceLogEntryResponse = zod.object({
 export const ListAfterActionReportsQueryParams = zod.object({
   building: zod.coerce.string().optional(),
   deviceType: zod.coerce.string().optional(),
+  zendeskTicketId: zod.coerce.number().optional(),
 });
 
 export const ListAfterActionReportsResponseItem = zod.object({

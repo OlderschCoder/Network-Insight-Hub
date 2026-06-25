@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { useListAfterActionReports } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { Plus, ChevronRight, FileText } from "lucide-react";
+import { Plus, ChevronRight, FileText, Ticket, X } from "lucide-react";
 
 const outcomeColor: Record<string, string> = {
   success: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -13,7 +15,12 @@ const outcomeColor: Record<string, string> = {
 };
 
 export default function AfterAction() {
-  const { data: reports, isLoading } = useListAfterActionReports({});
+  const [ticketInput, setTicketInput] = useState("");
+  const parsedTicketId = parseInt(ticketInput.trim(), 10);
+  const hasFilter = ticketInput.trim() !== "" && !Number.isNaN(parsedTicketId);
+  const { data: reports, isLoading } = useListAfterActionReports(
+    hasFilter ? { zendeskTicketId: parsedTicketId } : {},
+  );
 
   return (
     <div className="space-y-6">
@@ -27,11 +34,33 @@ export default function AfterAction() {
         </Link>
       </div>
 
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-xs">
+          <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="Filter by Zendesk ticket #"
+            value={ticketInput}
+            onChange={(e) => setTicketInput(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {ticketInput.trim() !== "" && (
+          <Button variant="ghost" size="sm" onClick={() => setTicketInput("")}>
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-center text-muted-foreground py-8">Loading...</div>
       ) : (reports ?? []).length === 0 ? (
         <div className="text-center text-muted-foreground py-8">
-          No post-incident reviews yet.
+          {hasFilter
+            ? `No post-incident reviews for Zendesk #${parsedTicketId}.`
+            : "No post-incident reviews yet."}
         </div>
       ) : (
         <div className="space-y-3">
@@ -49,6 +78,12 @@ export default function AfterAction() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {report.zendeskTicketId && (
+                      <Badge variant="outline" className="bg-sky-500/20 text-sky-300 border-sky-500/30">
+                        <Ticket className="h-3 w-3 mr-1" />
+                        Zendesk #{report.zendeskTicketId}
+                      </Badge>
+                    )}
                     {(report as any).outcome && (
                       <Badge variant="outline" className={outcomeColor[(report as any).outcome] ?? ""}>
                         {(report as any).outcome}

@@ -23,10 +23,16 @@ async function enrichReport(r: any) {
 }
 
 router.get("/", requireAuth, async (req: any, res) => {
-  const { building, deviceType } = req.query;
+  const { building, deviceType, zendeskTicketId } = req.query;
   const conditions: any[] = [];
   if (building) conditions.push(ilike(afterActionReportsTable.building, `%${building}%`));
   if (deviceType) conditions.push(ilike(afterActionReportsTable.deviceType, `%${deviceType}%`));
+  if (zendeskTicketId) {
+    const parsedTicketId = parseInt(zendeskTicketId as string, 10);
+    if (!Number.isNaN(parsedTicketId)) {
+      conditions.push(eq(afterActionReportsTable.zendeskTicketId, parsedTicketId));
+    }
+  }
 
   const reports = conditions.length > 0
     ? await db.select().from(afterActionReportsTable).where(and(...conditions)).orderBy(desc(afterActionReportsTable.createdAt))

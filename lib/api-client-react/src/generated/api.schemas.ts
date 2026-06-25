@@ -1152,6 +1152,7 @@ export const ListVlansType = {
 export type ListAfterActionReportsParams = {
   building?: string;
   deviceType?: string;
+  zendeskTicketId?: number;
 };
 
 export type GetRecentActivityParams = {
