@@ -460,20 +460,38 @@ function entriesToMarkdown(owner: MaintenanceOwner, entries: MaintenanceLogEntry
 }
 
 type CombinedMaintenanceRow = {
-  switchHostname: string;
-  switchBuilding: string;
-  switchIp: string;
+  kind: "switch" | "vlan";
+  // Identity line shown as the section header / first identifying CSV column.
+  name: string;
+  building: string;
+  // IP for switches, subnet for VLANs.
+  address: string;
   entry: MaintenanceLogEntry;
 };
 
-function collectSwitchEntries(switches: NetworkSwitch[]): CombinedMaintenanceRow[] {
+function collectCombinedEntries(
+  switches: NetworkSwitch[],
+  vlans: Vlan[],
+): CombinedMaintenanceRow[] {
   const rows: CombinedMaintenanceRow[] = [];
   for (const sw of switches) {
     for (const entry of sw.maintenanceLog ?? []) {
       rows.push({
-        switchHostname: sw.hostname,
-        switchBuilding: sw.building ?? "",
-        switchIp: sw.ipAddress ?? "",
+        kind: "switch",
+        name: sw.hostname,
+        building: sw.building ?? "",
+        address: sw.ipAddress ?? "",
+        entry,
+      });
+    }
+  }
+  for (const vlan of vlans) {
+    for (const entry of vlan.maintenanceLog ?? []) {
+      rows.push({
+        kind: "vlan",
+        name: `VLAN ${vlan.vlanId} — ${vlan.name}`,
+        building: vlan.building ?? "",
+        address: vlan.subnet ?? "",
         entry,
       });
     }
@@ -488,9 +506,10 @@ function collectSwitchEntries(switches: NetworkSwitch[]): CombinedMaintenanceRow
 
 function combinedRowsToCsv(rows: CombinedMaintenanceRow[]): string {
   const header = [
-    "switch",
+    "kind",
+    "name",
     "building",
-    "ip_address",
+    "address",
     "author",
     "created_at",
     "edited_at",
@@ -500,9 +519,10 @@ function combinedRowsToCsv(rows: CombinedMaintenanceRow[]): string {
   ];
   const lines = rows.map((r) =>
     [
-      r.switchHostname,
-      r.switchBuilding,
-      r.switchIp,
+      r.kind,
+      r.name,
+      r.building,
+      r.address,
       r.entry.authorName,
       r.entry.createdAt ?? "",
       r.entry.editedAt ?? "",
@@ -518,60 +538,71 @@ function combinedRowsToCsv(rows: CombinedMaintenanceRow[]): string {
 
 function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
   const lines: string[] = [];
-  lines.push(`# Maintenance log — all switches`);
+  lines.push(`# Maintenance log — switches & VLANs`);
   lines.push(`*${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${new Date().toLocaleString()}*`);
   lines.push("");
   if (!rows.length) {
     lines.push("_No entries match the current filters._");
     return lines.join("\n");
   }
-  // Group by switch for readability.
-  const grouped = new Map<string, CombinedMaintenanceRow[]>();
-  for (const r of rows) {
-    const key = r.switchHostname;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(r);
-  }
-  const switchNames = Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b));
-  for (const name of switchNames) {
-    const group = grouped.get(name)!;
-    const first = group[0];
-    const subtitle = [first.switchIp, first.switchBuilding].filter(Boolean).join(" · ");
-    lines.push(`## ${name}`);
-    if (subtitle) lines.push(`*${subtitle}*`);
+
+  const renderGroups = (kind: "switch" | "vlan", heading: string) => {
+    const kindRows = rows.filter((r) => r.kind === kind);
+    if (!kindRows.length) return;
+    lines.push(`# ${heading}`);
     lines.push("");
-    for (const { entry: e } of group) {
-      lines.push(`### ${formatLogTimestamp(e.createdAt)} — ${e.authorName}`);
-      if (e.windowStart || e.windowEnd) {
-        lines.push(
-          `*Window: ${formatLogTimestamp(e.windowStart)}${e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}*`,
-        );
-      }
-      if (e.editedAt) lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
-      lines.push("");
-      lines.push(e.body);
-      lines.push("");
+    const grouped = new Map<string, CombinedMaintenanceRow[]>();
+    for (const r of kindRows) {
+      if (!grouped.has(r.name)) grouped.set(r.name, []);
+      grouped.get(r.name)!.push(r);
     }
-  }
+    const names = Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b));
+    for (const name of names) {
+      const group = grouped.get(name)!;
+      const first = group[0];
+      const subtitle = [first.address, first.building].filter(Boolean).join(" · ");
+      lines.push(`## ${name}`);
+      if (subtitle) lines.push(`*${subtitle}*`);
+      lines.push("");
+      for (const { entry: e } of group) {
+        lines.push(`### ${formatLogTimestamp(e.createdAt)} — ${e.authorName}`);
+        if (e.windowStart || e.windowEnd) {
+          lines.push(
+            `*Window: ${formatLogTimestamp(e.windowStart)}${e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}*`,
+          );
+        }
+        if (e.editedAt) lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
+        lines.push("");
+        lines.push(e.body);
+        lines.push("");
+      }
+    }
+  };
+
+  renderGroups("switch", "Switches");
+  renderGroups("vlan", "VLANs");
   return lines.join("\n");
 }
 
 function ExportAllMaintenanceDialog({
   switches,
+  vlans,
   open,
   onOpenChange,
 }: {
   switches: NetworkSwitch[];
+  vlans: Vlan[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const [author, setAuthor] = useState<string>("__all__");
   const [building, setBuilding] = useState<string>("__all__");
+  const [kind, setKind] = useState<string>("__all__");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
 
-  const allRows = useMemo(() => collectSwitchEntries(switches), [switches]);
+  const allRows = useMemo(() => collectCombinedEntries(switches, vlans), [switches, vlans]);
 
   const authors = useMemo(() => {
     const seen = new Set<string>();
@@ -582,7 +613,7 @@ function ExportAllMaintenanceDialog({
   const buildings = useMemo(() => {
     const seen = new Set<string>();
     for (const r of allRows) {
-      const b = r.switchBuilding || "Unassigned";
+      const b = r.building || "Unassigned";
       seen.add(b);
     }
     return Array.from(seen).sort((a, b) => a.localeCompare(b));
@@ -594,16 +625,17 @@ function ExportAllMaintenanceDialog({
     const q = search.trim().toLowerCase();
     return allRows.filter((r) => {
       const e = r.entry;
+      if (kind !== "__all__" && r.kind !== kind) return false;
       if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
       if (building !== "__all__") {
-        const b = r.switchBuilding || "Unassigned";
+        const b = r.building || "Unassigned";
         if (b !== building) return false;
       }
       const created = e.createdAt ? new Date(e.createdAt).getTime() : null;
       if (fromTs != null && (created == null || created < fromTs)) return false;
       if (toTs != null && (created == null || created > toTs)) return false;
       if (q) {
-        const hay = [e.body, e.authorName, r.switchHostname, r.switchBuilding, r.switchIp]
+        const hay = [e.body, e.authorName, r.name, r.building, r.address]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -611,11 +643,12 @@ function ExportAllMaintenanceDialog({
       }
       return true;
     });
-  }, [allRows, author, building, from, to, search]);
+  }, [allRows, author, building, kind, from, to, search]);
 
   const reset = () => {
     setAuthor("__all__");
     setBuilding("__all__");
+    setKind("__all__");
     setFrom("");
     setTo("");
     setSearch("");
@@ -635,9 +668,9 @@ function ExportAllMaintenanceDialog({
       combinedRowsToMarkdown(filtered),
     );
 
-  const switchesWithEntries = useMemo(() => {
+  const devicesWithEntries = useMemo(() => {
     const seen = new Set<string>();
-    for (const r of filtered) seen.add(r.switchHostname);
+    for (const r of filtered) seen.add(`${r.kind}:${r.name}`);
     return seen.size;
   }, [filtered]);
 
@@ -645,15 +678,28 @@ function ExportAllMaintenanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Export maintenance log — all switches</DialogTitle>
+          <DialogTitle>Export maintenance log — switches & VLANs</DialogTitle>
           <DialogDescription>
             {allRows.length} total {allRows.length === 1 ? "entry" : "entries"} across{" "}
-            {switches.length} {switches.length === 1 ? "switch" : "switches"}. Filter, then export
-            CSV or Markdown.
+            {switches.length} {switches.length === 1 ? "switch" : "switches"} and {vlans.length}{" "}
+            {vlans.length === 1 ? "VLAN" : "VLANs"}. Filter, then export CSV or Markdown.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+          <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Type
+            <Select value={kind} onValueChange={setKind}>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All types</SelectItem>
+                <SelectItem value="switch">Switches</SelectItem>
+                <SelectItem value="vlan">VLANs</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Building
             <Select value={building} onValueChange={setBuilding}>
@@ -710,7 +756,7 @@ function ExportAllMaintenanceDialog({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="hostname, body…"
+              placeholder="hostname, VLAN, body…"
               className="h-8 text-xs mt-1"
             />
           </label>
@@ -719,7 +765,7 @@ function ExportAllMaintenanceDialog({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {filtered.length} of {allRows.length} {allRows.length === 1 ? "entry" : "entries"}
-            {filtered.length > 0 && ` · ${switchesWithEntries} ${switchesWithEntries === 1 ? "switch" : "switches"}`}
+            {filtered.length > 0 && ` · ${devicesWithEntries} ${devicesWithEntries === 1 ? "device" : "devices"}`}
           </span>
           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={reset}>
             <X className="h-3 w-3 mr-1" /> Reset filters
@@ -734,13 +780,16 @@ function ExportAllMaintenanceDialog({
           ) : (
             <div className="divide-y">
               {filtered.slice(0, 50).map((r) => (
-                <div key={`${r.switchHostname}-${r.entry.id}`} className="px-2 py-1.5">
+                <div key={`${r.kind}-${r.name}-${r.entry.id}`} className="px-2 py-1.5">
                   <div className="flex flex-wrap items-center gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <Badge variant="outline" className="h-4 px-1 text-[9px] uppercase">
+                      {r.kind}
+                    </Badge>
                     <span className="font-mono normal-case tracking-normal text-xs text-foreground/90">
-                      {r.switchHostname}
+                      {r.name}
                     </span>
-                    {r.switchBuilding && (
-                      <span className="normal-case tracking-normal">{r.switchBuilding}</span>
+                    {r.building && (
+                      <span className="normal-case tracking-normal">{r.building}</span>
                     )}
                     <span className="font-semibold normal-case tracking-normal text-foreground/80">
                       {r.entry.authorName}
@@ -1547,6 +1596,7 @@ export default function Network() {
           </Button>
           <ExportAllMaintenanceDialog
             switches={allSwitches}
+            vlans={allVlans}
             open={exportAllOpen}
             onOpenChange={setExportAllOpen}
           />
