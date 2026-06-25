@@ -19,4 +19,8 @@ description: Styling/theming setup gotchas for the it-reporting React app and wh
 
 - **Dark mode is latent.** No theme toggle adds `.dark` to the document, so `:root` (light) is always active. The `.dark` block in `index.css` is kept as a Saints-green variant for safety but is not exercised.
 
-- The maker's-mark footer signature (`system/Signature.tsx`) is mounted in `layout.tsx` so it shows on every authenticated page; the sidebar header uses the white SCCC logo on the forest background. SCCC logo assets live in `src/assets/brand/`.
+- The maker's-mark footer signature (`system/Signature.tsx`) is mounted in `layout.tsx` so it shows on every authenticated page; the top brand bar uses the white SCCC logo on the forest background. SCCC logo assets live in `src/assets/brand/`.
+
+- **Navigation is a top-bar "Launchpad", not a sidebar.** `layout.tsx` renders a forest-green top bar (logo, current-section label, central "Jump to anything…" pill, Quick Add, Ask AI, account avatar). Full nav lives in a full-screen `AppLauncher` overlay (search + grouped tiles) opened by the pill / grid button / Cmd-Ctrl+K. Nav data + role-gating are centralized in `src/config/nav.tsx` (`getNavGroups(isCIO)`); consume that rather than re-listing routes.
+
+- **Seed/login creds in `replit.md` are outdated.** The actual CIO account is `mark.bojeun@sccc.edu` (not `cio@sccc.edu`); generic `*@sccc.edu` seed logins from `replit.md` may 401. To log in for e2e, set a known bcrypt password on an existing dev test-CIO row (dev DB only). Zendesk stored creds have also tested invalid (401 on `/users/me`) — a fresh `ZENDESK_API_TOKEN` is needed, the auth-header code is correct.

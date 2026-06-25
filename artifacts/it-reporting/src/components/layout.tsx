@@ -14,52 +14,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
-import { useState } from "react";
+import { AppLauncher } from "@/components/AppLauncher";
+import { getNavGroups, findActiveItem } from "@/config/nav";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ListChecks as ListChecksIcon, ShieldAlert as ShieldAlertIcon, Activity as ActivityIcon, Network as NetworkIcon } from "lucide-react";
 import {
-  LayoutDashboard,
-  FileText,
-  Files,
-  ListChecks,
-  ShieldAlert,
-  Network,
-  Activity,
-  Users,
-  Sparkles,
-  BookOpen,
-  Briefcase,
-  Target,
-  LogOut,
-  Zap,
-  Cloud,
-  BarChart3,
-  Gauge,
+  ListChecks as ListChecksIcon,
+  ShieldAlert as ShieldAlertIcon,
+  Activity as ActivityIcon,
+  Network as NetworkIcon,
 } from "lucide-react";
-
-type NavItem = { href: string; label: string; icon: React.ComponentType<any>; match?: (loc: string) => boolean };
-type NavGroup = { label: string; items: NavItem[] };
+import { LogOut, Zap, Sparkles, LayoutGrid, ChevronRight } from "lucide-react";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -246,10 +221,53 @@ function QuickAddMenu() {
   );
 }
 
+function AccountMenu({
+  name,
+  role,
+  onLogout,
+}: {
+  name?: string;
+  role?: string;
+  onLogout: () => void;
+}) {
+  const initials = (name ?? "?")
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"
+          aria-label="Account menu"
+        >
+          {initials || "?"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="flex flex-col">
+          <span className="truncate">{name}</span>
+          <span className="text-xs font-normal capitalize text-muted-foreground">{role}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout, isCIO } = useAuth();
   const [location] = useLocation();
   const logoutMutation = useLogout();
+  const [launcherOpen, setLauncherOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -259,116 +277,83 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const myWorkGroup: NavGroup = {
-    label: "My Work",
-    items: [
-      { href: "/", label: isCIO ? "Dashboard" : "Home", icon: LayoutDashboard, match: (l) => l === "/" },
-      { href: "/items", label: "My Tasks", icon: ListChecks },
-      { href: "/entries", label: "Weekly Log", icon: FileText },
-    ],
-  };
+  const groups = getNavGroups(isCIO);
+  const activeItem = findActiveItem(groups, location);
 
-  const knowledgeGroup: NavGroup = {
-    label: "Knowledge",
-    items: [
-      { href: "/network", label: "Network", icon: Network },
-      { href: "/azure-vms", label: "Azure VMs", icon: Cloud },
-      { href: "/monitoring", label: "Monitoring", icon: Gauge },
-      { href: "/processes", label: "Process Library", icon: BookOpen },
-      { href: "/ai-report", label: "AI Assistant", icon: Sparkles },
-    ],
-  };
-
-  const teamGroup: NavGroup = {
-    label: "Team",
-    items: [
-      { href: "/risks", label: "Risks & Issues", icon: ShieldAlert },
-      { href: "/after-action", label: "Post-Incident Reviews", icon: Activity },
-      { href: "/reports", label: "Reports", icon: Files },
-    ],
-  };
-
-  const leadershipGroup: NavGroup = {
-    label: "Leadership & Admin",
-    items: [
-      { href: "/projects", label: "Projects", icon: Briefcase },
-      { href: "/strategic-objectives", label: "Department Goals", icon: Target },
-      { href: "/analytics", label: "Usage Analytics", icon: BarChart3 },
-      { href: "/admin", label: "Admin", icon: Users },
-    ],
-  };
-
-  const groups: NavGroup[] = isCIO
-    ? [myWorkGroup, knowledgeGroup, teamGroup, leadershipGroup]
-    : [myWorkGroup, knowledgeGroup, teamGroup];
-
-  const isActive = (item: NavItem) => {
-    if (item.match) return item.match(location);
-    return location.startsWith(item.href);
-  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setLauncherOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background w-full">
-        <Sidebar className="border-r border-sidebar-border">
-          <SidebarContent>
-            <div className="p-4 border-b border-sidebar-border">
-              <Logo variant="white" className="h-7" />
-            </div>
-            {groups.map((group) => (
-              <SidebarGroup key={group.label}>
-                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <SidebarMenuItem key={item.href}>
-                          <SidebarMenuButton asChild isActive={isActive(item)}>
-                            <Link href={item.href}>
-                              <Icon className="mr-2" />
-                              {item.label}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ))}
-          </SidebarContent>
-          <SidebarFooter className="border-t border-sidebar-border p-4 flex flex-col gap-2">
-            <div className="text-xs text-muted-foreground truncate">
-              {user?.name} ({user?.role})
-            </div>
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+    <div className="flex h-screen w-full flex-col bg-background">
+      <header className="flex h-14 shrink-0 items-center gap-3 bg-sidebar px-4 text-sidebar-foreground">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Logo variant="white" className="h-7" />
+        </Link>
+
+        {activeItem && (
+          <div className="hidden items-center gap-1.5 text-sm text-white/70 md:flex">
+            <ChevronRight className="h-4 w-4" />
+            <span className="font-medium text-white/90">{activeItem.label}</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setLauncherOpen(true)}
+          className="mx-auto hidden w-full max-w-md items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/15 sm:flex"
+        >
+          <LayoutGrid className="h-4 w-4" />
+          <span>Jump to anything…</span>
+          <kbd className="ml-auto inline-flex items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
+            ⌘K
+          </kbd>
+        </button>
+
+        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <button
+            type="button"
+            onClick={() => setLauncherOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+            aria-label="Open menu"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+
+          <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button:hover]:bg-white/20">
+            <QuickAddMenu />
+          </div>
+
+          <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Ask AI</span>
             </Button>
-          </SidebarFooter>
-        </Sidebar>
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-12 border-b border-border flex items-center justify-between px-4 shrink-0 bg-card gap-2">
-            <SidebarTrigger />
-            <div className="flex items-center gap-2">
-              <QuickAddMenu />
-              <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
-                <Button variant="outline" size="sm">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Ask AI
-                </Button>
-              </Link>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto bg-background">
-            <div className="p-6">{children}</div>
-            <footer className="border-t border-border px-6 py-4">
-              <Signature />
-            </footer>
-          </div>
-        </main>
-      </div>
-    </SidebarProvider>
+          </Link>
+
+          <AccountMenu name={user?.name} role={user?.role} onLogout={handleLogout} />
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-auto bg-background">
+        <div className="p-6">{children}</div>
+        <footer className="border-t border-border px-6 py-4">
+          <Signature />
+        </footer>
+      </main>
+
+      <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
+    </div>
   );
 }
