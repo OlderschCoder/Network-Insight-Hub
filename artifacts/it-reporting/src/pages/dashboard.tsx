@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText, AlertCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
+import { ZendeskResolved } from "@/components/ZendeskResolved";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { HowToUse } from "@/components/HowToUse";
 import { useAuth } from "@/context/AuthContext";
@@ -150,6 +151,8 @@ function CIODashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ZendeskResolved />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="col-span-1">
