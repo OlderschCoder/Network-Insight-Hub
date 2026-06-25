@@ -26,8 +26,18 @@ function CIODashboard() {
     refetch: refetchSummary,
     isFetching: isSummaryFetching,
   } = useGetDashboardSummary();
-  const { data: recentActivity } = useGetRecentActivity({ limit: 10 });
-  const { data: weekStatus } = useGetWeekStatus();
+  const {
+    data: recentActivity,
+    isError: isActivityError,
+    refetch: refetchActivity,
+    isFetching: isActivityFetching,
+  } = useGetRecentActivity({ limit: 10 });
+  const {
+    data: weekStatus,
+    isError: isWeekStatusError,
+    refetch: refetchWeekStatus,
+    isFetching: isWeekStatusFetching,
+  } = useGetWeekStatus();
 
   const summaryValue = (value: number | undefined) =>
     isSummaryError ? "—" : value ?? 0;
@@ -38,14 +48,19 @@ function CIODashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-3">
           <QuickAddItemDialog />
-          {weekStatus && (
+          {weekStatus ? (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Week of {format(new Date(weekStatus.weekOf), 'MMM d, yyyy')}</span>
               <Badge variant={weekStatus.isFinalized ? "default" : "secondary"}>
                 {weekStatus.isFinalized ? "Finalized" : "Draft"}
               </Badge>
             </div>
-          )}
+          ) : isWeekStatusError ? (
+            <div className="flex items-center gap-1.5 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Week status unavailable</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -145,27 +160,48 @@ function CIODashboard() {
             <CardTitle>Team Submission Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {weekStatus?.submissions?.map((sub) => (
-                <div key={sub.userId} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
-                  <div className="flex flex-col">
-                    <span className="font-medium text-sm">{sub.userName}</span>
-                    <span className="text-xs text-muted-foreground">{sub.userRole}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm">{sub.entryCount} entries</span>
-                    {sub.isSubmitted ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-amber-500" />
-                    )}
-                  </div>
+            {isWeekStatusError ? (
+              <div
+                role="alert"
+                className="flex flex-col items-center gap-3 py-6 text-center text-sm"
+              >
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Couldn't load team submission status.</span>
                 </div>
-              ))}
-              {!weekStatus?.submissions?.length && (
-                <div className="text-sm text-muted-foreground py-4 text-center">No submissions yet for this week</div>
-              )}
-            </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchWeekStatus()}
+                  disabled={isWeekStatusFetching}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isWeekStatusFetching ? "animate-spin" : ""}`} />
+                  {isWeekStatusFetching ? "Retrying…" : "Retry"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {weekStatus?.submissions?.map((sub) => (
+                  <div key={sub.userId} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{sub.userName}</span>
+                      <span className="text-xs text-muted-foreground">{sub.userRole}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm">{sub.entryCount} entries</span>
+                      {sub.isSubmitted ? (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-amber-500" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {!weekStatus?.submissions?.length && (
+                  <div className="text-sm text-muted-foreground py-4 text-center">No submissions yet for this week</div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -174,23 +210,44 @@ function CIODashboard() {
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity?.map((item) => (
-                <div key={item.id} className="flex flex-col border-l-2 border-primary pl-4 py-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{item.action} {item.type}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(item.createdAt), 'MMM d, HH:mm')}
-                    </span>
-                  </div>
-                  <span className="text-sm mt-1">{item.title}</span>
-                  <span className="text-xs text-muted-foreground mt-1">By {item.userName}</span>
+            {isActivityError ? (
+              <div
+                role="alert"
+                className="flex flex-col items-center gap-3 py-6 text-center text-sm"
+              >
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Couldn't load recent activity.</span>
                 </div>
-              ))}
-              {!recentActivity?.length && (
-                <div className="text-sm text-muted-foreground py-4 text-center">No recent activity</div>
-              )}
-            </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchActivity()}
+                  disabled={isActivityFetching}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isActivityFetching ? "animate-spin" : ""}`} />
+                  {isActivityFetching ? "Retrying…" : "Retry"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity?.map((item) => (
+                  <div key={item.id} className="flex flex-col border-l-2 border-primary pl-4 py-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{item.action} {item.type}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(item.createdAt), 'MMM d, HH:mm')}
+                      </span>
+                    </div>
+                    <span className="text-sm mt-1">{item.title}</span>
+                    <span className="text-xs text-muted-foreground mt-1">By {item.userName}</span>
+                  </div>
+                ))}
+                {!recentActivity?.length && (
+                  <div className="text-sm text-muted-foreground py-4 text-center">No recent activity</div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
