@@ -861,13 +861,17 @@ export default function ReportDetail() {
       {(() => {
         type MaintItem = {
           id: string;
+          source?: "switch" | "vlan";
           body: string;
           authorName: string;
           createdAt?: string | null;
           windowStart?: string | null;
           windowEnd?: string | null;
-          switchHostname: string;
-          switchBuilding: string;
+          switchHostname?: string;
+          switchBuilding?: string;
+          vlanId?: number;
+          vlanName?: string;
+          vlanBuilding?: string;
         };
         const maint = (extras?.maintenance ?? []) as unknown as MaintItem[];
         if (maint.length === 0) return null;
@@ -893,6 +897,11 @@ export default function ReportDetail() {
                   const when = m.windowStart
                     ? `${m.windowStart}${m.windowEnd ? ` → ${m.windowEnd}` : ""}`
                     : (m.createdAt ?? "").slice(0, 16).replace("T", " ");
+                  const isVlan = m.source === "vlan";
+                  const targetLabel = isVlan
+                    ? `VLAN ${m.vlanId}${m.vlanName ? ` · ${m.vlanName}` : ""}`
+                    : m.switchHostname;
+                  const buildingLabel = isVlan ? m.vlanBuilding : m.switchBuilding;
                   return (
                     <li key={m.id} className="border rounded p-2">
                       <div className="flex items-start gap-2">
@@ -904,8 +913,11 @@ export default function ReportDetail() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{m.switchHostname}</span>
-                            <Badge variant="outline" className="text-[10px]">{m.switchBuilding}</Badge>
+                            <Badge variant="secondary" className="text-[10px]">{isVlan ? "VLAN" : "Switch"}</Badge>
+                            <span className="font-medium">{targetLabel}</span>
+                            {buildingLabel && (
+                              <Badge variant="outline" className="text-[10px]">{buildingLabel}</Badge>
+                            )}
                             <span className="text-xs text-muted-foreground ml-auto">{m.authorName}</span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">{when}</p>

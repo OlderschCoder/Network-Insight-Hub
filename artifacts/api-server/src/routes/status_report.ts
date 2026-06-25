@@ -10,6 +10,7 @@ import {
   projectsTable,
   strategicObjectivesTable,
   networkSwitchesTable,
+  vlansTable,
 } from "@workspace/db";
 import { and, gte, lte, or, sql } from "drizzle-orm";
 
@@ -72,6 +73,7 @@ router.post(
         projectsData,
         objectivesData,
         switchesData,
+        vlansData,
       ] = await Promise.all([
         db
           .select({
@@ -209,6 +211,12 @@ router.post(
           building: networkSwitchesTable.building,
           maintenanceLog: networkSwitchesTable.maintenanceLog,
         }).from(networkSwitchesTable),
+        db.select({
+          vlanId: vlansTable.vlanId,
+          name: vlansTable.name,
+          building: vlansTable.building,
+          maintenanceLog: vlansTable.maintenanceLog,
+        }).from(vlansTable),
       ]);
 
       // Filter maintenance windows to the date range — OR semantics on
@@ -222,7 +230,8 @@ router.post(
         return d >= startStr && d <= endStr;
       };
       type MaintenanceWindow = {
-        switch: string;
+        target: string;
+        kind: "switch" | "vlan";
         building: string;
         author: string;
         windowStart: string | null;
@@ -232,10 +241,28 @@ router.post(
       const maintenanceWindows: MaintenanceWindow[] = [];
       for (const sw of switchesData) {
         for (const log of sw.maintenanceLog ?? []) {
+          if (log.deletedAt) continue;
           if (inRange(log.createdAt) || inRange(log.windowStart) || inRange(log.windowEnd)) {
             maintenanceWindows.push({
-              switch: sw.hostname,
+              target: sw.hostname,
+              kind: "switch",
               building: sw.building,
+              author: log.authorName,
+              windowStart: log.windowStart ?? null,
+              windowEnd: log.windowEnd ?? null,
+              body: log.body,
+            });
+          }
+        }
+      }
+      for (const vlan of vlansData) {
+        for (const log of vlan.maintenanceLog ?? []) {
+          if (log.deletedAt) continue;
+          if (inRange(log.createdAt) || inRange(log.windowStart) || inRange(log.windowEnd)) {
+            maintenanceWindows.push({
+              target: `VLAN ${vlan.vlanId} (${vlan.name})`,
+              kind: "vlan",
+              building: vlan.building,
               author: log.authorName,
               windowStart: log.windowStart ?? null,
               windowEnd: log.windowEnd ?? null,
@@ -400,7 +427,7 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 - \`completedTasks\` (closed log items): use these to support delivery / wins claims and inform Key Actions / Decisions where in-progress.
 - \`projects\` (each with title, status, progress, alignedDepartmentGoals): cite project name, status, and progress in On-going Projects / Services.
 - \`departmentGoals\` (each item: \`goal\`, \`linkedProjects\`, \`activeProjects\`, \`avgProgress\`, \`avgRangeDelta\`, \`sumRangeDelta\`, and per-project rows under \`projects[]\` with \`progressAtStart\` → \`progressNow\` and \`rangeDelta\`): summarize movement against strategic objectives, e.g., "Modernize Network advanced +12 pts this period (avg +6%)".
-- \`networkMaintenance\` (switch host, building, window times, notes): mention notable maintenance windows in On-going Projects / Services or Service Level Metrics.
+- \`networkMaintenance\` (each item: \`kind\` of "switch" or "vlan", \`target\` (switch hostname or "VLAN <id> (<name>)"), building, window times, notes): mention notable switch and VLAN maintenance windows in On-going Projects / Services or Service Level Metrics.
 - \`afterActionReports\` (PIRs with severity, incident, resolution, lessonsLearned): summarize incidents and learnings in Recent Wins / Challenges.
 - \`openRisksAndIssues\`, \`mitigatedRisks\`, \`closedRisks\`: open ones belong in Key Actions / Decisions and (if material) Challenges; mitigated/closed support Recent Wins.
 - \`ticketStats\` (helpdesk volume + categories): use for Service Level Metrics.`;

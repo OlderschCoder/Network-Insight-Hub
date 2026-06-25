@@ -7,6 +7,7 @@ import {
   usersTable,
   afterActionReportsTable,
   networkSwitchesTable,
+  vlansTable,
   strategicObjectivesTable,
   projectsTable,
   logItemsTable,
@@ -290,18 +291,28 @@ router.get("/:id/extras", requireAuth, async (req: any, res) => {
     resolution: a.resolution,
   }));
 
-  // Network maintenance windows in this week
-  const switches = await db.select().from(networkSwitchesTable);
+  // Network maintenance windows in this week (switches + VLANs)
+  const [switches, vlans] = await Promise.all([
+    db.select().from(networkSwitchesTable),
+    db.select().from(vlansTable),
+  ]);
   type MaintRow = {
     id: string;
+    source: "switch" | "vlan";
     body: string;
     authorName: string;
     createdAt: string;
     windowStart?: string | null;
     windowEnd?: string | null;
-    switchHostname: string;
-    switchBuilding: string;
-    switchId: number;
+    // Switch-sourced fields (present when source === "switch")
+    switchHostname?: string;
+    switchBuilding?: string;
+    switchId?: number;
+    // VLAN-sourced fields (present when source === "vlan")
+    vlanId?: number;
+    vlanName?: string;
+    vlanBuilding?: string;
+    vlanRowId?: number;
   };
   const maintenance: MaintRow[] = [];
   const inWeekDateStr = (s?: string | null) => {
@@ -309,16 +320,16 @@ router.get("/:id/extras", requireAuth, async (req: any, res) => {
     const d = s.slice(0, 10);
     return d >= weekStartStr && d < weekEndStr;
   };
+  // OR semantics: include if any of createdAt, windowStart, or windowEnd falls in the week
+  const logInWeek = (log: { createdAt: string; windowStart?: string | null; windowEnd?: string | null }) =>
+    inWeekDateStr(log.createdAt) || inWeekDateStr(log.windowStart) || inWeekDateStr(log.windowEnd);
   for (const sw of switches) {
     for (const log of sw.maintenanceLog ?? []) {
-      // OR semantics: include if any of createdAt, windowStart, or windowEnd falls in the week
-      if (
-        inWeekDateStr(log.createdAt) ||
-        inWeekDateStr(log.windowStart) ||
-        inWeekDateStr(log.windowEnd)
-      ) {
+      if (log.deletedAt) continue;
+      if (logInWeek(log)) {
         maintenance.push({
           id: log.id,
+          source: "switch",
           body: log.body,
           authorName: log.authorName,
           createdAt: log.createdAt,
@@ -327,6 +338,26 @@ router.get("/:id/extras", requireAuth, async (req: any, res) => {
           switchHostname: sw.hostname,
           switchBuilding: sw.building,
           switchId: sw.id,
+        });
+      }
+    }
+  }
+  for (const vlan of vlans) {
+    for (const log of vlan.maintenanceLog ?? []) {
+      if (log.deletedAt) continue;
+      if (logInWeek(log)) {
+        maintenance.push({
+          id: log.id,
+          source: "vlan",
+          body: log.body,
+          authorName: log.authorName,
+          createdAt: log.createdAt,
+          windowStart: log.windowStart ?? null,
+          windowEnd: log.windowEnd ?? null,
+          vlanId: vlan.vlanId,
+          vlanName: vlan.name,
+          vlanBuilding: vlan.building,
+          vlanRowId: vlan.id,
         });
       }
     }
