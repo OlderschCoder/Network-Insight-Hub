@@ -50,6 +50,14 @@ use actual staff names (e.g. `firstname.lastname@sccc.edu`) with unknown
 passwords. Don't rely on documented seed credentials; create + activate your own
 test user instead.
 
+## Deactivation kills sessions via two paths
+**Why:** The CIO update route (`users.ts`) proactively calls
+`invalidateUserSessions(id)` on `isActive:false`, dropping the user's tokens —
+so the victim's next request gets 401 **"Unauthorized"**, NOT the lazy
+`requireAuth` "Account is deactivated" branch (which only fires if a token
+survived the sweep). Tests asserting the kill should accept either 401 message,
+not pin to "Account is deactivated".
+
 ## Mocking external services
 Zendesk-dependent UI flows are tested by mocking the endpoint at the network
 layer with `page.route("**/api/zendesk/ticket/*/timeline", ...)`, avoiding live
