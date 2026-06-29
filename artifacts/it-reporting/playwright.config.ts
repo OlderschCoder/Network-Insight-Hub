@@ -6,6 +6,10 @@ const baseURL =
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : "http://localhost:8081");
 
+const chromiumExecutablePath =
+  process.env.CHROMIUM_EXECUTABLE_PATH ||
+  process.env.REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
@@ -24,8 +28,8 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        launchOptions: process.env.CHROMIUM_EXECUTABLE_PATH
-          ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH }
+        launchOptions: chromiumExecutablePath
+          ? { executablePath: chromiumExecutablePath }
           : undefined,
       },
     },

@@ -10,9 +10,16 @@ Committed specs live in `artifacts/it-reporting/tests/*.spec.ts`; run via
 
 ## Chromium binary
 There is no Playwright browser cache by default. The system provides a Chromium
-binary at env var `REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE`, and the playwright
-config honors `CHROMIUM_EXECUTABLE_PATH`. Run with:
-`CHROMIUM_EXECUTABLE_PATH="$REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE" pnpm exec playwright test`.
+binary at env var `REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE`. `playwright.config.ts`
+now auto-falls back to that env var when `CHROMIUM_EXECUTABLE_PATH` is unset, so
+`pnpm --filter @workspace/it-reporting exec playwright test` works with no extra
+env var or manual `playwright install`. Override with `CHROMIUM_EXECUTABLE_PATH`
+only if you need a different binary.
+
+Note: do NOT register this as a validation step via `setValidationCommand` in
+this repo — it is the only `[workflows.workflow]` entry in `.replit`, so the
+system makes it the `runButton` ("Project") and hijacks the Run button away from
+the app. Run the suite directly instead.
 
 ## Authenticating a test user
 **Why:** `POST /api/auth/register` creates a *pending/inactive* account and
