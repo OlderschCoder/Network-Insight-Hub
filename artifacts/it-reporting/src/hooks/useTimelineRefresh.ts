@@ -119,11 +119,13 @@ export function useTimelineRefresh() {
       return;
     }
     const ok = await confirm({
-      title: "Replace all timelines?",
-      description: `This will replace the Timeline on ${items.length} review${
+      title: "Replace every linked timeline?",
+      description: `This will replace the Timeline on all ${items.length} linked review${
         items.length === 1 ? "" : "s"
-      } with the latest comments from Zendesk. Any edits you've made will be lost.`,
-      confirmText: "Replace all",
+      } with the latest comments from Zendesk — including reviews created by other team members. Any hand-edited timelines (yours or theirs) will be lost.`,
+      confirmText: `Replace all ${items.length} timeline${
+        items.length === 1 ? "" : "s"
+      }`,
       destructive: true,
     });
     if (!ok) return;
