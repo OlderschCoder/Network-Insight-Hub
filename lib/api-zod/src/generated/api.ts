@@ -1350,6 +1350,48 @@ export const SyncAzureVmsResponse = zod.object({
   syncedAt: zod.coerce.date(),
 });
 
+/**
+ * @summary List the full Azure inventory (all resource types)
+ */
+export const ListAzureResourcesQueryParams = zod.object({
+  q: zod.coerce.string().optional(),
+  type: zod.coerce.string().optional(),
+});
+
+export const ListAzureResourcesResponseItem = zod.object({
+  id: zod.number(),
+  azureResourceId: zod.string(),
+  name: zod.string(),
+  type: zod.string(),
+  resourceGroup: zod.string().nullish(),
+  location: zod.string().nullish(),
+  kind: zod.string().nullish(),
+  sku: zod.string().nullish(),
+  tags: zod.record(zod.string(), zod.string()).nullish(),
+  subscription: zod.string().nullish(),
+  status: zod.string(),
+  source: zod.string(),
+  notes: zod.string().nullish(),
+  lastSyncedAt: zod.coerce.date().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListAzureResourcesResponse = zod.array(
+  ListAzureResourcesResponseItem,
+);
+
+/**
+ * @summary Sync the full Azure inventory from Azure (CIO only)
+ */
+export const SyncAzureResourcesResponse = zod.object({
+  created: zod.number(),
+  updated: zod.number(),
+  removed: zod.number(),
+  total: zod.number(),
+  syncedAt: zod.coerce.date(),
+});
+
 export const ListStrategicObjectivesResponseItem = zod.object({
   id: zod.number(),
   title: zod.string(),

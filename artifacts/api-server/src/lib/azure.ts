@@ -207,6 +207,53 @@ export async function fetchAzureVms(cfg: AzureConfig): Promise<AzureVmRecord[]> 
   });
 }
 
+export type AzureResourceRecord = {
+  azureResourceId: string;
+  name: string;
+  type: string;
+  resourceGroup: string | null;
+  location: string | null;
+  kind: string | null;
+  sku: string | null;
+  tags: Record<string, string> | null;
+  subscription: string | null;
+};
+
+type AzureGenericResource = {
+  id: string;
+  name: string;
+  type: string;
+  location?: string;
+  kind?: string;
+  sku?: { name?: string };
+  tags?: Record<string, string>;
+};
+
+/**
+ * Lists EVERY resource in the subscription (all types) via the generic ARM
+ * resources endpoint. Pages through nextLink so nothing is dropped. Resource
+ * group is parsed from the resource id.
+ */
+export async function fetchAzureResources(cfg: AzureConfig): Promise<AzureResourceRecord[]> {
+  const token = await getToken(cfg);
+  const sub = cfg.subscriptionId;
+  const resources = await armGetAll<AzureGenericResource>(
+    token,
+    `/subscriptions/${sub}/resources?api-version=2021-04-01`,
+  );
+  return resources.map((r) => ({
+    azureResourceId: r.id,
+    name: r.name,
+    type: r.type,
+    resourceGroup: parseResourceGroup(r.id),
+    location: r.location ?? null,
+    kind: r.kind ?? null,
+    sku: r.sku?.name ?? null,
+    tags: r.tags && Object.keys(r.tags).length > 0 ? r.tags : null,
+    subscription: sub,
+  }));
+}
+
 export async function isAzureReachable(cfg: AzureConfig): Promise<boolean> {
   try {
     await getToken(cfg);

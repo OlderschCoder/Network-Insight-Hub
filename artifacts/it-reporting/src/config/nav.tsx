@@ -15,6 +15,7 @@ import {
   BarChart3,
   Gauge,
   LayoutGrid,
+  Boxes,
 } from "lucide-react";
 
 export type NavItem = {
@@ -48,6 +49,7 @@ export function getNavGroups(isCIO: boolean): NavGroup[] {
     items: [
       { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network },
       { href: "/azure-vms", label: "Azure VMs", desc: "Cloud virtual machine inventory", icon: Cloud },
+      { href: "/azure-inventory", label: "Azure Inventory", desc: "Full inventory of all Azure resources by type", icon: Boxes },
       { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
       { href: "/it-apps", label: "IT Apps", desc: "Unified view of apps built for IT", icon: LayoutGrid },
       { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },

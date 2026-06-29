@@ -732,6 +732,28 @@ export interface AzureVmInput {
   owner?: string | null;
 }
 
+export type AzureResourceTags = { [key: string]: string } | null;
+
+export interface AzureResource {
+  id: number;
+  azureResourceId: string;
+  name: string;
+  type: string;
+  resourceGroup?: string | null;
+  location?: string | null;
+  kind?: string | null;
+  sku?: string | null;
+  tags?: AzureResourceTags;
+  subscription?: string | null;
+  status: string;
+  source: string;
+  notes?: string | null;
+  lastSyncedAt?: string | null;
+  createdBy?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type VlanType = (typeof VlanType)[keyof typeof VlanType];
 
 export const VlanType = {
@@ -1095,6 +1117,19 @@ export type DeleteAzureVm200 = {
 };
 
 export type SyncAzureVms200 = {
+  created: number;
+  updated: number;
+  removed: number;
+  total: number;
+  syncedAt: string;
+};
+
+export type ListAzureResourcesParams = {
+  q?: string;
+  type?: string;
+};
+
+export type SyncAzureResources200 = {
   created: number;
   updated: number;
   removed: number;

@@ -21,6 +21,7 @@ import type {
   AfterActionReport,
   AggregateReport,
   AuthResponse,
+  AzureResource,
   AzureVm,
   AzureVmInput,
   ClearNetworkLayout200,
@@ -51,6 +52,7 @@ import type {
   GetUsageAnalyticsParams,
   HealthStatus,
   ListAfterActionReportsParams,
+  ListAzureResourcesParams,
   ListAzureVmsParams,
   ListEntriesParams,
   ListLogItemsParams,
@@ -78,6 +80,7 @@ import type {
   SaveNetworkLayoutBody,
   StrategicObjective,
   StrategicObjectiveBody,
+  SyncAzureResources200,
   SyncAzureVms200,
   UpdateLogItemBody,
   UpdateMaintenanceLogEntryBody,
@@ -4022,6 +4025,184 @@ export const useSyncAzureVms = <
   TContext
 > => {
   return useMutation(getSyncAzureVmsMutationOptions(options));
+};
+
+/**
+ * @summary List the full Azure inventory (all resource types)
+ */
+export const getListAzureResourcesUrl = (params?: ListAzureResourcesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/azure-resources?${stringifiedParams}`
+    : `/api/azure-resources`;
+};
+
+export const listAzureResources = async (
+  params?: ListAzureResourcesParams,
+  options?: RequestInit,
+): Promise<AzureResource[]> => {
+  return customFetch<AzureResource[]>(getListAzureResourcesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAzureResourcesQueryKey = (
+  params?: ListAzureResourcesParams,
+) => {
+  return [`/api/azure-resources`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAzureResourcesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAzureResources>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAzureResourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAzureResources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAzureResourcesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAzureResources>>
+  > = ({ signal }) => listAzureResources(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAzureResources>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAzureResourcesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAzureResources>>
+>;
+export type ListAzureResourcesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the full Azure inventory (all resource types)
+ */
+
+export function useListAzureResources<
+  TData = Awaited<ReturnType<typeof listAzureResources>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAzureResourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAzureResources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAzureResourcesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Sync the full Azure inventory from Azure (CIO only)
+ */
+export const getSyncAzureResourcesUrl = () => {
+  return `/api/azure-resources/sync`;
+};
+
+export const syncAzureResources = async (
+  options?: RequestInit,
+): Promise<SyncAzureResources200> => {
+  return customFetch<SyncAzureResources200>(getSyncAzureResourcesUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSyncAzureResourcesMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncAzureResources>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof syncAzureResources>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["syncAzureResources"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof syncAzureResources>>,
+    void
+  > = () => {
+    return syncAzureResources(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SyncAzureResourcesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof syncAzureResources>>
+>;
+
+export type SyncAzureResourcesMutationError = ErrorType<void>;
+
+/**
+ * @summary Sync the full Azure inventory from Azure (CIO only)
+ */
+export const useSyncAzureResources = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncAzureResources>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof syncAzureResources>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSyncAzureResourcesMutationOptions(options));
 };
 
 export const getListStrategicObjectivesUrl = () => {
