@@ -25,11 +25,13 @@ the app. Run the suite directly instead.
 **Why:** `POST /api/auth/register` creates a *pending/inactive* account and
 returns NO token (CIO-approval flow); login rejects inactive users. Register
 also ignores any `role` field and always inserts `helpdesk`.
-**How to apply:** register a fresh `@sccc.edu` user (registration is restricted
-to that domain), then UPDATE the row in Postgres via `DATABASE_URL` (the `pg`
-Pool) to set BOTH `is_active=true` AND the desired `role`, then
-`POST /api/auth/login`. Both `timeline-refresh.spec.ts` and
-`role-based-ui.spec.ts` use this register→activate(+role)→login pattern.
+**How to apply:** use the shared helper `tests/helpers/auth.ts`
+(`registerActivateLogin(request, { role?, prefix? })` + `authenticate(page,
+token)`) instead of re-implementing. It registers a fresh `@sccc.edu` user,
+UPDATEs the row in Postgres via `DATABASE_URL` to set BOTH `is_active=true` AND
+the desired `role`, then `POST /api/auth/login`. Both `timeline-refresh.spec.ts`
+and `role-based-ui.spec.ts` consume this helper — don't copy the flow back into
+specs.
 
 ## Navigation is a command palette, not a sidebar
 **Why:** There is no persistent sidebar. The top bar is a `<header>` above

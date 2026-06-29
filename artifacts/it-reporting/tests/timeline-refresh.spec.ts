@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { Pool } from "pg";
+import { authenticate, registerActivateLogin } from "./helpers/auth";
 
 // End-to-end coverage for the shared "Refresh from Zendesk" flow
 // (src/hooks/useTimelineRefresh.ts) across every place it is used: the
@@ -14,48 +14,14 @@ function rand(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
-const PASSWORD = "Password123";
-
-// Registration is restricted to @sccc.edu addresses (see auth route).
-function uniqueEmail(): string {
-  return `e2e_timeline_${Date.now()}_${rand()}@sccc.edu`;
-}
-
-// New registrations land in a pending/inactive state and return no token, so we
-// register a fresh account, flip it active directly in the database, then log
-// in. The Zendesk timeline endpoint itself is mocked, so no special role or
-// ticket assignment is required to exercise the refresh flow.
-async function registerActivateLogin(
-  request: APIRequestContext,
-): Promise<string> {
-  const email = uniqueEmail();
-  const regRes = await request.post("/api/auth/register", {
-    data: { email, password: PASSWORD, name: "E2E Timeline" },
+// The Zendesk timeline endpoint is mocked, so no special role or ticket
+// assignment is required to exercise the refresh flow — a default (helpdesk)
+// account is enough.
+async function loginAsTester(request: APIRequestContext): Promise<string> {
+  const { token } = await registerActivateLogin(request, {
+    prefix: "e2e_timeline",
   });
-  expect(
-    regRes.ok(),
-    `register failed: ${regRes.status()} ${await regRes.text()}`,
-  ).toBeTruthy();
-
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  try {
-    await pool.query("UPDATE users SET is_active = true WHERE email = $1", [
-      email,
-    ]);
-  } finally {
-    await pool.end();
-  }
-
-  const loginRes = await request.post("/api/auth/login", {
-    data: { email, password: PASSWORD },
-  });
-  expect(
-    loginRes.ok(),
-    `login failed: ${loginRes.status()} ${await loginRes.text()}`,
-  ).toBeTruthy();
-  const body = await loginRes.json();
-  expect(body.token, "no token returned").toBeTruthy();
-  return body.token as string;
+  return token;
 }
 
 async function createReviewViaApi(
@@ -82,14 +48,6 @@ async function createReviewViaApi(
   const body = await res.json();
   expect(body.id, "no review id returned").toBeTruthy();
   return body.id as number;
-}
-
-async function authenticate(page: Page, token: string) {
-  await page.addInitScript((t) => {
-    try {
-      window.localStorage.setItem("auth_token", t);
-    } catch {}
-  }, token);
 }
 
 // Mock the Zendesk timeline endpoint with a successful payload.
@@ -206,7 +164,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketId = 100000 + Math.floor(Math.random() * 800000);
     const oldTimeline = `OLD timeline ${rand()}`;
     const id = await createReviewViaApi(request, token, {
@@ -233,7 +191,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketId = 100000 + Math.floor(Math.random() * 800000);
     const oldTimeline = `OLD timeline ${rand()}`;
     const id = await createReviewViaApi(request, token, {
@@ -259,7 +217,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketId = 100000 + Math.floor(Math.random() * 800000);
     const id = await createReviewViaApi(request, token, {
       zendeskTicketId: ticketId,
@@ -283,7 +241,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketId = 100000 + Math.floor(Math.random() * 800000);
 
     const fresh = `FRESH form timeline ${rand()}`;
@@ -309,7 +267,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketA = 100000 + Math.floor(Math.random() * 400000);
     const ticketB = ticketA + 1 + Math.floor(Math.random() * 400000);
     const idA = await createReviewViaApi(request, token, {
@@ -341,7 +299,7 @@ test.describe("Refresh from Zendesk", () => {
     page,
     request,
   }) => {
-    const token = await registerActivateLogin(request);
+    const token = await loginAsTester(request);
     const ticketA = 100000 + Math.floor(Math.random() * 400000);
     const ticketB = ticketA + 1 + Math.floor(Math.random() * 400000);
     const idA = await createReviewViaApi(request, token, {

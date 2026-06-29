@@ -1,64 +1,14 @@
-import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { Pool } from "pg";
-
-type Role = "helpdesk" | "network_engineer" | "security_engineer" | "cio";
+import { test, expect, type Page } from "@playwright/test";
+import {
+  authenticate,
+  registerActivateLogin,
+  type Role,
+} from "./helpers/auth";
 
 const ROLES: Role[] = ["helpdesk", "network_engineer", "security_engineer", "cio"];
 
-const PASSWORD = "Password123";
-
-// Registration is restricted to @sccc.edu addresses (see auth route).
-function uniqueEmail(role: Role): string {
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 8);
-  return `e2e_${role}_${ts}_${rand}@sccc.edu`;
-}
-
-// New registrations land in a pending/inactive state, always default to the
-// "helpdesk" role, and return no token. So we register a fresh account, flip it
-// active and stamp the desired role directly in the database, then log in.
-async function registerActivateLogin(
-  request: APIRequestContext,
-  role: Role,
-): Promise<{ token: string; email: string }> {
-  const email = uniqueEmail(role);
-  const regRes = await request.post("/api/auth/register", {
-    data: { email, password: PASSWORD, name: `E2E ${role}` },
-  });
-  expect(
-    regRes.ok(),
-    `register failed for ${role}: ${regRes.status()} ${await regRes.text()}`,
-  ).toBeTruthy();
-
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  try {
-    await pool.query(
-      "UPDATE users SET is_active = true, role = $1 WHERE email = $2",
-      [role, email],
-    );
-  } finally {
-    await pool.end();
-  }
-
-  const loginRes = await request.post("/api/auth/login", {
-    data: { email, password: PASSWORD },
-  });
-  expect(
-    loginRes.ok(),
-    `login failed for ${role}: ${loginRes.status()} ${await loginRes.text()}`,
-  ).toBeTruthy();
-  const body = await loginRes.json();
-  expect(body.token, `no token returned for ${role}`).toBeTruthy();
-  expect(body.user?.role).toBe(role);
-  return { token: body.token, email };
-}
-
 async function loginAndGoHome(page: Page, token: string) {
-  await page.addInitScript((t) => {
-    try {
-      window.localStorage.setItem("auth_token", t);
-    } catch {}
-  }, token);
+  await authenticate(page, token);
   await page.goto("/");
   await expect(
     page.getByAltText("Seward County Community College").first(),
@@ -71,7 +21,7 @@ test.describe("Role-based UI visibility", () => {
       page,
       request,
     }) => {
-      const { token } = await registerActivateLogin(request, role);
+      const { token } = await registerActivateLogin(request, { role });
       await loginAndGoHome(page, token);
 
       const isCIO = role === "cio";
