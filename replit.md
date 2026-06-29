@@ -120,6 +120,7 @@ All routes under `/api/`:
 - `/risks` — Risks, issues, design suggestions
 - `/risks/new` — New risk/issue form
 - `/network` — Network reference (switches + VLANs) with search tabs
+- `/it-apps` — Embeds the external unified project view (apps built for IT) in a sandboxed iframe
 - `/after-action` — After-action reports list
 - `/after-action/new` — New AAR form
 - `/after-action/:id` — AAR detail

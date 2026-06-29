@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, Sparkles, Send, Copy, Download, Trash2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
 
@@ -23,6 +25,49 @@ function authHeaders(): Record<string, string> {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <div className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ node, ...props }) => <h1 className="text-base font-bold mt-4 mb-2" {...props} />,
+          h2: ({ node, ...props }) => <h2 className="text-sm font-bold mt-4 mb-2" {...props} />,
+          h3: ({ node, ...props }) => <h3 className="text-sm font-semibold mt-3 mb-1.5" {...props} />,
+          p: ({ node, ...props }) => <p className="my-2" {...props} />,
+          ul: ({ node, ...props }) => <ul className="my-2 ml-5 list-disc space-y-1" {...props} />,
+          ol: ({ node, ...props }) => <ol className="my-2 ml-5 list-decimal space-y-1" {...props} />,
+          li: ({ node, ...props }) => <li className="pl-1 [&>ul]:mt-1 [&>ol]:mt-1" {...props} />,
+          strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+          em: ({ node, ...props }) => <em className="italic" {...props} />,
+          a: ({ node, ...props }) => (
+            <a className="underline underline-offset-2" target="_blank" rel="noopener noreferrer" {...props} />
+          ),
+          code: ({ node, ...props }) => (
+            <code className="rounded bg-background/60 px-1 py-0.5 font-mono text-[0.85em]" {...props} />
+          ),
+          pre: ({ node, ...props }) => (
+            <pre className="my-2 overflow-x-auto rounded bg-background/60 p-3 font-mono text-xs" {...props} />
+          ),
+          blockquote: ({ node, ...props }) => (
+            <blockquote className="my-2 border-l-2 border-border pl-3 italic" {...props} />
+          ),
+          hr: ({ node, ...props }) => <hr className="my-3 border-border" {...props} />,
+          table: ({ node, ...props }) => (
+            <div className="my-2 overflow-x-auto">
+              <table className="w-full border-collapse text-xs" {...props} />
+            </div>
+          ),
+          th: ({ node, ...props }) => <th className="border border-border px-2 py-1 text-left font-semibold" {...props} />,
+          td: ({ node, ...props }) => <td className="border border-border px-2 py-1 align-top" {...props} />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function StatusReportTab() {
@@ -442,13 +487,13 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
+              className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${
                 m.role === "user"
-                  ? "bg-primary text-primary-foreground"
+                  ? "whitespace-pre-wrap bg-primary text-primary-foreground"
                   : "bg-muted"
               }`}
             >
-              {m.content}
+              {m.role === "user" ? m.content : <MarkdownMessage content={m.content} />}
             </div>
           </div>
         ))}
@@ -504,7 +549,7 @@ export default function AIReport() {
         </p>
       </div>
 
-      <Tabs defaultValue={contextHint || !isCIO ? "chat" : "status"}>
+      <Tabs defaultValue="chat">
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           <TabsTrigger value="chat">Ask AI</TabsTrigger>
