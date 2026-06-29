@@ -421,7 +421,7 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
   };
 
   return (
-    <Card className="h-[calc(100vh-220px)] flex flex-col">
+    <Card className="h-[calc(100vh-17rem)] min-h-[24rem] flex flex-col">
       <CardHeader className="border-b shrink-0">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
