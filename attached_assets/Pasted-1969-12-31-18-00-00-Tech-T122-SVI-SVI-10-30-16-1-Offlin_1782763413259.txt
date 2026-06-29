@@ -1,0 +1,190 @@
+1969-12-31 18:00:00
+Tech T122 (SVI)
+SVI
+10.30.16.1
+Offline
+2026-06-29 15:01:06
+Agriculture V201
+Access
+192.168.2.195
+Online
+2026-06-29 15:01:06
+Aruba 6300 A-144 1
+Access
+192.168.2.201
+Online
+2026-06-29 15:01:06
+Aruba 6300 A-144 2
+Access
+192.168.2.202
+Online
+2026-06-29 15:01:06
+Baseball Field Pressbox
+Access
+192.168.2.27
+Online
+2026-06-29 15:01:06
+Cosmetology
+Access
+192.168.2.171
+Online
+2026-06-29 15:01:06
+Epworth ALC Building
+Access
+192.168.2.24
+Online
+2026-06-29 15:02:04
+FortiGate Firewall (Hobble AA-158)
+Firewall
+192.168.1.1
+Online
+2026-06-29 15:01:06
+Hobble AA105 SVI
+SVI
+10.70.34.1
+Online
+2026-06-29 15:01:06
+Hobble Building (Server Room)
+SVI
+10.70.1.1
+Online
+2026-06-29 15:01:06
+Hobble Core Access (AA-144)
+Core Access
+192.168.2.1
+Online
+2026-06-29 15:01:06
+Hobble Core SVI (AA-144)
+Core SVI
+10.80.33.1
+Online
+2026-06-29 15:01:06
+Hobble HR AA105
+Access
+192.168.2.199
+Online
+2026-06-29 15:01:06
+Hobble Testing A161 (SWA-A161)
+Access
+192.168.2.197
+Online
+2026-06-29 15:01:06
+Humanities H128
+SVI
+10.70.89.1
+Online
+2026-06-29 15:01:06
+Maintenance
+Access
+192.168.2.205
+Online
+2026-06-29 15:02:07
+Nexus Core 1 (Hobble AA-158)
+Core
+192.168.2.70
+Online
+2026-06-29 15:02:08
+Nexus Core 2 (Hobble AA-158)
+Core
+192.168.2.71
+Online
+2026-06-29 15:01:06
+SLG Switch G
+Access
+192.168.2.179
+Online
+2026-06-29 15:01:06
+Sharp Center
+Access
+192.168.2.203
+Online
+2026-06-29 15:01:06
+Softball Field
+Access
+192.168.2.204
+Online
+2026-06-29 15:01:06
+Student Health Center
+Access
+192.168.2.212
+Online
+2026-06-29 15:01:06
+Student Living Center (SLC151)
+Access
+192.168.2.175
+Online
+2026-06-29 15:01:06
+Student Living SLS
+Access
+192.168.2.183
+Online
+2026-06-29 15:01:06
+Student Living SLT
+Access
+192.168.2.184
+Online
+2026-06-29 15:01:06
+Student Union
+Access
+192.168.2.200
+Online
+2026-06-29 15:01:06
+Student Union Gym 208 (SUGymCam)
+Access
+192.168.252.46
+Online
+2026-06-29 15:01:06
+Tech B141
+Access
+192.168.2.186
+Online
+2026-06-29 15:01:06
+Tech Building F / Hale Court
+Access
+192.168.2.178
+Online
+2026-06-29 15:02:07
+Tech Core 3
+Core
+192.168.2.72
+Online
+2026-06-29 15:02:07
+Tech Core 4
+Core
+192.168.2.73
+Online
+2026-06-29 15:01:06
+Tech D201
+Access
+192.168.2.187
+Online
+2026-06-29 15:01:06
+Tech Dorm H / Hale Court Building H
+Access
+192.168.2.180
+Online
+2026-06-29 15:01:06
+Tech Dorm SLR
+Access
+192.168.2.182
+Online
+2026-06-29 15:01:06
+Tech Dorms J (SLJ)
+Access
+192.168.2.181
+Online
+2026-06-29 15:01:06
+Tech T122 (mgmt)
+Access
+192.168.2.190
+Online
+2026-06-29 15:01:06
+Tech TA107
+Access
+192.168.2.189
+Online
+2026-06-29 15:01:06
+Tech TT103
+Access
+192.168.2.188
+Online

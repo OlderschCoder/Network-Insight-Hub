@@ -1,0 +1,307 @@
+2026-06-29 15:03:08
+"Aruba 6300 A-144 1"
+Aruba
+true
+"Hobble A-144 Switch 1"
+1.02
+Online
+10.70.1.1
+SW-A144-1-aruba
+2026-06-29 15:03:08
+Hobble AA105 SVI Online
+Aruba
+true
+"Hobble AA152 Switch 0"
+1.02
+Online
+10.70.34.1
+SWA-AA105
+2026-06-29 15:03:08
+Humanities H128 Online
+Aruba
+true
+"Humanities Switch 0"
+1.02
+Online
+10.70.89.1
+swa-h128
+2026-06-29 15:03:08
+"IT Testing Switch"
+Aruba
+true
+"A144 Access - Cecil"
+1.02
+Online
+10.80.33.1
+SWA-AA144-Access
+2026-06-29 15:02:04
+FortiGate
+true
+2.09
+Online
+192.168.1.1
+FortigateA-Sccc.sccc.edu
+2026-06-29 15:03:08
+"IT Testing Switch"
+Aruba
+true
+"A144 Access - Cecil"
+1.02
+Online
+192.168.2.1
+SWA-AA144-Access
+2026-06-29 15:03:08
+"Aruba 6300 Switch 0"
+Aruba
+true
+"Cosmetology Switch 0"
+1.02
+Online
+192.168.2.171
+SW-COS109-Aruba
+2026-06-29 15:03:08
+Student Living Center (SLC151)
+Aruba
+true
+"SLC 151 Switch 0"
+1.02
+Online
+192.168.2.175
+SWA-SLC151
+2026-06-29 15:03:08
+SLG Switch G Online
+Aruba
+true
+"Tech dorm G Building Switch 0"
+1.02
+Online
+192.168.2.179
+SWA-SLG
+2026-06-29 15:03:08
+Tech Dorms J (SLJ) Online
+Aruba
+true
+SWA-SLR 213 Tech Dorms J (SLJ) Student Living Online
+1.02
+Online
+192.168.2.181
+SWA-SLJ
+2026-06-29 15:03:08
+Tech Dorm SLR Online
+Aruba
+true
+Tech D201 Academic Online
+1.02
+Online
+192.168.2.182
+SWA-SLR
+2026-06-29 15:03:08
+Student Living SLS
+Aruba
+true
+"Student Living SLS"
+1.02
+Online
+192.168.2.183
+SWA-SLS
+2026-06-29 15:03:08
+Student Living SLT
+Aruba
+true
+"Tech dorm T Building Switch 0"
+1.02
+Online
+192.168.2.184
+SWA-SLT
+2026-06-29 15:03:08
+Tech B141 Online
+Aruba
+true
+Tech B141 Academic Online
+1.02
+Online
+192.168.2.186
+swa-tb141
+2026-06-29 15:03:08
+Tech D201 Online
+Aruba
+true
+Tech D201 Academic Online
+1.02
+Online
+192.168.2.187
+swa-td201
+2026-06-29 15:03:08
+Tech TT103 Online
+Aruba
+true
+"Tech T 103"
+1.02
+Online
+192.168.2.188
+swa-tt103
+2026-06-29 15:03:08
+Tech TA107 Online
+Aruba
+true
+swa-t122 119 Tech TA107 Academic Online
+1.02
+Online
+192.168.2.189
+swa-ta107
+2026-06-29 15:03:08
+Tech T122 (mgmt) Online
+Aruba
+true
+SWA-SLJ 213 Tech T122 (mgmt) Academic Online
+1.02
+Online
+192.168.2.190
+swa-t122
+2026-06-29 15:03:08
+"Aruba 6300 Ag V201"
+Aruba
+true
+"Agriculture Building"
+1.02
+Online
+192.168.2.195
+SWA-V201
+1969-12-31 18:00:00
+Aruba
+true
+-1
+Missing from recent poll
+192.168.2.196
+2026-06-29 15:03:08
+"Aruba 6300 Switch 0"
+Aruba
+true
+"Aruba A163 Testing Center 48 Port"
+1.02
+Online
+192.168.2.197
+swa-a161
+2026-06-29 15:03:09
+Hobble AA105 SVI Online
+Aruba
+true
+"Hobble AA152 Switch 0"
+1.00
+Online
+192.168.2.199
+SWA-AA105
+2026-06-29 15:03:08
+Student Union
+Aruba
+true
+"SU121 Bookstore Switch 0"
+1.02
+Online
+192.168.2.200
+SWA-SU121
+2026-06-29 15:03:08
+"Aruba 6300 A-144 1"
+Aruba
+true
+"Hobble A-144 Switch 1"
+1.02
+Online
+192.168.2.201
+SW-A144-1-aruba
+2026-06-29 15:03:08
+"Aruba 6300 A-144 2"
+Aruba
+true
+"Hobble A-144 Switch 2"
+1.02
+Online
+192.168.2.202
+SW-A144-2-Aruba
+2026-06-29 15:03:08
+Sharp Center Online
+Aruba
+true
+"Sharp Champions Center Switch 0"
+1.02
+Online
+192.168.2.203
+swa-scc
+2026-06-29 15:03:08
+Softball Field Online
+Aruba
+true
+"Softball Field"
+1.02
+Online
+192.168.2.204
+SW-SoftBallPB
+2026-06-29 15:03:08
+Maintenance Online
+Aruba
+true
+"Maintenance Switch 0"
+1.02
+Online
+192.168.2.205
+SW-M201-1
+2026-06-29 15:03:08
+Student Health Center
+Aruba
+true
+"Healthcare Center Access Switch 0"
+1.02
+Online
+192.168.2.212
+sw-healthcenter
+2026-06-29 15:03:08
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)\r\nTechnical Support: http://www.cisco.com/techsupport\r\nCopyright (c) 1986-2014 by Cisco Systems, Inc.\r\nCompiled Mon 03-Mar-14 22:45 by prod_rel_team
+Cisco
+true
+ALC Building Cisco 3750
+1.02
+Online
+192.168.2.24
+SW-E208.sccc.edu
+1969-12-31 18:00:00
+Aruba
+true
+-1
+Missing from recent poll
+192.168.2.40
+2026-06-29 15:03:04
+Cisco NX-OS(tm) Nexus9000 C93180YC-EX chassis, Software (NXOS 64-bit), Version 10.2(6), RELEASE SOFTWARE Copyright (c) 2002-2023 by Cisco Systems, Inc. Compiled 8/31/2023 12:00:00
+Cisco
+true
+"Hobble AA152 Nexus 9000 Box 1"
+1.09
+Online
+192.168.2.70
+sw-aa144-A48.sccc.edu
+2026-06-29 15:03:04
+Cisco NX-OS(tm) Nexus9000 C93180YC-EX chassis, Software (NXOS 64-bit), Version 10.2(6), RELEASE SOFTWARE Copyright (c) 2002-2023 by Cisco Systems, Inc. Compiled 8/31/2023 12:00:00
+Cisco
+true
+"Hobble AA152 Nexus 9000 Box 2"
+1.09
+Online
+192.168.2.71
+sw-aa144-A24.sccc.edu
+2026-06-29 15:03:04
+Cisco NX-OS(tm) Nexus9000 C93180YC-EX chassis, Software (NXOS 64-bit), Version 10.2(6), RELEASE SOFTWARE Copyright (c) 2002-2023 by Cisco Systems, Inc. Compiled 8/31/2023 12:00:00
+Cisco
+true
+Tech Core 3 Infrastructure Online
+1.09
+Online
+192.168.2.72
+sw-t122-T24.sccc.edu
+2026-06-29 15:03:04
+Cisco NX-OS(tm) Nexus9000 C93180YC-EX chassis, Software (NXOS 64-bit), Version 10.2(6), RELEASE SOFTWARE Copyright (c) 2002-2023 by Cisco Systems, Inc. Compiled 8/31/2023 12:00:00
+Cisco
+true
+Tech Core 4 Infrastructure Online
+1.09
+Online
+192.168.2.73
+sw-t122-T48.sccc.edu
