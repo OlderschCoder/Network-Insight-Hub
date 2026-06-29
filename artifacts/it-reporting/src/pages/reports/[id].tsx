@@ -33,6 +33,7 @@ import {
 import { format } from "date-fns";
 import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase, Mail, AlertTriangle, Wrench, Target } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/authFetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -280,10 +281,8 @@ export default function ReportDetail() {
 
   const handleExport = async (type: "docx" | "xlsx" | "pdf") => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const res = await fetch(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, {
+      const res = await authFetch(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, {
         credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();

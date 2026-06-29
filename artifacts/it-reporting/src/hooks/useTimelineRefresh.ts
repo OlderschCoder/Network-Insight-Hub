@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { authFetch } from "@/lib/authFetch";
 
 const BULK_KEY = "__all__";
 
@@ -12,12 +13,10 @@ const BULK_KEY = "__all__";
 export async function fetchZendeskTimeline(
   ticketId: string | number,
 ): Promise<string> {
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(
+  const res = await authFetch(
     `${import.meta.env.BASE_URL}api/zendesk/ticket/${encodeURIComponent(
       String(ticketId),
     )}/timeline`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
   );
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.timeline) {

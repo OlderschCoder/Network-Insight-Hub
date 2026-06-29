@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Ticket } from "lucide-react";
+import { authFetch } from "@/lib/authFetch";
 
 interface Row {
   zendeskUserId: number | null;
@@ -40,10 +41,7 @@ export function ZendeskResolved() {
     let cancelled = false;
     setLoading(true);
     setErrorKind(null);
-    const token = localStorage.getItem("auth_token");
-    fetch(`${import.meta.env.BASE_URL}api/zendesk/resolved-by-user?days=${days}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    authFetch(`${import.meta.env.BASE_URL}api/zendesk/resolved-by-user?days=${days}`)
       .then(async (r) => {
         const body = await r.json().catch(() => null);
         if (cancelled) return;
