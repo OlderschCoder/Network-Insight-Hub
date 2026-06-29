@@ -367,6 +367,11 @@ test.describe("Refresh from Zendesk", () => {
     await confirmReplaceAll(page);
 
     await expectToast(page, "Timelines refreshed");
-    await expectToast(page, "Refreshed 1 timeline, 1 failed.");
+    // The summary now names the review that failed, not just the count, so the
+    // user can tell which one needs attention.
+    await expectToast(
+      page,
+      `Refreshed 1 timeline, 1 failed: Bulk refresh review ${idB}.`,
+    );
   });
 });

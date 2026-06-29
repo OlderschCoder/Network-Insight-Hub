@@ -41,6 +41,18 @@ export type RefreshTimelineArgs = {
 export type RefreshManyItem = {
   ticketId: string | number;
   apply: (timeline: string) => void | Promise<void>;
+  /**
+   * Human-readable name used in the progress indicator and failure summary so
+   * users can tell which review failed (falls back to the ticket number).
+   */
+  label?: string;
+};
+
+export type RefreshProgress = {
+  /** 1-based index of the review currently being refreshed. */
+  current: number;
+  /** Total number of reviews in this bulk run. */
+  total: number;
 };
 
 /**
@@ -53,6 +65,7 @@ export function useTimelineRefresh() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const [activeKey, setActiveKey] = useState<string | number | null>(null);
+  const [progress, setProgress] = useState<RefreshProgress | null>(null);
 
   const isRefreshing = activeKey !== null;
   const isRefreshingAll = activeKey === BULK_KEY;
@@ -115,29 +128,43 @@ export function useTimelineRefresh() {
     });
     if (!ok) return;
     setActiveKey(BULK_KEY);
+    setProgress({ current: 0, total: items.length });
     let refreshed = 0;
-    let failed = 0;
+    const failedLabels: string[] = [];
     try {
-      for (const item of items) {
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i]!;
+        setProgress({ current: i + 1, total: items.length });
         try {
           const timeline = await fetchZendeskTimeline(item.ticketId);
           await item.apply(timeline);
           refreshed += 1;
         } catch {
-          failed += 1;
+          failedLabels.push(item.label?.trim() || `Zendesk #${item.ticketId}`);
         }
       }
+      const failed = failedLabels.length;
+      const failPart =
+        failed > 0 ? `, ${failed} failed: ${failedLabels.join(", ")}` : "";
       toast({
         title: "Timelines refreshed",
         description: `Refreshed ${refreshed} timeline${
           refreshed === 1 ? "" : "s"
-        }${failed > 0 ? `, ${failed} failed` : ""}.`,
+        }${failPart}.`,
         variant: failed > 0 ? "destructive" : undefined,
       });
     } finally {
       setActiveKey(null);
+      setProgress(null);
     }
   };
 
-  return { isRefreshing, isRefreshingAll, activeKey, refresh, refreshMany };
+  return {
+    isRefreshing,
+    isRefreshingAll,
+    activeKey,
+    progress,
+    refresh,
+    refreshMany,
+  };
 }

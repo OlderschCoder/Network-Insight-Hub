@@ -26,8 +26,14 @@ export default function AfterAction() {
     hasFilter ? { zendeskTicketId: parsedTicketId } : {},
   );
   const updateMutation = useUpdateAfterActionReport();
-  const { isRefreshing, isRefreshingAll, activeKey, refresh, refreshMany } =
-    useTimelineRefresh();
+  const {
+    isRefreshing,
+    isRefreshingAll,
+    activeKey,
+    progress,
+    refresh,
+    refreshMany,
+  } = useTimelineRefresh();
 
   const applyTimeline = (report: any) => async (timeline: string) => {
     await updateMutation.mutateAsync({
@@ -52,6 +58,7 @@ export default function AfterAction() {
       linked.map((report) => ({
         ticketId: (report as any).zendeskTicketId,
         apply: applyTimeline(report),
+        label: report.title,
       })),
     );
     if (linked.length > 0) await refetch();
@@ -76,7 +83,11 @@ export default function AfterAction() {
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${isRefreshingAll ? "animate-spin" : ""}`}
               />
-              {isRefreshingAll ? "Refreshing all…" : "Refresh all from Zendesk"}
+              {isRefreshingAll
+                ? progress
+                  ? `Refreshing ${progress.current} of ${progress.total}…`
+                  : "Refreshing all…"
+                : "Refresh all from Zendesk"}
             </Button>
           )}
           <Link href="/after-action/new">
