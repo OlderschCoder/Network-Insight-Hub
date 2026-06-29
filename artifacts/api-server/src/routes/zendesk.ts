@@ -20,9 +20,9 @@ interface ZendeskTicket {
 }
 
 function zendeskConfig() {
-  const subdomain = process.env.ZENDESK_SUBDOMAIN;
-  const email = process.env.ZENDESK_EMAIL;
-  const token = process.env.ZENDESK_API_TOKEN;
+  const subdomain = process.env.ZENDESK_SUBDOMAIN?.trim();
+  const email = process.env.ZENDESK_EMAIL?.trim();
+  const token = process.env.ZENDESK_API_TOKEN?.trim();
   if (!subdomain || !email || !token) {
     return null;
   }
