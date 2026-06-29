@@ -1,10 +1,15 @@
 import { useState } from "react";
-import { Gauge, ExternalLink, RefreshCw, Info } from "lucide-react";
+import { Gauge, ExternalLink, RefreshCw, Info, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const GRAFANA_URL =
   (import.meta.env.VITE_GRAFANA_URL as string | undefined)?.replace(/\/$/, "") ||
   "http://10.0.0.22:3000";
+
+const isMixedContent =
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  GRAFANA_URL.startsWith("http://");
 
 export default function Monitoring() {
   const [reloadKey, setReloadKey] = useState(0);
@@ -31,6 +36,21 @@ export default function Monitoring() {
           </Button>
         </div>
       </div>
+
+      {isMixedContent && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            <span className="font-semibold">This app is served over HTTPS, but the Grafana server uses
+            plain HTTP</span> (<code className="font-mono">{GRAFANA_URL}</code>). Browsers block insecure
+            HTTP content inside a secure HTTPS page, so the dashboard below will not load here. To fix
+            this permanently, either serve Grafana over HTTPS and set{" "}
+            <code className="font-mono">VITE_GRAFANA_URL</code> to its <code className="font-mono">https://</code>{" "}
+            address, or use <span className="font-medium">Open in new tab</span> (which works because the
+            new tab is plain HTTP).
+          </span>
+        </div>
+      )}
 
       <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
