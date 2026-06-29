@@ -19,6 +19,8 @@ import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { AppLauncher } from "@/components/AppLauncher";
 import { TopNav } from "@/components/TopNav";
+import { ZendeskAlerts } from "@/components/ZendeskAlerts";
+import { ZendeskChatWidget } from "@/components/ZendeskChatWidget";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -335,9 +337,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </Link>
 
+          <ZendeskAlerts />
+
           <AccountMenu name={user?.name} role={user?.role} onLogout={handleLogout} />
         </div>
       </header>
+
+      <ZendeskChatWidget />
 
       <main className="flex-1 overflow-auto bg-background">
         <div className="p-6">{children}</div>

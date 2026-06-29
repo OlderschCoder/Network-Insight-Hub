@@ -251,6 +251,53 @@ router.get("/ticket/:id/timeline", requireAuth, async (req: any, res) => {
   }
 });
 
+// Public-to-the-app widget config: returns the Zendesk Web Widget key so the
+// SPA can inject the official chat snippet. The key is a client-side embed key
+// (not a secret), but we still gate behind auth so it only loads in-app.
+router.get("/widget-config", requireAuth, (_req, res) => {
+  const key = process.env.ZENDESK_WIDGET_KEY?.trim();
+  return res.json({ enabled: !!key, key: key || null });
+});
+
+// Recent open-ticket activity for the team group, newest-updated first. The SPA
+// polls this and sounds an alert when the newest updatedAt advances (a new
+// ticket or a new reply both bump updated_at).
+router.get("/recent-activity", requireAuth, async (_req, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) {
+    return res.json({ configured: false, latestUpdatedAt: null, items: [] });
+  }
+  try {
+    const group = process.env.ZENDESK_GROUP || "Onsite_it";
+    type SearchResp = { results: ZendeskTicket[] };
+    const data = await zget<SearchResp>(
+      cfg,
+      `search.json?query=${encodeURIComponent(
+        `type:ticket group:"${group}" status<solved`,
+      )}&sort_by=updated_at&sort_order=desc&per_page=25`,
+    );
+    const items = (data.results || []).map((t) => ({
+      id: t.id,
+      subject: t.subject,
+      status: t.status,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at,
+      url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
+    }));
+    const latestUpdatedAt = items.reduce(
+      (max, i) => (i.updatedAt > max ? i.updatedAt : max),
+      "",
+    );
+    return res.json({ configured: true, latestUpdatedAt: latestUpdatedAt || null, items });
+  } catch (e: any) {
+    const upstream = e?.status;
+    if (upstream === 401 || upstream === 403) {
+      return res.status(502).json({ error: "Zendesk authentication failed", code: "ZENDESK_AUTH" });
+    }
+    return res.status(502).json({ error: "Zendesk API error", code: "ZENDESK_ERROR" });
+  }
+});
+
 router.get("/status", requireAuth, async (_req, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {
