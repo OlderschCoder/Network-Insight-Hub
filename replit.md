@@ -69,6 +69,7 @@ All routes under `/api/`:
 - `GET /reports/:id/tickets` — Zendesk-resolved tickets for the report's week
 - `GET/POST/PATCH/DELETE /projects` — project CRUD with assignees, attachments, decisions, progress log
 - `GET/POST/PATCH/DELETE /azure-vms` — Azure VM inventory (write ops CIO-only)
+- `POST /azure-vms/sync` — pull live VM inventory from Azure (CIO only); upserts on `azureResourceId`, preserves manual fields (purpose/notes/owner), flags missing azure rows `status='deleted'`; 503 `AZURE_NOT_CONFIGURED` if unset
 - `GET/POST/PUT /after-action` — after-action reports
 - `GET /dashboard/summary`, `/activity`, `/week-status`
 - `GET /export/report/:id/docx`, `/export/report/:id/xlsx`
@@ -93,6 +94,7 @@ All routes under `/api/`:
 
 - Zendesk: `ZENDESK_SUBDOMAIN=sccc`, `ZENDESK_EMAIL=admin@sccc.edu`, `ZENDESK_API_TOKEN` (secret)
 - Zendesk ticket creation via `/export/report/:id/zendesk` and `/export/entry/:id/zendesk`
+- Azure: service principal (client-credentials) → ARM. Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`. SP needs **Reader** at subscription scope. Client lives in `artifacts/api-server/src/lib/azure.ts`; "Sync from Azure" button on the Azure VMs page calls `POST /api/azure-vms/sync`.
 
 ## Export Features
 
