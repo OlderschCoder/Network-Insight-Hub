@@ -416,7 +416,7 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3">
+      <CardContent ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto py-4 space-y-3">
         {messages.length === 0 && (
           <div className="space-y-3 py-6">
             <p className="text-sm text-center text-muted-foreground">
