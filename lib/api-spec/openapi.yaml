@@ -970,6 +970,37 @@ paths:
                 properties:
                   ok:
                     type: boolean
+  /azure-vms/sync:
+    post:
+      operationId: syncAzureVms
+      tags: [azure-vms]
+      summary: Sync VM inventory from Azure (CIO only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer
+                  updated:
+                    type: integer
+                  removed:
+                    type: integer
+                  total:
+                    type: integer
+                  syncedAt:
+                    type: string
+                    format: date-time
+                required: [created, updated, removed, total, syncedAt]
+        "503":
+          description: Azure not configured
+        "502":
+          description: Azure sync failed
   /strategic-objectives:
     get:
       operationId: listStrategicObjectives
@@ -2924,6 +2955,15 @@ components:
           nullable: true
         owner:
           type: string
+          nullable: true
+        azureResourceId:
+          type: string
+          nullable: true
+        source:
+          type: string
+        lastSyncedAt:
+          type: string
+          format: date-time
           nullable: true
         createdBy:
           type: integer

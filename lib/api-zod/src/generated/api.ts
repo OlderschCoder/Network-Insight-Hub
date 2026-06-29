@@ -1229,6 +1229,9 @@ export const ListAzureVmsResponseItem = zod.object({
   purpose: zod.string().nullish(),
   notes: zod.string().nullish(),
   owner: zod.string().nullish(),
+  azureResourceId: zod.string().nullish(),
+  source: zod.string().optional(),
+  lastSyncedAt: zod.coerce.date().nullish(),
   createdBy: zod.number().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1275,6 +1278,9 @@ export const GetAzureVmResponse = zod.object({
   purpose: zod.string().nullish(),
   notes: zod.string().nullish(),
   owner: zod.string().nullish(),
+  azureResourceId: zod.string().nullish(),
+  source: zod.string().optional(),
+  lastSyncedAt: zod.coerce.date().nullish(),
   createdBy: zod.number().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1317,6 +1323,9 @@ export const UpdateAzureVmResponse = zod.object({
   purpose: zod.string().nullish(),
   notes: zod.string().nullish(),
   owner: zod.string().nullish(),
+  azureResourceId: zod.string().nullish(),
+  source: zod.string().optional(),
+  lastSyncedAt: zod.coerce.date().nullish(),
   createdBy: zod.number().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1328,6 +1337,17 @@ export const DeleteAzureVmParams = zod.object({
 
 export const DeleteAzureVmResponse = zod.object({
   ok: zod.boolean().optional(),
+});
+
+/**
+ * @summary Sync VM inventory from Azure (CIO only)
+ */
+export const SyncAzureVmsResponse = zod.object({
+  created: zod.number(),
+  updated: zod.number(),
+  removed: zod.number(),
+  total: zod.number(),
+  syncedAt: zod.coerce.date(),
 });
 
 export const ListStrategicObjectivesResponseItem = zod.object({

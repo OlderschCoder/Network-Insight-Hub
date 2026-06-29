@@ -707,6 +707,9 @@ export interface AzureVm {
   purpose?: string | null;
   notes?: string | null;
   owner?: string | null;
+  azureResourceId?: string | null;
+  source?: string;
+  lastSyncedAt?: string | null;
   createdBy?: number | null;
   createdAt: string;
   updatedAt: string;
@@ -1089,6 +1092,14 @@ export type ListAzureVmsParams = {
 
 export type DeleteAzureVm200 = {
   ok?: boolean;
+};
+
+export type SyncAzureVms200 = {
+  created: number;
+  updated: number;
+  removed: number;
+  total: number;
+  syncedAt: string;
 };
 
 export type DeleteStrategicObjective200 = {

@@ -4,6 +4,7 @@ import {
   useCreateAzureVm,
   useUpdateAzureVm,
   useDeleteAzureVm,
+  useSyncAzureVms,
   type AzureVm,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
@@ -24,7 +25,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Cloud, Plus, Pencil, Trash2, Search, Server, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Cloud, Plus, Pencil, Trash2, Search, Server, Download, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 const PAGE_SIZE = 25;
 
@@ -162,6 +163,30 @@ export default function AzureVmsPage() {
   const createMut = useCreateAzureVm();
   const updateMut = useUpdateAzureVm();
   const deleteMut = useDeleteAzureVm();
+  const syncMut = useSyncAzureVms();
+
+  const handleSync = async () => {
+    try {
+      const result = await syncMut.mutateAsync();
+      toast({
+        title: "Synced from Azure",
+        description: `${result.created} added · ${result.updated} updated · ${result.removed} marked deleted (${result.total} total).`,
+      });
+      refetch();
+    } catch (err: any) {
+      const body = err?.response?.data ?? err?.data;
+      const code = body?.error;
+      toast({
+        title:
+          code === "AZURE_NOT_CONFIGURED"
+            ? "Azure not connected"
+            : "Sync failed",
+        description:
+          body?.message ?? err?.message ?? "Could not reach Azure. Try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -285,6 +310,18 @@ export default function AzureVmsPage() {
                   className="pl-8"
                 />
               </div>
+              {isCIO && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncMut.isPending}
+                  title="Pull the latest VM inventory from Azure"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncMut.isPending ? "animate-spin" : ""}`} />
+                  {syncMut.isPending ? "Syncing…" : "Sync from Azure"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

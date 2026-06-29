@@ -78,6 +78,7 @@ import type {
   SaveNetworkLayoutBody,
   StrategicObjective,
   StrategicObjectiveBody,
+  SyncAzureVms200,
   UpdateLogItemBody,
   UpdateMaintenanceLogEntryBody,
   UpdateProcessBody,
@@ -3940,6 +3941,87 @@ export const useDeleteAzureVm = <
   TContext
 > => {
   return useMutation(getDeleteAzureVmMutationOptions(options));
+};
+
+/**
+ * @summary Sync VM inventory from Azure (CIO only)
+ */
+export const getSyncAzureVmsUrl = () => {
+  return `/api/azure-vms/sync`;
+};
+
+export const syncAzureVms = async (
+  options?: RequestInit,
+): Promise<SyncAzureVms200> => {
+  return customFetch<SyncAzureVms200>(getSyncAzureVmsUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSyncAzureVmsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncAzureVms>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof syncAzureVms>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["syncAzureVms"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof syncAzureVms>>,
+    void
+  > = () => {
+    return syncAzureVms(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SyncAzureVmsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof syncAzureVms>>
+>;
+
+export type SyncAzureVmsMutationError = ErrorType<void>;
+
+/**
+ * @summary Sync VM inventory from Azure (CIO only)
+ */
+export const useSyncAzureVms = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncAzureVms>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof syncAzureVms>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSyncAzureVmsMutationOptions(options));
 };
 
 export const getListStrategicObjectivesUrl = () => {
