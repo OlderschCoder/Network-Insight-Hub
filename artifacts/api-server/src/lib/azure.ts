@@ -131,10 +131,17 @@ export async function fetchAzureVms(cfg: AzureConfig): Promise<AzureVmRecord[]> 
   const token = await getToken(cfg);
   const sub = cfg.subscriptionId;
 
-  const [vms, nics, publicIps] = await Promise.all([
+  // Note: $expand=instanceView is NOT supported on the subscription-wide VM
+  // list (Azure 400s — it's only valid for scale sets). Power state must be
+  // fetched via the same list endpoint with ?statusOnly=true, then merged.
+  const [vms, statusVms, nics, publicIps] = await Promise.all([
     armGetAll<AzureVm>(
       token,
-      `/subscriptions/${sub}/providers/Microsoft.Compute/virtualMachines?api-version=${API_COMPUTE}&$expand=instanceView`,
+      `/subscriptions/${sub}/providers/Microsoft.Compute/virtualMachines?api-version=${API_COMPUTE}`,
+    ),
+    armGetAll<AzureVm>(
+      token,
+      `/subscriptions/${sub}/providers/Microsoft.Compute/virtualMachines?api-version=${API_COMPUTE}&statusOnly=true`,
     ),
     armGetAll<AzureNic>(
       token,
@@ -148,6 +155,9 @@ export async function fetchAzureVms(cfg: AzureConfig): Promise<AzureVmRecord[]> 
 
   const nicById = new Map(nics.map((n) => [n.id.toLowerCase(), n]));
   const pipById = new Map(publicIps.map((p) => [p.id.toLowerCase(), p]));
+  const instanceViewById = new Map(
+    statusVms.map((v) => [v.id.toLowerCase(), v.properties?.instanceView]),
+  );
 
   return vms.map((vm) => {
     const props = vm.properties ?? {};
@@ -188,7 +198,7 @@ export async function fetchAzureVms(cfg: AzureConfig): Promise<AzureVmRecord[]> 
       location: vm.location ?? null,
       size: props.hardwareProfile?.vmSize ?? null,
       os,
-      status: mapPowerState(props.instanceView),
+      status: mapPowerState(instanceViewById.get(vm.id.toLowerCase()) ?? props.instanceView),
       privateIp,
       publicIp,
       vnet,
