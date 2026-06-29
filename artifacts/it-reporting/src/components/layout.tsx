@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { AppLauncher } from "@/components/AppLauncher";
-import { getNavGroups, findActiveItem } from "@/config/nav";
+import { TopNav } from "@/components/TopNav";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -34,7 +34,7 @@ import {
   Activity as ActivityIcon,
   Network as NetworkIcon,
 } from "lucide-react";
-import { LogOut, Zap, Sparkles, LayoutGrid, ChevronRight } from "lucide-react";
+import { LogOut, Zap, Sparkles, LayoutGrid, Search } from "lucide-react";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -277,9 +277,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const groups = getNavGroups(isCIO);
-  const activeItem = findActiveItem(groups, location);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -298,30 +295,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Logo variant="white" className="h-7" />
         </Link>
 
-        {activeItem && (
-          <div className="hidden items-center gap-1.5 text-sm text-white/70 md:flex">
-            <ChevronRight className="h-4 w-4" />
-            <span className="font-medium text-white/90">{activeItem.label}</span>
-          </div>
-        )}
+        <TopNav />
 
-        <button
-          type="button"
-          onClick={() => setLauncherOpen(true)}
-          className="mx-auto hidden w-full max-w-md items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/15 sm:flex"
-        >
-          <LayoutGrid className="h-4 w-4" />
-          <span>Menu — search or jump to any page</span>
-          <kbd className="ml-auto inline-flex items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
-            ⌘K
-          </kbd>
-        </button>
-
-        <div className="ml-auto flex items-center gap-2 sm:ml-0">
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => setLauncherOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+            className="hidden h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-white/70 transition-colors hover:bg-white/15 md:flex"
+            aria-label="Search pages"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden lg:inline">Search</span>
+            <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
+              ⌘K
+            </kbd>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLauncherOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 md:hidden"
             aria-label="Open menu"
           >
             <LayoutGrid className="h-4 w-4" />
