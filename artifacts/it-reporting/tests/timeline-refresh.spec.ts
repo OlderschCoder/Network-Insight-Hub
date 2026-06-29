@@ -138,6 +138,69 @@ async function confirmReplace(page: Page) {
   await dialog.getByRole("button", { name: "Replace", exact: true }).click();
 }
 
+// Click the destructive "Replace all" button in the bulk-refresh confirm dialog.
+async function confirmReplaceAll(page: Page) {
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Replace all", exact: true }).click();
+}
+
+// Mock the reviews list endpoint so the page renders exactly the reviews we
+// created for this test. The list route is global (not user-scoped), so without
+// this the shared dev DB would leak other reviews into the bulk action and make
+// the "Refreshed N timelines" count non-deterministic. PATCH (apply) still hits
+// the real API because the reviews really exist.
+async function mockReviewList(page: Page, reviews: unknown[]) {
+  await page.route("**/api/after-action", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(reviews),
+    });
+  });
+}
+
+// Mock the Zendesk timeline endpoint per ticket: the ticket id in `successId`
+// returns a usable timeline, every other ticket returns nothing (simulating a
+// ticket Zendesk has no comments for), which the hook counts as a failure.
+async function mockTimelineByTicket(
+  page: Page,
+  successId: number,
+  timeline: string,
+) {
+  await page.route(TIMELINE_ENDPOINT, async (route) => {
+    const m = route.request().url().match(/\/ticket\/(\d+)\/timeline/);
+    const id = m ? parseInt(m[1]!, 10) : 0;
+    const usable = id === successId;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        usable
+          ? { ticketId: id, commentCount: 1, includedCount: 1, timeline }
+          : { ticketId: id, commentCount: 0, timeline: "" },
+      ),
+    });
+  });
+}
+
+// Build a minimal review object shaped like the list endpoint's response, using
+// a real review id so the apply (PATCH) call succeeds against the live API.
+function listReview(id: number, zendeskTicketId: number) {
+  return {
+    id,
+    title: `Bulk refresh review ${id}`,
+    incidentDate: new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString(),
+    zendeskTicketId,
+    timeline: `OLD bulk timeline ${rand()}`,
+  };
+}
+
 test.describe("Refresh from Zendesk", () => {
   test("review detail: refresh replaces the timeline and shows a success toast", async ({
     page,
@@ -240,5 +303,70 @@ test.describe("Refresh from Zendesk", () => {
 
     await expectToast(page, "Timeline refreshed");
     await expect(timelineField).toHaveValue(fresh);
+  });
+
+  test("reviews list: 'Refresh all from Zendesk' refreshes every linked review", async ({
+    page,
+    request,
+  }) => {
+    const token = await registerActivateLogin(request);
+    const ticketA = 100000 + Math.floor(Math.random() * 400000);
+    const ticketB = ticketA + 1 + Math.floor(Math.random() * 400000);
+    const idA = await createReviewViaApi(request, token, {
+      zendeskTicketId: ticketA,
+      timeline: `OLD A ${rand()}`,
+    });
+    const idB = await createReviewViaApi(request, token, {
+      zendeskTicketId: ticketB,
+      timeline: `OLD B ${rand()}`,
+    });
+
+    // Pin the list to exactly our two reviews so the bulk count is deterministic.
+    await mockReviewList(page, [
+      listReview(idA, ticketA),
+      listReview(idB, ticketB),
+    ]);
+    await mockTimelineSuccess(page, `FRESH bulk ${rand()}`);
+    await authenticate(page, token);
+
+    await page.goto(`/after-action`);
+    await page.getByTestId("button-refresh-all-timelines").click();
+    await confirmReplaceAll(page);
+
+    await expectToast(page, "Timelines refreshed");
+    await expectToast(page, "Refreshed 2 timelines.");
+  });
+
+  test("reviews list: bulk refresh reports failures when a ticket returns nothing", async ({
+    page,
+    request,
+  }) => {
+    const token = await registerActivateLogin(request);
+    const ticketA = 100000 + Math.floor(Math.random() * 400000);
+    const ticketB = ticketA + 1 + Math.floor(Math.random() * 400000);
+    const idA = await createReviewViaApi(request, token, {
+      zendeskTicketId: ticketA,
+      timeline: `OLD A ${rand()}`,
+    });
+    const idB = await createReviewViaApi(request, token, {
+      zendeskTicketId: ticketB,
+      timeline: `OLD B ${rand()}`,
+    });
+
+    await mockReviewList(page, [
+      listReview(idA, ticketA),
+      listReview(idB, ticketB),
+    ]);
+    // Only ticketA returns a usable timeline; ticketB returns nothing and is
+    // counted as a failure.
+    await mockTimelineByTicket(page, ticketA, `FRESH bulk ${rand()}`);
+    await authenticate(page, token);
+
+    await page.goto(`/after-action`);
+    await page.getByTestId("button-refresh-all-timelines").click();
+    await confirmReplaceAll(page);
+
+    await expectToast(page, "Timelines refreshed");
+    await expectToast(page, "Refreshed 1 timeline, 1 failed.");
   });
 });
