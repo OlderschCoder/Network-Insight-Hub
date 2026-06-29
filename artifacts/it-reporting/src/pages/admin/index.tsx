@@ -91,6 +91,7 @@ export default function Admin() {
               {(users ?? []).map((user) => (
                 <div
                   key={user.id}
+                  data-testid={`user-row-${user.id}`}
                   className={`flex items-center gap-4 p-3 rounded-lg border ${
                     user.isActive !== false ? "border-border" : "border-destructive/20 opacity-60"
                   }`}
@@ -142,6 +143,7 @@ export default function Admin() {
                     <Button
                       variant="outline"
                       size="sm"
+                      data-testid={`button-toggle-active-${user.id}`}
                       onClick={() => handleActiveToggle(user.id, user.isActive !== false)}
                       disabled={updateMutation.isPending}
                     >
