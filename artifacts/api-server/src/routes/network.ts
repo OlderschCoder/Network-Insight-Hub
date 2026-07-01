@@ -8,6 +8,13 @@ import {
 import type { MaintenanceLogEntry } from "@workspace/db";
 import { eq, and, or, ilike, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
+import {
+  getFortiGateConfig,
+  whitelistUrl,
+  listWhitelistEntries,
+  normalizeUrlPattern,
+  FortiGateError,
+} from "../lib/fortigate";
 import { z } from "zod";
 import crypto from "crypto";
 import OpenAI from "openai";
@@ -362,6 +369,72 @@ router.delete("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: an
     .where(eq(vlansTable.id, id))
     .returning();
   return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+// ----- FortiGate website whitelist (Network Tool) -----
+
+router.get("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const cfg = getFortiGateConfig();
+  if (!cfg) {
+    return res.json({ configured: false, host: null, profile: null, entries: [] });
+  }
+  try {
+    const entries = await listWhitelistEntries(cfg);
+    return res.json({ configured: true, host: cfg.host, profile: cfg.profile, entries });
+  } catch (err: any) {
+    req.log.error({ err }, "FortiGate whitelist fetch failed");
+    return res.status(502).json({
+      error: "FORTIGATE_ERROR",
+      message: err instanceof FortiGateError ? err.message : "Failed to read whitelist from FortiGate.",
+    });
+  }
+});
+
+router.post("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    url: z.string().min(1).max(500),
+    action: z.enum(["exempt", "allow", "monitor"]).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const cfg = getFortiGateConfig();
+  if (!cfg) {
+    return res.status(503).json({
+      error: "FORTIGATE_NOT_CONFIGURED",
+      message:
+        "FortiGate is not configured. Set FORTIGATE_HOST and FORTIGATE_API_TOKEN (optionally FORTIGATE_VDOM, FORTIGATE_WEBFILTER_PROFILE) to enable this tool.",
+    });
+  }
+
+  let pattern: string;
+  try {
+    pattern = normalizeUrlPattern(parsed.data.url);
+  } catch (err: any) {
+    return res.status(400).json({ error: "INVALID_URL", message: err?.message ?? "Invalid URL." });
+  }
+
+  const action = parsed.data.action ?? "exempt";
+  try {
+    const result = await whitelistUrl(cfg, pattern, action);
+    req.log.info(
+      { url: pattern, action, tableId: result.tableId, added: result.added, by: req.user?.email },
+      "FortiGate whitelist add",
+    );
+    return res.json({
+      url: pattern,
+      action,
+      tableId: result.tableId,
+      tableName: result.tableName,
+      added: result.added,
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "FortiGate whitelist add failed");
+    return res.status(502).json({
+      error: "FORTIGATE_ERROR",
+      message: err instanceof FortiGateError ? err.message : "Failed to update FortiGate.",
+    });
+  }
 });
 
 // ----- AI Network Engineer chat -----

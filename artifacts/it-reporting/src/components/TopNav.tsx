@@ -63,9 +63,10 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
 }
 
 export function TopNav() {
-  const { isCIO } = useAuth();
+  const { isCIO, user } = useAuth();
   const [location] = useLocation();
-  const groups = getNavGroups(isCIO);
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const groups = getNavGroups(isCIO, canNetworkTools);
 
   return (
     <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">

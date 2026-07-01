@@ -601,6 +601,49 @@ export interface UpdateLogItemBody {
   itemDate?: string;
 }
 
+export interface FortiGateWhitelistEntry {
+  id: number | string;
+  url: string;
+  type: string;
+  action: string;
+  status: string;
+}
+
+export interface FortiGateWhitelistStatus {
+  configured: boolean;
+  host?: string | null;
+  profile?: string | null;
+  entries: FortiGateWhitelistEntry[];
+}
+
+/**
+ * Web-filter action for the entry. Defaults to exempt.
+ */
+export type WhitelistWebsiteBodyAction =
+  (typeof WhitelistWebsiteBodyAction)[keyof typeof WhitelistWebsiteBodyAction];
+
+export const WhitelistWebsiteBodyAction = {
+  exempt: "exempt",
+  allow: "allow",
+  monitor: "monitor",
+} as const;
+
+export interface WhitelistWebsiteBody {
+  /** URL or domain to whitelist (scheme optional; bare domains are wildcarded). */
+  url: string;
+  /** Web-filter action for the entry. Defaults to exempt. */
+  action?: WhitelistWebsiteBodyAction;
+}
+
+export interface WhitelistWebsiteResult {
+  url: string;
+  action: string;
+  tableId: number;
+  tableName: string;
+  /** True if a new entry was created; false if it already existed. */
+  added: boolean;
+}
+
 export type NetworkSwitchStatus =
   (typeof NetworkSwitchStatus)[keyof typeof NetworkSwitchStatus];
 

@@ -13,12 +13,13 @@ export function AppLauncher({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { isCIO } = useAuth();
+  const { isCIO, user } = useAuth();
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const groups = useMemo(() => getNavGroups(isCIO), [isCIO]);
+  const groups = useMemo(() => getNavGroups(isCIO, canNetworkTools), [isCIO, canNetworkTools]);
   const allItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   const q = query.trim().toLowerCase();

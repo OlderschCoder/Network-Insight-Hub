@@ -47,6 +47,7 @@ import type {
   ErrorResponse,
   ForgotPassword200,
   ForgotPasswordBody,
+  FortiGateWhitelistStatus,
   GetAggregateReportParams,
   GetRecentActivityParams,
   GetUsageAnalyticsParams,
@@ -92,6 +93,8 @@ import type {
   User,
   Vlan,
   WeekStatus,
+  WhitelistWebsiteBody,
+  WhitelistWebsiteResult,
   ZendeskTicketBody,
   ZendeskTicketResponse,
 } from "./api.schemas";
@@ -6347,6 +6350,167 @@ export const useDeleteVlanMaintenanceLogEntry = <
   TContext
 > => {
   return useMutation(getDeleteVlanMaintenanceLogEntryMutationOptions(options));
+};
+
+/**
+ * @summary List FortiGate web-filter whitelist entries and config status
+ */
+export const getGetNetworkWhitelistUrl = () => {
+  return `/api/network/whitelist`;
+};
+
+export const getNetworkWhitelist = async (
+  options?: RequestInit,
+): Promise<FortiGateWhitelistStatus> => {
+  return customFetch<FortiGateWhitelistStatus>(getGetNetworkWhitelistUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetNetworkWhitelistQueryKey = () => {
+  return [`/api/network/whitelist`] as const;
+};
+
+export const getGetNetworkWhitelistQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNetworkWhitelist>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkWhitelist>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetNetworkWhitelistQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getNetworkWhitelist>>
+  > = ({ signal }) => getNetworkWhitelist({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkWhitelist>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNetworkWhitelistQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNetworkWhitelist>>
+>;
+export type GetNetworkWhitelistQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List FortiGate web-filter whitelist entries and config status
+ */
+
+export function useGetNetworkWhitelist<
+  TData = Awaited<ReturnType<typeof getNetworkWhitelist>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNetworkWhitelist>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNetworkWhitelistQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Whitelist a website on the FortiGate web filter
+ */
+export const getWhitelistWebsiteUrl = () => {
+  return `/api/network/whitelist`;
+};
+
+export const whitelistWebsite = async (
+  whitelistWebsiteBody: WhitelistWebsiteBody,
+  options?: RequestInit,
+): Promise<WhitelistWebsiteResult> => {
+  return customFetch<WhitelistWebsiteResult>(getWhitelistWebsiteUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(whitelistWebsiteBody),
+  });
+};
+
+export const getWhitelistWebsiteMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof whitelistWebsite>>,
+    TError,
+    { data: BodyType<WhitelistWebsiteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof whitelistWebsite>>,
+  TError,
+  { data: BodyType<WhitelistWebsiteBody> },
+  TContext
+> => {
+  const mutationKey = ["whitelistWebsite"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof whitelistWebsite>>,
+    { data: BodyType<WhitelistWebsiteBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return whitelistWebsite(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WhitelistWebsiteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof whitelistWebsite>>
+>;
+export type WhitelistWebsiteMutationBody = BodyType<WhitelistWebsiteBody>;
+export type WhitelistWebsiteMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Whitelist a website on the FortiGate web filter
+ */
+export const useWhitelistWebsite = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof whitelistWebsite>>,
+    TError,
+    { data: BodyType<WhitelistWebsiteBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof whitelistWebsite>>,
+  TError,
+  { data: BodyType<WhitelistWebsiteBody> },
+  TContext
+> => {
+  return useMutation(getWhitelistWebsiteMutationOptions(options));
 };
 
 export const getListAfterActionReportsUrl = (

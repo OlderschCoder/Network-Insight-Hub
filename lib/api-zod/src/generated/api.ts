@@ -1983,6 +1983,49 @@ export const DeleteVlanMaintenanceLogEntryResponse = zod.object({
   createdAt: zod.coerce.date().optional(),
 });
 
+/**
+ * @summary List FortiGate web-filter whitelist entries and config status
+ */
+export const GetNetworkWhitelistResponse = zod.object({
+  configured: zod.boolean(),
+  host: zod.string().nullish(),
+  profile: zod.string().nullish(),
+  entries: zod.array(
+    zod.object({
+      id: zod.union([zod.number(), zod.string()]),
+      url: zod.string(),
+      type: zod.string(),
+      action: zod.string(),
+      status: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Whitelist a website on the FortiGate web filter
+ */
+export const WhitelistWebsiteBody = zod.object({
+  url: zod
+    .string()
+    .describe(
+      "URL or domain to whitelist (scheme optional; bare domains are wildcarded).",
+    ),
+  action: zod
+    .enum(["exempt", "allow", "monitor"])
+    .optional()
+    .describe("Web-filter action for the entry. Defaults to exempt."),
+});
+
+export const WhitelistWebsiteResponse = zod.object({
+  url: zod.string(),
+  action: zod.string(),
+  tableId: zod.number(),
+  tableName: zod.string(),
+  added: zod
+    .boolean()
+    .describe("True if a new entry was created; false if it already existed."),
+});
+
 export const ListAfterActionReportsQueryParams = zod.object({
   building: zod.coerce.string().optional(),
   deviceType: zod.coerce.string().optional(),

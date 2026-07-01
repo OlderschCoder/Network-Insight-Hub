@@ -16,6 +16,7 @@ import {
   Gauge,
   LayoutGrid,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 
 export type NavItem = {
@@ -28,7 +29,7 @@ export type NavItem = {
 
 export type NavGroup = { label: string; items: NavItem[] };
 
-export function getNavGroups(isCIO: boolean): NavGroup[] {
+export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[] {
   const myWork: NavGroup = {
     label: "My Work",
     items: [
@@ -47,7 +48,10 @@ export function getNavGroups(isCIO: boolean): NavGroup[] {
   const knowledge: NavGroup = {
     label: "Systems & Tools",
     items: [
-      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network },
+      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") },
+      ...(canNetworkTools
+        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites on the FortiGate", icon: ShieldCheck } as NavItem]
+        : []),
       { href: "/azure-vms", label: "Azure VMs", desc: "Cloud virtual machine inventory", icon: Cloud },
       { href: "/azure-inventory", label: "Azure Inventory", desc: "Full inventory of all Azure resources by type", icon: Boxes },
       { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },

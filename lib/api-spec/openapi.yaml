@@ -1639,6 +1639,72 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /network/whitelist:
+    get:
+      operationId: getNetworkWhitelist
+      tags: [network]
+      summary: List FortiGate web-filter whitelist entries and config status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FortiGateWhitelistStatus"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: FortiGate error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: whitelistWebsite
+      tags: [network]
+      summary: Whitelist a website on the FortiGate web filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhitelistWebsiteBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhitelistWebsiteResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: FortiGate not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: FortiGate error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # AFTER-ACTION REPORTS
   /after-action:
     get:
@@ -2803,6 +2869,68 @@ components:
           nullable: true
         itemDate:
           type: string
+
+    FortiGateWhitelistEntry:
+      type: object
+      required: [id, url, type, action, status]
+      properties:
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+        url:
+          type: string
+        type:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+
+    FortiGateWhitelistStatus:
+      type: object
+      required: [configured, entries]
+      properties:
+        configured:
+          type: boolean
+        host:
+          type: string
+          nullable: true
+        profile:
+          type: string
+          nullable: true
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FortiGateWhitelistEntry"
+
+    WhitelistWebsiteBody:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: URL or domain to whitelist (scheme optional; bare domains are wildcarded).
+        action:
+          type: string
+          enum: [exempt, allow, monitor]
+          description: Web-filter action for the entry. Defaults to exempt.
+
+    WhitelistWebsiteResult:
+      type: object
+      required: [url, action, tableId, tableName, added]
+      properties:
+        url:
+          type: string
+        action:
+          type: string
+        tableId:
+          type: integer
+        tableName:
+          type: string
+        added:
+          type: boolean
+          description: True if a new entry was created; false if it already existed.
 
     NetworkSwitch:
       type: object

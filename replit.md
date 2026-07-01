@@ -64,6 +64,7 @@ All routes under `/api/`:
 - `GET/POST/PUT /reports` — weekly reports; `POST /reports/:id/finalize` (CIO)
 - `GET/POST/PUT /risks` — risks, issues, design suggestions
 - `GET /network/switches`, `GET /network/vlans` — network reference
+- `GET/POST /network/whitelist` — FortiGate web-filter website whitelist (network-admin: cio/network/network_engineer). GET returns config status + current entries; POST adds a URL (defaults action `exempt`). 503 `FORTIGATE_NOT_CONFIGURED` if unset, 502 on FortiGate API/reachability error
 - `GET/PUT /network/layout` — saved React Flow node positions (PUT auth, DELETE CIO-only)
 - `DELETE /reports/:id` — delete a report (CIO)
 - `GET /reports/:id/tickets` — Zendesk-resolved tickets for the report's week
@@ -95,6 +96,7 @@ All routes under `/api/`:
 - Zendesk: `ZENDESK_SUBDOMAIN=sccc`, `ZENDESK_EMAIL=admin@sccc.edu`, `ZENDESK_API_TOKEN` (secret)
 - Zendesk ticket creation via `/export/report/:id/zendesk` and `/export/entry/:id/zendesk`
 - Azure: service principal (client-credentials) → ARM. Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`. SP needs **Reader** at subscription scope. Client lives in `artifacts/api-server/src/lib/azure.ts`; "Sync from Azure" button on the Azure VMs page calls `POST /api/azure-vms/sync`.
+- FortiGate: REST API v2 (Bearer token) web-filter URL whitelist. Config env: `FORTIGATE_HOST` (e.g. 192.168.1.1), `FORTIGATE_API_TOKEN` (secret; create a REST API Admin token in FortiGate — a login password is not used), optional `FORTIGATE_VDOM` (default `root`), `FORTIGATE_WEBFILTER_PROFILE` (default `default`), `FORTIGATE_VERIFY_SSL` (default off; set `true` in production with trusted certs). Client lives in `artifacts/api-server/src/lib/fortigate.ts`; "Network Tools" page calls `POST /api/network/whitelist`. **Reachability:** the FortiGate is a private IP, so the API server can only reach it when running on the SCCC network/VPN — off-network calls return 502. Scope is REST webfilter only (no SSH ssl-exempt automation from the original script).
 
 ## Export Features
 
@@ -120,6 +122,7 @@ All routes under `/api/`:
 - `/risks` — Risks, issues, design suggestions
 - `/risks/new` — New risk/issue form
 - `/network` — Network reference (switches + VLANs) with search tabs
+- `/network/tools` — Network Tools: FortiGate website whitelist (network-admin roles only; nav item hidden for others)
 - `/it-apps` — Embeds the external unified project view (apps built for IT) in a sandboxed iframe
 - `/after-action` — After-action reports list
 - `/after-action/new` — New AAR form
