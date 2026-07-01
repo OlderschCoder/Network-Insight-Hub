@@ -1,5 +1,6 @@
 - [it-reporting frontend](it-reporting-frontend.md) — SCCC theming: whole app re-themes via shadcn `:root` tokens in index.css; brief-zip "Saints green" is canonical palette.
 - [e2e testing](e2e-testing.md) — Playwright specs need CHROMIUM_EXECUTABLE_PATH; register→activate-in-DB→login (register no longer returns a token); seed creds in replit.md are stale.
 - [FortiGate whitelist](fortigate-whitelist.md) — Network Tool: REST API-token auth (not password), webfilter-only (no SSH ssl-exempt), private-IP so on-network/VPN only (off-net = 502).
+- [Network script tools](network-script-tools.md) — printer/laptop/equipment tools GENERATE .ps1 (no server exec, can't run on staff PCs); psQuote strings, validate numeric sinks separately.
 - [Secrets need restart](replit-secrets-restart.md) — changed secrets/env vars only reach a workflow after restart; running server keeps its launch-time process.env snapshot.
 - [Azure VM sync quirks](azure-vm-sync.md) — no $expand=instanceView on subscription-wide VM list (use ?statusOnly=true); SP needs Reader RBAC even when auth succeeds.

@@ -122,7 +122,7 @@ All routes under `/api/`:
 - `/risks` — Risks, issues, design suggestions
 - `/risks/new` — New risk/issue form
 - `/network` — Network reference (switches + VLANs) with search tabs
-- `/network/tools` — Network Tools: FortiGate website whitelist (network-admin roles only; nav item hidden for others)
+- `/network/tools` — Network Tools (network-admin roles only; nav item hidden for others). Tabbed: FortiGate website whitelist (live API) + client-side PowerShell script generators (Install Printer, Add Laptop, Remove Equipment) that produce copy/download `.ps1` files to run on the target Windows machine (no server execution)
 - `/it-apps` — Embeds the external unified project view (apps built for IT) in a sandboxed iframe
 - `/after-action` — After-action reports list
 - `/after-action/new` — New AAR form

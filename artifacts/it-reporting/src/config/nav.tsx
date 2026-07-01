@@ -50,7 +50,7 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     items: [
       { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") },
       ...(canNetworkTools
-        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites on the FortiGate", icon: ShieldCheck } as NavItem]
+        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites and generate setup scripts", icon: ShieldCheck } as NavItem]
         : []),
       { href: "/azure-vms", label: "Azure VMs", desc: "Cloud virtual machine inventory", icon: Cloud },
       { href: "/azure-inventory", label: "Azure Inventory", desc: "Full inventory of all Azure resources by type", icon: Boxes },
