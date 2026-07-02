@@ -18,6 +18,7 @@ import {
 import { z } from "zod";
 import crypto from "crypto";
 import OpenAI from "openai";
+import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
 import fs from "fs";
 import path from "path";
 
@@ -525,6 +526,8 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
       maintenanceText = "(No maintenance log entries recorded yet.)";
     }
 
+    const knowledgeContext = await getKnowledgeContext();
+
     const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.
 
 You have direct knowledge of the SCCC campus map (provided as an image in the first user turn). Key context:
@@ -540,6 +543,8 @@ ${inventoryText}
 Below is the **recent maintenance log** — the most recent ${RECENT_PER_DEVICE} entries per switch and VLAN (oldest entries omitted). Use this to answer questions about recent changes, who worked on a device, and incident triage:
 ${maintenanceText}
 
+You also have a persistent memory: the SCCC Environment Knowledge Base below contains institutional and environment-specific knowledge (network design guidance, FortiGate, wireless, Azure, identity, monitoring, procedures). Prefer it over generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
+${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
 Guidelines for your answers:
 - Be concise, technical, and direct — you are talking to other IT staff.
 - When asked about a building, look it up in the inventory above and identify the building's switches, VLANs, and likely uplink path back to the AA144 Nexus pair.
@@ -567,17 +572,18 @@ Guidelines for your answers:
       userMessages.push({ role: m.role, content: m.content });
     }
 
-    const completion = await openai.chat.completions.create({
+    const { reply: rawReply, savedMemories } = await runChatWithMemory(openai, {
       model: "gpt-5.2",
-      max_completion_tokens: 2048,
+      maxCompletionTokens: 2048,
       messages: [
         { role: "system", content: systemPrompt },
         ...userMessages,
       ],
+      userId: req.user?.id ?? null,
     });
 
-    const reply = completion.choices[0]?.message?.content?.trim() || "(no response)";
-    return res.json({ reply });
+    const reply = rawReply.trim() || "(no response)";
+    return res.json({ reply, savedMemories });
   } catch (err: any) {
     console.error("[network ai-chat]", err);
     return res.status(500).json({ error: err?.message || "AI request failed" });

@@ -19,6 +19,7 @@ import strategicObjectivesRouter from "./strategic_objectives";
 import azureVmsRouter from "./azure_vms";
 import azureResourcesRouter from "./azure_resources";
 import analyticsRouter from "./analytics";
+import aiKnowledgeRouter from "./ai_knowledge";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use("/strategic-objectives", strategicObjectivesRouter);
 router.use("/azure-vms", azureVmsRouter);
 router.use("/azure-resources", azureResourcesRouter);
 router.use("/analytics", analyticsRouter);
+router.use("/ai-knowledge", aiKnowledgeRouter);
 
 export default router;

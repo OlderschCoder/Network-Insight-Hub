@@ -2361,3 +2361,105 @@ export const GetUsageAnalyticsResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * @summary List all AI knowledge base entries (including inactive)
+ */
+export const ListAiKnowledgeResponseItem = zod.object({
+  id: zod.number(),
+  category: zod.string(),
+  title: zod.string(),
+  content: zod.string(),
+  source: zod.enum(["seed", "manual", "ai"]),
+  isActive: zod.boolean(),
+  updatedBy: zod.number().nullish(),
+  updatedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date().optional(),
+  updatedAt: zod.coerce.date().optional(),
+});
+export const ListAiKnowledgeResponse = zod.array(ListAiKnowledgeResponseItem);
+
+/**
+ * @summary Add a knowledge entry to the AI's persistent memory
+ */
+export const createAiKnowledgeBodyTitleMax = 300;
+
+export const createAiKnowledgeBodyContentMax = 20000;
+
+export const CreateAiKnowledgeBody = zod.object({
+  category: zod
+    .enum([
+      "organization",
+      "environment",
+      "network",
+      "wireless",
+      "azure",
+      "identity",
+      "applications",
+      "endpoints",
+      "monitoring",
+      "security",
+      "helpdesk",
+      "general",
+    ])
+    .optional(),
+  title: zod.string().min(1).max(createAiKnowledgeBodyTitleMax),
+  content: zod.string().min(1).max(createAiKnowledgeBodyContentMax),
+});
+
+/**
+ * @summary Update a knowledge entry (content, category, or active state)
+ */
+export const UpdateAiKnowledgeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateAiKnowledgeBodyTitleMax = 300;
+
+export const updateAiKnowledgeBodyContentMax = 20000;
+
+export const UpdateAiKnowledgeBody = zod.object({
+  category: zod
+    .enum([
+      "organization",
+      "environment",
+      "network",
+      "wireless",
+      "azure",
+      "identity",
+      "applications",
+      "endpoints",
+      "monitoring",
+      "security",
+      "helpdesk",
+      "general",
+    ])
+    .optional(),
+  title: zod.string().min(1).max(updateAiKnowledgeBodyTitleMax).optional(),
+  content: zod.string().min(1).max(updateAiKnowledgeBodyContentMax).optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateAiKnowledgeResponse = zod.object({
+  id: zod.number(),
+  category: zod.string(),
+  title: zod.string(),
+  content: zod.string(),
+  source: zod.enum(["seed", "manual", "ai"]),
+  isActive: zod.boolean(),
+  updatedBy: zod.number().nullish(),
+  updatedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date().optional(),
+  updatedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Permanently delete a knowledge entry (CIO only)
+ */
+export const DeleteAiKnowledgeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteAiKnowledgeResponse = zod.object({
+  success: zod.boolean(),
+});

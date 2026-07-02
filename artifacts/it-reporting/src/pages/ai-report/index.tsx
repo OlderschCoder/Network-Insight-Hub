@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Loader2, Sparkles, Send, Copy, Download, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { MemoryTab } from "./memory-tab";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
 
@@ -383,6 +384,12 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
       }
       const data = await res.json();
       setMessages([...newMessages, { role: "assistant", content: data.reply ?? "" }]);
+      if (Array.isArray(data.savedMemories) && data.savedMemories.length > 0) {
+        toast({
+          title: "AI saved to memory",
+          description: data.savedMemories.map((m: any) => m.title).join("; "),
+        });
+      }
     } catch (e: any) {
       toast({ title: "Chat failed", description: e.message, variant: "destructive" });
       setMessages(newMessages);
@@ -553,6 +560,7 @@ export default function AIReport() {
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           <TabsTrigger value="chat">Ask AI</TabsTrigger>
+          <TabsTrigger value="memory">AI Memory</TabsTrigger>
         </TabsList>
         {isCIO && (
           <TabsContent value="status" className="mt-6">
@@ -561,6 +569,9 @@ export default function AIReport() {
         )}
         <TabsContent value="chat" className="mt-6">
           <ChatTab contextHint={contextHint} />
+        </TabsContent>
+        <TabsContent value="memory" className="mt-6">
+          <MemoryTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -19,6 +19,7 @@ const reports = reportsTable;
 const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
+import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -465,13 +466,18 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 - \`openRisksAndIssues\`, \`mitigatedRisks\`, \`closedRisks\`: open ones belong in Key Actions / Decisions and (if material) Challenges; mitigated/closed support Recent Wins.
 - \`ticketStats\` (helpdesk volume + categories): use for Service Level Metrics.`;
 
+      const knowledgeContext = await getKnowledgeContext();
+      const systemPromptWithKnowledge = knowledgeContext
+        ? `${systemPrompt}\n\n# SCCC Environment Knowledge Base (institutional context — use for accurate terminology, systems, and environment specifics)\n${knowledgeContext}`
+        : systemPrompt;
+
       const userPrompt = `Generate the Managed Services Status Report from the following operational data:\n\n${JSON.stringify(operationalData, null, 2)}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5.2",
         max_completion_tokens: 8192,
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPromptWithKnowledge },
           { role: "user", content: userPrompt },
         ],
       });
@@ -583,24 +589,28 @@ router.post(
         },
       };
 
+      const knowledgeContext = await getKnowledgeContext();
+
       const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to operational data: log entries, weekly reports, risks/issues/design suggestions, after-action reports, and the full network inventory — every switch and VLAN grouped by campus building, including IP addresses, models, status, subnets, and gateways.
 
 Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions — including questions about the campus network such as which buildings contain which switches and VLANs, IP/subnet/gateway details, and device status. Be concise and professional. Cite specific entries, AARs, risks, buildings, switches, or VLANs by name when relevant. If the data does not support an answer, say so.
 
+You have a persistent memory: the SCCC Environment Knowledge Base below. Use it to give SCCC-specific answers instead of generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
+${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const completion = await openai.chat.completions.create({
+      const { reply, savedMemories } = await runChatWithMemory(openai, {
         model: "gpt-5.2",
-        max_completion_tokens: 4096,
+        maxCompletionTokens: 4096,
         messages: [
           { role: "system", content: systemPrompt },
           ...chatMessages,
         ],
+        userId: (req as any).user?.id ?? null,
       });
 
-      const reply = completion.choices[0]?.message?.content ?? "";
-      return res.json({ reply });
+      return res.json({ reply, savedMemories });
     } catch (error) {
       console.error("AI chat error:", error);
       return res.status(500).json({

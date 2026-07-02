@@ -51,6 +51,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `after_action_reports` — id, userId, title, incidentDate, outcome, summary, timeline, whatWentWell, whatWentPoorly, actionItems
 - `projects` — id, title, description, status, progress (0-100), targetDate, newEstimatedDate, attachments (json), progressLog (json), pendingDecisions (json), strategicObjectiveIds (json), createdBy
 - `project_assignees` — projectId + userId composite PK
+- `ai_knowledge` — id, category (organization/environment/network/wireless/azure/identity/applications/endpoints/monitoring/security/helpdesk/general), title, content, source (seed/manual/ai), isActive, updatedBy, timestamps. Persistent AI memory: all active entries are injected into every AI prompt (status report generate, status-report chat, network AI chat). Seeded with 33 sections from the SCCC Helpdesk AI Knowledge Base doc.
 
 ## API Routes
 
@@ -74,6 +75,7 @@ All routes under `/api/`:
 - `GET/POST/PUT /after-action` — after-action reports
 - `GET /dashboard/summary`, `/activity`, `/week-status`
 - `GET /export/report/:id/docx`, `/export/report/:id/xlsx`
+- `GET/POST /ai-knowledge`, `PATCH /ai-knowledge/:id` (auth), `DELETE /ai-knowledge/:id` (CIO) — AI persistent memory CRUD. Server-side secret-pattern gate rejects credential-like content (also enforced in the AI `save_memory` tool). Context loader caps injection at 60k chars and wraps entries in an anti-prompt-injection preamble (`artifacts/api-server/src/lib/ai_knowledge.ts`). AI chats use `runChatWithMemory` (tool loop, max 3 rounds) and return `{reply, savedMemories}`; the AI can self-save memories via the `save_memory` tool.
 - `POST /export/report/:id/zendesk`, `/export/entry/:id/zendesk`
 
 ## Auth
@@ -128,3 +130,4 @@ All routes under `/api/`:
 - `/after-action/new` — New AAR form
 - `/after-action/:id` — AAR detail
 - `/admin` — User management (CIO only)
+- AI Assistant page has an "AI Memory" tab (all users): search/filter/add/edit/toggle memories, CIO-only delete; chat toasts when the AI saves a memory

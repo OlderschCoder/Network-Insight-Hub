@@ -32,6 +32,8 @@ tags:
     description: Project management
   - name: strategic-objectives
     description: Strategic objectives
+  - name: ai-knowledge
+    description: Persistent AI knowledge base (environment memory)
 paths:
   /healthz:
     get:
@@ -2021,6 +2023,84 @@ paths:
               schema:
                 $ref: "#/components/schemas/UsageAnalytics"
 
+  # AI KNOWLEDGE BASE
+  /ai-knowledge:
+    get:
+      operationId: listAiKnowledge
+      tags: [ai-knowledge]
+      summary: List all AI knowledge base entries (including inactive)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiKnowledge"
+    post:
+      operationId: createAiKnowledge
+      tags: [ai-knowledge]
+      summary: Add a knowledge entry to the AI's persistent memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAiKnowledgeBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiKnowledge"
+  /ai-knowledge/{id}:
+    patch:
+      operationId: updateAiKnowledge
+      tags: [ai-knowledge]
+      summary: Update a knowledge entry (content, category, or active state)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAiKnowledgeBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiKnowledge"
+    delete:
+      operationId: deleteAiKnowledge
+      tags: [ai-knowledge]
+      summary: Permanently delete a knowledge entry (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
 components:
   schemas:
     HealthStatus:
@@ -3611,3 +3691,66 @@ components:
           items:
             $ref: "#/components/schemas/UsageDailyPoint"
       required: [range, summary, perUser, featureTotals, roleBreakdown, dailyActivity]
+
+    AiKnowledge:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          enum: [seed, manual, ai]
+        isActive:
+          type: boolean
+        updatedBy:
+          type: integer
+          nullable: true
+        updatedByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, category, title, content, source, isActive]
+
+    CreateAiKnowledgeBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [organization, environment, network, wireless, azure, identity, applications, endpoints, monitoring, security, helpdesk, general]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          minLength: 1
+          maxLength: 20000
+      required: [title, content]
+
+    UpdateAiKnowledgeBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [organization, environment, network, wireless, azure, identity, applications, endpoints, monitoring, security, helpdesk, general]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        isActive:
+          type: boolean

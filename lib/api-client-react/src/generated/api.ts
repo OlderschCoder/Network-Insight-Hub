@@ -20,6 +20,7 @@ import type {
   ActivityItem,
   AfterActionReport,
   AggregateReport,
+  AiKnowledge,
   AuthResponse,
   AzureResource,
   AzureVm,
@@ -27,6 +28,7 @@ import type {
   ClearNetworkLayout200,
   ClearNetworkLayoutBody,
   CreateAfterActionBody,
+  CreateAiKnowledgeBody,
   CreateEntryBody,
   CreateLogItemBody,
   CreateMaintenanceLogEntryBody,
@@ -36,6 +38,7 @@ import type {
   CreateSwitchBody,
   CreateVlanBody,
   DashboardSummary,
+  DeleteAiKnowledge200,
   DeleteAzureVm200,
   DeleteProject200,
   DeleteReport200,
@@ -83,6 +86,7 @@ import type {
   StrategicObjectiveBody,
   SyncAzureResources200,
   SyncAzureVms200,
+  UpdateAiKnowledgeBody,
   UpdateLogItemBody,
   UpdateMaintenanceLogEntryBody,
   UpdateProcessBody,
@@ -7892,3 +7896,335 @@ export function useGetUsageAnalytics<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List all AI knowledge base entries (including inactive)
+ */
+export const getListAiKnowledgeUrl = () => {
+  return `/api/ai-knowledge`;
+};
+
+export const listAiKnowledge = async (
+  options?: RequestInit,
+): Promise<AiKnowledge[]> => {
+  return customFetch<AiKnowledge[]>(getListAiKnowledgeUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAiKnowledgeQueryKey = () => {
+  return [`/api/ai-knowledge`] as const;
+};
+
+export const getListAiKnowledgeQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAiKnowledge>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAiKnowledge>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAiKnowledgeQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAiKnowledge>>> = ({
+    signal,
+  }) => listAiKnowledge({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAiKnowledge>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAiKnowledgeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAiKnowledge>>
+>;
+export type ListAiKnowledgeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all AI knowledge base entries (including inactive)
+ */
+
+export function useListAiKnowledge<
+  TData = Awaited<ReturnType<typeof listAiKnowledge>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAiKnowledge>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAiKnowledgeQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a knowledge entry to the AI's persistent memory
+ */
+export const getCreateAiKnowledgeUrl = () => {
+  return `/api/ai-knowledge`;
+};
+
+export const createAiKnowledge = async (
+  createAiKnowledgeBody: CreateAiKnowledgeBody,
+  options?: RequestInit,
+): Promise<AiKnowledge> => {
+  return customFetch<AiKnowledge>(getCreateAiKnowledgeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createAiKnowledgeBody),
+  });
+};
+
+export const getCreateAiKnowledgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAiKnowledge>>,
+    TError,
+    { data: BodyType<CreateAiKnowledgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAiKnowledge>>,
+  TError,
+  { data: BodyType<CreateAiKnowledgeBody> },
+  TContext
+> => {
+  const mutationKey = ["createAiKnowledge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAiKnowledge>>,
+    { data: BodyType<CreateAiKnowledgeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAiKnowledge(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAiKnowledgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAiKnowledge>>
+>;
+export type CreateAiKnowledgeMutationBody = BodyType<CreateAiKnowledgeBody>;
+export type CreateAiKnowledgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a knowledge entry to the AI's persistent memory
+ */
+export const useCreateAiKnowledge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAiKnowledge>>,
+    TError,
+    { data: BodyType<CreateAiKnowledgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAiKnowledge>>,
+  TError,
+  { data: BodyType<CreateAiKnowledgeBody> },
+  TContext
+> => {
+  return useMutation(getCreateAiKnowledgeMutationOptions(options));
+};
+
+/**
+ * @summary Update a knowledge entry (content, category, or active state)
+ */
+export const getUpdateAiKnowledgeUrl = (id: number) => {
+  return `/api/ai-knowledge/${id}`;
+};
+
+export const updateAiKnowledge = async (
+  id: number,
+  updateAiKnowledgeBody: UpdateAiKnowledgeBody,
+  options?: RequestInit,
+): Promise<AiKnowledge> => {
+  return customFetch<AiKnowledge>(getUpdateAiKnowledgeUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateAiKnowledgeBody),
+  });
+};
+
+export const getUpdateAiKnowledgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAiKnowledge>>,
+    TError,
+    { id: number; data: BodyType<UpdateAiKnowledgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAiKnowledge>>,
+  TError,
+  { id: number; data: BodyType<UpdateAiKnowledgeBody> },
+  TContext
+> => {
+  const mutationKey = ["updateAiKnowledge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAiKnowledge>>,
+    { id: number; data: BodyType<UpdateAiKnowledgeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAiKnowledge(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAiKnowledgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAiKnowledge>>
+>;
+export type UpdateAiKnowledgeMutationBody = BodyType<UpdateAiKnowledgeBody>;
+export type UpdateAiKnowledgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a knowledge entry (content, category, or active state)
+ */
+export const useUpdateAiKnowledge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAiKnowledge>>,
+    TError,
+    { id: number; data: BodyType<UpdateAiKnowledgeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAiKnowledge>>,
+  TError,
+  { id: number; data: BodyType<UpdateAiKnowledgeBody> },
+  TContext
+> => {
+  return useMutation(getUpdateAiKnowledgeMutationOptions(options));
+};
+
+/**
+ * @summary Permanently delete a knowledge entry (CIO only)
+ */
+export const getDeleteAiKnowledgeUrl = (id: number) => {
+  return `/api/ai-knowledge/${id}`;
+};
+
+export const deleteAiKnowledge = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteAiKnowledge200> => {
+  return customFetch<DeleteAiKnowledge200>(getDeleteAiKnowledgeUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAiKnowledgeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAiKnowledge>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAiKnowledge>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAiKnowledge"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAiKnowledge>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteAiKnowledge(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAiKnowledgeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAiKnowledge>>
+>;
+
+export type DeleteAiKnowledgeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Permanently delete a knowledge entry (CIO only)
+ */
+export const useDeleteAiKnowledge = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAiKnowledge>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAiKnowledge>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteAiKnowledgeMutationOptions(options));
+};

@@ -1051,6 +1051,93 @@ export interface UsageAnalytics {
   dailyActivity: UsageDailyPoint[];
 }
 
+export type AiKnowledgeSource =
+  (typeof AiKnowledgeSource)[keyof typeof AiKnowledgeSource];
+
+export const AiKnowledgeSource = {
+  seed: "seed",
+  manual: "manual",
+  ai: "ai",
+} as const;
+
+export interface AiKnowledge {
+  id: number;
+  category: string;
+  title: string;
+  content: string;
+  source: AiKnowledgeSource;
+  isActive: boolean;
+  updatedBy?: number | null;
+  updatedByName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CreateAiKnowledgeBodyCategory =
+  (typeof CreateAiKnowledgeBodyCategory)[keyof typeof CreateAiKnowledgeBodyCategory];
+
+export const CreateAiKnowledgeBodyCategory = {
+  organization: "organization",
+  environment: "environment",
+  network: "network",
+  wireless: "wireless",
+  azure: "azure",
+  identity: "identity",
+  applications: "applications",
+  endpoints: "endpoints",
+  monitoring: "monitoring",
+  security: "security",
+  helpdesk: "helpdesk",
+  general: "general",
+} as const;
+
+export interface CreateAiKnowledgeBody {
+  category?: CreateAiKnowledgeBodyCategory;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  title: string;
+  /**
+   * @minLength 1
+   * @maxLength 20000
+   */
+  content: string;
+}
+
+export type UpdateAiKnowledgeBodyCategory =
+  (typeof UpdateAiKnowledgeBodyCategory)[keyof typeof UpdateAiKnowledgeBodyCategory];
+
+export const UpdateAiKnowledgeBodyCategory = {
+  organization: "organization",
+  environment: "environment",
+  network: "network",
+  wireless: "wireless",
+  azure: "azure",
+  identity: "identity",
+  applications: "applications",
+  endpoints: "endpoints",
+  monitoring: "monitoring",
+  security: "security",
+  helpdesk: "helpdesk",
+  general: "general",
+} as const;
+
+export interface UpdateAiKnowledgeBody {
+  category?: UpdateAiKnowledgeBodyCategory;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
+  title?: string;
+  /**
+   * @minLength 1
+   * @maxLength 20000
+   */
+  content?: string;
+  isActive?: boolean;
+}
+
 export type ForgotPasswordBody = {
   email: string;
 };
@@ -1255,4 +1342,8 @@ export type GetUsageAnalyticsParams = {
    * @maximum 365
    */
   days?: number;
+};
+
+export type DeleteAiKnowledge200 = {
+  success: boolean;
 };
