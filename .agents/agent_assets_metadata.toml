@@ -12,3 +12,9 @@ id = "13p9HvvSH27bmdXJlVC_L"
 uri = "file://USER_GUIDE.md"
 type = "text"
 title = "SCCC IT Reporting — User Guide"
+
+[[outputs]]
+id = "XNT8XNa7Ts8iv-zzYM_tF"
+uri = "file://exports/sccc_backup.sql.gz"
+type = "unspecified"
+title = "SCCC database dump (compressed, restore with gunzip | psql)"
