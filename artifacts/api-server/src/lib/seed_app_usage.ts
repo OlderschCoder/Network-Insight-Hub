@@ -1,14 +1,18 @@
-// Seeds "how to use this platform" knowledge into the ai_knowledge table so the
-// embedded AI assistant can guide users through the app. Idempotent: it removes
-// its own previously-seeded rows (identified by the "Using the Platform:" title
-// prefix) and re-inserts the current set.
-//
-// Run:  node artifacts/api-server/scripts/seed-app-usage.mjs
-import { Client } from "pg";
+import { and, eq, like, sql } from "drizzle-orm";
+import { db, aiKnowledgeTable } from "@workspace/db";
+import { logger } from "./logger";
 
+// Arbitrary constant key for a Postgres advisory lock so concurrent app
+// instances/restarts can't run the delete+insert at the same time.
+const SEED_LOCK_KEY = 748213001;
+
+// "How to use this platform" knowledge injected into every AI prompt so the
+// embedded assistant can guide users. Seeded on server startup (idempotent) so
+// the knowledge exists in whatever database the app is connected to — including
+// the production database, which is provisioned fresh (schema only) on publish.
 const TITLE_PREFIX = "Using the Platform:";
 
-const ENTRIES = [
+const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] = [
   {
     category: "general",
     title: "Using the Platform: What this app is",
@@ -61,7 +65,7 @@ const ENTRIES = [
     category: "general",
     title: "Using the Platform: Network reference and topology",
     content:
-      "Network (/network) is the reference for switches and VLANs with search tabs, seeded from SCCC inventory (switches and VLANs). /network/visualize shows the topology diagram (React Flow); node positions are saved and shared across users (last writer wins; the CIO can reset layout). Use this to look up a switch's hostname, building, IP, model, or a VLAN's ID, subnet, and gateway.",
+      "Network (/network) is the reference for switches and VLANs with search tabs, seeded from SCCC inventory. /network/visualize shows the topology diagram (React Flow); node positions are saved and shared across users (last writer wins; the CIO can reset layout). Use this to look up a switch's hostname, building, IP, model, or a VLAN's ID, subnet, and gateway.",
   },
   {
     category: "general",
@@ -107,35 +111,39 @@ const ENTRIES = [
   },
 ];
 
-async function main() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    console.error("DATABASE_URL is not set");
-    process.exit(1);
-  }
-  const client = new Client({ connectionString });
-  await client.connect();
+// Idempotent: removes the previously seeded app-usage rows (identified by the
+// title prefix + source 'seed') and re-inserts the current set, so the content
+// stays in sync with this file across restarts and deployments.
+export async function seedAppUsageKnowledge(): Promise<void> {
   try {
-    const del = await client.query(
-      "DELETE FROM ai_knowledge WHERE source = 'seed' AND title LIKE $1",
-      [TITLE_PREFIX + "%"],
-    );
-    let inserted = 0;
-    for (const e of ENTRIES) {
-      await client.query(
-        `INSERT INTO ai_knowledge (category, title, content, source, is_active)
-         VALUES ($1, $2, $3, 'seed', true)`,
-        [e.category, e.title, e.content],
+    await db.transaction(async (tx) => {
+      // Serialize concurrent seeders (multiple instances / overlapping restarts)
+      // so delete+insert can't interleave into duplicate rows. Lock is released
+      // automatically when the transaction ends.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${SEED_LOCK_KEY})`);
+      await tx
+        .delete(aiKnowledgeTable)
+        .where(
+          and(
+            eq(aiKnowledgeTable.source, "seed"),
+            like(aiKnowledgeTable.title, `${TITLE_PREFIX}%`),
+          ),
+        );
+      await tx.insert(aiKnowledgeTable).values(
+        APP_USAGE_ENTRIES.map((e) => ({
+          category: e.category,
+          title: e.title,
+          content: e.content,
+          source: "seed",
+          isActive: true,
+        })),
       );
-      inserted++;
-    }
-    console.log(`Removed ${del.rowCount} old app-usage rows; inserted ${inserted}.`);
-  } finally {
-    await client.end();
+    });
+    logger.info(
+      { count: APP_USAGE_ENTRIES.length },
+      "Seeded app-usage AI knowledge",
+    );
+  } catch (err) {
+    logger.error({ err }, "Failed to seed app-usage AI knowledge");
   }
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
