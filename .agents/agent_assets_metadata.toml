@@ -6,3 +6,9 @@ id = "x8Uzhlf3ajISoPBeulLaB"
 uri = "file://artifacts/it-reporting/README.md"
 type = "text"
 title = "SCCC IT Hub — Quick-Start Guide (by role)"
+
+[[outputs]]
+id = "13p9HvvSH27bmdXJlVC_L"
+uri = "file://USER_GUIDE.md"
+type = "text"
+title = "SCCC IT Reporting — User Guide"
