@@ -17,7 +17,8 @@ import {
 } from "../lib/fortigate";
 import { z } from "zod";
 import crypto from "crypto";
-import OpenAI from "openai";
+import type OpenAI from "openai";
+import { getOpenAI, isAIConfigured } from "../lib/openai";
 import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
 import fs from "fs";
 import path from "path";
@@ -40,11 +41,6 @@ function canEditMaintenanceEntry(user: any, entry: MaintenanceLogEntry): boolean
   if (entry.authorId != null && entry.authorId === user.id) return true;
   return MAINTENANCE_EDIT_ROLES.has(user.role);
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 let cachedMapDataUrl: string | null = null;
 function getCampusMapDataUrl(): string | null {
@@ -452,7 +448,7 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
     return res.status(400).json({ error: "Invalid messages payload" });
   }
 
-  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY || !process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+  if (!isAIConfigured()) {
     return res.status(503).json({ error: "AI service is not configured." });
   }
 
@@ -572,7 +568,7 @@ Guidelines for your answers:
       userMessages.push({ role: m.role, content: m.content });
     }
 
-    const { reply: rawReply, savedMemories } = await runChatWithMemory(openai, {
+    const { reply: rawReply, savedMemories } = await runChatWithMemory(getOpenAI(), {
       model: "gpt-5.2",
       maxCompletionTokens: 2048,
       messages: [

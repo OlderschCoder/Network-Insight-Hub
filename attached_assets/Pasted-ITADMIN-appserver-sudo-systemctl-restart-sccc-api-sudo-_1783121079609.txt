@@ -1,0 +1,90 @@
+ITADMIN@appserver:~$ sudo systemctl restart sccc-api
+sudo systemctl status sccc-api
+sudo journalctl -u sccc-api -n 80 --no-pager
+[sudo] password for ITADMIN:
+● sccc-api.service - SCCC IT Reporting API
+     Loaded: loaded (/etc/systemd/system/sccc-api.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-07-03 23:23:58 UTC; 52ms ago
+   Main PID: 33858 (MainThread)
+      Tasks: 6 (limit: 3996)
+     Memory: 3.6M (peak: 3.6M)
+        CPU: 21ms
+     CGroup: /system.slice/sccc-api.service
+             └─33858 /usr/bin/node --enable-source-maps artifacts/api-server/dist/index.mjs
+
+Jul 03 23:23:58 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:45 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:46 appserver node[31259]: /opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415
+Jul 03 19:55:46 appserver node[31259]:       throw new Errors.OpenAIError(
+Jul 03 19:55:46 appserver node[31259]:             ^
+Jul 03 19:55:46 appserver node[31259]: OpenAIError: Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.
+Jul 03 19:55:46 appserver node[31259]:     at new OpenAI (/opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415:13)
+Jul 03 19:55:46 appserver node[31259]:     at <anonymous> (/opt/sccc-it/artifacts/api-server/src/routes/network.ts:44:16)
+Jul 03 19:55:46 appserver node[31259]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 03 19:55:46 appserver node[31259]:     at async node:internal/modules/esm/loader:643:26
+Jul 03 19:55:46 appserver node[31259]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 03 19:55:46 appserver node[31259]: Node.js v24.18.0
+Jul 03 19:55:46 appserver systemd[1]: sccc-api.service: Main process exited, code=exited, status=1/FAILURE
+Jul 03 19:55:46 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:46 appserver systemd[1]: sccc-api.service: Scheduled restart job, restart counter is at 1.
+Jul 03 19:55:46 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:47 appserver node[31273]: /opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415
+Jul 03 19:55:47 appserver node[31273]:       throw new Errors.OpenAIError(
+Jul 03 19:55:47 appserver node[31273]:             ^
+Jul 03 19:55:47 appserver node[31273]: OpenAIError: Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.
+Jul 03 19:55:47 appserver node[31273]:     at new OpenAI (/opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415:13)
+Jul 03 19:55:47 appserver node[31273]:     at <anonymous> (/opt/sccc-it/artifacts/api-server/src/routes/network.ts:44:16)
+Jul 03 19:55:47 appserver node[31273]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 03 19:55:47 appserver node[31273]:     at async node:internal/modules/esm/loader:643:26
+Jul 03 19:55:47 appserver node[31273]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 03 19:55:47 appserver node[31273]: Node.js v24.18.0
+Jul 03 19:55:47 appserver systemd[1]: sccc-api.service: Main process exited, code=exited, status=1/FAILURE
+Jul 03 19:55:47 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:47 appserver systemd[1]: sccc-api.service: Scheduled restart job, restart counter is at 2.
+Jul 03 19:55:47 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:48 appserver node[31282]: /opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415
+Jul 03 19:55:48 appserver node[31282]:       throw new Errors.OpenAIError(
+Jul 03 19:55:48 appserver node[31282]:             ^
+Jul 03 19:55:48 appserver node[31282]: OpenAIError: Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.
+Jul 03 19:55:48 appserver node[31282]:     at new OpenAI (/opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415:13)
+Jul 03 19:55:48 appserver node[31282]:     at <anonymous> (/opt/sccc-it/artifacts/api-server/src/routes/network.ts:44:16)
+Jul 03 19:55:48 appserver node[31282]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 03 19:55:48 appserver node[31282]:     at async node:internal/modules/esm/loader:643:26
+Jul 03 19:55:48 appserver node[31282]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 03 19:55:48 appserver node[31282]: Node.js v24.18.0
+Jul 03 19:55:48 appserver systemd[1]: sccc-api.service: Main process exited, code=exited, status=1/FAILURE
+Jul 03 19:55:48 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:48 appserver systemd[1]: sccc-api.service: Scheduled restart job, restart counter is at 3.
+Jul 03 19:55:48 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:49 appserver node[31291]: /opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415
+Jul 03 19:55:49 appserver node[31291]:       throw new Errors.OpenAIError(
+Jul 03 19:55:49 appserver node[31291]:             ^
+Jul 03 19:55:49 appserver node[31291]: OpenAIError: Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.
+Jul 03 19:55:49 appserver node[31291]:     at new OpenAI (/opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415:13)
+Jul 03 19:55:49 appserver node[31291]:     at <anonymous> (/opt/sccc-it/artifacts/api-server/src/routes/network.ts:44:16)
+Jul 03 19:55:49 appserver node[31291]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 03 19:55:49 appserver node[31291]:     at async node:internal/modules/esm/loader:643:26
+Jul 03 19:55:49 appserver node[31291]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 03 19:55:49 appserver node[31291]: Node.js v24.18.0
+Jul 03 19:55:49 appserver systemd[1]: sccc-api.service: Main process exited, code=exited, status=1/FAILURE
+Jul 03 19:55:49 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:49 appserver systemd[1]: sccc-api.service: Scheduled restart job, restart counter is at 4.
+Jul 03 19:55:49 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+Jul 03 19:55:50 appserver node[31300]: /opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415
+Jul 03 19:55:50 appserver node[31300]:       throw new Errors.OpenAIError(
+Jul 03 19:55:50 appserver node[31300]:             ^
+Jul 03 19:55:50 appserver node[31300]: OpenAIError: Missing credentials. Please pass an `apiKey`, `workloadIdentity`, or set the `OPENAI_API_KEY` environment variable.
+Jul 03 19:55:50 appserver node[31300]:     at new OpenAI (/opt/sccc-it/node_modules/.pnpm/openai@6.34.0_zod@3.25.76/node_modules/openai/src/client.ts:415:13)
+Jul 03 19:55:50 appserver node[31300]:     at <anonymous> (/opt/sccc-it/artifacts/api-server/src/routes/network.ts:44:16)
+Jul 03 19:55:50 appserver node[31300]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 03 19:55:50 appserver node[31300]:     at async node:internal/modules/esm/loader:643:26
+Jul 03 19:55:50 appserver node[31300]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 03 19:55:50 appserver node[31300]: Node.js v24.18.0
+Jul 03 19:55:50 appserver systemd[1]: sccc-api.service: Main process exited, code=exited, status=1/FAILURE
+Jul 03 19:55:50 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:50 appserver systemd[1]: sccc-api.service: Scheduled restart job, restart counter is at 5.
+Jul 03 19:55:50 appserver systemd[1]: sccc-api.service: Start request repeated too quickly.
+Jul 03 19:55:50 appserver systemd[1]: sccc-api.service: Failed with result 'exit-code'.
+Jul 03 19:55:50 appserver systemd[1]: Failed to start sccc-api.service - SCCC IT Reporting API.
+Jul 03 23:23:58 appserver systemd[1]: Started sccc-api.service - SCCC IT Reporting API.
+ITADMIN@appserver:~$

@@ -4,4 +4,5 @@
 - [Network script tools](network-script-tools.md) — printer/laptop/equipment tools GENERATE .ps1 (no server exec, can't run on staff PCs); psQuote strings, validate numeric sinks separately.
 - [Secrets need restart](replit-secrets-restart.md) — changed secrets/env vars only reach a workflow after restart; running server keeps its launch-time process.env snapshot.
 - [Azure VM sync quirks](azure-vm-sync.md) — no $expand=instanceView on subscription-wide VM list (use ?statusOnly=true); SP needs Reader RBAC even when auth succeeds.
+- [Self-hosted boot](self-hosted-boot.md) — never `new OpenAI()` at module scope (throws on missing key → crash-loop/502 on self-host); lazy accessor + isAIConfigured() 503 guards.
 - [Production seed data](prod-seed-data.md) — publish migrates schema only, NOT rows; dev-only seeds never reach prod. Self-seed reference data at app startup, idempotently.

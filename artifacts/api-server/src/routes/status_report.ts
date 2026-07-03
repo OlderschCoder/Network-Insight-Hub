@@ -1,5 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import OpenAI from "openai";
 import {
   db,
   entriesTable,
@@ -20,11 +19,7 @@ const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
 import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+import { getOpenAI, isAIConfigured } from "../lib/openai";
 
 const router = Router();
 
@@ -72,6 +67,9 @@ router.post(
   requireAuth,
   requireCIO,
   async (req: Request, res: Response) => {
+    if (!isAIConfigured()) {
+      return res.status(503).json({ error: "AI service is not configured." });
+    }
     try {
       const {
         startDate,
@@ -473,7 +471,7 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 
       const userPrompt = `Generate the Managed Services Status Report from the following operational data:\n\n${JSON.stringify(operationalData, null, 2)}`;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAI().chat.completions.create({
         model: "gpt-5.2",
         max_completion_tokens: 8192,
         messages: [
@@ -514,6 +512,9 @@ router.post(
   requireAuth,
   requireCIO,
   async (req: Request, res: Response) => {
+    if (!isAIConfigured()) {
+      return res.status(503).json({ error: "AI service is not configured." });
+    }
     try {
       const { messages: chatMessages = [], lookbackDays: rawLookback = 90 } = req.body ?? {};
 
@@ -600,7 +601,7 @@ ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const { reply, savedMemories } = await runChatWithMemory(openai, {
+      const { reply, savedMemories } = await runChatWithMemory(getOpenAI(), {
         model: "gpt-5.2",
         maxCompletionTokens: 4096,
         messages: [
