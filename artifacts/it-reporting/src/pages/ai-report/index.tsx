@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Sparkles, Send, Copy, Download, Trash2 } from "lucide-react";
+import { Loader2, Sparkles, Send, Copy, Download, Trash2, BookmarkPlus, Flag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MemoryTab } from "./memory-tab";
+import { CIOInsightsTab } from "./cio-insights-tab";
+import { CaptureDialog } from "./capture-dialog";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
 
@@ -30,6 +32,7 @@ interface ChatMessage {
 }
 
 function MarkdownMessage({ content }: { content: string }) {
+  const [, navigate] = useLocation();
   return (
     <div className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
       <ReactMarkdown
@@ -44,9 +47,31 @@ function MarkdownMessage({ content }: { content: string }) {
           li: ({ node, ...props }) => <li className="pl-1 [&>ul]:mt-1 [&>ol]:mt-1" {...props} />,
           strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
           em: ({ node, ...props }) => <em className="italic" {...props} />,
-          a: ({ node, ...props }) => (
-            <a className="underline underline-offset-2" target="_blank" rel="noopener noreferrer" {...props} />
-          ),
+          a: ({ node, href, ...props }) => {
+            const isInternal = typeof href === "string" && href.startsWith("/");
+            if (isInternal) {
+              return (
+                <a
+                  className="underline underline-offset-2 text-primary cursor-pointer"
+                  href={href}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(href);
+                  }}
+                  {...props}
+                />
+              );
+            }
+            return (
+              <a
+                className="underline underline-offset-2"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                {...props}
+              />
+            );
+          },
           code: ({ node, ...props }) => (
             <code className="rounded bg-background/60 px-1 py-0.5 font-mono text-[0.85em]" {...props} />
           ),
@@ -370,6 +395,10 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
     });
   };
   const [input, setInput] = useState("");
+  const [capture, setCapture] = useState<{ open: boolean; text: string }>({
+    open: false,
+    text: "",
+  });
   const [loading, setLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -493,6 +522,18 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
             .join("; "),
         });
       }
+      if (Array.isArray(data.savedShadowNotes) && data.savedShadowNotes.length > 0) {
+        const sn = data.savedShadowNotes as { title?: string; content?: string }[];
+        toast({
+          title:
+            sn.length === 1
+              ? "Saved to your shadow memory"
+              : `Saved ${sn.length} notes to shadow memory`,
+          description: sn
+            .map((n) => n.title ?? (n.content ?? "").slice(0, 60))
+            .join("; "),
+        });
+      }
     } catch (e: any) {
       toast({ title: "Chat failed", description: e.message, variant: "destructive" });
       setMessages(newMessages);
@@ -594,7 +635,7 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
           >
             <div
               className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${
@@ -605,6 +646,17 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
             >
               {m.role === "user" ? m.content : <MarkdownMessage content={m.content} />}
             </div>
+            {m.role === "assistant" && m.content.trim() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => setCapture({ open: true, text: m.content })}
+                title="Capture this into a Task, Risk, or Post-Incident Review"
+              >
+                <BookmarkPlus className="h-3.5 w-3.5 mr-1" /> Capture
+              </Button>
+            )}
           </div>
         ))}
         {loading && (
@@ -637,6 +689,12 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
           </Button>
         </div>
       </div>
+      <CaptureDialog
+        open={capture.open}
+        onOpenChange={(v) => setCapture((c) => ({ ...c, open: v }))}
+        sourceText={capture.text}
+        authorName={user?.name ?? null}
+      />
     </Card>
   );
 }
@@ -663,11 +721,21 @@ export default function AIReport() {
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           <TabsTrigger value="chat">Ask AI</TabsTrigger>
+          {isCIO && (
+            <TabsTrigger value="insights">
+              <Flag className="h-4 w-4 mr-1.5" /> CIO Insights
+            </TabsTrigger>
+          )}
           <TabsTrigger value="memory">AI Memory</TabsTrigger>
         </TabsList>
         {isCIO && (
           <TabsContent value="status" className="mt-6">
             <StatusReportTab />
+          </TabsContent>
+        )}
+        {isCIO && (
+          <TabsContent value="insights" className="mt-6">
+            <CIOInsightsTab />
           </TabsContent>
         )}
         <TabsContent value="chat" className="mt-6">

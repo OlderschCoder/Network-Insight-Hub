@@ -575,19 +575,20 @@ Guidelines for your answers:
       userMessages.push({ role: m.role, content: m.content });
     }
 
-    const { reply: rawReply, savedMemories, createdTasks, networkUpdates } = await runChatWithMemory(getOpenAI(), {
-      model: "gpt-5.2",
-      maxCompletionTokens: 2048,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...userMessages,
-      ],
-      userId: req.user?.id ?? null,
-      userRole: req.user?.role ?? null,
-    });
+    const { reply: rawReply, savedMemories, createdTasks, networkUpdates, savedShadowNotes } =
+      await runChatWithMemory(getOpenAI(), {
+        model: "gpt-5.2",
+        maxCompletionTokens: 2048,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...userMessages,
+        ],
+        userId: req.user?.id ?? null,
+        userRole: req.user?.role ?? null,
+      });
 
     const reply = rawReply.trim() || "(no response)";
-    return res.json({ reply, savedMemories, createdTasks, networkUpdates });
+    return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes });
   } catch (err: any) {
     console.error("[network ai-chat]", err);
     return res.status(500).json({ error: err?.message || "AI request failed" });

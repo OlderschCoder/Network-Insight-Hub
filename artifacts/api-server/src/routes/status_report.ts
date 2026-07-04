@@ -11,7 +11,7 @@ import {
   networkSwitchesTable,
   vlansTable,
 } from "@workspace/db";
-import { and, gte, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
 const entries = entriesTable;
 const reports = reportsTable;
@@ -535,9 +535,19 @@ router.post(
       since.setDate(since.getDate() - lookbackDays);
       const sinceStr = since.toISOString().slice(0, 10);
 
-      const [entriesData, risksData, aarData, switchRows, vlanRows] = await Promise.all([
+      const [
+        entriesData,
+        risksData,
+        aarData,
+        projectsData,
+        objectivesData,
+        tasksData,
+        switchRows,
+        vlanRows,
+      ] = await Promise.all([
         db
           .select({
+            id: entries.id,
             category: entries.category,
             title: entries.title,
             description: entries.description,
@@ -551,17 +561,20 @@ router.post(
           .limit(100),
         db
           .select({
+            id: risks.id,
             type: risks.type,
             severity: risks.severity,
             status: risks.status,
             title: risks.title,
             description: risks.description,
             mitigation: risks.mitigation,
+            relatedBuilding: risks.relatedBuilding,
           })
           .from(risks)
           .limit(50),
         db
           .select({
+            id: afterActionReports.id,
             title: afterActionReports.title,
             incident: afterActionReports.incident,
             severity: afterActionReports.severity,
@@ -572,6 +585,36 @@ router.post(
           .from(afterActionReports)
           .where(gte(afterActionReports.incidentDate, since))
           .limit(50),
+        db
+          .select({
+            id: projectsTable.id,
+            title: projectsTable.title,
+            status: projectsTable.status,
+            progress: projectsTable.progress,
+            targetDate: projectsTable.targetDate,
+            description: projectsTable.description,
+          })
+          .from(projectsTable)
+          .limit(100),
+        db
+          .select({
+            id: strategicObjectivesTable.id,
+            title: strategicObjectivesTable.title,
+            status: strategicObjectivesTable.status,
+          })
+          .from(strategicObjectivesTable)
+          .limit(50),
+        db
+          .select({
+            id: logItemsTable.id,
+            title: logItemsTable.title,
+            category: logItemsTable.category,
+            itemDate: logItemsTable.itemDate,
+            weekOf: logItemsTable.weekOf,
+          })
+          .from(logItemsTable)
+          .where(gte(logItemsTable.itemDate, sinceStr))
+          .limit(200),
         db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
         db.select().from(vlansTable).orderBy(vlansTable.vlanId),
       ]);
@@ -583,6 +626,9 @@ router.post(
         recentEntries: entriesData,
         risksAndIssues: risksData,
         afterActionReports: aarData,
+        projects: projectsData,
+        strategicObjectives: objectivesData,
+        recentTasks: tasksData,
         networkInventory: {
           switchCount: switchRows.length,
           vlanCount: vlanRows.length,
@@ -597,13 +643,23 @@ router.post(
         ? `You are currently assisting ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — their role is "${authUser.role}"${authUser.jobTitle ? `, job title "${authUser.jobTitle}"` : ""}. You already know who they are, so never ask; address them by first name when natural and attribute anything they report (work done, updates, requests) to this person.`
         : "";
 
-      const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to operational data: log entries, weekly reports, risks/issues/design suggestions, after-action reports, and the full network inventory — every switch and VLAN grouped by campus building, including IP addresses, models, status, subnets, and gateways.
+      const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to the department's operational data: weekly log entries, individual tasks (log items), weekly reports, risks/issues/design suggestions, after-action (post-incident) reviews, projects, department strategic objectives, and the full network inventory — every switch and VLAN grouped by campus building, including IP addresses, models, status, subnets, and gateways. You do NOT have access to any credentials, passwords, tokens, or user login details; never claim to.
 ${identityLine ? `\n${identityLine}\n` : ""}
-Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions — including questions about the campus network such as which buildings contain which switches and VLANs, IP/subnet/gateway details, and device status. Be concise and professional. Cite specific entries, AARs, risks, buildings, switches, or VLANs by name when relevant. If the data does not support an answer, say so.
+Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions — including questions about the campus network such as which buildings contain which switches and VLANs, IP/subnet/gateway details, and device status. Be concise and professional. If the data does not support an answer, say so.
+
+When you reference a specific record that exists in the context below, add a clickable Markdown citation linking to that record's page in the app, using the numeric id from the context:
+- Risk/issue → \`[label](/risks)\`
+- After-action review → \`[label](/after-action/<id>)\`
+- Weekly log entry → \`[label](/entries/<id>)\`
+- Project → \`[label](/projects)\`
+- Network switch/VLAN or building → \`[label](/network)\`
+Keep the link label short (e.g. the record's title). Only cite records that appear in the context; never invent ids.
 
 When answering questions about how to use or navigate the app (where a feature lives, how to reach a page), rely ONLY on the navigation and pages documented in the SCCC Environment Knowledge Base below. There IS a built-in "User Guide" page (in the "Systems & Tools" menu group, at /user-guide) with full step-by-step instructions — point users there for detailed how-to help, in addition to giving them the quick steps. Do NOT invent any other pages, menu items, or features that are not documented (there is no separate "Help" or "FAQ" page). If you are unsure where something is, say so instead of guessing.
 
 You can capture work directly into the user's records. When the user describes concrete work in the conversation — something they did, fixed, completed, or need to do — call the create_task tool to save it as an item in their personal "My Tasks" list for the current week. These items roll up into their weekly report automatically, so this is how their conversation turns into their report. Capture each distinct piece of work as its own task, and prefer capturing over asking. After saving, briefly confirm in plain language what you added (the app also shows them a toast with an Undo option). Do not use create_task for questions, hypotheticals, or durable environment facts.
+
+When (and ONLY when) you are assisting the CIO, you have a private "shadow memory" for reporting time. If, while reviewing the data, you notice something the CIO should weigh when writing the weekly executive report — a risk or red flag worth surfacing, a trend across the team's work, a metric to highlight, a follow-up, or framing/wording advice — call the save_shadow_note tool to stage it as a reviewable suggestion for the current week. These notes are shown to the CIO privately for review only; they never modify any report, entry, or deliverable, and they are never visible to other staff. Do not stage shadow notes for anyone who is not the CIO.
 
 You can also keep the network inventory current. When a network administrator reports a real change to a switch (added, replaced, moved building/location, went online/offline, or an IP/model change) or a VLAN (new VLAN, or a changed subnet/gateway/name/type), call upsert_switch or upsert_vlan so the switch and VLAN records stay up to date — identify a switch by its hostname and a VLAN by its numeric id. Only do this for concrete changes the user actually states; never invent inventory. If the user is not a network administrator, these updates will be refused — just tell them who to ask.
 
@@ -612,18 +668,19 @@ ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const { reply, savedMemories, createdTasks, networkUpdates } = await runChatWithMemory(getOpenAI(), {
-        model: "gpt-5.2",
-        maxCompletionTokens: 4096,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...chatMessages,
-        ],
-        userId: (req as any).user?.id ?? null,
-        userRole: (req as any).user?.role ?? null,
-      });
+      const { reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes } =
+        await runChatWithMemory(getOpenAI(), {
+          model: "gpt-5.2",
+          maxCompletionTokens: 4096,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...chatMessages,
+          ],
+          userId: (req as any).user?.id ?? null,
+          userRole: (req as any).user?.role ?? null,
+        });
 
-      return res.json({ reply, savedMemories, createdTasks, networkUpdates });
+      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes });
     } catch (error) {
       console.error("AI chat error:", error);
       return res.status(500).json({
@@ -633,5 +690,191 @@ ${JSON.stringify(context, null, 2)}`;
     }
   }
 );
+
+// ---- AI Red Flags ----------------------------------------------------------
+// CIO-only. Scans a week's operational data and produces a structured list of
+// "red flags" plus three ready-to-use formats: a report narrative block, a
+// Risks & Issues entry, and a concise alert note. This endpoint only READS data
+// and returns text — it never writes reports, risks, or notes itself; the CIO
+// promotes the output using the existing endpoints.
+function isoWeekStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = dt.getUTCDay() || 7;
+  const monday = new Date(dt.getTime() - (dow - 1) * 86400000);
+  return monday.toISOString().slice(0, 10);
+}
+
+const SEVERITY_RANK: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+
+router.post("/red-flags", requireAuth, requireCIO, async (req: Request, res: Response) => {
+  if (!isAIConfigured()) {
+    return res.status(503).json({ error: "AI service is not configured." });
+  }
+  try {
+    const rawWeek = typeof req.body?.weekOf === "string" ? req.body.weekOf : "";
+    const weekOf = /^\d{4}-\d{2}-\d{2}$/.test(rawWeek)
+      ? isoWeekStart(rawWeek)
+      : isoWeekStart(new Date().toISOString().slice(0, 10));
+    const weekEnd = new Date(new Date(weekOf + "T00:00:00Z").getTime() + 7 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+
+    const [tasksData, entriesData, risksData, aarData, projectsData] = await Promise.all([
+      db
+        .select({
+          id: logItemsTable.id,
+          title: logItemsTable.title,
+          category: logItemsTable.category,
+          itemDate: logItemsTable.itemDate,
+        })
+        .from(logItemsTable)
+        .where(eq(logItemsTable.weekOf, weekOf))
+        .limit(300),
+      db
+        .select({
+          id: entriesTable.id,
+          title: entriesTable.title,
+          category: entriesTable.category,
+          challenges: entriesTable.challenges,
+          description: entriesTable.description,
+        })
+        .from(entriesTable)
+        .where(eq(entriesTable.weekOf, weekOf))
+        .limit(100),
+      db
+        .select({
+          id: risksTable.id,
+          type: risksTable.type,
+          severity: risksTable.severity,
+          status: risksTable.status,
+          title: risksTable.title,
+          description: risksTable.description,
+          relatedBuilding: risksTable.relatedBuilding,
+        })
+        .from(risksTable)
+        .where(ne(risksTable.status, "closed"))
+        .limit(80),
+      db
+        .select({
+          id: afterActionReportsTable.id,
+          title: afterActionReportsTable.title,
+          severity: afterActionReportsTable.severity,
+          status: afterActionReportsTable.status,
+          incident: afterActionReportsTable.incident,
+        })
+        .from(afterActionReportsTable)
+        .where(
+          or(
+            ne(afterActionReportsTable.status, "closed"),
+            and(
+              gte(afterActionReportsTable.incidentDate, new Date(weekOf + "T00:00:00Z")),
+              lte(afterActionReportsTable.incidentDate, new Date(weekEnd + "T00:00:00Z")),
+            ),
+          ),
+        )
+        .limit(60),
+      db
+        .select({
+          id: projectsTable.id,
+          title: projectsTable.title,
+          status: projectsTable.status,
+          progress: projectsTable.progress,
+          targetDate: projectsTable.targetDate,
+        })
+        .from(projectsTable)
+        .where(notInArray(projectsTable.status, ["completed", "cancelled"]))
+        .limit(100),
+    ]);
+
+    const knowledgeContext = await getKnowledgeContext();
+    const context = {
+      weekOf,
+      weekEnd,
+      thisWeekTasks: tasksData,
+      thisWeekEntries: entriesData,
+      currentlyOpenRisksAndIssues: risksData,
+      openOrThisWeekIncidents: aarData,
+      activeProjects: projectsData,
+    };
+
+    const systemPrompt = `You are the CIO's private analyst for the Seward County Community College IT Department. Review the operational data for the week of ${weekOf} and identify the most important "red flags" — risks, slipping projects, recurring problems, unresolved incidents, capacity/coverage gaps, or anything the CIO should proactively call out before finalizing the weekly executive report. Be specific and grounded strictly in the provided data; do not invent facts, and if the week is quiet, return few or zero flags. Note on the data: "thisWeekTasks"/"thisWeekEntries" are scoped to this week, while "currentlyOpenRisksAndIssues", "openOrThisWeekIncidents", and "activeProjects" reflect current outstanding state (they may have originated earlier) — treat a still-open risk or slipping project as a live red flag regardless of when it started.
+
+Return ONLY a JSON object with this exact shape:
+{
+  "flags": [
+    { "title": string, "detail": string, "severity": "low"|"medium"|"high"|"critical", "source": string }
+  ],
+  "narrative": string,
+  "alertNote": string
+}
+- "flags": up to 6 concise items, most important first. "source" briefly names the record(s) it came from (e.g. "Risk: <title>", "PIR: <title>", "Project: <title>").
+- "narrative": a short Markdown block (a lead sentence plus bullet points) the CIO can paste directly into the weekly report under a "Risks & Red Flags" heading.
+- "alertNote": one tight paragraph (2-4 sentences) written as an at-a-glance alert for the CIO.
+Keep it professional and executive-ready. Do not include secrets, credentials, or personal login details.${knowledgeContext ? `\n\n# SCCC Environment Knowledge Base (reference)\n${knowledgeContext}` : ""}`;
+
+    const completion = await getOpenAI().chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 2048,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Operational data for the week:\n${JSON.stringify(context, null, 2)}`,
+        },
+      ],
+    });
+
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    } catch {
+      parsed = {};
+    }
+
+    const rawFlags = Array.isArray(parsed.flags) ? parsed.flags : [];
+    const flags = rawFlags
+      .map((f: any) => {
+        const sev = String(f?.severity ?? "medium").toLowerCase();
+        return {
+          title: String(f?.title ?? "").trim().slice(0, 300),
+          detail: String(f?.detail ?? "").trim().slice(0, 2000),
+          severity: SEVERITY_RANK[sev] ? sev : "medium",
+          source: String(f?.source ?? "").trim().slice(0, 300),
+        };
+      })
+      .filter((f: any) => f.title.length > 0)
+      .slice(0, 6);
+
+    const narrative = typeof parsed.narrative === "string" ? parsed.narrative.trim() : "";
+    const alertNote = typeof parsed.alertNote === "string" ? parsed.alertNote.trim() : "";
+
+    // Derive a ready-to-create Risks & Issues entry from the flags.
+    const topSeverity = flags.reduce(
+      (max: string, f: any) => (SEVERITY_RANK[f.severity] > SEVERITY_RANK[max] ? f.severity : max),
+      "low",
+    );
+    const riskEntry =
+      flags.length > 0
+        ? {
+            type: "issue" as const,
+            severity: topSeverity,
+            title: `AI Red Flags — week of ${weekOf}`,
+            description: flags
+              .map((f: any) => `[${f.severity.toUpperCase()}] ${f.title}: ${f.detail}${f.source ? ` (${f.source})` : ""}`)
+              .join("\n\n"),
+          }
+        : null;
+
+    return res.json({ weekOf, flags, narrative, alertNote, riskEntry });
+  } catch (error) {
+    console.error("AI red-flags error:", error);
+    return res.status(500).json({
+      error: "Failed to generate red flags",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
 
 export default router;

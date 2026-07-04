@@ -20,6 +20,7 @@ import azureVmsRouter from "./azure_vms";
 import azureResourcesRouter from "./azure_resources";
 import analyticsRouter from "./analytics";
 import aiKnowledgeRouter from "./ai_knowledge";
+import cioShadowNotesRouter from "./cio_shadow_notes";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use("/azure-vms", azureVmsRouter);
 router.use("/azure-resources", azureResourcesRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/ai-knowledge", aiKnowledgeRouter);
+router.use("/cio-shadow-notes", cioShadowNotesRouter);
 
 export default router;
