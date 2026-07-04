@@ -1,0 +1,28 @@
+Jul 04 03:42:55 appserver systemd[1]: Failed to start sccc-api.service - SCCC IT Reporting API.
+ITADMIN@appserver:~/Network-Insight-Hub$ head -c 15 /opt/sccc-it/.env.production; echo
+sudo systemctl reset-failed sccc-api
+sudo systemctl start sccc-api
+sudo journalctl -u sccc-api -n 40 --no-pager | grep -iv 'systemd\['
+\DATABASE_URL=p
+Jul 04 03:42:53 appserver node[38177]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 04 03:42:53 appserver node[38177]:     at async node:internal/modules/esm/loader:643:26
+Jul 04 03:42:53 appserver node[38177]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 04 03:42:53 appserver node[38177]: Node.js v24.18.0
+Jul 04 03:42:54 appserver node[38189]: /opt/sccc-it/lib/db/src/index.ts:8
+Jul 04 03:42:54 appserver node[38189]:   throw new Error(
+Jul 04 03:42:54 appserver node[38189]:         ^
+Jul 04 03:42:54 appserver node[38189]: Error: DATABASE_URL must be set. Did you forget to provision a database?
+Jul 04 03:42:54 appserver node[38189]:     at <anonymous> (/opt/sccc-it/lib/db/src/index.ts:8:9)
+Jul 04 03:42:54 appserver node[38189]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 04 03:42:54 appserver node[38189]:     at async node:internal/modules/esm/loader:643:26
+Jul 04 03:42:54 appserver node[38189]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 04 03:42:54 appserver node[38189]: Node.js v24.18.0
+Jul 04 03:42:55 appserver node[38198]: /opt/sccc-it/lib/db/src/index.ts:8
+Jul 04 03:42:55 appserver node[38198]:   throw new Error(
+Jul 04 03:42:55 appserver node[38198]:         ^
+Jul 04 03:42:55 appserver node[38198]: Error: DATABASE_URL must be set. Did you forget to provision a database?
+Jul 04 03:42:55 appserver node[38198]:     at <anonymous> (/opt/sccc-it/lib/db/src/index.ts:8:9)
+Jul 04 03:42:55 appserver node[38198]:     at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+Jul 04 03:42:55 appserver node[38198]:     at async node:internal/modules/esm/loader:643:26
+Jul 04 03:42:55 appserver node[38198]:     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+Jul 04 03:42:55 appserver node[38198]: Node.js v24.18.0
