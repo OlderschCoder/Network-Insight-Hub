@@ -23,13 +23,13 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "There is no fixed sidebar. Navigation is a command palette: click the 'Menu — search or jump to any page' button in the top header, or press Cmd/Ctrl+K, then type or click a destination. Pages are grouped into 'My Work' (Home/Dashboard, My Tasks, Weekly Log), 'Systems & Tools' (Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant), 'Reports & Records' (Risks & Issues, Post-Incident Reviews, Reports), and a CIO-only 'Leadership & Admin' group (Projects, Department Goals, Usage Analytics, Admin). The header also has 'Quick Add' and 'Ask AI' shortcuts.",
+      "There is no fixed sidebar. Navigation is a command palette: click the 'Menu — search or jump to any page' button in the top header, or press Cmd/Ctrl+K, then type or click a destination. Pages are grouped into 'My Work' (Home/Dashboard, My Tasks, Weekly Log), 'Systems & Tools' (Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant, User Guide), 'Reports & Records' (Risks & Issues, Post-Incident Reviews, Reports), and a CIO-only 'Leadership & Admin' group (Projects, Department Goals, Usage Analytics, Admin). The header also has 'Quick Add' and 'Ask AI' shortcuts.",
   },
   {
     category: "general",
     title: "Using the Platform: Logging in and accounts",
     content:
-      "Users sign in at /login with their @sccc.edu email and password. New accounts are created via /register but stay inactive until the CIO approves them under Admin. Passwords are reset by the CIO in Admin; there is no self-service 'force change on next login' step, so users keep an assigned password until they change it themselves. If a user is deactivated, their active sessions are dropped immediately.",
+      "Users sign in at /login by clicking 'Sign in with Microsoft' and authenticating with their SCCC Microsoft (Entra ID) account. Access is limited to the IT team via Entra group / app-role membership, so authorized users are signed straight in and their Hub account is created automatically on first sign-in — there is no separate self-registration step. A break-glass email/password login exists only for designated emergency admin accounts, for use when Microsoft sign-in is unavailable. If a user can't sign in, the CIO should confirm their IT group membership and role. If a user is deactivated, their active sessions are dropped immediately.",
   },
   {
     category: "general",
@@ -99,9 +99,15 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
   },
   {
     category: "general",
+    title: "Using the Platform: User Guide page",
+    content:
+      "There is a built-in User Guide page at /user-guide, in the 'Systems & Tools' menu group (labeled 'User Guide'). It contains the full written, step-by-step guide to the platform: signing in, My Tasks, Weekly Log, Risks & Issues, Post-Incident Reviews, Systems & Tools, Weekly Reports, Projects & Department Goals, AI Assistant, and Admin. When a user wants a detailed walkthrough or how-to instructions, point them to this User Guide page by name in addition to giving the quick steps.",
+  },
+  {
+    category: "general",
     title: "Using the Platform: Admin and Usage Analytics (CIO)",
     content:
-      "Admin (/admin, CIO only) manages users: approve/activate new registrations, change roles, reset passwords, and deactivate accounts. Usage Analytics (/analytics, CIO only) shows platform usage insights. These are the CIO's control surfaces for access and adoption.",
+      "Admin (/admin, CIO only) manages users: change roles, deactivate accounts (which immediately ends their sessions), and reset passwords for break-glass emergency accounts. New users are provisioned automatically on first Microsoft sign-in, so there is no manual registration-approval step. Usage Analytics (/analytics, CIO only) shows platform usage insights. These are the CIO's control surfaces for access and adoption.",
   },
   {
     category: "general",

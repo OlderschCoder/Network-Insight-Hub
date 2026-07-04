@@ -31,6 +31,7 @@ import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
 import Admin from "@/pages/admin/index";
 import AIReport from "@/pages/ai-report/index";
+import UserGuide from "@/pages/user-guide/index";
 import ProcessesIndex from "@/pages/processes/index";
 import NewProcess from "@/pages/processes/new";
 import ProcessDetail from "@/pages/processes/[id]";
@@ -125,6 +126,8 @@ function Router() {
       <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />
       
       <Route path="/ai-report" component={() => <ProtectedRoute component={AIReport} />} />
+
+      <Route path="/user-guide" component={() => <ProtectedRoute component={UserGuide} />} />
 
       <Route path="/processes" component={() => <ProtectedRoute component={ProcessesIndex} />} />
       <Route path="/processes/new" component={() => <ProtectedRoute component={NewProcess} />} />

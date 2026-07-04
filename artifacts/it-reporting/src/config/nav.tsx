@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Boxes,
   ShieldCheck,
+  LifeBuoy,
 } from "lucide-react";
 
 export type NavItem = {
@@ -58,6 +59,7 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
       { href: "/it-apps", label: "IT Apps", desc: "Unified view of apps built for IT", icon: LayoutGrid },
       { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
       { href: "/ai-report", label: "AI Assistant", desc: "Generate reports and ask questions", icon: Sparkles },
+      { href: "/user-guide", label: "User Guide", desc: "How to use this platform, step by step", icon: LifeBuoy },
     ],
   };
 
