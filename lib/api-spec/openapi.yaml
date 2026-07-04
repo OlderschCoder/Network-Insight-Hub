@@ -49,30 +49,6 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 
   # AUTH
-  /auth/register:
-    post:
-      operationId: register
-      tags: [auth]
-      summary: Register a new user
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RegisterBody"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegisterResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /auth/login:
     post:
       operationId: login
@@ -93,6 +69,42 @@ paths:
                 $ref: "#/components/schemas/AuthResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/entra/status:
+    get:
+      operationId: entraStatus
+      tags: [auth]
+      summary: Whether Microsoft Entra SSO is configured
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntraStatus"
+  /auth/entra/exchange:
+    post:
+      operationId: entraExchange
+      tags: [auth]
+      summary: Redeem a one-time SSO code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntraExchangeBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid or expired code
           content:
             application/json:
               schema:
@@ -2133,34 +2145,15 @@ components:
           enum: [cio, helpdesk, network, security, network_engineer, security_engineer, staff]
         department:
           type: string
+        jobTitle:
+          type: string
+          nullable: true
         isActive:
           type: boolean
         createdAt:
           type: string
           format: date-time
       required: [id, email, name, role]
-
-    RegisterBody:
-      type: object
-      properties:
-        email:
-          type: string
-        password:
-          type: string
-        name:
-          type: string
-        department:
-          type: string
-      required: [email, password, name]
-
-    RegisterResponse:
-      type: object
-      properties:
-        user:
-          $ref: "#/components/schemas/User"
-        message:
-          type: string
-      required: [user, message]
 
     LoginBody:
       type: object
@@ -2179,6 +2172,20 @@ components:
         token:
           type: string
       required: [user, token]
+
+    EntraStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+      required: [configured]
+
+    EntraExchangeBody:
+      type: object
+      properties:
+        code:
+          type: string
+      required: [code]
 
     UpdateUserBody:
       type: object

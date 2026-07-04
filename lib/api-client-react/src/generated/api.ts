@@ -46,6 +46,8 @@ import type {
   DeleteStrategicObjective200,
   EmailReportBody,
   EmailReportResponse,
+  EntraExchangeBody,
+  EntraStatus,
   Entry,
   ErrorResponse,
   ForgotPassword200,
@@ -72,8 +74,6 @@ import type {
   Process,
   Project,
   ProjectBody,
-  RegisterBody,
-  RegisterResponse,
   Report,
   ReportExtras,
   ReportTicketsResponse,
@@ -188,92 +188,6 @@ export function useHealthCheck<
 }
 
 /**
- * @summary Register a new user
- */
-export const getRegisterUrl = () => {
-  return `/api/auth/register`;
-};
-
-export const register = async (
-  registerBody: RegisterBody,
-  options?: RequestInit,
-): Promise<RegisterResponse> => {
-  return customFetch<RegisterResponse>(getRegisterUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(registerBody),
-  });
-};
-
-export const getRegisterMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof register>>,
-    TError,
-    { data: BodyType<RegisterBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof register>>,
-  TError,
-  { data: BodyType<RegisterBody> },
-  TContext
-> => {
-  const mutationKey = ["register"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof register>>,
-    { data: BodyType<RegisterBody> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return register(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type RegisterMutationResult = NonNullable<
-  Awaited<ReturnType<typeof register>>
->;
-export type RegisterMutationBody = BodyType<RegisterBody>;
-export type RegisterMutationError = ErrorType<ErrorResponse>;
-
-/**
- * @summary Register a new user
- */
-export const useRegister = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof register>>,
-    TError,
-    { data: BodyType<RegisterBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof register>>,
-  TError,
-  { data: BodyType<RegisterBody> },
-  TContext
-> => {
-  return useMutation(getRegisterMutationOptions(options));
-};
-
-/**
  * @summary Login
  */
 export const getLoginUrl = () => {
@@ -357,6 +271,167 @@ export const useLogin = <
   TContext
 > => {
   return useMutation(getLoginMutationOptions(options));
+};
+
+/**
+ * @summary Whether Microsoft Entra SSO is configured
+ */
+export const getEntraStatusUrl = () => {
+  return `/api/auth/entra/status`;
+};
+
+export const entraStatus = async (
+  options?: RequestInit,
+): Promise<EntraStatus> => {
+  return customFetch<EntraStatus>(getEntraStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getEntraStatusQueryKey = () => {
+  return [`/api/auth/entra/status`] as const;
+};
+
+export const getEntraStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof entraStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof entraStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getEntraStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof entraStatus>>> = ({
+    signal,
+  }) => entraStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof entraStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type EntraStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof entraStatus>>
+>;
+export type EntraStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Whether Microsoft Entra SSO is configured
+ */
+
+export function useEntraStatus<
+  TData = Awaited<ReturnType<typeof entraStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof entraStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getEntraStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Redeem a one-time SSO code for a session token
+ */
+export const getEntraExchangeUrl = () => {
+  return `/api/auth/entra/exchange`;
+};
+
+export const entraExchange = async (
+  entraExchangeBody: EntraExchangeBody,
+  options?: RequestInit,
+): Promise<AuthResponse> => {
+  return customFetch<AuthResponse>(getEntraExchangeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(entraExchangeBody),
+  });
+};
+
+export const getEntraExchangeMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof entraExchange>>,
+    TError,
+    { data: BodyType<EntraExchangeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof entraExchange>>,
+  TError,
+  { data: BodyType<EntraExchangeBody> },
+  TContext
+> => {
+  const mutationKey = ["entraExchange"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof entraExchange>>,
+    { data: BodyType<EntraExchangeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return entraExchange(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EntraExchangeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof entraExchange>>
+>;
+export type EntraExchangeMutationBody = BodyType<EntraExchangeBody>;
+export type EntraExchangeMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Redeem a one-time SSO code for a session token
+ */
+export const useEntraExchange = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof entraExchange>>,
+    TError,
+    { data: BodyType<EntraExchangeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof entraExchange>>,
+  TError,
+  { data: BodyType<EntraExchangeBody> },
+  TContext
+> => {
+  return useMutation(getEntraExchangeMutationOptions(options));
 };
 
 /**

@@ -8,7 +8,6 @@ import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 
 import Login from "@/pages/login";
-import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
@@ -88,7 +87,6 @@ function Router() {
       <Route path="/design-system" component={DesignSystem} />
 
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       

@@ -15,16 +15,6 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * @summary Register a new user
- */
-export const RegisterBody = zod.object({
-  email: zod.string(),
-  password: zod.string(),
-  name: zod.string(),
-  department: zod.string().optional(),
-});
-
-/**
  * @summary Login
  */
 export const LoginBody = zod.object({
@@ -47,6 +37,43 @@ export const LoginResponse = zod.object({
       "staff",
     ]),
     department: zod.string().optional(),
+    jobTitle: zod.string().nullish(),
+    isActive: zod.boolean().optional(),
+    createdAt: zod.coerce.date().optional(),
+  }),
+  token: zod.string(),
+});
+
+/**
+ * @summary Whether Microsoft Entra SSO is configured
+ */
+export const EntraStatusResponse = zod.object({
+  configured: zod.boolean(),
+});
+
+/**
+ * @summary Redeem a one-time SSO code for a session token
+ */
+export const EntraExchangeBody = zod.object({
+  code: zod.string(),
+});
+
+export const EntraExchangeResponse = zod.object({
+  user: zod.object({
+    id: zod.number(),
+    email: zod.string(),
+    name: zod.string(),
+    role: zod.enum([
+      "cio",
+      "helpdesk",
+      "network",
+      "security",
+      "network_engineer",
+      "security_engineer",
+      "staff",
+    ]),
+    department: zod.string().optional(),
+    jobTitle: zod.string().nullish(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -70,6 +97,7 @@ export const GetMeResponse = zod.object({
     "staff",
   ]),
   department: zod.string().optional(),
+  jobTitle: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -121,6 +149,7 @@ export const ListUsersResponseItem = zod.object({
     "staff",
   ]),
   department: zod.string().optional(),
+  jobTitle: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -144,6 +173,7 @@ export const GetUserResponse = zod.object({
     "staff",
   ]),
   department: zod.string().optional(),
+  jobTitle: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -183,6 +213,7 @@ export const UpdateUserResponse = zod.object({
     "staff",
   ]),
   department: zod.string().optional(),
+  jobTitle: zod.string().nullish(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });

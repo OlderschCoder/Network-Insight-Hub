@@ -104,6 +104,9 @@ export default function Admin() {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                    {user.jobTitle && (
+                      <p className="text-xs text-muted-foreground truncate">{user.jobTitle}</p>
+                    )}
                   </div>
 
                   <Badge

@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAppUsageKnowledge } from "./lib/seed_app_usage";
+import { seedBreakGlassAccount, stripNonBreakGlassPasswords } from "./lib/seed_breakglass";
 
 const rawPort = process.env["PORT"];
 
@@ -25,4 +26,7 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 
   void seedAppUsageKnowledge();
+  // Seed the break-glass account first (flags it), then strip local passwords
+  // from every other account so legacy credentials can't bypass Entra SSO.
+  void seedBreakGlassAccount().then(() => stripNonBreakGlassPasswords());
 });

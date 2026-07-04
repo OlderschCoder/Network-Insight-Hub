@@ -32,20 +32,9 @@ export interface User {
   name: string;
   role: UserRole;
   department?: string;
+  jobTitle?: string | null;
   isActive?: boolean;
   createdAt?: string;
-}
-
-export interface RegisterBody {
-  email: string;
-  password: string;
-  name: string;
-  department?: string;
-}
-
-export interface RegisterResponse {
-  user: User;
-  message: string;
 }
 
 export interface LoginBody {
@@ -56,6 +45,14 @@ export interface LoginBody {
 export interface AuthResponse {
   user: User;
   token: string;
+}
+
+export interface EntraStatus {
+  configured: boolean;
+}
+
+export interface EntraExchangeBody {
+  code: string;
 }
 
 export type UpdateUserBodyRole =

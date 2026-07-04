@@ -39,7 +39,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 
 ## DB Schema Tables
 
-- `users` — id, name, email, passwordHash, role (cio/helpdesk/network/security/network_engineer/security_engineer/staff), department, isActive
+- `users` — id, name, email, passwordHash (nullable — SSO users have none), jobTitle, entraObjectId (unique), role (cio/helpdesk/network/security/network_engineer/security_engineer/staff), department, isActive, isBreakGlass (only break-glass accounts may use local password login)
 - `entries` — id, userId, category, title, description, accomplishments, challenges, supportNeeded, ticketCount, weekOf, entryDate, tags, isSubmitted (one weekly log per user per week, enforced by unique `(user_id, week_of)`; POST /api/entries upserts on this key)
 - `log_items` — id, userId, itemDate, weekOf, title, category, notes, weeklyEntryId (nullable). Standalone items added throughout the week; rolled into the weekly log when the user generates one. After saving a weekly log, all matching items for that user+week are stamped with `weekly_entry_id` so historical logs stay stable when items are later edited.
 - `reports` — id, weekOf, isFinalized, summary, finalizedAt, finalizedBy
@@ -80,9 +80,21 @@ All routes under `/api/`:
 
 ## Auth
 
-- Email/password with bcrypt
+- **Primary: Microsoft Entra ID (Azure AD) SSO** — OIDC Authorization Code + PKCE (confidential client). "Sign in with Microsoft" on the login page. Flow: `GET /api/auth/entra/login` (starts PKCE, redirects to Microsoft) → `GET /api/auth/entra/callback` (validates id_token, calls Graph `/me`, gates on IT group/app-role, upserts the user, mints a bearer token, redirects to the SPA `/login?entra_code=<one-time>`) → `POST /api/auth/entra/exchange` (SPA redeems the single-use, 60s code for `{user, token}`). The token is never placed in a URL — only the one-time code is. Public self-registration (`POST /auth/register`) has been removed.
+- **Break-glass local login (break-glass accounts only)** — `POST /api/auth/login` (bcrypt) is retained for emergency admin access when SSO is down. Only accounts flagged `is_break_glass` (and with a `passwordHash`) can use it — every other user, including legacy pre-SSO accounts, is rejected and must use Microsoft sign-in. Seed via `BREAKGLASS_EMAIL` / `BREAKGLASS_PASSWORD` env (idempotent startup seeder in `lib/seed_breakglass.ts`; ensures a `cio` role, break-glass-flagged account). On boot, after seeding, `stripNonBreakGlassPasswords()` nulls `password_hash` + reset tokens for all non-break-glass rows so old credentials can't bypass the Entra gate. Forgot/reset-password endpoints are likewise limited to break-glass accounts.
+- **Account linking** — Entra identities match an existing row by `entra_object_id`, then by email, so prior history stays attached. New people are created on first sign-in with a role from the title/app-role mapping; existing accounts keep their current role (manual/CIO overrides preserved) and only refresh name/title/object-id.
+- **Role mapping** — default job-title-keyword → Hub-role map lives in `lib/entra.ts` (`mapEntraToHubRole`); override/extend via `ENTRA_ROLE_MAP_JSON` (JSON object of keyword-or-app-role → hub role). Applied only on first sign-in. CIO can still override any user's role on the Admin page.
+- **Access gate (fail closed)** — `ENTRA_ALLOWED_GROUP_IDS` (group object-ids, via the token `groups` claim) and/or `ENTRA_ALLOWED_APP_ROLES` (app-role values, via the `roles` claim); satisfying either allows entry. If **neither** is set, all SSO sign-ins are **denied** (an error is logged) — an IT membership gate is mandatory. `/auth/entra/status` reports `configured:false` unless both the OIDC client config and a gate value are set, so the login page won't offer a dead-end sign-in.
+- **Login CSRF protection** — `/auth/entra/login` sets an httpOnly, SameSite=Lax `entra_state` cookie (path `/api/auth/entra`, `secure` in production) bound to the random `state`; the callback rejects the response unless the returned `state` matches the cookie. Requires `cookie-parser` (registered in `app.ts`).
 - Bearer token sessions (in-memory Map — tokens reset on server restart)
 - `requireAuth` middleware, `requireCIO` for CIO-only routes
+
+### Entra app-registration setup (operator note)
+
+- Register a **Web** app in the SCCC Entra tenant (or reuse the SCCCACR registration). Add redirect URI `https://<hub-host>/api/auth/entra/callback` (must match `ENTRA_REDIRECT_URI` exactly). **HTTPS is mandatory** — Entra rejects non-HTTPS redirect URIs except `localhost`, so plain `http://<ip>` will not work.
+- Delegated Microsoft Graph permissions: `openid`, `profile`, `email`, `User.Read`.
+- **Required:** configure at least one access-gate value (SSO fails closed without it). Add an **App Role** (and assign users) for `ENTRA_ALLOWED_APP_ROLES`, or configure the token `groups` claim and set `ENTRA_ALLOWED_GROUP_IDS`.
+- Env vars: `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_REDIRECT_URI`, **at least one of** `ENTRA_ALLOWED_GROUP_IDS` / `ENTRA_ALLOWED_APP_ROLES` (required — SSO fails closed without a gate), optional `ENTRA_ROLE_MAP_JSON`, `ENTRA_POST_LOGIN_REDIRECT` (override the SPA landing URL). These are **separate** from the `AZURE_*` service-principal secrets used for VM inventory.
 
 ## Seeded Data
 
@@ -113,8 +125,7 @@ All routes under `/api/`:
 
 ## Frontend Pages
 
-- `/login` — Email/password login
-- `/register` — New user registration
+- `/login` — "Sign in with Microsoft" (Entra SSO) primary, with a secondary break-glass email/password form; also handles the SSO callback landing (`?entra_code` / `?entra_error`). Public self-registration removed.
 - `/` — Dashboard with summary stats
 - `/entries` — Log entries list with search
 - `/entries/new` — New log entry form

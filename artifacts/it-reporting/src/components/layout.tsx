@@ -226,10 +226,12 @@ function QuickAddMenu() {
 function AccountMenu({
   name,
   role,
+  jobTitle,
   onLogout,
 }: {
   name?: string;
   role?: string;
+  jobTitle?: string | null;
   onLogout: () => void;
 }) {
   const initials = (name ?? "?")
@@ -253,6 +255,9 @@ function AccountMenu({
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
           <span className="truncate">{name}</span>
+          {jobTitle && (
+            <span className="truncate text-xs font-normal text-muted-foreground">{jobTitle}</span>
+          )}
           <span className="text-xs font-normal capitalize text-muted-foreground">{role}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -339,7 +344,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           <ZendeskAlerts />
 
-          <AccountMenu name={user?.name} role={user?.role} onLogout={handleLogout} />
+          <AccountMenu name={user?.name} role={user?.role} jobTitle={user?.jobTitle} onLogout={handleLogout} />
         </div>
       </header>
 
