@@ -1,12 +1,22 @@
 import { Router } from "express";
-import { db, azureVmsTable, azureSyncRunsTable } from "@workspace/db";
+import { db, azureVmsTable, azureSyncRunsTable, cioShadowNotesTable } from "@workspace/db";
 import type { AzureSyncDiff, AzureSyncFieldChange } from "@workspace/db";
 import { eq, asc, desc, ilike, or, and, notInArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { getAzureConfig, fetchAzureVms } from "../lib/azure";
 import type { AzureVmRecord } from "../lib/azure";
-import { summarizeVmRisks } from "../lib/azure_risk";
+import { summarizeVmRisks, flagVmRisks } from "../lib/azure_risk";
+
+// Monday (ISO week start) for a YYYY-MM-DD date, used to scope the auto-created
+// CIO shadow note to the current reporting week.
+function isoWeekStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = dt.getUTCDay() || 7;
+  const monday = new Date(dt.getTime() - (dow - 1) * 86400000);
+  return monday.toISOString().slice(0, 10);
+}
 
 const router = Router();
 
@@ -167,9 +177,22 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
   const diff: AzureSyncDiff = { added: [], removed: [], changed: [] };
   let created = 0;
   let updated = 0;
+  // VMs that gained a high-severity risk flag in this sync (newly added and
+  // already risky, or existing rows that transitioned into a high-severity
+  // state). Used to proactively alert the CIO after the sync.
+  const newlyHighRisk: { name: string; resourceGroup: string | null; flags: string[] }[] = [];
 
   for (const vm of vms) {
     const prior = existingByAzureId.get(vm.azureResourceId);
+    const newHighFlags = flagVmRisks(vm).filter((f) => f.severity === "high");
+    const priorHadHigh = prior ? flagVmRisks(prior).some((f) => f.severity === "high") : false;
+    if (newHighFlags.length > 0 && !priorHadHigh) {
+      newlyHighRisk.push({
+        name: vm.name,
+        resourceGroup: vm.resourceGroup ?? null,
+        flags: newHighFlags.map((f) => f.label),
+      });
+    }
     if (!prior) {
       created++;
       diff.added.push({
@@ -265,8 +288,45 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
     })
     .catch((e) => req.log.error({ err: e }, "Failed to record Azure VM sync run"));
 
+  // Proactively alert the CIO to any VM that became high-severity in this sync,
+  // so newly-introduced risks surface on the CIO Insights → Shadow Memory panel
+  // without the CIO having to open the Azure VMs page. The note is a private,
+  // read-only observation (source "ai") scoped to the current reporting week.
+  let alertedCount = 0;
+  if (newlyHighRisk.length > 0) {
+    const weekOf = isoWeekStart(now.toISOString().slice(0, 10));
+    const lines = newlyHighRisk.map((v) => {
+      const rg = v.resourceGroup ? ` (${v.resourceGroup})` : "";
+      return `- **${v.name}**${rg} — ${v.flags.join(", ")}`;
+    });
+    const content =
+      `Azure sync flagged ${newlyHighRisk.length} newly high-risk VM` +
+      `${newlyHighRisk.length === 1 ? "" : "s"}:\n\n${lines.join("\n")}\n\n` +
+      `Review these on the Azure VMs page and confirm exposure is intended.`;
+    try {
+      await db.insert(cioShadowNotesTable).values({
+        content,
+        category: "azure_risk",
+        weekOf,
+        status: "open",
+        source: "ai",
+        createdBy: actorId,
+      });
+      alertedCount = newlyHighRisk.length;
+    } catch (e) {
+      req.log.error({ err: e }, "Failed to create Azure risk shadow note");
+    }
+  }
+
   req.log.info(
-    { created, updated, removed, changed: diff.changed.length, total: vms.length },
+    {
+      created,
+      updated,
+      removed,
+      changed: diff.changed.length,
+      total: vms.length,
+      newlyHighRisk: newlyHighRisk.length,
+    },
     "Azure VM sync complete",
   );
   return res.json({
@@ -277,6 +337,7 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
     total: vms.length,
     syncedAt: now.toISOString(),
     diff,
+    newlyFlagged: alertedCount,
   });
 });
 

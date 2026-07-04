@@ -1407,6 +1407,8 @@ export type SyncAzureVms200 = {
   total: number;
   syncedAt: string;
   diff?: AzureSyncDiff;
+  /** Number of VMs that newly became high-severity in this sync. When > 0, a private CIO shadow note was auto-created. */
+  newlyFlagged?: number;
 };
 
 export type GetAzureSyncStatus200 = {

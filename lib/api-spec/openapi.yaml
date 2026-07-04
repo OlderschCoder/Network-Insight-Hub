@@ -1014,6 +1014,11 @@ paths:
                     format: date-time
                   diff:
                     $ref: "#/components/schemas/AzureSyncDiff"
+                  newlyFlagged:
+                    type: integer
+                    description: >-
+                      Number of VMs that newly became high-severity in this sync.
+                      When > 0, a private CIO shadow note was auto-created.
                 required: [created, updated, removed, total, syncedAt]
         "503":
           description: Azure not configured

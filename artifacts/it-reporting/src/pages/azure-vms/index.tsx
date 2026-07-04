@@ -186,6 +186,15 @@ export default function AzureVmsPage() {
         title: "Synced from Azure",
         description: `${result.created} added · ${result.updated} updated · ${result.removed} marked deleted (${result.total} total).`,
       });
+      const newlyFlagged = result.newlyFlagged ?? 0;
+      if (newlyFlagged > 0) {
+        toast({
+          title: `${newlyFlagged} newly high-risk VM${newlyFlagged === 1 ? "" : "s"}`,
+          description:
+            "Added to CIO Insights → Shadow Memory. Review exposure and confirm it's intended.",
+          variant: "destructive",
+        });
+      }
       if (result.diff) setSyncDiff(result.diff);
       refetch();
       refetchStatus();

@@ -1457,6 +1457,12 @@ export const SyncAzureVmsResponse = zod.object({
       ),
     })
     .optional(),
+  newlyFlagged: zod
+    .number()
+    .optional()
+    .describe(
+      "Number of VMs that newly became high-severity in this sync. When > 0, a private CIO shadow note was auto-created.",
+    ),
 });
 
 /**
