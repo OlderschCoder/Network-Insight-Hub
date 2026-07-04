@@ -9,10 +9,86 @@ import {
   networkSwitchesTable,
   strategicObjectivesTable,
   projectsTable,
+  azureVmsTable,
+  azureSyncRunsTable,
   type Report,
 } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, desc, notInArray } from "drizzle-orm";
 import { streamPdf, type PdfSection } from "./pdf";
+import { summarizeVmRisks, type VmRiskSummary } from "./azure_risk";
+
+export type CloudInventorySnapshot = {
+  configured: boolean;
+  total: number;
+  byStatus: { status: string; count: number }[];
+  risk: VmRiskSummary;
+  lastSync: {
+    status: string;
+    createdAt: string;
+    createdCount: number;
+    updatedCount: number;
+    removedCount: number;
+    changedCount: number;
+    totalCount: number;
+    error: string | null;
+    actorName: string | null;
+  } | null;
+};
+
+/**
+ * Point-in-time snapshot of the Azure VM inventory for the weekly report:
+ * counts by power state, current risk-flag summary, and the last sync run.
+ * Shared by the report editor extras endpoint and the export builders so the
+ * on-screen preview and the exported document agree.
+ */
+export async function getCloudInventorySnapshot(): Promise<CloudInventorySnapshot> {
+  const vms = await db.select().from(azureVmsTable).where(notInArray(azureVmsTable.status, ["deleted"]));
+  const [lastRun] = await db
+    .select()
+    .from(azureSyncRunsTable)
+    .where(eq(azureSyncRunsTable.kind, "vm"))
+    .orderBy(desc(azureSyncRunsTable.createdAt))
+    .limit(1);
+
+  const statusCounts = new Map<string, number>();
+  for (const vm of vms) {
+    const s = vm.status ?? "unknown";
+    statusCounts.set(s, (statusCounts.get(s) ?? 0) + 1);
+  }
+  const byStatus = [...statusCounts.entries()]
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count);
+  const { summary } = summarizeVmRisks(vms);
+
+  return {
+    configured: !!getAzureConfigured(),
+    total: vms.length,
+    byStatus,
+    risk: summary,
+    lastSync: lastRun
+      ? {
+          status: lastRun.status,
+          createdAt: lastRun.createdAt.toISOString(),
+          createdCount: lastRun.createdCount,
+          updatedCount: lastRun.updatedCount,
+          removedCount: lastRun.removedCount,
+          changedCount: lastRun.changedCount,
+          totalCount: lastRun.totalCount,
+          error: lastRun.error,
+          actorName: lastRun.actorName,
+        }
+      : null,
+  };
+}
+
+function getAzureConfigured(): boolean {
+  return !!(
+    process.env.AZURE_TENANT_ID &&
+    process.env.AZURE_CLIENT_ID &&
+    process.env.AZURE_CLIENT_SECRET &&
+    process.env.AZURE_SUBSCRIPTION_ID
+  );
+}
 
 export type ReportExportData = {
   report: Report;
@@ -49,6 +125,7 @@ export type ReportExportData = {
     }[];
   }>;
   openRisks: any[];
+  cloudInventory: CloudInventorySnapshot;
 };
 
 async function fetchClosedTicketsForWeek(weekOf: string): Promise<{
@@ -314,6 +391,7 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     selectedMaintenance,
     goalProgress,
     openRisks,
+    cloudInventory: await getCloudInventorySnapshot(),
   };
 }
 
@@ -442,6 +520,34 @@ export async function buildReportDocxBuffer(report: Report): Promise<Buffer> {
     h2(`Open Risks & Issues (${data.openRisks.length})`);
     for (const r of data.openRisks) {
       bullet(`[${(r.severity ?? "").toUpperCase()}] ${r.title}${r.relatedBuilding ? ` — ${r.relatedBuilding}` : ""}`);
+    }
+    blank();
+  }
+
+  // Cloud Inventory (Azure)
+  if (report.includeCloudInventory) {
+    const ci = data.cloudInventory;
+    h2(`Cloud Inventory — Azure VMs (${ci.total})`);
+    if (ci.lastSync) {
+      const when = ci.lastSync.createdAt.slice(0, 16).replace("T", " ");
+      bullet(
+        ci.lastSync.status === "success"
+          ? `Last sync ${when} UTC — ${ci.lastSync.createdCount} added, ${ci.lastSync.changedCount} changed, ${ci.lastSync.removedCount} removed`
+          : `Last sync ${when} UTC FAILED${ci.lastSync.error ? `: ${ci.lastSync.error}` : ""}`,
+      );
+    } else {
+      bullet("No sync has been recorded yet.");
+    }
+    if (ci.byStatus.length > 0) {
+      bullet(`By power state: ${ci.byStatus.map((s) => `${s.count} ${s.status}`).join(", ")}`);
+    }
+    if (ci.risk.flaggedVms > 0) {
+      bullet(
+        `Risk flags: ${ci.risk.publicIp} public-IP exposed, ${ci.risk.unhealthy} unhealthy, ` +
+          `${ci.risk.retiringSize} on retiring series (${ci.risk.flaggedVms} VM${ci.risk.flaggedVms === 1 ? "" : "s"} flagged)`,
+      );
+    } else {
+      bullet("No VM risk flags.");
     }
     blank();
   }
@@ -580,6 +686,33 @@ export function buildReportPdfSections(data: ReportExportData): PdfSection[] {
     for (const r of data.openRisks) {
       sections.push({ kind: "bullet", text: `[${(r.severity ?? "").toUpperCase()}] ${r.title}${r.relatedBuilding ? ` — ${r.relatedBuilding}` : ""}` });
     }
+  }
+
+  if (report.includeCloudInventory) {
+    const ci = data.cloudInventory;
+    sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: `Cloud Inventory — Azure VMs (${ci.total})` });
+    if (ci.lastSync) {
+      const when = ci.lastSync.createdAt.slice(0, 16).replace("T", " ");
+      sections.push({
+        kind: "bullet",
+        text:
+          ci.lastSync.status === "success"
+            ? `Last sync ${when} UTC — ${ci.lastSync.createdCount} added, ${ci.lastSync.changedCount} changed, ${ci.lastSync.removedCount} removed`
+            : `Last sync ${when} UTC FAILED${ci.lastSync.error ? `: ${ci.lastSync.error}` : ""}`,
+      });
+    } else {
+      sections.push({ kind: "bullet", text: "No sync has been recorded yet." });
+    }
+    if (ci.byStatus.length > 0) {
+      sections.push({ kind: "bullet", text: `By power state: ${ci.byStatus.map((s) => `${s.count} ${s.status}`).join(", ")}` });
+    }
+    sections.push({
+      kind: "bullet",
+      text:
+        ci.risk.flaggedVms > 0
+          ? `Risk flags: ${ci.risk.publicIp} public-IP exposed, ${ci.risk.unhealthy} unhealthy, ${ci.risk.retiringSize} on retiring series (${ci.risk.flaggedVms} VM${ci.risk.flaggedVms === 1 ? "" : "s"} flagged)`
+          : "No VM risk flags.",
+    });
   }
 
   sections.push({ kind: "spacer" }, { kind: "heading", level: 2, text: "Team Weekly Logs" });

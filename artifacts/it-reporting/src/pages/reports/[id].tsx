@@ -31,7 +31,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase, Mail, AlertTriangle, Wrench, Target } from "lucide-react";
+import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase, Mail, AlertTriangle, Wrench, Target, Cloud } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/lib/authFetch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -86,6 +86,7 @@ export default function ReportDetail() {
   const [selectedRiskIds, setSelectedRiskIds] = useState<number[] | null>(null);
   const [includeGoalProgress, setIncludeGoalProgress] = useState(true);
   const [includeOpenRisks, setIncludeOpenRisks] = useState(true);
+  const [includeCloudInventory, setIncludeCloudInventory] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskUser, setNewTaskUser] = useState("");
   const [emailOpen, setEmailOpen] = useState(false);
@@ -112,6 +113,7 @@ export default function ReportDetail() {
       setSelectedRiskIds(Array.isArray(r.selectedRiskIds) ? r.selectedRiskIds : null);
       setIncludeGoalProgress(r.includeGoalProgress !== false);
       setIncludeOpenRisks(r.includeOpenRisks !== false);
+      setIncludeCloudInventory(r.includeCloudInventory === true);
       setEmailRecipientsText(Array.isArray(r.emailRecipients) ? r.emailRecipients.join(", ") : "");
       setDirty(false);
     }
@@ -181,6 +183,10 @@ export default function ReportDetail() {
   const toggleIncludeRisks = async (v: boolean) => {
     setIncludeOpenRisks(v);
     await persist({ includeOpenRisks: v });
+  };
+  const toggleIncludeCloud = async (v: boolean) => {
+    setIncludeCloudInventory(v);
+    await persist({ includeCloudInventory: v });
   };
 
   const handleSendEmail = async () => {
@@ -491,6 +497,11 @@ export default function ReportDetail() {
               <Item label="Network maintenance windows" n={maintIncluded} />
               <Item label="Department goals" n={goalCount} on={includeGoalProgress} />
               <Item label="Open risks &amp; issues" n={risksIncluded} on={includeOpenRisks} />
+              <Item
+                label="Cloud inventory (Azure VMs)"
+                n={extras?.cloudInventory?.total ?? 0}
+                on={includeCloudInventory}
+              />
             </CardContent>
           </Card>
         );
@@ -1098,6 +1109,85 @@ export default function ReportDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Cloud inventory (Azure VMs) */}
+      {(() => {
+        const ci = extras?.cloudInventory;
+        if (!ci || !ci.configured) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4 text-sky-600" />
+                  Cloud Inventory — Azure VMs ({ci.total})
+                </span>
+                {canEdit && (
+                  <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                    <Checkbox
+                      checked={includeCloudInventory}
+                      onCheckedChange={(v) => toggleIncludeCloud(v === true)}
+                    />
+                    Include in this report
+                  </label>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {ci.lastSync ? (
+                <p className="text-xs text-muted-foreground">
+                  {ci.lastSync.status === "success" ? (
+                    <>
+                      Last sync{" "}
+                      {ci.lastSync.createdAt
+                        ? format(new Date(ci.lastSync.createdAt), "MMM d, h:mm a")
+                        : "—"}{" "}
+                      — {ci.lastSync.createdCount ?? 0} added, {ci.lastSync.changedCount ?? 0}{" "}
+                      changed, {ci.lastSync.removedCount ?? 0} removed
+                    </>
+                  ) : (
+                    <span className="text-red-600">
+                      Last sync failed{ci.lastSync.error ? `: ${ci.lastSync.error}` : ""}
+                    </span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No sync has been recorded yet.</p>
+              )}
+              {ci.byStatus.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {ci.byStatus.map((s) => (
+                    <Badge key={s.status} variant="outline" className="text-[10px]">
+                      {s.count} {s.status}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {ci.risk.flaggedVms > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {ci.risk.publicIp > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-700 border-red-200">
+                      {ci.risk.publicIp} public-IP exposed
+                    </Badge>
+                  )}
+                  {ci.risk.unhealthy > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-200">
+                      {ci.risk.unhealthy} unhealthy
+                    </Badge>
+                  )}
+                  {ci.risk.retiringSize > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-200">
+                      {ci.risk.retiringSize} retiring series
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No VM risk flags.</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

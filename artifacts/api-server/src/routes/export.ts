@@ -232,6 +232,30 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
       }
     }
 
+    if (report.includeCloudInventory) {
+      const ci = data.cloudInventory;
+      const ciSheet = workbook.addWorksheet("Cloud Inventory");
+      ciSheet.addRow(["Azure VM Inventory Snapshot"]);
+      ciSheet.addRow(["Total VMs", ci.total]);
+      if (ci.lastSync) {
+        ciSheet.addRow(["Last Sync", ci.lastSync.createdAt]);
+        ciSheet.addRow(["Last Sync Status", ci.lastSync.status]);
+        ciSheet.addRow(["Added / Changed / Removed", `${ci.lastSync.createdCount} / ${ci.lastSync.changedCount} / ${ci.lastSync.removedCount}`]);
+        if (ci.lastSync.error) ciSheet.addRow(["Last Sync Error", ci.lastSync.error]);
+      } else {
+        ciSheet.addRow(["Last Sync", "never"]);
+      }
+      ciSheet.addRow([]);
+      ciSheet.addRow(["Power State", "Count"]);
+      for (const s of ci.byStatus) ciSheet.addRow([s.status, s.count]);
+      ciSheet.addRow([]);
+      ciSheet.addRow(["Risk Flag", "Count"]);
+      ciSheet.addRow(["Public IP exposed", ci.risk.publicIp]);
+      ciSheet.addRow(["Unhealthy state", ci.risk.unhealthy]);
+      ciSheet.addRow(["Retiring VM series", ci.risk.retiringSize]);
+      ciSheet.addRow(["VMs flagged", ci.risk.flaggedVms]);
+    }
+
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="it-report-${report.weekOf}.xlsx"`);
     await workbook.xlsx.write(res);

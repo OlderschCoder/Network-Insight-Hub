@@ -134,4 +134,46 @@ export async function ensureSchema(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Failed to ensure network layout governance tables");
   }
+
+  // 6) Azure sync run log. Records each VM/resource sync (success/failure,
+  //    counts, error detail, and a per-VM diff) so the inventory views can show
+  //    a sync-status indicator and post-sync change view. New table added after
+  //    initial self-hosted setup. Mirrors lib/db/src/schema/azure_sync_runs.ts.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "azure_sync_runs" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "kind" varchar(20) NOT NULL,
+        "status" varchar(20) NOT NULL,
+        "error" text,
+        "created_count" integer DEFAULT 0 NOT NULL,
+        "updated_count" integer DEFAULT 0 NOT NULL,
+        "removed_count" integer DEFAULT 0 NOT NULL,
+        "total_count" integer DEFAULT 0 NOT NULL,
+        "changed_count" integer DEFAULT 0 NOT NULL,
+        "diff" jsonb DEFAULT '{"added":[],"removed":[],"changed":[]}'::jsonb NOT NULL,
+        "actor_id" integer,
+        "actor_name" varchar(255),
+        "created_at" timestamp DEFAULT now() NOT NULL
+      )
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "azure_sync_runs_kind_created_idx" ON "azure_sync_runs" ("kind", "created_at")`,
+    );
+    logger.info("Ensured azure_sync_runs table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure azure_sync_runs table");
+  }
+
+  // 7) reports.include_cloud_inventory: opt-in flag to attach the Azure cloud
+  //    inventory snapshot to a weekly report. New column added after initial
+  //    setup; ADD COLUMN IF NOT EXISTS is a no-op when already present.
+  try {
+    await db.execute(
+      sql`ALTER TABLE "reports" ADD COLUMN IF NOT EXISTS "include_cloud_inventory" boolean DEFAULT false NOT NULL`,
+    );
+    logger.info("Ensured reports.include_cloud_inventory column exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure reports.include_cloud_inventory column");
+  }
 }

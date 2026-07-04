@@ -370,6 +370,7 @@ export const ListReportsResponseItem = zod.object({
     .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
+  includeCloudInventory: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
   lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
@@ -425,6 +426,7 @@ export const GetReportResponse = zod.object({
     .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
+  includeCloudInventory: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
   lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
@@ -454,6 +456,7 @@ export const UpdateReportBody = zod.object({
   selectedRiskIds: zod.array(zod.number()).nullish(),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
+  includeCloudInventory: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string().email()).optional(),
 });
 
@@ -483,6 +486,7 @@ export const UpdateReportResponse = zod.object({
     .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
+  includeCloudInventory: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
   lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
@@ -542,6 +546,40 @@ export const GetReportExtrasResponse = zod.object({
   afterActionReports: zod.array(zod.record(zod.string(), zod.unknown())),
   maintenance: zod.array(zod.record(zod.string(), zod.unknown())),
   goalProgress: zod.array(zod.record(zod.string(), zod.unknown())),
+  cloudInventory: zod
+    .object({
+      configured: zod.boolean(),
+      total: zod.number(),
+      byStatus: zod.array(
+        zod.object({
+          status: zod.string().optional(),
+          count: zod.number().optional(),
+        }),
+      ),
+      risk: zod.object({
+        publicIp: zod.number(),
+        unhealthy: zod.number(),
+        retiringSize: zod.number(),
+        flaggedVms: zod.number(),
+        high: zod.number(),
+        medium: zod.number(),
+        low: zod.number(),
+      }),
+      lastSync: zod
+        .object({
+          status: zod.string().optional(),
+          createdAt: zod.coerce.date().optional(),
+          createdCount: zod.number().optional(),
+          updatedCount: zod.number().optional(),
+          removedCount: zod.number().optional(),
+          changedCount: zod.number().optional(),
+          totalCount: zod.number().optional(),
+          error: zod.string().nullish(),
+          actorName: zod.string().nullish(),
+        })
+        .nullable(),
+    })
+    .optional(),
 });
 
 /**
@@ -597,6 +635,7 @@ export const FinalizeReportResponse = zod.object({
     .describe("IDs of projects linked to this report."),
   includeGoalProgress: zod.boolean().optional(),
   includeOpenRisks: zod.boolean().optional(),
+  includeCloudInventory: zod.boolean().optional(),
   emailRecipients: zod.array(zod.string()).optional(),
   lastEmailedAt: zod.coerce.date().nullish(),
   contributorCount: zod.number().optional(),
@@ -1383,8 +1422,176 @@ export const SyncAzureVmsResponse = zod.object({
   created: zod.number(),
   updated: zod.number(),
   removed: zod.number(),
+  changed: zod.number().optional(),
   total: zod.number(),
   syncedAt: zod.coerce.date(),
+  diff: zod
+    .object({
+      added: zod.array(
+        zod.object({
+          name: zod.string().optional(),
+          resourceGroup: zod.string().nullish(),
+          status: zod.string().nullish(),
+          publicIp: zod.string().nullish(),
+        }),
+      ),
+      removed: zod.array(
+        zod.object({
+          name: zod.string().optional(),
+          resourceGroup: zod.string().nullish(),
+        }),
+      ),
+      changed: zod.array(
+        zod.object({
+          name: zod.string().optional(),
+          changes: zod
+            .array(
+              zod.object({
+                field: zod.string(),
+                from: zod.string().nullable(),
+                to: zod.string().nullable(),
+              }),
+            )
+            .optional(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Latest Azure sync run for VM and resource inventory
+ */
+export const GetAzureSyncStatusResponse = zod.object({
+  vm: zod
+    .object({
+      id: zod.number(),
+      kind: zod.enum(["vm", "resource"]),
+      status: zod.enum(["success", "failed"]),
+      error: zod.string().nullish(),
+      createdCount: zod.number().optional(),
+      updatedCount: zod.number().optional(),
+      removedCount: zod.number().optional(),
+      changedCount: zod.number().optional(),
+      totalCount: zod.number().optional(),
+      diff: zod
+        .object({
+          added: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              resourceGroup: zod.string().nullish(),
+              status: zod.string().nullish(),
+              publicIp: zod.string().nullish(),
+            }),
+          ),
+          removed: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              resourceGroup: zod.string().nullish(),
+            }),
+          ),
+          changed: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              changes: zod
+                .array(
+                  zod.object({
+                    field: zod.string(),
+                    from: zod.string().nullable(),
+                    to: zod.string().nullable(),
+                  }),
+                )
+                .optional(),
+            }),
+          ),
+        })
+        .optional(),
+      actorId: zod.number().nullish(),
+      actorName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    })
+    .nullable(),
+  resource: zod
+    .object({
+      id: zod.number(),
+      kind: zod.enum(["vm", "resource"]),
+      status: zod.enum(["success", "failed"]),
+      error: zod.string().nullish(),
+      createdCount: zod.number().optional(),
+      updatedCount: zod.number().optional(),
+      removedCount: zod.number().optional(),
+      changedCount: zod.number().optional(),
+      totalCount: zod.number().optional(),
+      diff: zod
+        .object({
+          added: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              resourceGroup: zod.string().nullish(),
+              status: zod.string().nullish(),
+              publicIp: zod.string().nullish(),
+            }),
+          ),
+          removed: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              resourceGroup: zod.string().nullish(),
+            }),
+          ),
+          changed: zod.array(
+            zod.object({
+              name: zod.string().optional(),
+              changes: zod
+                .array(
+                  zod.object({
+                    field: zod.string(),
+                    from: zod.string().nullable(),
+                    to: zod.string().nullable(),
+                  }),
+                )
+                .optional(),
+            }),
+          ),
+        })
+        .optional(),
+      actorId: zod.number().nullish(),
+      actorName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    })
+    .nullable(),
+});
+
+/**
+ * @summary Risk flags across current Azure VM inventory
+ */
+export const GetAzureVmRisksResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      resourceGroup: zod.string().nullish(),
+      status: zod.string().optional(),
+      size: zod.string().nullish(),
+      publicIp: zod.string().nullish(),
+      flags: zod.array(
+        zod.object({
+          code: zod.enum(["public_ip", "unhealthy", "retiring_size"]),
+          severity: zod.enum(["high", "medium", "low"]),
+          label: zod.string(),
+          detail: zod.string(),
+        }),
+      ),
+    }),
+  ),
+  summary: zod.object({
+    publicIp: zod.number(),
+    unhealthy: zod.number(),
+    retiringSize: zod.number(),
+    flaggedVms: zod.number(),
+    high: zod.number(),
+    medium: zod.number(),
+    low: zod.number(),
+  }),
 });
 
 /**

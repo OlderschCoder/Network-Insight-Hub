@@ -16,7 +16,7 @@ import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { sendReportEmail } from "../lib/email";
-import { buildReportPdfBuffer, buildReportDocxBuffer } from "../lib/report_export";
+import { buildReportPdfBuffer, buildReportDocxBuffer, getCloudInventorySnapshot } from "../lib/report_export";
 
 const router = Router();
 
@@ -234,6 +234,7 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
     selectedRiskIds: z.array(z.number()).nullable().optional(),
     includeGoalProgress: z.boolean().optional(),
     includeOpenRisks: z.boolean().optional(),
+    includeCloudInventory: z.boolean().optional(),
     emailRecipients: z.array(z.string().email()).optional(),
   });
   const parsed = schema.safeParse(req.body);
@@ -435,6 +436,8 @@ router.get("/:id/extras", requireAuth, async (req: any, res) => {
     })
     .filter((g) => g.projectCount > 0);
 
+  const cloudInventory = await getCloudInventorySnapshot();
+
   return res.json({
     weekOf: report.weekOf,
     weekStart: weekStartStr,
@@ -442,6 +445,7 @@ router.get("/:id/extras", requireAuth, async (req: any, res) => {
     afterActionReports: enrichedAars,
     maintenance,
     goalProgress,
+    cloudInventory,
   });
 });
 

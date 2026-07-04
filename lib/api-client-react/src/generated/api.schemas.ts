@@ -182,6 +182,7 @@ in the export (default behavior). Empty array = include none.
   projectIds?: number[];
   includeGoalProgress?: boolean;
   includeOpenRisks?: boolean;
+  includeCloudInventory?: boolean;
   emailRecipients?: string[];
   lastEmailedAt?: string | null;
   contributorCount?: number;
@@ -225,6 +226,7 @@ export interface UpdateReportBody {
   selectedRiskIds?: number[] | null;
   includeGoalProgress?: boolean;
   includeOpenRisks?: boolean;
+  includeCloudInventory?: boolean;
   emailRecipients?: string[];
 }
 
@@ -234,6 +236,41 @@ export type ReportExtrasMaintenanceItem = { [key: string]: unknown };
 
 export type ReportExtrasGoalProgressItem = { [key: string]: unknown };
 
+export interface AzureVmRiskSummary {
+  publicIp: number;
+  unhealthy: number;
+  retiringSize: number;
+  flaggedVms: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export type CloudInventorySnapshotByStatusItem = {
+  status?: string;
+  count?: number;
+};
+
+export type CloudInventorySnapshotLastSync = {
+  status?: string;
+  createdAt?: string;
+  createdCount?: number;
+  updatedCount?: number;
+  removedCount?: number;
+  changedCount?: number;
+  totalCount?: number;
+  error?: string | null;
+  actorName?: string | null;
+} | null;
+
+export interface CloudInventorySnapshot {
+  configured: boolean;
+  total: number;
+  byStatus: CloudInventorySnapshotByStatusItem[];
+  risk: AzureVmRiskSummary;
+  lastSync: CloudInventorySnapshotLastSync;
+}
+
 export interface ReportExtras {
   weekOf: string;
   weekStart?: string;
@@ -241,6 +278,7 @@ export interface ReportExtras {
   afterActionReports: ReportExtrasAfterActionReportsItem[];
   maintenance: ReportExtrasMaintenanceItem[];
   goalProgress: ReportExtrasGoalProgressItem[];
+  cloudInventory?: CloudInventorySnapshot;
 }
 
 export type EmailReportBodyFormat =
@@ -816,6 +854,102 @@ export interface AzureResource {
   updatedAt: string;
 }
 
+export interface AzureSyncFieldChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
+
+export type AzureSyncDiffAddedItem = {
+  name?: string;
+  resourceGroup?: string | null;
+  status?: string | null;
+  publicIp?: string | null;
+};
+
+export type AzureSyncDiffRemovedItem = {
+  name?: string;
+  resourceGroup?: string | null;
+};
+
+export type AzureSyncDiffChangedItem = {
+  name?: string;
+  changes?: AzureSyncFieldChange[];
+};
+
+export interface AzureSyncDiff {
+  added: AzureSyncDiffAddedItem[];
+  removed: AzureSyncDiffRemovedItem[];
+  changed: AzureSyncDiffChangedItem[];
+}
+
+export type AzureSyncRunKind =
+  (typeof AzureSyncRunKind)[keyof typeof AzureSyncRunKind];
+
+export const AzureSyncRunKind = {
+  vm: "vm",
+  resource: "resource",
+} as const;
+
+export type AzureSyncRunStatus =
+  (typeof AzureSyncRunStatus)[keyof typeof AzureSyncRunStatus];
+
+export const AzureSyncRunStatus = {
+  success: "success",
+  failed: "failed",
+} as const;
+
+export interface AzureSyncRun {
+  id: number;
+  kind: AzureSyncRunKind;
+  status: AzureSyncRunStatus;
+  error?: string | null;
+  createdCount?: number;
+  updatedCount?: number;
+  removedCount?: number;
+  changedCount?: number;
+  totalCount?: number;
+  diff?: AzureSyncDiff;
+  actorId?: number | null;
+  actorName?: string | null;
+  createdAt: string;
+}
+
+export type AzureVmRiskFlagCode =
+  (typeof AzureVmRiskFlagCode)[keyof typeof AzureVmRiskFlagCode];
+
+export const AzureVmRiskFlagCode = {
+  public_ip: "public_ip",
+  unhealthy: "unhealthy",
+  retiring_size: "retiring_size",
+} as const;
+
+export type AzureVmRiskFlagSeverity =
+  (typeof AzureVmRiskFlagSeverity)[keyof typeof AzureVmRiskFlagSeverity];
+
+export const AzureVmRiskFlagSeverity = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface AzureVmRiskFlag {
+  code: AzureVmRiskFlagCode;
+  severity: AzureVmRiskFlagSeverity;
+  label: string;
+  detail: string;
+}
+
+export interface AzureVmRisk {
+  id: number;
+  name: string;
+  resourceGroup?: string | null;
+  status?: string;
+  size?: string | null;
+  publicIp?: string | null;
+  flags: AzureVmRiskFlag[];
+}
+
 export type VlanType = (typeof VlanType)[keyof typeof VlanType];
 
 export const VlanType = {
@@ -1269,8 +1403,20 @@ export type SyncAzureVms200 = {
   created: number;
   updated: number;
   removed: number;
+  changed?: number;
   total: number;
   syncedAt: string;
+  diff?: AzureSyncDiff;
+};
+
+export type GetAzureSyncStatus200 = {
+  vm: AzureSyncRun | null;
+  resource: AzureSyncRun | null;
+};
+
+export type GetAzureVmRisks200 = {
+  items: AzureVmRisk[];
+  summary: AzureVmRiskSummary;
 };
 
 export type ListAzureResourcesParams = {

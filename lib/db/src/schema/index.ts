@@ -11,6 +11,7 @@ export * from "./network_layout";
 export * from "./network_governance";
 export * from "./azure_vms";
 export * from "./azure_resources";
+export * from "./azure_sync_runs";
 export * from "./after_action";
 export * from "./quotes";
 export * from "./processes";

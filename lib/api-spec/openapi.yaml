@@ -1005,16 +1005,64 @@ paths:
                     type: integer
                   removed:
                     type: integer
+                  changed:
+                    type: integer
                   total:
                     type: integer
                   syncedAt:
                     type: string
                     format: date-time
+                  diff:
+                    $ref: "#/components/schemas/AzureSyncDiff"
                 required: [created, updated, removed, total, syncedAt]
         "503":
           description: Azure not configured
         "502":
           description: Azure sync failed
+  /azure-vms/sync-status:
+    get:
+      operationId: getAzureSyncStatus
+      tags: [azure-vms]
+      summary: Latest Azure sync run for VM and resource inventory
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Latest sync runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vm:
+                    $ref: "#/components/schemas/AzureSyncRun"
+                    nullable: true
+                  resource:
+                    $ref: "#/components/schemas/AzureSyncRun"
+                    nullable: true
+                required: [vm, resource]
+  /azure-vms/risks:
+    get:
+      operationId: getAzureVmRisks
+      tags: [azure-vms]
+      summary: Risk flags across current Azure VM inventory
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: VM risk flags and summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AzureVmRisk"
+                  summary:
+                    $ref: "#/components/schemas/AzureVmRiskSummary"
+                required: [items, summary]
   /azure-resources:
     get:
       operationId: listAzureResources
@@ -2340,6 +2388,8 @@ components:
           type: boolean
         includeOpenRisks:
           type: boolean
+        includeCloudInventory:
+          type: boolean
         emailRecipients:
           type: array
           items:
@@ -2428,6 +2478,8 @@ components:
           type: boolean
         includeOpenRisks:
           type: boolean
+        includeCloudInventory:
+          type: boolean
         emailRecipients:
           type: array
           items:
@@ -2458,6 +2510,8 @@ components:
           items:
             type: object
             additionalProperties: true
+        cloudInventory:
+          $ref: "#/components/schemas/CloudInventorySnapshot"
       required: [weekOf, afterActionReports, maintenance, goalProgress]
 
     EmailReportBody:
@@ -3354,6 +3408,201 @@ components:
           type: string
           format: date-time
       required: [id, azureResourceId, name, type, status, source, createdAt, updatedAt]
+
+    AzureSyncFieldChange:
+      type: object
+      properties:
+        field:
+          type: string
+        from:
+          type: string
+          nullable: true
+        to:
+          type: string
+          nullable: true
+      required: [field, from, to]
+
+    AzureSyncDiff:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              resourceGroup:
+                type: string
+                nullable: true
+              status:
+                type: string
+                nullable: true
+              publicIp:
+                type: string
+                nullable: true
+        removed:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              resourceGroup:
+                type: string
+                nullable: true
+        changed:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              changes:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AzureSyncFieldChange"
+      required: [added, removed, changed]
+
+    AzureSyncRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [vm, resource]
+        status:
+          type: string
+          enum: [success, failed]
+        error:
+          type: string
+          nullable: true
+        createdCount:
+          type: integer
+        updatedCount:
+          type: integer
+        removedCount:
+          type: integer
+        changedCount:
+          type: integer
+        totalCount:
+          type: integer
+        diff:
+          $ref: "#/components/schemas/AzureSyncDiff"
+        actorId:
+          type: integer
+          nullable: true
+        actorName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, kind, status, createdAt]
+
+    AzureVmRiskFlag:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [public_ip, unhealthy, retiring_size]
+        severity:
+          type: string
+          enum: [high, medium, low]
+        label:
+          type: string
+        detail:
+          type: string
+      required: [code, severity, label, detail]
+
+    AzureVmRisk:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        status:
+          type: string
+        size:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AzureVmRiskFlag"
+      required: [id, name, flags]
+
+    AzureVmRiskSummary:
+      type: object
+      properties:
+        publicIp:
+          type: integer
+        unhealthy:
+          type: integer
+        retiringSize:
+          type: integer
+        flaggedVms:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+      required: [publicIp, unhealthy, retiringSize, flaggedVms, high, medium, low]
+
+    CloudInventorySnapshot:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        total:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+        risk:
+          $ref: "#/components/schemas/AzureVmRiskSummary"
+        lastSync:
+          nullable: true
+          type: object
+          properties:
+            status:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            createdCount:
+              type: integer
+            updatedCount:
+              type: integer
+            removedCount:
+              type: integer
+            changedCount:
+              type: integer
+            totalCount:
+              type: integer
+            error:
+              type: string
+              nullable: true
+            actorName:
+              type: string
+              nullable: true
+      required: [configured, total, byStatus, risk, lastSync]
 
     Vlan:
       type: object

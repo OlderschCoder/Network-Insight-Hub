@@ -22,6 +22,7 @@ export const reportsTable = pgTable("reports", {
   selectedRiskIds: json("selected_risk_ids").$type<number[] | null>().default(null),
   includeGoalProgress: boolean("include_goal_progress").notNull().default(true),
   includeOpenRisks: boolean("include_open_risks").notNull().default(true),
+  includeCloudInventory: boolean("include_cloud_inventory").notNull().default(false),
   emailRecipients: json("email_recipients").$type<string[]>().default([]),
   lastEmailedAt: timestamp("last_emailed_at"),
   contributorCount: integer("contributor_count").default(0),

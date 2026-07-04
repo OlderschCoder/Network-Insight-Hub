@@ -5,7 +5,11 @@ import {
   useUpdateAzureVm,
   useDeleteAzureVm,
   useSyncAzureVms,
+  useGetAzureSyncStatus,
+  useGetAzureVmRisks,
   type AzureVm,
+  type AzureVmRiskFlag,
+  type AzureSyncDiff,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +29,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Cloud, Plus, Pencil, Trash2, Search, Server, Download, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Cloud, Plus, Pencil, Trash2, Search, Server, Download, ChevronLeft, ChevronRight, RefreshCw, ShieldAlert, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
 
 const PAGE_SIZE = 25;
 
@@ -158,12 +163,21 @@ export default function AzureVmsPage() {
   const [form, setForm] = useState<VmFormState>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<AzureVm | null>(null);
   const [page, setPage] = useState(0);
+  const [syncDiff, setSyncDiff] = useState<AzureSyncDiff | null>(null);
 
   const { data: vms = [], isLoading, refetch } = useListAzureVms({});
+  const { data: syncStatus, refetch: refetchStatus } = useGetAzureSyncStatus();
+  const { data: riskData, refetch: refetchRisks } = useGetAzureVmRisks();
   const createMut = useCreateAzureVm();
   const updateMut = useUpdateAzureVm();
   const deleteMut = useDeleteAzureVm();
   const syncMut = useSyncAzureVms();
+
+  const riskByVm = useMemo(() => {
+    const m = new Map<number, AzureVmRiskFlag[]>();
+    for (const item of riskData?.items ?? []) m.set(item.id, item.flags);
+    return m;
+  }, [riskData]);
 
   const handleSync = async () => {
     try {
@@ -172,7 +186,10 @@ export default function AzureVmsPage() {
         title: "Synced from Azure",
         description: `${result.created} added · ${result.updated} updated · ${result.removed} marked deleted (${result.total} total).`,
       });
+      if (result.diff) setSyncDiff(result.diff);
       refetch();
+      refetchStatus();
+      refetchRisks();
     } catch (err: any) {
       const body = err?.response?.data ?? err?.data;
       const code = body?.error;
@@ -287,6 +304,76 @@ export default function AzureVmsPage() {
         )}
       </div>
 
+      {(() => {
+        const run = syncStatus?.vm;
+        const summary = riskData?.summary;
+        return (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Card>
+              <CardContent className="py-3 flex items-center gap-3">
+                {!run ? (
+                  <>
+                    <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-sm text-muted-foreground">
+                      No Azure sync recorded yet.
+                      {isCIO ? " Use “Sync from Azure” to pull inventory." : ""}
+                    </div>
+                  </>
+                ) : run.status === "success" ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                    <div className="text-sm">
+                      <div className="font-medium">
+                        Last sync {format(new Date(run.createdAt), "MMM d, h:mm a")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {run.createdCount ?? 0} added · {run.changedCount ?? 0} changed ·{" "}
+                        {run.removedCount ?? 0} removed · {run.totalCount ?? 0} total
+                        {run.actorName ? ` · by ${run.actorName}` : ""}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+                    <div className="text-sm">
+                      <div className="font-medium text-red-700">
+                        Last sync failed {format(new Date(run.createdAt), "MMM d, h:mm a")}
+                      </div>
+                      {run.error && (
+                        <div className="text-xs text-muted-foreground line-clamp-2">{run.error}</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 flex items-center gap-3">
+                <ShieldAlert
+                  className={`h-5 w-5 shrink-0 ${summary && summary.flaggedVms > 0 ? "text-amber-600" : "text-green-600"}`}
+                />
+                <div className="text-sm">
+                  {summary && summary.flaggedVms > 0 ? (
+                    <>
+                      <div className="font-medium">
+                        {summary.flaggedVms} VM{summary.flaggedVms === 1 ? "" : "s"} flagged
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {summary.publicIp} public-IP · {summary.unhealthy} unhealthy ·{" "}
+                        {summary.retiringSize} retiring series
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No VM risk flags.</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -355,6 +442,7 @@ export default function AzureVmsPage() {
                     <TableHead>Private IP</TableHead>
                     <TableHead>Public IP</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Risk</TableHead>
                     <TableHead>Owner</TableHead>
                     {isCIO && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
@@ -380,6 +468,31 @@ export default function AzureVmsPage() {
                         <Badge className={STATUS_COLORS[vm.status] ?? STATUS_COLORS.unknown}>
                           {vm.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const flags = riskByVm.get(vm.id) ?? [];
+                          if (flags.length === 0)
+                            return <span className="text-xs text-muted-foreground">—</span>;
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {flags.map((f) => (
+                                <Badge
+                                  key={f.code}
+                                  variant="outline"
+                                  title={f.detail}
+                                  className={`text-[10px] ${
+                                    f.severity === "high"
+                                      ? "bg-red-500/10 text-red-700 border-red-200"
+                                      : "bg-amber-500/10 text-amber-700 border-amber-200"
+                                  }`}
+                                >
+                                  {f.label}
+                                </Badge>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-sm">{vm.owner ?? "—"}</TableCell>
                       {isCIO && (
@@ -488,6 +601,83 @@ export default function AzureVmsPage() {
             >
               {editing ? "Save changes" : "Add VM"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!syncDiff} onOpenChange={(open) => { if (!open) setSyncDiff(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>What changed in this sync</DialogTitle>
+            <DialogDescription>
+              Differences between the previous inventory and the latest Azure pull.
+            </DialogDescription>
+          </DialogHeader>
+          {syncDiff && (
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-green-600" /> Added ({syncDiff.added?.length ?? 0})
+                </div>
+                {(syncDiff.added?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-1">None</p>
+                ) : (
+                  <ul className="mt-1 space-y-0.5">
+                    {syncDiff.added!.map((a) => (
+                      <li key={a.name} className="text-xs">
+                        <span className="font-medium">{a.name}</span>
+                        {a.resourceGroup ? ` · ${a.resourceGroup}` : ""}
+                        {a.status ? ` · ${a.status}` : ""}
+                        {a.publicIp ? ` · public ${a.publicIp}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  <Trash2 className="h-4 w-4 text-red-600" /> Removed ({syncDiff.removed?.length ?? 0})
+                </div>
+                {(syncDiff.removed?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-1">None</p>
+                ) : (
+                  <ul className="mt-1 space-y-0.5">
+                    {syncDiff.removed!.map((rm) => (
+                      <li key={rm.name} className="text-xs">
+                        <span className="font-medium">{rm.name}</span>
+                        {rm.resourceGroup ? ` · ${rm.resourceGroup}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  <Pencil className="h-4 w-4 text-amber-600" /> Changed ({syncDiff.changed?.length ?? 0})
+                </div>
+                {(syncDiff.changed?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-1">None</p>
+                ) : (
+                  <ul className="mt-1 space-y-1.5">
+                    {syncDiff.changed!.map((c) => (
+                      <li key={c.name} className="text-xs border rounded p-2">
+                        <div className="font-medium">{c.name}</div>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {c.changes?.map((ch) => (
+                            <li key={ch.field} className="font-mono">
+                              {ch.field}: {ch.from ?? "∅"} → {ch.to ?? "∅"}
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setSyncDiff(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

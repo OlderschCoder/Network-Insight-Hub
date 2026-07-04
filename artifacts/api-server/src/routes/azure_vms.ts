@@ -1,11 +1,28 @@
 import { Router } from "express";
-import { db, azureVmsTable } from "@workspace/db";
-import { eq, asc, ilike, or, and, notInArray } from "drizzle-orm";
+import { db, azureVmsTable, azureSyncRunsTable } from "@workspace/db";
+import type { AzureSyncDiff, AzureSyncFieldChange } from "@workspace/db";
+import { eq, asc, desc, ilike, or, and, notInArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { getAzureConfig, fetchAzureVms } from "../lib/azure";
+import type { AzureVmRecord } from "../lib/azure";
+import { summarizeVmRisks } from "../lib/azure_risk";
 
 const router = Router();
+
+// Fields compared to build a per-VM change diff during sync.
+const DIFF_FIELDS: (keyof AzureVmRecord)[] = [
+  "name",
+  "resourceGroup",
+  "location",
+  "size",
+  "os",
+  "privateIp",
+  "publicIp",
+  "vnet",
+  "subnet",
+  "status",
+];
 
 const upsertSchema = z.object({
   name: z.string().min(1).max(255),
@@ -43,6 +60,35 @@ router.get("/", requireAuth, async (req, res) => {
     )
     .orderBy(asc(azureVmsTable.name));
   return res.json(rows);
+});
+
+// Latest sync run for each kind, so the UI can show a status indicator.
+// Registered before "/:id" so these literal paths aren't swallowed by the param route.
+router.get("/sync-status", requireAuth, async (_req, res) => {
+  const [vmRun] = await db
+    .select()
+    .from(azureSyncRunsTable)
+    .where(eq(azureSyncRunsTable.kind, "vm"))
+    .orderBy(desc(azureSyncRunsTable.createdAt))
+    .limit(1);
+  const [resourceRun] = await db
+    .select()
+    .from(azureSyncRunsTable)
+    .where(eq(azureSyncRunsTable.kind, "resource"))
+    .orderBy(desc(azureSyncRunsTable.createdAt))
+    .limit(1);
+  return res.json({ vm: vmRun ?? null, resource: resourceRun ?? null });
+});
+
+// Risk flags across current (non-deleted) VM inventory.
+router.get("/risks", requireAuth, async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(azureVmsTable)
+    .where(notInArray(azureVmsTable.status, ["deleted"]))
+    .orderBy(asc(azureVmsTable.name));
+  const { items, summary } = summarizeVmRisks(rows);
+  return res.json({ items, summary });
 });
 
 router.get("/:id", requireAuth, async (req, res) => {
@@ -95,28 +141,56 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
     });
   }
 
+  const actorId = req.user?.id ?? null;
+  const actorName = req.user?.name ?? null;
+
   let vms;
   try {
     vms = await fetchAzureVms(cfg);
   } catch (err) {
     req.log.error({ err }, "Azure VM sync failed");
-    return res.status(502).json({
-      error: "AZURE_SYNC_FAILED",
-      message: err instanceof Error ? err.message : "Failed to fetch VMs from Azure.",
-    });
+    const message = err instanceof Error ? err.message : "Failed to fetch VMs from Azure.";
+    // Record the failed run so the UI can surface the last error + when it happened.
+    await db
+      .insert(azureSyncRunsTable)
+      .values({ kind: "vm", status: "failed", error: message.slice(0, 2000), actorId, actorName })
+      .catch((e) => req.log.error({ err: e }, "Failed to record failed Azure VM sync run"));
+    return res.status(502).json({ error: "AZURE_SYNC_FAILED", message });
   }
 
   const now = new Date();
   const existing = await db.select().from(azureVmsTable);
-  const existingAzureIds = new Set(
-    existing.filter((v) => v.azureResourceId).map((v) => v.azureResourceId as string),
+  const existingByAzureId = new Map(
+    existing.filter((v) => v.azureResourceId).map((v) => [v.azureResourceId as string, v]),
   );
 
+  const diff: AzureSyncDiff = { added: [], removed: [], changed: [] };
   let created = 0;
   let updated = 0;
 
   for (const vm of vms) {
-    const isNew = !existingAzureIds.has(vm.azureResourceId);
+    const prior = existingByAzureId.get(vm.azureResourceId);
+    if (!prior) {
+      created++;
+      diff.added.push({
+        name: vm.name,
+        resourceGroup: vm.resourceGroup,
+        status: vm.status,
+        publicIp: vm.publicIp,
+      });
+    } else {
+      updated++;
+      const changes: AzureSyncFieldChange[] = [];
+      for (const field of DIFF_FIELDS) {
+        const before = (prior as any)[field] ?? null;
+        const after = (vm as any)[field] ?? null;
+        if (String(before ?? "") !== String(after ?? "")) {
+          changes.push({ field, from: before === null ? null : String(before), to: after === null ? null : String(after) });
+        }
+      }
+      if (changes.length > 0) diff.changed.push({ name: vm.name, changes });
+    }
+
     await db
       .insert(azureVmsTable)
       .values({
@@ -134,7 +208,7 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
         status: vm.status,
         source: "azure",
         lastSyncedAt: now,
-        createdBy: req.user?.id ?? null,
+        createdBy: actorId,
       })
       .onConflictDoUpdate({
         target: azureVmsTable.azureResourceId,
@@ -155,25 +229,55 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
           updatedAt: now,
         },
       });
-    if (isNew) created++;
-    else updated++;
   }
 
   const seenIds = vms.map((v) => v.azureResourceId);
-  let removed = 0;
+  // Only rows not already marked deleted count as newly removed for the diff.
   const removedRows = await db
     .update(azureVmsTable)
     .set({ status: "deleted", updatedAt: now })
     .where(
       seenIds.length > 0
-        ? and(eq(azureVmsTable.source, "azure"), notInArray(azureVmsTable.azureResourceId, seenIds))
-        : eq(azureVmsTable.source, "azure"),
+        ? and(
+            eq(azureVmsTable.source, "azure"),
+            notInArray(azureVmsTable.azureResourceId, seenIds),
+            notInArray(azureVmsTable.status, ["deleted"]),
+          )
+        : and(eq(azureVmsTable.source, "azure"), notInArray(azureVmsTable.status, ["deleted"])),
     )
-    .returning({ id: azureVmsTable.id });
-  removed = removedRows.length;
+    .returning({ name: azureVmsTable.name, resourceGroup: azureVmsTable.resourceGroup });
+  const removed = removedRows.length;
+  for (const r of removedRows) diff.removed.push({ name: r.name, resourceGroup: r.resourceGroup });
 
-  req.log.info({ created, updated, removed, total: vms.length }, "Azure VM sync complete");
-  return res.json({ created, updated, removed, total: vms.length, syncedAt: now.toISOString() });
+  await db
+    .insert(azureSyncRunsTable)
+    .values({
+      kind: "vm",
+      status: "success",
+      createdCount: created,
+      updatedCount: updated,
+      removedCount: removed,
+      changedCount: diff.changed.length,
+      totalCount: vms.length,
+      diff,
+      actorId,
+      actorName,
+    })
+    .catch((e) => req.log.error({ err: e }, "Failed to record Azure VM sync run"));
+
+  req.log.info(
+    { created, updated, removed, changed: diff.changed.length, total: vms.length },
+    "Azure VM sync complete",
+  );
+  return res.json({
+    created,
+    updated,
+    removed,
+    changed: diff.changed.length,
+    total: vms.length,
+    syncedAt: now.toISOString(),
+    diff,
+  });
 });
 
 export default router;

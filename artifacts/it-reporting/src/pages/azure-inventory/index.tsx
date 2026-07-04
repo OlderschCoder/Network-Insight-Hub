@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useListAzureResources,
   useSyncAzureResources,
+  useGetAzureSyncStatus,
   type AzureResource,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
@@ -16,7 +17,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Cloud, Search, Download, ChevronLeft, ChevronRight, RefreshCw, Boxes } from "lucide-react";
+import { Cloud, Search, Download, ChevronLeft, ChevronRight, RefreshCw, Boxes, CheckCircle2, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
 
 const PAGE_SIZE = 25;
 
@@ -75,6 +77,7 @@ export default function AzureInventoryPage() {
   const [page, setPage] = useState(0);
 
   const { data: resources = [], isLoading, refetch } = useListAzureResources({});
+  const { data: syncStatus, refetch: refetchStatus } = useGetAzureSyncStatus();
   const syncMut = useSyncAzureResources();
 
   const handleSync = async () => {
@@ -85,6 +88,7 @@ export default function AzureInventoryPage() {
         description: `${result.created} added · ${result.updated} updated · ${result.removed} marked deleted (${result.total} total).`,
       });
       refetch();
+      refetchStatus();
     } catch (err: any) {
       const body = err?.response?.data ?? err?.data;
       const code = body?.error;
@@ -140,6 +144,44 @@ export default function AzureInventoryPage() {
           </p>
         </div>
       </div>
+
+      {(() => {
+        const run = syncStatus?.resource;
+        if (!run) return null;
+        return (
+          <Card>
+            <CardContent className="py-3 flex items-center gap-3">
+              {run.status === "success" ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      Last sync {format(new Date(run.createdAt), "MMM d, h:mm a")}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {run.createdCount ?? 0} added · {run.updatedCount ?? 0} updated ·{" "}
+                      {run.removedCount ?? 0} removed · {run.totalCount ?? 0} total
+                      {run.actorName ? ` · by ${run.actorName}` : ""}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-medium text-red-700">
+                      Last sync failed {format(new Date(run.createdAt), "MMM d, h:mm a")}
+                    </div>
+                    {run.error && (
+                      <div className="text-xs text-muted-foreground line-clamp-2">{run.error}</div>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Card>
         <CardHeader className="pb-3">

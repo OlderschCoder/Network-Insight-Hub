@@ -54,6 +54,8 @@ import type {
   ForgotPasswordBody,
   FortiGateWhitelistStatus,
   GetAggregateReportParams,
+  GetAzureSyncStatus200,
+  GetAzureVmRisks200,
   GetRecentActivityParams,
   GetUsageAnalyticsParams,
   HealthStatus,
@@ -4108,6 +4110,156 @@ export const useSyncAzureVms = <
 > => {
   return useMutation(getSyncAzureVmsMutationOptions(options));
 };
+
+/**
+ * @summary Latest Azure sync run for VM and resource inventory
+ */
+export const getGetAzureSyncStatusUrl = () => {
+  return `/api/azure-vms/sync-status`;
+};
+
+export const getAzureSyncStatus = async (
+  options?: RequestInit,
+): Promise<GetAzureSyncStatus200> => {
+  return customFetch<GetAzureSyncStatus200>(getGetAzureSyncStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAzureSyncStatusQueryKey = () => {
+  return [`/api/azure-vms/sync-status`] as const;
+};
+
+export const getGetAzureSyncStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAzureSyncStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureSyncStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAzureSyncStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAzureSyncStatus>>
+  > = ({ signal }) => getAzureSyncStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureSyncStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAzureSyncStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAzureSyncStatus>>
+>;
+export type GetAzureSyncStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Latest Azure sync run for VM and resource inventory
+ */
+
+export function useGetAzureSyncStatus<
+  TData = Awaited<ReturnType<typeof getAzureSyncStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureSyncStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAzureSyncStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Risk flags across current Azure VM inventory
+ */
+export const getGetAzureVmRisksUrl = () => {
+  return `/api/azure-vms/risks`;
+};
+
+export const getAzureVmRisks = async (
+  options?: RequestInit,
+): Promise<GetAzureVmRisks200> => {
+  return customFetch<GetAzureVmRisks200>(getGetAzureVmRisksUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAzureVmRisksQueryKey = () => {
+  return [`/api/azure-vms/risks`] as const;
+};
+
+export const getGetAzureVmRisksQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAzureVmRisks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureVmRisks>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAzureVmRisksQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAzureVmRisks>>> = ({
+    signal,
+  }) => getAzureVmRisks({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureVmRisks>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAzureVmRisksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAzureVmRisks>>
+>;
+export type GetAzureVmRisksQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Risk flags across current Azure VM inventory
+ */
+
+export function useGetAzureVmRisks<
+  TData = Awaited<ReturnType<typeof getAzureVmRisks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAzureVmRisks>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAzureVmRisksQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List the full Azure inventory (all resource types)

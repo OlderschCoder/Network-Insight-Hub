@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, azureResourcesTable } from "@workspace/db";
+import { db, azureResourcesTable, azureSyncRunsTable } from "@workspace/db";
 import { asc, ilike, or, and, eq, notInArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { getAzureConfig, fetchAzureResources } from "../lib/azure";
@@ -40,15 +40,20 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
     });
   }
 
+  const actorId = req.user?.id ?? null;
+  const actorName = req.user?.name ?? null;
+
   let resources;
   try {
     resources = await fetchAzureResources(cfg);
   } catch (err) {
     req.log.error({ err }, "Azure resource sync failed");
-    return res.status(502).json({
-      error: "AZURE_SYNC_FAILED",
-      message: err instanceof Error ? err.message : "Failed to fetch resources from Azure.",
-    });
+    const message = err instanceof Error ? err.message : "Failed to fetch resources from Azure.";
+    await db
+      .insert(azureSyncRunsTable)
+      .values({ kind: "resource", status: "failed", error: message.slice(0, 2000), actorId, actorName })
+      .catch((e) => req.log.error({ err: e }, "Failed to record failed Azure resource sync run"));
+    return res.status(502).json({ error: "AZURE_SYNC_FAILED", message });
   }
 
   const now = new Date();
@@ -104,10 +109,31 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
     .set({ status: "deleted", updatedAt: now })
     .where(
       seenIds.length > 0
-        ? and(eq(azureResourcesTable.source, "azure"), notInArray(azureResourcesTable.azureResourceId, seenIds))
-        : eq(azureResourcesTable.source, "azure"),
+        ? and(
+            eq(azureResourcesTable.source, "azure"),
+            notInArray(azureResourcesTable.azureResourceId, seenIds),
+            notInArray(azureResourcesTable.status, ["deleted"]),
+          )
+        : and(
+            eq(azureResourcesTable.source, "azure"),
+            notInArray(azureResourcesTable.status, ["deleted"]),
+          ),
     )
     .returning({ id: azureResourcesTable.id });
+
+  await db
+    .insert(azureSyncRunsTable)
+    .values({
+      kind: "resource",
+      status: "success",
+      createdCount: created,
+      updatedCount: updated,
+      removedCount: removedRows.length,
+      totalCount: resources.length,
+      actorId,
+      actorName,
+    })
+    .catch((e) => req.log.error({ err: e }, "Failed to record Azure resource sync run"));
 
   req.log.info(
     { created, updated, removed: removedRows.length, total: resources.length },
