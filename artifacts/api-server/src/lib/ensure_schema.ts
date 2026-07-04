@@ -47,4 +47,29 @@ export async function ensureSchema(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Failed to ensure users.password_hash is nullable");
   }
+
+  // 3) CIO-only "shadow memory" scratchpad. New table added after initial
+  //    self-hosted setup, so create it on boot when missing. Mirrors
+  //    lib/db/src/schema/cio_shadow_notes.ts.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "cio_shadow_notes" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "week_of" varchar(20),
+        "category" varchar(50) DEFAULT 'general' NOT NULL,
+        "content" text NOT NULL,
+        "status" varchar(20) DEFAULT 'open' NOT NULL,
+        "source" varchar(20) DEFAULT 'ai' NOT NULL,
+        "created_by" integer,
+        "created_at" timestamp DEFAULT now() NOT NULL,
+        "updated_at" timestamp DEFAULT now() NOT NULL
+      )
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "cio_shadow_notes_week_of_idx" ON "cio_shadow_notes" ("week_of")`,
+    );
+    logger.info("Ensured cio_shadow_notes table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure cio_shadow_notes table");
+  }
 }

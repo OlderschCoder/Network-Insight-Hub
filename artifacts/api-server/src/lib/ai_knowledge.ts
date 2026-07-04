@@ -1,5 +1,5 @@
 import type OpenAI from "openai";
-import { db, aiKnowledgeTable, logItemsTable, networkSwitchesTable, vlansTable } from "@workspace/db";
+import { db, aiKnowledgeTable, logItemsTable, networkSwitchesTable, vlansTable, cioShadowNotesTable } from "@workspace/db";
 import { eq, asc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
 
@@ -210,6 +210,78 @@ async function executeCreateTask(
   return {
     result: `Created task "${row.title}" in the user's My Tasks for the week of ${weekOf} (id ${row.id}).`,
     created: { id: row.id, title: row.title },
+  };
+}
+
+// ---- CIO shadow-memory tool -----------------------------------------------
+
+export const SAVE_SHADOW_NOTE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "save_shadow_note",
+    description:
+      "Record a private observation or suggestion for the CIO in the CIO-only 'shadow memory' for the current week. Use this to capture things the CIO should consider AT REPORTING TIME — a risk worth calling out, a trend across the team's work, a metric to highlight, a follow-up, or wording/framing advice for the executive report. These notes are shown to the CIO as reviewable suggestions ONLY; they never modify any actual report, entry, or deliverable. Only call this when the signed-in user is the CIO. Do not save secrets or passwords.",
+    parameters: {
+      type: "object",
+      properties: {
+        content: {
+          type: "string",
+          description: "The observation or suggestion, written to stand on its own so it's useful when reviewed later.",
+        },
+        category: {
+          type: "string",
+          description: "Optional short tag for the suggestion, e.g. risk, trend, metric, follow-up, framing, general.",
+        },
+      },
+      required: ["content"],
+    },
+  },
+};
+
+export interface SavedShadowNote {
+  id: number;
+  content: string;
+}
+
+async function executeSaveShadowNote(
+  rawArgs: string,
+  userId: number | null,
+  userRole: string | null,
+): Promise<{ result: string; saved: SavedShadowNote | null }> {
+  if (userRole !== "cio") {
+    return {
+      result: "Error: the shadow memory is CIO-only; this suggestion was not saved.",
+      saved: null,
+    };
+  }
+  let args: any;
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return { result: "Error: invalid JSON arguments", saved: null };
+  }
+  const content = typeof args?.content === "string" ? args.content.trim() : "";
+  if (!content) {
+    return { result: "Error: content is required", saved: null };
+  }
+  let category = typeof args?.category === "string" ? args.category.trim().toLowerCase().slice(0, 50) : "general";
+  if (!category) category = "general";
+
+  if (containsSecretLike(content)) {
+    logger.warn("save_shadow_note rejected: content looked like a secret");
+    return { result: `Error: ${SECRET_REJECTION_MESSAGE}`, saved: null };
+  }
+
+  const weekOf = isoWeekStart(todayInCentral());
+  const [row] = await db
+    .insert(cioShadowNotesTable)
+    .values({ weekOf, category, content, source: "ai", createdBy: userId ?? undefined })
+    .returning();
+
+  logger.info({ id: row.id, weekOf }, "AI saved a CIO shadow note");
+  return {
+    result: `Saved a CIO suggestion for the week of ${weekOf} (id ${row.id}). It will surface as a reviewable suggestion and does not change any report.`,
+    saved: { id: row.id, content: row.content },
   };
 }
 
@@ -430,11 +502,13 @@ export async function runChatWithMemory(
   savedMemories: SavedMemory[];
   createdTasks: CreatedTask[];
   networkUpdates: NetworkUpdate[];
+  savedShadowNotes: SavedShadowNote[];
 }> {
   const messages = [...opts.messages];
   const savedMemories: SavedMemory[] = [];
   const createdTasks: CreatedTask[] = [];
   const networkUpdates: NetworkUpdate[] = [];
+  const savedShadowNotes: SavedShadowNote[] = [];
   const userRole = opts.userRole ?? null;
 
   for (let round = 0; round < 3; round++) {
@@ -442,15 +516,15 @@ export async function runChatWithMemory(
       model: opts.model,
       max_completion_tokens: opts.maxCompletionTokens,
       messages,
-      tools: [SAVE_MEMORY_TOOL, CREATE_TASK_TOOL, UPSERT_SWITCH_TOOL, UPSERT_VLAN_TOOL],
+      tools: [SAVE_MEMORY_TOOL, CREATE_TASK_TOOL, UPSERT_SWITCH_TOOL, UPSERT_VLAN_TOOL, SAVE_SHADOW_NOTE_TOOL],
     });
 
     const msg = completion.choices[0]?.message;
-    if (!msg) return { reply: "", savedMemories, createdTasks, networkUpdates };
+    if (!msg) return { reply: "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
 
     const toolCalls = msg.tool_calls ?? [];
     if (toolCalls.length === 0) {
-      return { reply: msg.content ?? "", savedMemories, createdTasks, networkUpdates };
+      return { reply: msg.content ?? "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
     }
 
     messages.push(msg);
@@ -492,6 +566,15 @@ export async function runChatWithMemory(
           logger.error({ err }, "upsert_vlan tool failed");
           resultText = "Error: failed to update VLAN";
         }
+      } else if (call.type === "function" && call.function.name === "save_shadow_note") {
+        try {
+          const { result, saved } = await executeSaveShadowNote(call.function.arguments, opts.userId, userRole);
+          resultText = result;
+          if (saved) savedShadowNotes.push(saved);
+        } catch (err) {
+          logger.error({ err }, "save_shadow_note tool failed");
+          resultText = "Error: failed to save shadow note";
+        }
       }
       messages.push({ role: "tool", tool_call_id: call.id, content: resultText });
     }
@@ -503,5 +586,5 @@ export async function runChatWithMemory(
     max_completion_tokens: opts.maxCompletionTokens,
     messages,
   });
-  return { reply: final.choices[0]?.message?.content ?? "", savedMemories, createdTasks, networkUpdates };
+  return { reply: final.choices[0]?.message?.content ?? "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
 }

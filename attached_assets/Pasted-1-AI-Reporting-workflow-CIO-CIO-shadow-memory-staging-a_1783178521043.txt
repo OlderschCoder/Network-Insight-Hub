@@ -1,0 +1,28 @@
+1) AI + Reporting workflow (CIO)
+CIO “shadow memory” / staging area for observations gathered during the week (review/approve before they go into executive-facing weekly reports).
+Weekly “AI Red Flags” summary surfaced in three formats:
+pasted into the Weekly Report narrative
+created as a dedicated Risks & Issues entry for the week
+shown as an “AI Observations” alert-style note format (if/when implemented)
+One-click “promote to Risk/Issue / Task / AAR action item” from AI chat excerpts (with attribution and links back to source).
+Source citation UX in AI outputs (clickable refs to the specific Weekly Log entry, Risk, AAR, switch/VLAN record).
+2) Chat-driven capture (Tasks + Inventory)
+Automatic task capture from chat for staff (with Undo), but excluded for you (Mark) unless you explicitly request it (per your guidance).
+Inventory write UX hardening:
+clear “pending change” preview before commit (optional)
+visible audit trail (“who/when/what fields changed”)
+rollback/undo beyond just the toast (history view)
+3) Network Inventory quality & operations
+Data normalization helpers:
+building naming consistency (e.g., “Agriculture” vs “Agriculture (V201)”, “Hobble” vs sub-areas)
+switch naming consistency checks (“swa-m201” note: V vs M naming)
+Staleness detection: flag switches marked “offline/unknown” for >N days and prompt for verification.
+Coverage gaps report: identify buildings with VLANs but no switches (and vice versa).
+Topology page safeguards: since node positions are shared “last writer wins,” add:
+layout versioning or “lock while editing”
+CIO “reset layout” confirmation + change log
+4) Azure VM + Azure Inventory integration
+Ensure “Sync from Azure” is part of the weekly reporting rhythm (so reports reference current cloud inventory).
+Sync status indicator (last sync time, success/failure, error detail).
+Diff view after sync (what changed, what was added/removed).
+Track and flag key risk metadata on VMs (public IP exposure, unhealthy health state, disk retirement notices).
