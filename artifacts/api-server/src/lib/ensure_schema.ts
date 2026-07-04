@@ -72,4 +72,33 @@ export async function ensureSchema(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Failed to ensure cio_shadow_notes table");
   }
+
+  // 4) Inventory audit trail for switch/VLAN writes. New table added after the
+  //    initial self-hosted setup, so create it on boot when missing. Mirrors
+  //    lib/db/src/schema/inventory_audit.ts.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "inventory_audit" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "entity_type" varchar(20) NOT NULL,
+        "entity_id" integer NOT NULL,
+        "entity_label" varchar(255) NOT NULL,
+        "action" varchar(20) NOT NULL,
+        "source" varchar(20) NOT NULL,
+        "actor_id" integer,
+        "actor_name" varchar(255),
+        "changes" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      )
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "inventory_audit_entity_idx" ON "inventory_audit" ("entity_type", "entity_id")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "inventory_audit_created_at_idx" ON "inventory_audit" ("created_at")`,
+    );
+    logger.info("Ensured inventory_audit table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure inventory_audit table");
+  }
 }

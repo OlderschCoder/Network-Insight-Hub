@@ -6,6 +6,7 @@ export * from "./reports";
 export * from "./risks";
 export * from "./network_switches";
 export * from "./vlans";
+export * from "./inventory_audit";
 export * from "./network_layout";
 export * from "./azure_vms";
 export * from "./azure_resources";

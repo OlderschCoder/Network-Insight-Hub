@@ -1,7 +1,18 @@
 import type OpenAI from "openai";
-import { db, aiKnowledgeTable, logItemsTable, networkSwitchesTable, vlansTable, cioShadowNotesTable } from "@workspace/db";
-import { eq, asc, ilike } from "drizzle-orm";
+import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable } from "@workspace/db";
+import { eq, asc } from "drizzle-orm";
 import { logger } from "./logger";
+import {
+  upsertSwitchByHostname,
+  upsertVlanByVlanId,
+  previewSwitchByHostname,
+  previewVlanByVlanId,
+  type NetworkUpdate,
+  type PendingNetworkChange,
+  type InventoryActor,
+} from "./inventory";
+
+export type { NetworkUpdate, PendingNetworkChange };
 
 const MAX_CONTEXT_CHARS = 60_000;
 
@@ -288,15 +299,6 @@ async function executeSaveShadowNote(
 // ---- network inventory tools ----------------------------------------------
 
 const NETWORK_ADMIN_ROLES = new Set(["cio", "network", "network_engineer"]);
-const SWITCH_STATUSES = new Set(["online", "offline", "unknown"]);
-const VLAN_TYPES = new Set(["data", "voice", "ospf", "management", "security", "other"]);
-
-export interface NetworkUpdate {
-  kind: "switch" | "vlan";
-  id: number;
-  label: string;
-  action: "created" | "updated";
-}
 
 export const UPSERT_SWITCH_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
@@ -349,138 +351,109 @@ function cleanStr(v: unknown, max: number): string | undefined {
   return t ? t.slice(0, max) : undefined;
 }
 
-async function executeUpsertSwitch(
-  rawArgs: string,
-  userRole: string | null,
-): Promise<{ result: string; updated: NetworkUpdate | null }> {
-  if (!userRole || !NETWORK_ADMIN_ROLES.has(userRole)) {
-    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null };
-  }
-  let args: any;
-  try {
-    args = JSON.parse(rawArgs);
-  } catch {
-    return { result: "Error: invalid JSON arguments", updated: null };
-  }
-  const hostname = cleanStr(args?.hostname, 255);
-  if (!hostname) return { result: "Error: hostname is required", updated: null };
-
-  const building = cleanStr(args?.building, 255);
-  const ipAddress = cleanStr(args?.ipAddress, 50);
-  const model = cleanStr(args?.model, 255);
-  const location = cleanStr(args?.location, 255);
-  const notes = cleanStr(args?.notes, 4000);
-  let status = cleanStr(args?.status, 20)?.toLowerCase();
-  if (status && !SWITCH_STATUSES.has(status)) status = undefined;
-
-  const [existing] = await db
-    .select()
-    .from(networkSwitchesTable)
-    .where(ilike(networkSwitchesTable.hostname, hostname));
-
-  if (existing) {
-    const updates: any = { updatedAt: new Date() };
-    if (building !== undefined) updates.building = building;
-    if (ipAddress !== undefined) updates.ipAddress = ipAddress;
-    if (model !== undefined) updates.model = model;
-    if (location !== undefined) updates.location = location;
-    if (notes !== undefined) updates.notes = notes;
-    if (status !== undefined) updates.status = status;
-    const [row] = await db
-      .update(networkSwitchesTable)
-      .set(updates)
-      .where(eq(networkSwitchesTable.id, existing.id))
-      .returning();
-    logger.info({ id: row.id, hostname: row.hostname }, "AI updated a switch from chat");
-    return {
-      result: `Updated switch "${row.hostname}" (id ${row.id}).`,
-      updated: { kind: "switch", id: row.id, label: row.hostname, action: "updated" },
-    };
-  }
-
-  if (!building || !ipAddress) {
-    return {
-      result: `Error: switch "${hostname}" does not exist yet; creating it requires both building and ipAddress.`,
-      updated: null,
-    };
-  }
-  const [row] = await db
-    .insert(networkSwitchesTable)
-    .values({ hostname, building, ipAddress, model, location, notes, status: status ?? "unknown" })
-    .returning();
-  logger.info({ id: row.id, hostname: row.hostname }, "AI created a switch from chat");
-  return {
-    result: `Added switch "${row.hostname}" in ${row.building} (id ${row.id}).`,
-    updated: { kind: "switch", id: row.id, label: row.hostname, action: "created" },
-  };
+interface InventoryToolCtx {
+  userRole: string | null;
+  actor: InventoryActor;
+  preview: boolean;
 }
 
-async function executeUpsertVlan(
-  rawArgs: string,
-  userRole: string | null,
-): Promise<{ result: string; updated: NetworkUpdate | null }> {
-  if (!userRole || !NETWORK_ADMIN_ROLES.has(userRole)) {
-    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null };
+interface InventoryToolResult {
+  result: string;
+  updated: NetworkUpdate | null;
+  pending: PendingNetworkChange | null;
+}
+
+async function executeUpsertSwitch(rawArgs: string, ctx: InventoryToolCtx): Promise<InventoryToolResult> {
+  if (!ctx.userRole || !NETWORK_ADMIN_ROLES.has(ctx.userRole)) {
+    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null, pending: null };
   }
   let args: any;
   try {
     args = JSON.parse(rawArgs);
   } catch {
-    return { result: "Error: invalid JSON arguments", updated: null };
+    return { result: "Error: invalid JSON arguments", updated: null, pending: null };
+  }
+  const hostname = cleanStr(args?.hostname, 255);
+  if (!hostname) return { result: "Error: hostname is required", updated: null, pending: null };
+
+  const input = {
+    hostname,
+    building: cleanStr(args?.building, 255),
+    ipAddress: cleanStr(args?.ipAddress, 50),
+    model: cleanStr(args?.model, 255),
+    location: cleanStr(args?.location, 255),
+    notes: cleanStr(args?.notes, 4000),
+    status: cleanStr(args?.status, 20)?.toLowerCase(),
+  };
+
+  if (ctx.preview) {
+    const res = await previewSwitchByHostname(input);
+    if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+    return {
+      result: `Proposed switch change staged for the user to review and confirm — it has NOT been applied yet.`,
+      updated: null,
+      pending: res.pending,
+    };
+  }
+  const res = await upsertSwitchByHostname(input, { actor: ctx.actor, source: "chat_ai" });
+  if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+  return { result: res.result, updated: res.update, pending: null };
+}
+
+async function executeUpsertVlan(rawArgs: string, ctx: InventoryToolCtx): Promise<InventoryToolResult> {
+  if (!ctx.userRole || !NETWORK_ADMIN_ROLES.has(ctx.userRole)) {
+    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null, pending: null };
+  }
+  let args: any;
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return { result: "Error: invalid JSON arguments", updated: null, pending: null };
   }
   const vlanId = typeof args?.vlanId === "number" && Number.isInteger(args.vlanId) ? args.vlanId : NaN;
-  if (Number.isNaN(vlanId)) return { result: "Error: a numeric vlanId is required", updated: null };
+  if (Number.isNaN(vlanId)) return { result: "Error: a numeric vlanId is required", updated: null, pending: null };
 
-  const name = cleanStr(args?.name, 255);
-  const building = cleanStr(args?.building, 255);
-  const description = cleanStr(args?.description, 4000);
-  const subnet = cleanStr(args?.subnet, 100);
-  const gateway = cleanStr(args?.gateway, 50);
-  const notes = cleanStr(args?.notes, 4000);
-  let type = cleanStr(args?.type, 20)?.toLowerCase();
-  if (type && !VLAN_TYPES.has(type)) type = undefined;
-
-  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.vlanId, vlanId));
-
-  if (existing) {
-    const updates: any = {};
-    if (name !== undefined) updates.name = name;
-    if (building !== undefined) updates.building = building;
-    if (type !== undefined) updates.type = type;
-    if (description !== undefined) updates.description = description;
-    if (subnet !== undefined) updates.subnet = subnet;
-    if (gateway !== undefined) updates.gateway = gateway;
-    if (notes !== undefined) updates.notes = notes;
-    if (Object.keys(updates).length === 0) {
-      return { result: `No changes provided for VLAN ${vlanId}.`, updated: null };
-    }
-    const [row] = await db
-      .update(vlansTable)
-      .set(updates)
-      .where(eq(vlansTable.id, existing.id))
-      .returning();
-    logger.info({ id: row.id, vlanId: row.vlanId }, "AI updated a VLAN from chat");
-    return {
-      result: `Updated VLAN ${row.vlanId} "${row.name}" (id ${row.id}).`,
-      updated: { kind: "vlan", id: row.id, label: `VLAN ${row.vlanId}`, action: "updated" },
-    };
-  }
-
-  if (!name || !building || !type) {
-    return {
-      result: `Error: VLAN ${vlanId} does not exist yet; creating it requires name, building, and type.`,
-      updated: null,
-    };
-  }
-  const [row] = await db
-    .insert(vlansTable)
-    .values({ vlanId, name, building, type, description, subnet, gateway, notes })
-    .returning();
-  logger.info({ id: row.id, vlanId: row.vlanId }, "AI created a VLAN from chat");
-  return {
-    result: `Added VLAN ${row.vlanId} "${row.name}" (id ${row.id}).`,
-    updated: { kind: "vlan", id: row.id, label: `VLAN ${row.vlanId}`, action: "created" },
+  const input = {
+    vlanId,
+    name: cleanStr(args?.name, 255),
+    building: cleanStr(args?.building, 255),
+    type: cleanStr(args?.type, 20)?.toLowerCase(),
+    description: cleanStr(args?.description, 4000),
+    subnet: cleanStr(args?.subnet, 100),
+    gateway: cleanStr(args?.gateway, 50),
+    notes: cleanStr(args?.notes, 4000),
   };
+
+  if (ctx.preview) {
+    const res = await previewVlanByVlanId(input);
+    if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+    return {
+      result: `Proposed VLAN change staged for the user to review and confirm — it has NOT been applied yet.`,
+      updated: null,
+      pending: res.pending,
+    };
+  }
+  const res = await upsertVlanByVlanId(input, { actor: ctx.actor, source: "chat_ai" });
+  if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+  return { result: res.result, updated: res.update, pending: null };
+}
+
+// Explicit capture intent — used to let the CIO opt into task capture on a
+// per-message basis (their chat is otherwise non-capturing by default).
+const CAPTURE_INTENT_PATTERNS: RegExp[] = [
+  /\b(add|create|save|capture|log|record|track|make)\b[^.]*\b(task|to-?do|item|note this|reminder)\b/i,
+  /\b(add|save|capture|log|put)\b[^.]*\bto (my )?(tasks|to-?do|list|report)\b/i,
+  /\b(remember to|make a task|create a task|add a task|log this|capture this|track this)\b/i,
+];
+
+/**
+ * Heuristic: did the user explicitly ask for their message to be captured as a
+ * task? The CIO's chat does not auto-capture, so capture only fires when they
+ * ask for it; ordinary staff always auto-capture regardless of this result.
+ */
+export function messageRequestsCapture(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return CAPTURE_INTENT_PATTERNS.some((re) => re.test(text));
 }
 
 /**
@@ -496,6 +469,11 @@ export async function runChatWithMemory(
     messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
     userId: number | null;
     userRole?: string | null;
+    userName?: string | null;
+    /** When false, the create_task tool is withheld so the chat never auto-captures work. */
+    allowTaskCapture?: boolean;
+    /** When true, inventory upserts are staged as pending changes instead of applied. */
+    previewInventory?: boolean;
   },
 ): Promise<{
   reply: string;
@@ -503,28 +481,54 @@ export async function runChatWithMemory(
   createdTasks: CreatedTask[];
   networkUpdates: NetworkUpdate[];
   savedShadowNotes: SavedShadowNote[];
+  pendingNetworkChanges: PendingNetworkChange[];
 }> {
   const messages = [...opts.messages];
   const savedMemories: SavedMemory[] = [];
   const createdTasks: CreatedTask[] = [];
   const networkUpdates: NetworkUpdate[] = [];
   const savedShadowNotes: SavedShadowNote[] = [];
+  const pendingNetworkChanges: PendingNetworkChange[] = [];
   const userRole = opts.userRole ?? null;
+  const allowTaskCapture = opts.allowTaskCapture !== false;
+  const preview = opts.previewInventory === true;
+  const inventoryCtx: InventoryToolCtx = {
+    userRole,
+    actor: { id: opts.userId, name: opts.userName ?? null },
+    preview,
+  };
+
+  const tools = [
+    SAVE_MEMORY_TOOL,
+    ...(allowTaskCapture ? [CREATE_TASK_TOOL] : []),
+    UPSERT_SWITCH_TOOL,
+    UPSERT_VLAN_TOOL,
+    SAVE_SHADOW_NOTE_TOOL,
+  ];
+
+  const done = (reply: string) => ({
+    reply,
+    savedMemories,
+    createdTasks,
+    networkUpdates,
+    savedShadowNotes,
+    pendingNetworkChanges,
+  });
 
   for (let round = 0; round < 3; round++) {
     const completion = await openai.chat.completions.create({
       model: opts.model,
       max_completion_tokens: opts.maxCompletionTokens,
       messages,
-      tools: [SAVE_MEMORY_TOOL, CREATE_TASK_TOOL, UPSERT_SWITCH_TOOL, UPSERT_VLAN_TOOL, SAVE_SHADOW_NOTE_TOOL],
+      tools,
     });
 
     const msg = completion.choices[0]?.message;
-    if (!msg) return { reply: "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
+    if (!msg) return done("");
 
     const toolCalls = msg.tool_calls ?? [];
     if (toolCalls.length === 0) {
-      return { reply: msg.content ?? "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
+      return done(msg.content ?? "");
     }
 
     messages.push(msg);
@@ -550,18 +554,20 @@ export async function runChatWithMemory(
         }
       } else if (call.type === "function" && call.function.name === "upsert_switch") {
         try {
-          const { result, updated } = await executeUpsertSwitch(call.function.arguments, userRole);
+          const { result, updated, pending } = await executeUpsertSwitch(call.function.arguments, inventoryCtx);
           resultText = result;
           if (updated) networkUpdates.push(updated);
+          if (pending) pendingNetworkChanges.push(pending);
         } catch (err) {
           logger.error({ err }, "upsert_switch tool failed");
           resultText = "Error: failed to update switch";
         }
       } else if (call.type === "function" && call.function.name === "upsert_vlan") {
         try {
-          const { result, updated } = await executeUpsertVlan(call.function.arguments, userRole);
+          const { result, updated, pending } = await executeUpsertVlan(call.function.arguments, inventoryCtx);
           resultText = result;
           if (updated) networkUpdates.push(updated);
+          if (pending) pendingNetworkChanges.push(pending);
         } catch (err) {
           logger.error({ err }, "upsert_vlan tool failed");
           resultText = "Error: failed to update VLAN";
@@ -586,5 +592,5 @@ export async function runChatWithMemory(
     max_completion_tokens: opts.maxCompletionTokens,
     messages,
   });
-  return { reply: final.choices[0]?.message?.content ?? "", savedMemories, createdTasks, networkUpdates, savedShadowNotes };
+  return done(final.choices[0]?.message?.content ?? "");
 }

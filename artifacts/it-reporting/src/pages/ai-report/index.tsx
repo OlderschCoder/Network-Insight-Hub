@@ -16,6 +16,11 @@ import remarkGfm from "remark-gfm";
 import { MemoryTab } from "./memory-tab";
 import { CIOInsightsTab } from "./cio-insights-tab";
 import { CaptureDialog } from "./capture-dialog";
+import {
+  PendingInventoryChanges,
+  type PendingNetworkChange,
+} from "@/components/network/pending-inventory-changes";
+import { useQueryClient } from "@tanstack/react-query";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
 
@@ -401,7 +406,10 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
   });
   const [loading, setLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
+  const [pendingChanges, setPendingChanges] = useState<PendingNetworkChange[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
 
   // Load persisted chat history when the signed-in user (storage key) is known,
   // so the conversation survives navigating away and page reloads. Keying the
@@ -481,7 +489,7 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
       const res = await fetch(`${API_BASE}/status-report/chat`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ messages: newMessages, lookbackDays }),
+        body: JSON.stringify({ messages: newMessages, lookbackDays, previewInventory: isNetworkAdmin }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -533,6 +541,9 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
             .map((n) => n.title ?? (n.content ?? "").slice(0, 60))
             .join("; "),
         });
+      }
+      if (Array.isArray(data.pendingNetworkChanges) && data.pendingNetworkChanges.length > 0) {
+        setPendingChanges((prev) => [...prev, ...(data.pendingNetworkChanges as PendingNetworkChange[])]);
       }
     } catch (e: any) {
       toast({ title: "Chat failed", description: e.message, variant: "destructive" });
@@ -659,6 +670,26 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
             )}
           </div>
         ))}
+        {isNetworkAdmin && pendingChanges.length > 0 && (
+          <PendingInventoryChanges
+            changes={pendingChanges}
+            onApplied={(change, message) => {
+              setPendingChanges((prev) => prev.filter((c) => c !== change));
+              toast({ title: message ?? `Applied ${change.kind} ${change.label}` });
+              queryClient.invalidateQueries({ queryKey: ["network"] });
+            }}
+            onFailed={(change, err) => {
+              toast({
+                variant: "destructive",
+                title: `Failed to apply ${change.kind} ${change.label}`,
+                description: err,
+              });
+            }}
+            onDismiss={(change) => {
+              setPendingChanges((prev) => prev.filter((c) => c !== change));
+            }}
+          />
+        )}
         {loading && (
           <div className="flex justify-start">
             <div className="bg-muted rounded-lg px-4 py-2 text-sm">

@@ -18,7 +18,7 @@ const reports = reportsTable;
 const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
-import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
+import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture } from "../lib/ai_knowledge";
 import { getOpenAI, isAIConfigured } from "../lib/openai";
 
 const router = Router();
@@ -516,7 +516,7 @@ router.post(
       return res.status(503).json({ error: "AI service is not configured." });
     }
     try {
-      const { messages: chatMessages = [], lookbackDays: rawLookback = 90 } = req.body ?? {};
+      const { messages: chatMessages = [], lookbackDays: rawLookback = 90, previewInventory = false } = req.body ?? {};
 
       if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
         return res.status(400).json({ error: "messages array required" });
@@ -669,7 +669,15 @@ ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const { reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes } =
+      // The CIO's chat does not auto-capture work into their task list — only
+      // when they explicitly ask for it in the message — so their reporting
+      // conversations aren't silently turned into report items. (This route is
+      // CIO-only; ordinary staff capture via other chat surfaces.)
+      const lastUserMsg = [...chatMessages].reverse().find((m: any) => m.role === "user")?.content ?? "";
+      const authRole = (req as any).user?.role ?? null;
+      const allowTaskCapture = authRole !== "cio" || messageRequestsCapture(lastUserMsg);
+
+      const { reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges } =
         await runChatWithMemory(getOpenAI(), {
           model: "gpt-5.2",
           maxCompletionTokens: 4096,
@@ -678,10 +686,13 @@ ${JSON.stringify(context, null, 2)}`;
             ...chatMessages,
           ],
           userId: (req as any).user?.id ?? null,
-          userRole: (req as any).user?.role ?? null,
+          userRole: authRole,
+          userName: (req as any).user?.name ?? null,
+          allowTaskCapture,
+          previewInventory: previewInventory === true,
         });
 
-      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes });
+      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges });
     } catch (error) {
       console.error("AI chat error:", error);
       return res.status(500).json({

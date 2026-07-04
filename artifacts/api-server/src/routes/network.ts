@@ -19,11 +19,26 @@ import { z } from "zod";
 import crypto from "crypto";
 import type OpenAI from "openai";
 import { getOpenAI, isAIConfigured } from "../lib/openai";
-import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
+import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture } from "../lib/ai_knowledge";
+import {
+  upsertSwitchByHostname,
+  upsertVlanByVlanId,
+  listInventoryAudit,
+  rollbackInventoryChange,
+  recordInventoryAudit,
+  diffFields,
+  SWITCH_AUDIT_FIELDS,
+  VLAN_AUDIT_FIELDS,
+  type InventoryActor,
+} from "../lib/inventory";
 import fs from "fs";
 import path from "path";
 
 const router = Router();
+
+function reqActor(req: any): InventoryActor {
+  return { id: req.user?.id ?? null, name: req.user?.name ?? null };
+}
 
 const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
 
@@ -98,6 +113,15 @@ router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res)
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [sw] = await db.insert(networkSwitchesTable).values(parsed.data).returning();
+  await recordInventoryAudit({
+    entityType: "switch",
+    entityId: sw.id,
+    entityLabel: sw.hostname,
+    action: "create",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(null, sw, SWITCH_AUDIT_FIELDS),
+  });
   return res.status(201).json(sw);
 });
 
@@ -122,9 +146,20 @@ router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any,
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const [before] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!before) return res.status(404).json({ error: "Not found" });
   const [sw] = await db.update(networkSwitchesTable).set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id)).returning();
   if (!sw) return res.status(404).json({ error: "Not found" });
+  await recordInventoryAudit({
+    entityType: "switch",
+    entityId: sw.id,
+    entityLabel: sw.hostname,
+    action: "update",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
+  });
   return res.json(sw);
 });
 
@@ -265,6 +300,15 @@ router.post("/vlans", requireAuth, requireNetworkAdmin, async (req: any, res) =>
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [vlan] = await db.insert(vlansTable).values(parsed.data).returning();
+  await recordInventoryAudit({
+    entityType: "vlan",
+    entityId: vlan.id,
+    entityLabel: `VLAN ${vlan.vlanId} ${vlan.name}`,
+    action: "create",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(null, vlan, VLAN_AUDIT_FIELDS),
+  });
   return res.status(201).json(withVisibleMaintenanceLog(vlan));
 });
 
@@ -434,6 +478,63 @@ router.post("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res
   }
 });
 
+// ----- Inventory audit trail & AI change application -----
+
+// Read the audit history for switch/VLAN inventory changes.
+router.get("/inventory/audit", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const entityTypeRaw = typeof req.query.entityType === "string" ? req.query.entityType : undefined;
+  const entityType = entityTypeRaw === "switch" || entityTypeRaw === "vlan" ? entityTypeRaw : undefined;
+  const entityIdRaw = typeof req.query.entityId === "string" ? parseInt(req.query.entityId) : NaN;
+  const entityId = Number.isNaN(entityIdRaw) ? undefined : entityIdRaw;
+  const limitRaw = typeof req.query.limit === "string" ? parseInt(req.query.limit) : NaN;
+  const limit = Number.isNaN(limitRaw) ? 100 : Math.min(Math.max(limitRaw, 1), 500);
+  try {
+    const rows = await listInventoryAudit({ entityType, entityId, limit });
+    return res.json(rows);
+  } catch (err: any) {
+    console.error("[inventory audit list]", err);
+    return res.status(500).json({ error: err?.message || "Failed to load audit history" });
+  }
+});
+
+// Roll back a prior inventory change to its recorded "from" values.
+router.post("/inventory/audit/:id/rollback", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  try {
+    const result = await rollbackInventoryChange(id, reqActor(req));
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    return res.json({ ok: true, result: result.result, update: result.update });
+  } catch (err: any) {
+    console.error("[inventory rollback]", err);
+    return res.status(500).json({ error: err?.message || "Rollback failed" });
+  }
+});
+
+// Apply a pending AI-proposed inventory change (from a preview chat turn).
+router.post("/inventory/apply", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    kind: z.enum(["switch", "vlan"]),
+    payload: z.record(z.string(), z.any()),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid apply payload" });
+  const actor = reqActor(req);
+  try {
+    if (parsed.data.kind === "switch") {
+      const result = await upsertSwitchByHostname(parsed.data.payload as any, { actor, source: "chat_ai" });
+      if (!result.ok) return res.status(400).json({ error: result.error });
+      return res.json({ ok: true, result: result.result, update: result.update });
+    }
+    const result = await upsertVlanByVlanId(parsed.data.payload as any, { actor, source: "chat_ai" });
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    return res.json({ ok: true, result: result.result, update: result.update });
+  } catch (err: any) {
+    console.error("[inventory apply]", err);
+    return res.status(500).json({ error: err?.message || "Failed to apply change" });
+  }
+});
+
 // ----- AI Network Engineer chat -----
 
 router.post("/ai-chat", requireAuth, async (req: any, res) => {
@@ -442,6 +543,7 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
       role: z.enum(["user", "assistant"]),
       content: z.string().min(1).max(8000),
     })).min(1).max(40),
+    previewInventory: z.boolean().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
@@ -575,7 +677,13 @@ Guidelines for your answers:
       userMessages.push({ role: m.role, content: m.content });
     }
 
-    const { reply: rawReply, savedMemories, createdTasks, networkUpdates, savedShadowNotes } =
+    // The CIO's chat does not auto-capture work into their task list unless they
+    // explicitly ask; ordinary staff always auto-capture.
+    const lastUserMsg = [...parsed.data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const authRole = req.user?.role ?? null;
+    const allowTaskCapture = authRole !== "cio" || messageRequestsCapture(lastUserMsg);
+
+    const { reply: rawReply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges } =
       await runChatWithMemory(getOpenAI(), {
         model: "gpt-5.2",
         maxCompletionTokens: 2048,
@@ -584,11 +692,14 @@ Guidelines for your answers:
           ...userMessages,
         ],
         userId: req.user?.id ?? null,
-        userRole: req.user?.role ?? null,
+        userRole: authRole,
+        userName: req.user?.name ?? null,
+        allowTaskCapture,
+        previewInventory: parsed.data.previewInventory === true,
       });
 
     const reply = rawReply.trim() || "(no response)";
-    return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes });
+    return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges });
   } catch (err: any) {
     console.error("[network ai-chat]", err);
     return res.status(500).json({ error: err?.message || "AI request failed" });

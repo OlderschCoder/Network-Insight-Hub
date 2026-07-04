@@ -50,6 +50,11 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { InventoryHistory } from "./inventory-history";
+import {
+  PendingInventoryChanges,
+  type PendingNetworkChange,
+} from "@/components/network/pending-inventory-changes";
 
 const statusColor: Record<string, string> = {
   online: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -1227,10 +1232,15 @@ function AskAIPanel({
   pendingPrompt: string | null;
   onPromptConsumed: () => void;
 }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<PendingNetworkChange[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1261,7 +1271,7 @@ function AskAIPanel({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, previewInventory: isNetworkAdmin }),
       });
       if (!res.ok) {
         const text = await res.text();
@@ -1269,6 +1279,9 @@ function AskAIPanel({
       }
       const data = await res.json();
       setMessages([...next, { role: "assistant", content: data.reply || "(empty response)" }]);
+      if (Array.isArray(data.pendingNetworkChanges) && data.pendingNetworkChanges.length > 0) {
+        setPendingChanges((prev) => [...prev, ...(data.pendingNetworkChanges as PendingNetworkChange[])]);
+      }
     } catch (e: any) {
       setError(e?.message || "AI request failed");
     } finally {
@@ -1341,6 +1354,26 @@ function AskAIPanel({
               <div className="text-xs text-red-700 border border-red-200 bg-red-500/10 rounded p-2">
                 {error}
               </div>
+            )}
+            {isNetworkAdmin && pendingChanges.length > 0 && (
+              <PendingInventoryChanges
+                changes={pendingChanges}
+                onApplied={(change, message) => {
+                  setPendingChanges((prev) => prev.filter((c) => c !== change));
+                  toast({ title: message ?? `Applied ${change.kind} ${change.label}` });
+                  queryClient.invalidateQueries({ queryKey: ["network"] });
+                }}
+                onFailed={(change, err) => {
+                  toast({
+                    variant: "destructive",
+                    title: `Failed to apply ${change.kind} ${change.label}`,
+                    description: err,
+                  });
+                }}
+                onDismiss={(change) => {
+                  setPendingChanges((prev) => prev.filter((c) => c !== change));
+                }}
+              />
             )}
           </div>
         </ScrollArea>
@@ -1529,6 +1562,8 @@ function CampusMapPanel() {
 
 export default function Network() {
   const searchString = useSearch();
+  const { user } = useAuth();
+  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("buildings");
   const [aiOpen, setAiOpen] = useState(false);
@@ -1538,7 +1573,7 @@ export default function Network() {
     const q = params.get("q");
     const t = params.get("tab");
     if (q !== null) setSearch(q);
-    if (t && ["buildings", "switches", "vlans"].includes(t)) setTab(t);
+    if (t && ["buildings", "switches", "vlans", "history"].includes(t)) setTab(t);
   }, [searchString]);
 
   const [exportAllOpen, setExportAllOpen] = useState(false);
@@ -1643,6 +1678,11 @@ export default function Network() {
           <TabsTrigger value="vlans">
             <NetworkIcon className="h-4 w-4 mr-2" /> VLANs ({allVlans.length})
           </TabsTrigger>
+          {isNetworkAdmin && (
+            <TabsTrigger value="history">
+              <History className="h-4 w-4 mr-2" /> History
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="buildings" className="mt-4">
@@ -1745,6 +1785,12 @@ export default function Network() {
             </div>
           )}
         </TabsContent>
+
+        {isNetworkAdmin && (
+          <TabsContent value="history" className="mt-4">
+            <InventoryHistory />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
