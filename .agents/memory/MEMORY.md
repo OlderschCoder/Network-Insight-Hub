@@ -10,3 +10,4 @@
 - [drizzle push non-interactive](drizzle-push-noninteractive.md) — push TUI can't be piped; --force still prompts on UNIQUE-over-existing-rows; reconcile DB drift via direct SQL instead.
 - [Persistent sessions](persistent-sessions.md) — bearer tokens live in the `sessions` DB table (survive restarts); auth helpers are async; SSO PKCE/exchange stays in-memory by design.
 - [Dev DB schema drift](dev-db-schema-drift.md) — dev Postgres drifts from schema; `db push` prompts interactively & can't be piped; reconcile with direct idempotent SQL.
+- [Publish diffs dev DB, not schema files](publish-diffs-dev-not-schema-files.md) — prod migrate = dev-DB→prod-DB diff; reconcile dev to source-of-truth first; task agents can't publish or DDL prod.
