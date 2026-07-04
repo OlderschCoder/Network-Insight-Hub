@@ -1,0 +1,32 @@
+                                              Table "public.users"
+         Column         |            Type             | Collation | Nullable |              Default
+------------------------+-----------------------------+-----------+----------+-----------------------------------
+ id                     | integer                     |           | not null | nextval('users_id_seq'::regclass)
+ email                  | character varying(255)      |           | not null |
+ password_hash          | text                        |           | not null |
+ name                   | character varying(255)      |           | not null |
+ role                   | character varying(50)       |           | not null | 'helpdesk'::character varying
+ department             | character varying(255)      |           |          |
+ created_at             | timestamp without time zone |           | not null | now()
+ updated_at             | timestamp without time zone |           | not null | now()
+ zendesk_email          | character varying(255)      |           |          |
+ password_reset_token   | character varying(128)      |           |          |
+ password_reset_expires | timestamp without time zone |           |          |
+ is_active              | boolean                     |           | not null | true
+ entra_object_id        | character varying(64)       |           |          |
+ is_break_glass         | boolean                     |           | not null | false
+ job_title              | character varying(255)      |           |          |
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "users_email_unique" UNIQUE CONSTRAINT, btree (email)
+    "users_entra_object_id_unique" UNIQUE, btree (entra_object_id)
+Referenced by:
+    TABLE "after_action_reports" CONSTRAINT "after_action_reports_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "ai_knowledge" CONSTRAINT "ai_knowledge_updated_by_users_id_fk" FOREIGN KEY (updated_by) REFERENCES users(id)
+    TABLE "azure_resources" CONSTRAINT "azure_resources_created_by_users_id_fk" FOREIGN KEY (created_by) REFERENCES users(id)
+    TABLE "azure_vms" CONSTRAINT "azure_vms_created_by_users_id_fk" FOREIGN KEY (created_by) REFERENCES users(id)
+    TABLE "entries" CONSTRAINT "entries_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "log_items" CONSTRAINT "log_items_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "network_layout_positions" CONSTRAINT "network_layout_positions_updated_by_users_id_fk" FOREIGN KEY (updated_by) REFERENCES users(id)
+    TABLE "processes" CONSTRAINT "processes_created_by_users_id_fk" FOREIGN KEY (created_by) REFERENCES users(id)
+:
