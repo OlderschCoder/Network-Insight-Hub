@@ -2120,6 +2120,14 @@ components:
       properties:
         status:
           type: string
+          enum: [ok, degraded]
+        breakGlass:
+          type: string
+          enum: [disabled, ok, failed]
+          description: >-
+            Status of the emergency break-glass login seeder. "failed" means the
+            feature is configured but the emergency CIO account could not be
+            created on boot, which forces the overall status to "degraded".
       required: [status]
 
     ErrorResponse:

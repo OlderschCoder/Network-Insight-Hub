@@ -11,7 +11,13 @@ import * as zod from "zod";
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  status: zod.string(),
+  status: zod.enum(["ok", "degraded"]),
+  breakGlass: zod
+    .enum(["disabled", "ok", "failed"])
+    .optional()
+    .describe(
+      'Status of the emergency break-glass login seeder. \"failed\" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to \"degraded\".',
+    ),
 });
 
 /**

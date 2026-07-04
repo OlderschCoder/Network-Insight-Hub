@@ -29,7 +29,17 @@ app.listen(port, (err) => {
   void seedAppUsageKnowledge();
   // Seed the break-glass account first (flags it), then strip local passwords
   // from every other account so legacy credentials can't bypass Entra SSO.
-  void seedBreakGlassAccount().then(() => stripNonBreakGlassPasswords());
+  // A failed break-glass seed does NOT crash the server (degraded-but-flagged:
+  // Entra SSO may still work); it is surfaced via a FATAL log banner and a
+  // "degraded" /api/healthz response. See seed_breakglass.ts for rationale.
+  void seedBreakGlassAccount().then((state) => {
+    if (state === "failed") {
+      logger.fatal(
+        "Break-glass emergency login is NOT available — see the banner above and /api/healthz",
+      );
+    }
+    return stripNonBreakGlassPasswords();
+  });
   // Periodically purge expired persistent sessions.
   startSessionCleanup();
 });

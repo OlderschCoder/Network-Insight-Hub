@@ -5,8 +5,30 @@
  * SCCC IT Department Reporting Platform API
  * OpenAPI spec version: 0.1.0
  */
+export type HealthStatusStatus =
+  (typeof HealthStatusStatus)[keyof typeof HealthStatusStatus];
+
+export const HealthStatusStatus = {
+  ok: "ok",
+  degraded: "degraded",
+} as const;
+
+/**
+ * Status of the emergency break-glass login seeder. "failed" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to "degraded".
+ */
+export type HealthStatusBreakGlass =
+  (typeof HealthStatusBreakGlass)[keyof typeof HealthStatusBreakGlass];
+
+export const HealthStatusBreakGlass = {
+  disabled: "disabled",
+  ok: "ok",
+  failed: "failed",
+} as const;
+
 export interface HealthStatus {
-  status: string;
+  status: HealthStatusStatus;
+  /** Status of the emergency break-glass login seeder. "failed" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to "degraded". */
+  breakGlass?: HealthStatusBreakGlass;
 }
 
 export interface ErrorResponse {
