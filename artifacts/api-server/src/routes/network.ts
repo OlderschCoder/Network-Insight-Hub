@@ -798,17 +798,33 @@ const layoutDeleteSchema = z.object({
   nodeIds: z.array(z.string().min(1)).optional(),
 });
 
-router.delete("/layout", requireAuth, requireCIO, async (req, res) => {
+router.delete("/layout", requireAuth, requireCIO, async (req: any, res) => {
   const parsed = layoutDeleteSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  // Don't let a delete land on top of another user's active arrangement.
+  const lock = await getLockStatus(req.user?.id ?? null);
+  if (lock.locked && !lock.heldByMe) {
+    return res.status(409).json({
+      error: "LAYOUT_LOCKED",
+      message: `${lock.lockedByName ?? "Another user"} is currently editing the diagram layout.`,
+      lock,
+    });
+  }
+
   if (parsed.data.nodeIds && parsed.data.nodeIds.length > 0) {
+    // Targeted removal of specific nodes (not a full wipe).
     await db
       .delete(networkLayoutPositionsTable)
       .where(inArray(networkLayoutPositionsTable.nodeId, parsed.data.nodeIds));
-  } else {
-    await db.delete(networkLayoutPositionsTable);
+    return res.json({ ok: true });
   }
-  return res.json({ ok: true });
+
+  // Full wipe must go through the governed reset path so it is snapshotted,
+  // recorded in the change log, and performed transactionally — never a raw
+  // unrecoverable delete.
+  const result = await resetLayout(reqActor(req));
+  return res.json({ ok: true, removed: result.removed, eventId: result.eventId });
 });
 
 // ---- Inventory health / data-quality report -------------------------------
