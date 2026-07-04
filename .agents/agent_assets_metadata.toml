@@ -18,3 +18,9 @@ id = "XNT8XNa7Ts8iv-zzYM_tF"
 uri = "file://exports/sccc_backup.sql.gz"
 type = "unspecified"
 title = "SCCC database dump (compressed, restore with gunzip | psql)"
+
+[[outputs]]
+id = "PgW-kvv9nxsCFq5yyKDcA"
+uri = "file://docs/azure-vm-deployment-runbook.md"
+type = "text"
+title = "SCCC IT Hub — Azure VM Deployment & Security Runbook"
