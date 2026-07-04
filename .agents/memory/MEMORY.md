@@ -6,3 +6,4 @@
 - [Azure VM sync quirks](azure-vm-sync.md) — no $expand=instanceView on subscription-wide VM list (use ?statusOnly=true); SP needs Reader RBAC even when auth succeeds.
 - [Self-hosted boot](self-hosted-boot.md) — never `new OpenAI()` at module scope (throws on missing key → crash-loop/502 on self-host); lazy accessor + isAIConfigured() 503 guards.
 - [Production seed data](prod-seed-data.md) — publish migrates schema only, NOT rows; dev-only seeds never reach prod. Self-seed reference data at app startup, idempotently.
+- [drizzle push non-interactive](drizzle-push-noninteractive.md) — push TUI can't be piped; --force still prompts on UNIQUE-over-existing-rows; reconcile DB drift via direct SQL instead.
