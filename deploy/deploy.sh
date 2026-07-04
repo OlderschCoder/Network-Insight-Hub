@@ -39,4 +39,4 @@ sleep 2
 sudo systemctl status sccc-api --no-pager -n 8 || true
 
 echo ">> Done. Tail logs with: sudo journalctl -u sccc-api -f"
-echo ">> NOTE: restarting resets in-memory sessions — users must sign in again."
+echo ">> Sessions are stored in the DB, so users stay signed in across this restart."
