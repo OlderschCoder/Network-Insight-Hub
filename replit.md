@@ -39,6 +39,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 
 ## DB Schema Tables
 
+- `sessions` — token (PK), userId (FK → users.id, ON DELETE CASCADE), createdAt, expiresAt. Persistent bearer-token store so logins survive restarts; ensured idempotently at boot.
 - `users` — id, name, email, passwordHash (nullable — SSO users have none), jobTitle, entraObjectId (unique), role (cio/helpdesk/network/security/network_engineer/security_engineer/staff), department, isActive, isBreakGlass (only break-glass accounts may use local password login)
 - `entries` — id, userId, category, title, description, accomplishments, challenges, supportNeeded, ticketCount, weekOf, entryDate, tags, isSubmitted (one weekly log per user per week, enforced by unique `(user_id, week_of)`; POST /api/entries upserts on this key)
 - `log_items` — id, userId, itemDate, weekOf, title, category, notes, weeklyEntryId (nullable). Standalone items added throughout the week; rolled into the weekly log when the user generates one. After saving a weekly log, all matching items for that user+week are stamped with `weekly_entry_id` so historical logs stay stable when items are later edited.
@@ -86,7 +87,7 @@ All routes under `/api/`:
 - **Role mapping** — default job-title-keyword → Hub-role map lives in `lib/entra.ts` (`mapEntraToHubRole`); override/extend via `ENTRA_ROLE_MAP_JSON` (JSON object of keyword-or-app-role → hub role). Applied only on first sign-in. CIO can still override any user's role on the Admin page.
 - **Access gate (fail closed)** — `ENTRA_ALLOWED_GROUP_IDS` (group object-ids, via the token `groups` claim) and/or `ENTRA_ALLOWED_APP_ROLES` (app-role values, via the `roles` claim); satisfying either allows entry. If **neither** is set, all SSO sign-ins are **denied** (an error is logged) — an IT membership gate is mandatory. `/auth/entra/status` reports `configured:false` unless both the OIDC client config and a gate value are set, so the login page won't offer a dead-end sign-in.
 - **Login CSRF protection** — `/auth/entra/login` sets an httpOnly, SameSite=Lax `entra_state` cookie (path `/api/auth/entra`, `secure` in production) bound to the random `state`; the callback rejects the response unless the returned `state` matches the cookie. Requires `cookie-parser` (registered in `app.ts`).
-- Bearer token sessions (in-memory Map — tokens reset on server restart)
+- Bearer token sessions are persisted in the `sessions` DB table (token PK, user_id FK cascade, created_at, expires_at) so logins survive an API-server restart/redeploy. Expired rows are swept lazily on read and by a periodic cleanup timer. On boot, `ensureSchema()` (`lib/ensure_schema.ts`) idempotently reconciles known self-hosted schema drift: `CREATE TABLE IF NOT EXISTS "sessions"` (+ indexes) and `ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL` (SSO users have no local password). `deploy/fix-login-schema.sql` applies the same fixes to an already-running instance without a rebuild.
 - `requireAuth` middleware, `requireCIO` for CIO-only routes
 
 ### Entra app-registration setup (operator note)

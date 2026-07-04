@@ -38,6 +38,22 @@ sudo systemctl restart sccc-api
 SRC=~/Network-Insight-Hub ./deploy/deploy.sh
 ```
 
+## Login fails right after "Sign in with Microsoft" (`relation "sessions" does not exist`)
+
+The production database is missing schema changes that exist in the code
+(the `sessions` table, and a nullable `users.password_hash`). Deploying the
+current code applies these automatically on service start. To fix an
+already-running instance immediately, without waiting for a rebuild:
+
+```bash
+psql "$DATABASE_URL" -f deploy/fix-login-schema.sql
+# or, if you administer Postgres locally:
+#   sudo -u postgres psql -d <db_name> -f deploy/fix-login-schema.sql
+sudo systemctl restart sccc-api
+```
+
+The script is idempotent — safe to run even if the schema is already correct.
+
 ## Verify / troubleshoot
 
 ```bash
