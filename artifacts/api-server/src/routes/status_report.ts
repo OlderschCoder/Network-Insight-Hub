@@ -18,7 +18,7 @@ const reports = reportsTable;
 const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
-import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture } from "../lib/ai_knowledge";
+import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture, getActiveRoster } from "../lib/ai_knowledge";
 import { getOpenAI, isAIConfigured } from "../lib/openai";
 
 const router = Router();
@@ -620,9 +620,11 @@ router.post(
       ]);
 
       const networkByBuilding = buildNetworkByBuilding(switchRows, vlanRows);
+      const teamRoster = await getActiveRoster();
 
       const context = {
         lookbackDays,
+        teamRoster,
         recentEntries: entriesData,
         risksAndIssues: risksData,
         afterActionReports: aarData,
@@ -659,6 +661,8 @@ Keep the link label short (e.g. the record's title). Only cite records that appe
 When answering questions about how to use or navigate the app (where a feature lives, how to reach a page), rely ONLY on the navigation and pages documented in the SCCC Environment Knowledge Base below. There IS a built-in "User Guide" page (in the "Systems & Tools" menu group, at /user-guide) with full step-by-step instructions — point users there for detailed how-to help, in addition to giving them the quick steps. Do NOT invent any other pages, menu items, or features that are not documented (there is no separate "Help" or "FAQ" page). If you are unsure where something is, say so instead of guessing.
 
 You can capture work directly into the user's records. When the user describes concrete work in the conversation — something they did, fixed, completed, or need to do — call the create_task tool to save it as an item in their personal "My Tasks" list for the current week. These items roll up into their weekly report automatically, so this is how their conversation turns into their report. Capture each distinct piece of work as its own task, and prefer capturing over asking. After saving, briefly confirm in plain language what you added (the app also shows them a toast with an Undo option). Do not use create_task for questions, hypotheticals, or durable environment facts.
+
+You can also DELEGATE work to teammates. When the user assigns or hands off work to someone else — e.g. "have Cecil check the SFP", "assign this to Jane", "add this to Mark's list", or describes work another team member is doing or should do — call create_task with the "assignee" set to that person's name or email from the team roster in the context. The task lands in that teammate's My Tasks (stamped with who assigned it), not the user's. Match the name against the roster; if it's ambiguous or you can't find them, ask the user which teammate they mean rather than guessing. Use critical thinking: not every task is for the person you're talking to — assign it to whoever is actually going to do the work.
 
 When (and ONLY when) you are assisting the CIO, you have a private "shadow memory" for reporting time. If, while reviewing the data, you notice something the CIO should weigh when writing the weekly executive report — a risk or red flag worth surfacing, a trend across the team's work, a metric to highlight, a follow-up, or framing/wording advice — call the save_shadow_note tool to stage it as a reviewable suggestion for the current week. These notes are shown to the CIO privately for review only; they never modify any report, entry, or deliverable, and they are never visible to other staff. Do not stage shadow notes for anyone who is not the CIO.
 

@@ -19,7 +19,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import type OpenAI from "openai";
 import { getOpenAI, isAIConfigured } from "../lib/openai";
-import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture } from "../lib/ai_knowledge";
+import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture, getActiveRoster } from "../lib/ai_knowledge";
 import {
   upsertSwitchByHostname,
   upsertVlanByVlanId,
@@ -634,6 +634,10 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
     }
 
     const knowledgeContext = await getKnowledgeContext();
+    const teamRoster = await getActiveRoster();
+    const rosterText = teamRoster.length
+      ? teamRoster.map((m) => `- ${m.name} (${m.email}) — ${m.role}`).join("\n")
+      : "(no active team members on file)";
 
     const authUser = (req as any).user;
     const identityLine = authUser
@@ -658,6 +662,11 @@ ${maintenanceText}
 You also have a persistent memory: the SCCC Environment Knowledge Base below contains institutional and environment-specific knowledge (network design guidance, FortiGate, wireless, Azure, identity, monitoring, procedures). Prefer it over generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
 ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
 You can keep the live network inventory current as you talk. When a network administrator reports a real change to a switch (added, replaced, moved to a different building/location, went online/offline, or an IP/model change) or a VLAN (a new VLAN, or a changed subnet/gateway/name/type), call upsert_switch or upsert_vlan so the switch and VLAN reference data stays accurate — match a switch by its hostname and a VLAN by its numeric id, and only send the fields that changed. Only do this for concrete changes the user actually states; never invent inventory. If the user lacks a network-admin role the update will be refused — tell them plainly. After a successful change, confirm what you updated.
+
+You can capture and delegate work as tasks. When the user describes concrete work they did or need to do, call create_task to add it to their "My Tasks" for the week. When they assign or hand work to a teammate — e.g. "have Cecil check the SFP", "assign this to Jane" — call create_task with "assignee" set to that person's name or email so it lands in that teammate's list (stamped with who assigned it). Use the team roster below to resolve names; if a name is ambiguous or not on the roster, ask which teammate they mean rather than guessing. Use critical thinking — assign each task to whoever is actually going to do the work, not automatically to the person you're chatting with.
+
+Active team members (for task assignment):
+${rosterText}
 
 Guidelines for your answers:
 - Be concise, technical, and direct — you are talking to other IT staff.

@@ -8,6 +8,7 @@
 - [Entra SSO on the VM](entra-sso-selfhosted.md) — group gate needs the Entra CLOUD Object Id (not on-prem AD/ADUC); on-prem groups need AD Connect sync else use App Role gate; legacy password_hash NOT NULL must be dropped for SSO.
 - [Production seed data](prod-seed-data.md) — publish migrates schema only, NOT rows; dev-only seeds never reach prod. Self-seed reference data at app startup, idempotently.
 - [drizzle push non-interactive](drizzle-push-noninteractive.md) — push TUI can't be piped; --force still prompts on UNIQUE-over-existing-rows; reconcile DB drift via direct SQL instead.
+- [AI chat tool gating](ai-chat-tool-gating.md) — CIO chat withholds create_task unless intent regex matches; prompt telling AI to use a gated tool → phantom narrated actions, empty createdTasks.
 - [Network diagram lock](network-layout-lock.md) — shared-layout edit lock must be enforced server-side on PUT /layout (409), UI advisory poll alone can't stop clobbering; reset = transactional snapshot+delete.
 - [AI weekly analysis scoping](ai-weekly-analysis-scoping.md) — "weekly" AI red-flags scope tasks/entries by week but risks/AARs/projects by open/active status, not week window.
 - [Schema-drift self-heal](schema-drift-selfheal.md) — self-hosted prod misses later schema changes; boot-time idempotent ensureSchema() DDL fixes it, but MUST await before listen/seeds or it races.

@@ -504,13 +504,21 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
         });
       }
       if (Array.isArray(data.createdTasks) && data.createdTasks.length > 0) {
-        const created = data.createdTasks as { id: number; title: string }[];
+        const created = data.createdTasks as { id: number; title: string; assigneeName?: string }[];
+        const assigned = created.filter((t) => t.assigneeName);
+        const title =
+          created.length === 1
+            ? created[0].assigneeName
+              ? `Assigned to ${created[0].assigneeName}`
+              : "Added to My Tasks"
+            : assigned.length > 0
+              ? `Added ${created.length} tasks (${assigned.length} delegated)`
+              : `Added ${created.length} items to My Tasks`;
         toast({
-          title:
-            created.length === 1
-              ? "Added to My Tasks"
-              : `Added ${created.length} items to My Tasks`,
-          description: created.map((t) => t.title).join("; "),
+          title,
+          description: created
+            .map((t) => (t.assigneeName ? `${t.title} → ${t.assigneeName}` : t.title))
+            .join("; "),
           action: (
             <ToastAction altText="Undo" onClick={() => undoCreatedTasks(created.map((t) => t.id))}>
               Undo

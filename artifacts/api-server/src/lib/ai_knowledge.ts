@@ -1,5 +1,5 @@
 import type OpenAI from "openai";
-import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable } from "@workspace/db";
+import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { logger } from "./logger";
 import {
@@ -166,7 +166,7 @@ export const CREATE_TASK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   function: {
     name: "create_task",
     description:
-      "Record a piece of work the user did or needs to do as an item in THEIR personal 'My Tasks' list for the current week. These items roll up into their weekly report automatically. Call this whenever the user describes concrete work in the conversation — an accomplishment, a completed action, a fix, or a to-do — capturing each distinct item as its own task. Prefer capturing over asking: if the user mentions doing or planning real work, save it. Do NOT use this for durable environment facts (use save_memory instead), for questions, or for hypotheticals.",
+      "Record a piece of work as an item in someone's 'My Tasks' list for the current week. By default the task goes to the signed-in user, and these items roll up into their weekly report automatically. To DELEGATE or ASSIGN the work to a specific teammate instead — e.g. the user says 'have Cecil look at the SFP issue', 'assign this to Jane', or 'add this to Mark's list' — pass that person's name or email in `assignee`; the task is added to THAT person's My Tasks and stamped with who assigned it. Use the team roster in the context to pick the right person; if the name is ambiguous or unknown, ask the user which teammate they mean instead of guessing. Call this whenever the user describes concrete work (an accomplishment, a completed action, a fix, or a to-do), capturing each distinct item as its own task, and prefer capturing over asking. Do NOT use this for durable environment facts (use save_memory instead), for questions, or for hypotheticals.",
     parameters: {
       type: "object",
       properties: {
@@ -179,6 +179,11 @@ export const CREATE_TASK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           type: "string",
           description: "Optional extra detail or context for the task.",
         },
+        assignee: {
+          type: "string",
+          description:
+            "Optional. The name or email of the teammate this task should be assigned to, when it belongs to someone other than the signed-in user. Omit to add it to the signed-in user's own list. Must match a person in the team roster provided in the context.",
+        },
       },
       required: ["title"],
     },
@@ -188,15 +193,85 @@ export const CREATE_TASK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 export interface CreatedTask {
   id: number;
   title: string;
+  /** Present only when the task was assigned to someone other than the signed-in user. */
+  assigneeName?: string;
+}
+
+export interface RosterMember {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
+
+/**
+ * Active team members the AI can assign tasks to. No credentials — id, name,
+ * email, and role only. Used both to inject a roster into the chat context and
+ * to resolve an `assignee` string in the create_task tool.
+ */
+export async function getActiveRoster(): Promise<RosterMember[]> {
+  const rows = await db
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.isActive, true))
+    .orderBy(asc(usersTable.name));
+  return rows;
+}
+
+/**
+ * Resolve a free-text assignee (name or email) against the active roster.
+ * Returns the single matching member, or a disambiguation/no-match error
+ * message for the AI to relay.
+ */
+function resolveAssignee(
+  query: string,
+  roster: RosterMember[],
+): { member: RosterMember | null; error?: string } {
+  const q = query.trim().toLowerCase();
+  if (!q) return { member: null, error: "no assignee provided" };
+
+  const rosterList = roster.map((m) => `${m.name} (${m.email})`).join(", ") || "(none)";
+
+  const exact = roster.filter(
+    (m) => m.email.toLowerCase() === q || m.name.toLowerCase() === q,
+  );
+  const pool = exact.length > 0 ? exact : roster.filter((m) => {
+    const name = m.name.toLowerCase();
+    const emailLocal = m.email.toLowerCase().split("@")[0];
+    return (
+      name.includes(q) ||
+      q.includes(name) ||
+      name.split(/\s+/).some((part) => part === q) ||
+      emailLocal === q ||
+      m.email.toLowerCase().startsWith(q)
+    );
+  });
+
+  if (pool.length === 0) {
+    return {
+      member: null,
+      error: `no team member matches "${query}". Active team members: ${rosterList}. Ask the user which one they mean.`,
+    };
+  }
+  if (pool.length > 1) {
+    const names = pool.map((m) => `${m.name} (${m.email})`).join(", ");
+    return {
+      member: null,
+      error: `"${query}" is ambiguous — it could be: ${names}. Ask the user which one they mean.`,
+    };
+  }
+  return { member: pool[0] };
 }
 
 async function executeCreateTask(
   rawArgs: string,
-  userId: number | null,
+  actor: { id: number | null; name: string | null; role: string | null },
 ): Promise<{ result: string; created: CreatedTask | null }> {
-  if (userId == null) {
-    return { result: "Error: cannot create a task without a signed-in user", created: null };
-  }
   let args: any;
   try {
     args = JSON.parse(rawArgs);
@@ -207,20 +282,57 @@ async function executeCreateTask(
   if (!title) {
     return { result: "Error: title is required", created: null };
   }
-  const notes = typeof args?.notes === "string" && args.notes.trim() ? args.notes.trim() : undefined;
+  let notes = typeof args?.notes === "string" && args.notes.trim() ? args.notes.trim() : undefined;
+
+  const assigneeArg = typeof args?.assignee === "string" ? args.assignee.trim() : "";
+
+  let targetUserId = actor.id;
+  let targetName: string | null = actor.name;
+  let crossAssign = false;
+
+  if (assigneeArg) {
+    const roster = await getActiveRoster();
+    const { member, error } = resolveAssignee(assigneeArg, roster);
+    if (!member) {
+      return { result: `Could not assign the task: ${error}`, created: null };
+    }
+    targetUserId = member.id;
+    targetName = member.name;
+    crossAssign = actor.id == null || member.id !== actor.id;
+  }
+
+  if (targetUserId == null) {
+    return { result: "Error: cannot create a task without a signed-in user", created: null };
+  }
+
+  // Stamp attribution when delegating to someone other than the signed-in user,
+  // so the assignee (and any report) shows who asked for the work.
+  if (crossAssign && actor.name) {
+    const attribution = `Assigned by ${actor.name} via the AI assistant.`;
+    notes = notes ? `${notes}\n\n${attribution}` : attribution;
+  }
 
   const itemDate = todayInCentral();
   const weekOf = isoWeekStart(itemDate);
 
   const [row] = await db
     .insert(logItemsTable)
-    .values({ userId, title, category: "task", notes, itemDate, weekOf })
+    .values({ userId: targetUserId, title, category: "task", notes, itemDate, weekOf })
     .returning();
 
-  logger.info({ id: row.id, userId, title }, "AI created a task (log item) from chat");
+  logger.info(
+    { id: row.id, targetUserId, assignedBy: actor.id, crossAssign, title },
+    "AI created a task (log item) from chat",
+  );
+
+  const forWhom = crossAssign && targetName ? `${targetName}'s My Tasks` : "the user's My Tasks";
   return {
-    result: `Created task "${row.title}" in the user's My Tasks for the week of ${weekOf} (id ${row.id}).`,
-    created: { id: row.id, title: row.title },
+    result: `Created task "${row.title}" in ${forWhom} for the week of ${weekOf} (id ${row.id}).`,
+    created: {
+      id: row.id,
+      title: row.title,
+      ...(crossAssign && targetName ? { assigneeName: targetName } : {}),
+    },
   };
 }
 
@@ -439,11 +551,20 @@ async function executeUpsertVlan(rawArgs: string, ctx: InventoryToolCtx): Promis
 }
 
 // Explicit capture intent — used to let the CIO opt into task capture on a
-// per-message basis (their chat is otherwise non-capturing by default).
+// per-message basis (their chat is otherwise non-capturing by default). This
+// also covers delegation: the CIO frequently assigns work to teammates, so
+// delegation phrasing ("assign to Jane", "have Cecil …") must open the
+// create_task tool even when the message never says the word "task".
 const CAPTURE_INTENT_PATTERNS: RegExp[] = [
   /\b(add|create|save|capture|log|record|track|make)\b[^.]*\b(task|to-?do|item|note this|reminder)\b/i,
   /\b(add|save|capture|log|put)\b[^.]*\bto (my )?(tasks|to-?do|list|report)\b/i,
   /\b(remember to|make a task|create a task|add a task|log this|capture this|track this)\b/i,
+  // Delegation intent (assign/hand work to a teammate).
+  /\b(assign|delegate|reassign)\b/i,
+  /\b(hand (this |it )?off|hand (this|it) to|give (this|it|the task) to)\b/i,
+  // "Have/Ask/Get/Tell <Name> …" — verb may be capitalized (sentence start),
+  // but require a capitalized name after it so "have to …" doesn't match.
+  /\b(?:[Hh]ave|[Aa]sk|[Gg]et|[Tt]ell)\s+[A-Z][a-z]+/,
 ];
 
 /**
@@ -545,7 +666,11 @@ export async function runChatWithMemory(
         }
       } else if (call.type === "function" && call.function.name === "create_task") {
         try {
-          const { result, created } = await executeCreateTask(call.function.arguments, opts.userId);
+          const { result, created } = await executeCreateTask(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName ?? null,
+            role: userRole,
+          });
           resultText = result;
           if (created) createdTasks.push(created);
         } catch (err) {
