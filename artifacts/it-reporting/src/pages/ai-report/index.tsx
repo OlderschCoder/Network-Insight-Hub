@@ -348,11 +348,60 @@ function pageHintFromPath(path: string): string | null {
 
 function ChatTab({ contextHint }: { contextHint?: string | null }) {
   const { toast } = useToast();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { user } = useAuth();
+  const storageKey = user?.id ? `ai_chat_history_${user.id}` : null;
+  // Chat history is tagged with the storage key it belongs to. During a user
+  // switch (before the load effect re-runs) `messages` falls back to empty, so
+  // the previous user's transcript is never rendered or persisted under the new
+  // user's key.
+  const [chat, setChat] = useState<{ key: string | null; messages: ChatMessage[] }>({
+    key: null,
+    messages: [],
+  });
+  const messages = chat.key === storageKey ? chat.messages : [];
+  const setMessages = (
+    updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+  ) => {
+    setChat((prev) => {
+      const base = prev.key === storageKey ? prev.messages : [];
+      const next = typeof updater === "function" ? updater(base) : updater;
+      return { key: storageKey, messages: next };
+    });
+  };
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load persisted chat history when the signed-in user (storage key) is known,
+  // so the conversation survives navigating away and page reloads. Keying the
+  // transcript by user id also prevents bleed between users on a shared browser.
+  useEffect(() => {
+    if (!storageKey) return;
+    let loaded: ChatMessage[] = [];
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) loaded = JSON.parse(raw);
+    } catch {
+      loaded = [];
+    }
+    setChat({ key: storageKey, messages: loaded });
+  }, [storageKey]);
+
+  // Persist only once the in-memory transcript belongs to the current key, so a
+  // user switch can't write the previous user's messages under the new key.
+  useEffect(() => {
+    if (!storageKey || chat.key !== storageKey) return;
+    try {
+      if (chat.messages.length > 0) {
+        localStorage.setItem(storageKey, JSON.stringify(chat.messages));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {
+      /* ignore storage quota errors */
+    }
+  }, [chat, storageKey]);
 
   useEffect(() => {
     if (contextHint && !input) {

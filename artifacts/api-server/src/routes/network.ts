@@ -524,7 +524,12 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
 
     const knowledgeContext = await getKnowledgeContext();
 
-    const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.
+    const authUser = (req as any).user;
+    const identityLine = authUser
+      ? `\n\nYou are advising ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — role "${authUser.role}"${authUser.jobTitle ? `, ${authUser.jobTitle}` : ""}. You already know who they are; address them by name when natural and attribute their reports to them.`
+      : "";
+
+    const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.${identityLine}
 
 You have direct knowledge of the SCCC campus map (provided as an image in the first user turn). Key context:
 - Main campus is laid out around Circle Drive. The Hobble Academic Building (codes A and AA) houses IT and the network core.
