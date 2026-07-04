@@ -56,7 +56,7 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
   const updates: any = { ...parsed.data, updatedAt: new Date() };
 
   if (isCIO && (parsed.data as { isActive?: boolean }).isActive === false) {
-    invalidateUserSessions(id);
+    await invalidateUserSessions(id);
   }
 
   const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();

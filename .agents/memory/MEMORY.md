@@ -8,3 +8,5 @@
 - [Entra SSO on the VM](entra-sso-selfhosted.md) — group gate needs the Entra CLOUD Object Id (not on-prem AD/ADUC); on-prem groups need AD Connect sync else use App Role gate; legacy password_hash NOT NULL must be dropped for SSO.
 - [Production seed data](prod-seed-data.md) — publish migrates schema only, NOT rows; dev-only seeds never reach prod. Self-seed reference data at app startup, idempotently.
 - [drizzle push non-interactive](drizzle-push-noninteractive.md) — push TUI can't be piped; --force still prompts on UNIQUE-over-existing-rows; reconcile DB drift via direct SQL instead.
+- [Persistent sessions](persistent-sessions.md) — bearer tokens live in the `sessions` DB table (survive restarts); auth helpers are async; SSO PKCE/exchange stays in-memory by design.
+- [Dev DB schema drift](dev-db-schema-drift.md) — dev Postgres drifts from schema; `db push` prompts interactively & can't be piped; reconcile with direct idempotent SQL.

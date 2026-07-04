@@ -1,4 +1,5 @@
 export * from "./users";
+export * from "./sessions";
 export * from "./entries";
 export * from "./log_items";
 export * from "./reports";

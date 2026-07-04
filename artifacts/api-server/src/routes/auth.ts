@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { and, eq, gt } from "drizzle-orm";
+import { db, usersTable, sessionsTable } from "@workspace/db";
+import { and, eq, gt, lt } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { z } from "zod";
@@ -20,12 +20,21 @@ import {
 
 const router = Router();
 
-const sessions = new Map<string, number>();
+// Bearer-token sessions are persisted in the `sessions` DB table so they survive
+// an API-server restart or redeploy (an in-memory Map would silently log every
+// user out on each boot). Tokens are given a sliding TTL and expired rows are
+// swept lazily on read plus by a periodic cleanup below.
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-function createToken(userId: number): string {
+async function createToken(userId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  sessions.set(token, userId);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  await db.insert(sessionsTable).values({ token, userId, expiresAt });
   return token;
+}
+
+async function deleteToken(token: string): Promise<void> {
+  await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
 }
 
 // ---- Entra SSO transient state ---------------------------------------------
@@ -46,16 +55,43 @@ function sweepExpired() {
   for (const [k, v] of exchangeCodes) if (now - v.createdAt > EXCHANGE_TTL_MS) exchangeCodes.delete(k);
 }
 
-export function getUserIdFromToken(token: string): number | null {
-  return sessions.get(token) ?? null;
+// Purge expired session rows. Called opportunistically on session lookups and
+// on a periodic timer so the table doesn't grow unbounded with dead tokens.
+async function sweepExpiredSessions(): Promise<void> {
+  try {
+    await db.delete(sessionsTable).where(lt(sessionsTable.expiresAt, new Date()));
+  } catch {
+    // Cleanup is best-effort; a transient DB hiccup must not break auth.
+  }
 }
 
-export function invalidateUserSessions(userId: number): void {
-  for (const [token, uid] of sessions.entries()) {
-    if (uid === userId) {
-      sessions.delete(token);
-    }
+// Resolve a bearer token to its user id, treating an expired row as absent
+// (and clearing it). Returns null for unknown/expired tokens.
+export async function getUserIdFromToken(token: string): Promise<number | null> {
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(eq(sessionsTable.token, token));
+  if (!session) return null;
+  if (session.expiresAt.getTime() <= Date.now()) {
+    await deleteToken(token);
+    return null;
   }
+  return session.userId;
+}
+
+export async function invalidateUserSessions(userId: number): Promise<void> {
+  await db.delete(sessionsTable).where(eq(sessionsTable.userId, userId));
+}
+
+// Periodically purge expired sessions. Safe to call once at boot; the timer is
+// unref'd so it never keeps the process alive on its own.
+let sessionCleanupTimer: NodeJS.Timeout | null = null;
+export function startSessionCleanup(intervalMs = 60 * 60 * 1000): void {
+  if (sessionCleanupTimer) return;
+  void sweepExpiredSessions();
+  sessionCleanupTimer = setInterval(() => void sweepExpiredSessions(), intervalMs);
+  sessionCleanupTimer.unref?.();
 }
 
 export async function requireAuth(req: any, res: any, next: any) {
@@ -64,16 +100,17 @@ export async function requireAuth(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   const token = authHeader.slice(7);
-  const userId = getUserIdFromToken(token);
+  const userId = await getUserIdFromToken(token);
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) {
+    await deleteToken(token);
     return res.status(401).json({ error: "Unauthorized" });
   }
   if (!user.isActive) {
-    sessions.delete(token);
+    await deleteToken(token);
     return res.status(401).json({ error: "Account is deactivated" });
   }
   req.user = user;
@@ -134,7 +171,7 @@ router.post("/login", async (req, res) => {
   if (!user.isActive) {
     return res.status(401).json({ error: "Account is deactivated" });
   }
-  const token = createToken(user.id);
+  const token = await createToken(user.id);
   return res.json({ user: formatUser(user), token });
 });
 
@@ -276,7 +313,7 @@ router.get("/entra/callback", async (req: any, res) => {
 
     // Mint the bearer token now, hand it to the SPA via a short-lived one-time
     // code (never the token itself in the URL).
-    const token = createToken(user.id);
+    const token = await createToken(user.id);
     const oneTime = crypto.randomBytes(24).toString("base64url");
     exchangeCodes.set(oneTime, { userId: user.id, token, createdAt: Date.now() });
     return res.redirect(`${loginUrl}?entra_code=${encodeURIComponent(oneTime)}`);
@@ -301,7 +338,7 @@ router.post("/entra/exchange", async (req, res) => {
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, entry.userId));
   if (!user || !user.isActive) {
-    sessions.delete(entry.token);
+    await deleteToken(entry.token);
     return res.status(401).json({ error: "Account is unavailable" });
   }
   return res.json({ user: formatUser(user), token: entry.token });
@@ -310,7 +347,7 @@ router.post("/entra/exchange", async (req, res) => {
 router.post("/logout", requireAuth, async (req: any, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
-    sessions.delete(authHeader.slice(7));
+    await deleteToken(authHeader.slice(7));
   }
   return res.json({ success: true });
 });
