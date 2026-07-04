@@ -101,4 +101,37 @@ export async function ensureSchema(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Failed to ensure inventory_audit table");
   }
+
+  // 5) Network-diagram layout governance: a change log (with position snapshots)
+  //    for shared-layout resets/restores, and a singleton advisory edit lock.
+  //    New tables added after initial self-hosted setup. Mirrors
+  //    lib/db/src/schema/network_governance.ts.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "network_layout_events" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "action" varchar(20) NOT NULL,
+        "actor_id" integer,
+        "actor_name" varchar(255),
+        "node_count" integer DEFAULT 0 NOT NULL,
+        "snapshot" jsonb DEFAULT '[]'::jsonb NOT NULL,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      )
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "network_layout_events_created_at_idx" ON "network_layout_events" ("created_at")`,
+    );
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "network_layout_lock" (
+        "id" integer PRIMARY KEY NOT NULL,
+        "locked_by_id" integer,
+        "locked_by_name" varchar(255),
+        "acquired_at" timestamp DEFAULT now() NOT NULL,
+        "expires_at" timestamp NOT NULL
+      )
+    `);
+    logger.info("Ensured network layout governance tables exist");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure network layout governance tables");
+  }
 }

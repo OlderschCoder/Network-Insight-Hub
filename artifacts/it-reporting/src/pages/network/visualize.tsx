@@ -22,6 +22,8 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 import { RotateCcw } from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +45,9 @@ import {
   Building2,
   Download,
   Cloud,
+  Lock,
+  History,
+  Undo2,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -51,6 +56,32 @@ const statusFill: Record<string, string> = {
   offline: "#ef4444",
   unknown: "#64748b",
 };
+
+function apiBase() {
+  return `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
+}
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("auth_token");
+  return token
+    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" };
+}
+
+interface LayoutLockStatus {
+  locked: boolean;
+  lockedById: number | null;
+  lockedByName: string | null;
+  expiresAt: string | null;
+  heldByMe: boolean;
+}
+interface LayoutEvent {
+  id: number;
+  action: string;
+  actorId: number | null;
+  actorName: string | null;
+  nodeCount: number;
+  createdAt: string;
+}
 
 export default function NetworkVisualize() {
   const confirm = useConfirm();
@@ -722,6 +753,54 @@ export default function NetworkVisualize() {
   const { toast } = useToast();
   const { data: savedLayout = [], refetch: refetchLayout } = useGetNetworkLayout();
   const saveLayoutMutation = useSaveNetworkLayout();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isCIO = user?.role === "cio";
+
+  // ---- Shared-layout edit lock -------------------------------------------
+  // A short-TTL advisory lock warns when someone else is already rearranging
+  // the shared diagram, and disables dragging so their work isn't clobbered.
+  const [lock, setLock] = useState<LayoutLockStatus | null>(null);
+  const lockedByOther = !!(lock?.locked && !lock.heldByMe);
+
+  const refreshLock = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase()}/network/layout/lock`, { headers: authHeaders() });
+      if (res.ok) setLock(await res.json());
+    } catch {
+      /* transient — keep last known lock state */
+    }
+  }, []);
+
+  const acquireLock = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase()}/network/layout/lock`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const body = await res.json().catch(() => null);
+      if (body) setLock(body);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Poll the lock while the diagram is open; release it on unmount.
+  useEffect(() => {
+    refreshLock();
+    const t = setInterval(refreshLock, 20_000);
+    return () => {
+      clearInterval(t);
+      // Best-effort release so the next editor isn't blocked by our stale lock.
+      fetch(`${apiBase()}/network/layout/lock`, {
+        method: "DELETE",
+        headers: authHeaders(),
+        keepalive: true,
+      }).catch(() => {});
+    };
+  }, [refreshLock]);
+
   const clearLayoutMutation = useClearNetworkLayout();
 
   const savedById = useMemo(() => {
@@ -768,8 +847,28 @@ export default function NetworkVisualize() {
   // Persist the dragged node's position. React Flow gives us the node in the
   // *parent's* coordinate space when it has parentNode, which matches what we
   // store and re-apply.
+  // Grab the edit lock as soon as the user starts dragging so concurrent
+  // editors are warned off before they clobber each other.
+  const handleNodeDragStart = useCallback<NodeDragHandler>(() => {
+    void acquireLock();
+  }, [acquireLock]);
+
   const handleNodeDragStop = useCallback<NodeDragHandler>(
-    (_evt, node) => {
+    async (_evt, node) => {
+      // Refresh/confirm the lock before persisting (heartbeat while editing).
+      // If another editor holds it, don't save — the server would reject the
+      // write anyway (409), so warn and re-sync the lock banner instead.
+      const held = await acquireLock();
+      if (!held) {
+        await refreshLock();
+        toast({
+          title: "Someone else is editing",
+          description: "Your move wasn't saved because another user holds the layout lock.",
+          variant: "destructive",
+        });
+        await refetchLayout();
+        return;
+      }
       const w =
         typeof node.style?.width === "number" ? (node.style.width as number) : undefined;
       const h =
@@ -790,29 +889,58 @@ export default function NetworkVisualize() {
         },
         {
           onError: (err: any) => {
+            const locked = err?.status === 409 || /LAYOUT_LOCKED/.test(String(err?.message));
+            void refreshLock();
             toast({
-              title: "Couldn't save layout",
-              description: err?.message ?? "Try again in a moment.",
+              title: locked ? "Someone else is editing" : "Couldn't save layout",
+              description: locked
+                ? "Your move wasn't saved — another user holds the layout lock."
+                : err?.message ?? "Try again in a moment.",
               variant: "destructive",
             });
           },
         },
       );
     },
-    [saveLayoutMutation, toast],
+    [acquireLock, refreshLock, refetchLayout, saveLayoutMutation, toast],
   );
+
+  // Reset/restore change log (CIO-governed). Snapshots let a reset be undone.
+  const { data: layoutEvents = [], refetch: refetchEvents } = useQuery<LayoutEvent[]>({
+    queryKey: ["network", "layout-events"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase()}/network/layout/events?limit=25`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    enabled: isCIO,
+  });
 
   const handleResetLayout = useCallback(async () => {
     if (!(await confirm({
       title: "Reset the diagram?",
-      description: "Restores the automatic layout. This affects everyone viewing the diagram.",
+      description:
+        "Restores the automatic layout for everyone. The current arrangement is snapshotted to the layout history so you can restore it later.",
       confirmText: "Reset",
       destructive: true,
     }))) return;
     try {
-      await clearLayoutMutation.mutateAsync({ data: {} });
+      const res = await fetch(`${apiBase()}/network/layout/reset`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ confirm: true }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
       await refetchLayout();
-      toast({ title: "Layout reset", description: "Auto-layout restored." });
+      await refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ["network", "layout-events"] });
+      toast({
+        title: "Layout reset",
+        description: `Auto-layout restored (${body?.removed ?? 0} positions saved to history).`,
+      });
     } catch (err: any) {
       toast({
         title: "Reset failed",
@@ -820,7 +948,37 @@ export default function NetworkVisualize() {
         variant: "destructive",
       });
     }
-  }, [clearLayoutMutation, refetchLayout, toast]);
+  }, [confirm, refetchLayout, refetchEvents, queryClient, toast]);
+
+  const handleRestoreLayout = useCallback(
+    async (ev: LayoutEvent) => {
+      if (!(await confirm({
+        title: "Restore this layout?",
+        description: `Re-applies ${ev.nodeCount} saved position(s) from ${new Date(
+          ev.createdAt,
+        ).toLocaleString()}. This affects everyone viewing the diagram.`,
+        confirmText: "Restore",
+      }))) return;
+      try {
+        const res = await fetch(`${apiBase()}/network/layout/events/${ev.id}/restore`, {
+          method: "POST",
+          headers: authHeaders(),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        await refetchLayout();
+        await refetchEvents();
+        toast({ title: "Layout restored", description: `${body?.restored ?? 0} positions re-applied.` });
+      } catch (err: any) {
+        toast({
+          title: "Restore failed",
+          description: err?.message ?? "Try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [confirm, refetchLayout, refetchEvents, toast],
+  );
 
   const totalSelected = selectedSwitchIds.size + selectedVlanIds.size + selectedVmIds.size;
 
@@ -1232,6 +1390,55 @@ export default function NetworkVisualize() {
               )}
             </CardTitle>
             <div className="flex items-center gap-2">
+              {lockedByOther && (
+                <Badge variant="destructive" className="text-[10px] font-normal gap-1">
+                  <Lock className="h-3 w-3" />
+                  {lock?.lockedByName ?? "Someone"} is editing
+                </Badge>
+              )}
+              {isCIO && (
+                <DropdownMenu onOpenChange={(o) => o && refetchEvents()}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                      <History className="h-3 w-3" /> Layout history
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80">
+                    {layoutEvents.length === 0 ? (
+                      <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                        No reset or restore history yet.
+                      </div>
+                    ) : (
+                      layoutEvents.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium capitalize">
+                              {ev.action} · {ev.nodeCount} node(s)
+                            </div>
+                            <div className="text-muted-foreground truncate">
+                              {ev.actorName ?? "Unknown"} ·{" "}
+                              {new Date(ev.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                          {ev.nodeCount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1 shrink-0"
+                              onClick={() => handleRestoreLayout(ev)}
+                            >
+                              <Undo2 className="h-3 w-3" /> Restore
+                            </Button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1279,7 +1486,9 @@ export default function NetworkVisualize() {
                   edges={edges}
                   onNodesChange={onNodesChange}
                   onEdgesChange={onEdgesChange}
+                  onNodeDragStart={handleNodeDragStart}
                   onNodeDragStop={handleNodeDragStop}
+                  nodesDraggable={!lockedByOther}
                   fitView
                   fitViewOptions={{ padding: 0.2 }}
                   minZoom={0.2}

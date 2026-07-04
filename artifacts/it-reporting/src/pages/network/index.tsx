@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Server, Network as NetworkIcon, Workflow, Building2,
   Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
-  Activity, Wrench, Save, Pencil, Trash2, X, History, Download, FileDown,
+  Activity, Wrench, Save, Pencil, Trash2, X, History, Download, FileDown, ShieldCheck,
 } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InventoryHistory } from "./inventory-history";
+import { InventoryHealth } from "./inventory-health";
 import {
   PendingInventoryChanges,
   type PendingNetworkChange,
@@ -1679,6 +1680,11 @@ export default function Network() {
             <NetworkIcon className="h-4 w-4 mr-2" /> VLANs ({allVlans.length})
           </TabsTrigger>
           {isNetworkAdmin && (
+            <TabsTrigger value="health">
+              <ShieldCheck className="h-4 w-4 mr-2" /> Health
+            </TabsTrigger>
+          )}
+          {isNetworkAdmin && (
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-2" /> History
             </TabsTrigger>
@@ -1785,6 +1791,12 @@ export default function Network() {
             </div>
           )}
         </TabsContent>
+
+        {isNetworkAdmin && (
+          <TabsContent value="health" className="mt-4">
+            <InventoryHealth />
+          </TabsContent>
+        )}
 
         {isNetworkAdmin && (
           <TabsContent value="history" className="mt-4">

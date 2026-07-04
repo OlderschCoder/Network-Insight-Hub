@@ -31,6 +31,15 @@ import {
   VLAN_AUDIT_FIELDS,
   type InventoryActor,
 } from "../lib/inventory";
+import { buildInventoryHealth } from "../lib/inventory_health";
+import {
+  getLockStatus,
+  acquireLock,
+  releaseLock,
+  resetLayout,
+  listLayoutEvents,
+  restoreLayout,
+} from "../lib/layout_governance";
 import fs from "fs";
 import path from "path";
 
@@ -745,6 +754,19 @@ router.put("/layout", requireAuth, async (req: any, res) => {
   const userId = req.user?.id ?? null;
   const now = new Date();
 
+  // Honor the advisory edit lock server-side: if another user is actively
+  // editing the shared diagram, reject the write so their arrangement isn't
+  // clobbered. The client acquires the lock on drag; a stale poll can't slip
+  // a conflicting save past this check.
+  const lock = await getLockStatus(userId, now);
+  if (lock.locked && !lock.heldByMe) {
+    return res.status(409).json({
+      error: "LAYOUT_LOCKED",
+      message: `${lock.lockedByName ?? "Another user"} is currently editing the diagram layout.`,
+      lock,
+    });
+  }
+
   const values = parsed.data.positions.map((p) => ({
     nodeId: p.nodeId,
     x: p.x,
@@ -787,6 +809,79 @@ router.delete("/layout", requireAuth, requireCIO, async (req, res) => {
     await db.delete(networkLayoutPositionsTable);
   }
   return res.json({ ok: true });
+});
+
+// ---- Inventory health / data-quality report -------------------------------
+
+const DEFAULT_STALE_DAYS = (() => {
+  const raw = parseInt(process.env.INVENTORY_STALE_DAYS ?? "", 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 30;
+})();
+
+router.get("/inventory/health", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const q = parseInt(String(req.query.staleDays ?? ""), 10);
+  const staleDays = Number.isFinite(q) && q > 0 && q <= 3650 ? q : DEFAULT_STALE_DAYS;
+  try {
+    const switches = await db.select().from(networkSwitchesTable);
+    const vlans = await db.select().from(vlansTable);
+    const report = buildInventoryHealth(switches, vlans, { staleDays });
+    return res.json(report);
+  } catch (err: any) {
+    req.log?.error({ err }, "inventory health failed");
+    return res.status(500).json({ error: err?.message || "Failed to build inventory health report" });
+  }
+});
+
+// ---- Shared-layout governance: advisory edit lock + reset change log -------
+
+router.get("/layout/lock", requireAuth, async (req: any, res) => {
+  const status = await getLockStatus(req.user?.id ?? null);
+  return res.json(status);
+});
+
+router.post("/layout/lock", requireAuth, async (req: any, res) => {
+  const result = await acquireLock(reqActor(req));
+  if (!result.ok) return res.status(409).json(result.status);
+  return res.json(result.status);
+});
+
+router.delete("/layout/lock", requireAuth, async (req: any, res) => {
+  await releaseLock(reqActor(req));
+  return res.json({ ok: true });
+});
+
+router.get("/layout/events", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "50"), 10) || 50, 1), 200);
+  const rows = await listLayoutEvents(limit);
+  return res.json(
+    rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      actorId: r.actorId,
+      actorName: r.actorName,
+      nodeCount: r.nodeCount,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  );
+});
+
+const layoutResetSchema = z.object({ confirm: z.literal(true) });
+
+router.post("/layout/reset", requireAuth, requireCIO, async (req: any, res) => {
+  const parsed = layoutResetSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Reset must be explicitly confirmed." });
+  }
+  const result = await resetLayout(reqActor(req));
+  return res.json({ ok: true, ...result });
+});
+
+router.post("/layout/events/:id/restore", requireAuth, requireCIO, async (req: any, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const result = await restoreLayout(id, reqActor(req));
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  return res.json({ ok: true, restored: result.restored });
 });
 
 export default router;
