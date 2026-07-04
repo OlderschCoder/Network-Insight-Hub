@@ -546,6 +546,8 @@ ${maintenanceText}
 
 You also have a persistent memory: the SCCC Environment Knowledge Base below contains institutional and environment-specific knowledge (network design guidance, FortiGate, wireless, Azure, identity, monitoring, procedures). Prefer it over generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
 ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
+You can keep the live network inventory current as you talk. When a network administrator reports a real change to a switch (added, replaced, moved to a different building/location, went online/offline, or an IP/model change) or a VLAN (a new VLAN, or a changed subnet/gateway/name/type), call upsert_switch or upsert_vlan so the switch and VLAN reference data stays accurate — match a switch by its hostname and a VLAN by its numeric id, and only send the fields that changed. Only do this for concrete changes the user actually states; never invent inventory. If the user lacks a network-admin role the update will be refused — tell them plainly. After a successful change, confirm what you updated.
+
 Guidelines for your answers:
 - Be concise, technical, and direct — you are talking to other IT staff.
 - When asked about a building, look it up in the inventory above and identify the building's switches, VLANs, and likely uplink path back to the AA144 Nexus pair.
@@ -573,7 +575,7 @@ Guidelines for your answers:
       userMessages.push({ role: m.role, content: m.content });
     }
 
-    const { reply: rawReply, savedMemories } = await runChatWithMemory(getOpenAI(), {
+    const { reply: rawReply, savedMemories, createdTasks, networkUpdates } = await runChatWithMemory(getOpenAI(), {
       model: "gpt-5.2",
       maxCompletionTokens: 2048,
       messages: [
@@ -581,10 +583,11 @@ Guidelines for your answers:
         ...userMessages,
       ],
       userId: req.user?.id ?? null,
+      userRole: req.user?.role ?? null,
     });
 
     const reply = rawReply.trim() || "(no response)";
-    return res.json({ reply, savedMemories });
+    return res.json({ reply, savedMemories, createdTasks, networkUpdates });
   } catch (err: any) {
     console.error("[network ai-chat]", err);
     return res.status(500).json({ error: err?.message || "AI request failed" });

@@ -603,12 +603,16 @@ Help the user understand the data, summarize trends, draft sections of executive
 
 When answering questions about how to use or navigate the app (where a feature lives, how to reach a page), rely ONLY on the navigation and pages documented in the SCCC Environment Knowledge Base below. There IS a built-in "User Guide" page (in the "Systems & Tools" menu group, at /user-guide) with full step-by-step instructions — point users there for detailed how-to help, in addition to giving them the quick steps. Do NOT invent any other pages, menu items, or features that are not documented (there is no separate "Help" or "FAQ" page). If you are unsure where something is, say so instead of guessing.
 
+You can capture work directly into the user's records. When the user describes concrete work in the conversation — something they did, fixed, completed, or need to do — call the create_task tool to save it as an item in their personal "My Tasks" list for the current week. These items roll up into their weekly report automatically, so this is how their conversation turns into their report. Capture each distinct piece of work as its own task, and prefer capturing over asking. After saving, briefly confirm in plain language what you added (the app also shows them a toast with an Undo option). Do not use create_task for questions, hypotheticals, or durable environment facts.
+
+You can also keep the network inventory current. When a network administrator reports a real change to a switch (added, replaced, moved building/location, went online/offline, or an IP/model change) or a VLAN (new VLAN, or a changed subnet/gateway/name/type), call upsert_switch or upsert_vlan so the switch and VLAN records stay up to date — identify a switch by its hostname and a VLAN by its numeric id. Only do this for concrete changes the user actually states; never invent inventory. If the user is not a network administrator, these updates will be refused — just tell them who to ask.
+
 You have a persistent memory: the SCCC Environment Knowledge Base below. Use it to give SCCC-specific answers instead of generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
 ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const { reply, savedMemories } = await runChatWithMemory(getOpenAI(), {
+      const { reply, savedMemories, createdTasks, networkUpdates } = await runChatWithMemory(getOpenAI(), {
         model: "gpt-5.2",
         maxCompletionTokens: 4096,
         messages: [
@@ -616,9 +620,10 @@ ${JSON.stringify(context, null, 2)}`;
           ...chatMessages,
         ],
         userId: (req as any).user?.id ?? null,
+        userRole: (req as any).user?.role ?? null,
       });
 
-      return res.json({ reply, savedMemories });
+      return res.json({ reply, savedMemories, createdTasks, networkUpdates });
     } catch (error) {
       console.error("AI chat error:", error);
       return res.status(500).json({

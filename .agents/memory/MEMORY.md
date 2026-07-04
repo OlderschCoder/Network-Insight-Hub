@@ -12,3 +12,4 @@
 - [Persistent sessions](persistent-sessions.md) — bearer tokens live in the `sessions` DB table (survive restarts); auth helpers are async; SSO PKCE/exchange stays in-memory by design.
 - [Dev DB schema drift](dev-db-schema-drift.md) — dev Postgres drifts from schema; `db push` prompts interactively & can't be piped; reconcile with direct idempotent SQL.
 - [Publish diffs dev DB, not schema files](publish-diffs-dev-not-schema-files.md) — prod migrate = dev-DB→prod-DB diff; reconcile dev to source-of-truth first; task agents can't publish or DDL prod.
+- [AI chat tool authorization](ai-chat-tools.md) — chat tools bypass route middleware; re-enforce role/ownership INSIDE each tool executor, not just the route.

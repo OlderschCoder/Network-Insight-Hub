@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, Sparkles, Send, Copy, Download, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -87,7 +88,7 @@ function StatusReportTab() {
     stakeholders: "Maddie Day, CFO / Brad Bennett, President",
     accountStatus: "Active – In Good Standing",
     oculusPM: "Matt Song",
-    oculusITO: "Dr. Mark Bojeun",
+    oculusITO: "SCCC IT",
     revenue: "$760,440",
     profitability: "35% gross margin / 5% net margin",
     contractValid: "July 1, 2027",
@@ -414,6 +415,32 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const undoCreatedTasks = async (ids: number[]) => {
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        const res = await fetch(`${API_BASE}/log-items/${id}`, {
+          method: "DELETE",
+          headers: authHeaders(),
+        });
+        if (!res.ok && res.status !== 404) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      }),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed === 0) {
+      toast({ title: ids.length === 1 ? "Task removed" : "Tasks removed" });
+    } else if (failed === ids.length) {
+      toast({ title: "Undo failed", description: "Could not remove the task(s).", variant: "destructive" });
+    } else {
+      toast({
+        title: "Partly undone",
+        description: `Removed ${ids.length - failed} of ${ids.length}; ${failed} could not be removed.`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     const userMsg: ChatMessage = { role: "user", content: input.trim() };
@@ -437,6 +464,33 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
         toast({
           title: "AI saved to memory",
           description: data.savedMemories.map((m: any) => m.title).join("; "),
+        });
+      }
+      if (Array.isArray(data.createdTasks) && data.createdTasks.length > 0) {
+        const created = data.createdTasks as { id: number; title: string }[];
+        toast({
+          title:
+            created.length === 1
+              ? "Added to My Tasks"
+              : `Added ${created.length} items to My Tasks`,
+          description: created.map((t) => t.title).join("; "),
+          action: (
+            <ToastAction altText="Undo" onClick={() => undoCreatedTasks(created.map((t) => t.id))}>
+              Undo
+            </ToastAction>
+          ),
+        });
+      }
+      if (Array.isArray(data.networkUpdates) && data.networkUpdates.length > 0) {
+        const ups = data.networkUpdates as { kind: string; label: string; action: string }[];
+        toast({
+          title:
+            ups.length === 1
+              ? "Network inventory updated"
+              : `Network inventory: ${ups.length} changes`,
+          description: ups
+            .map((u) => `${u.action === "created" ? "Added" : "Updated"} ${u.kind} ${u.label}`)
+            .join("; "),
         });
       }
     } catch (e: any) {

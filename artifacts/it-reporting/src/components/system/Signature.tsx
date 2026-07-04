@@ -9,7 +9,7 @@ export function Monogram({ className }: { className?: string }) {
       )}
       aria-hidden="true"
     >
-      MB
+      IT
     </span>
   );
 }
@@ -19,7 +19,7 @@ export function Signature({ className }: { className?: string }) {
     <div className={cn("flex items-center gap-3", className)}>
       <Monogram />
       <span className="text-[13px] text-ink-muted">
-        Built by Dr. Mark Bojeun · SCCC IT
+        SCCC IT
       </span>
     </div>
   );
