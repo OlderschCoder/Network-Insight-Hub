@@ -142,3 +142,8 @@ All routes under `/api/`:
 - `/after-action/:id` — AAR detail
 - `/admin` — User management (CIO only)
 - AI Assistant page has an "AI Memory" tab (all users): search/filter/add/edit/toggle memories, CIO-only delete; chat toasts when the AI saves a memory
+
+## User Preferences
+
+- **Delivery style:** Prefer complete, copy-paste-ready files and runnable scripts over piecemeal snippets/inline edits. Deployment/config assets live in `deploy/` (`.env.production.template`, `configure-o365-sender.ps1`, `deploy.sh`). When config or setup changes, update those files rather than sending fragments to hand-edit.
+- **Email sending (self-hosted):** `itech@sccc.edu` is a passwordless service account; send report email via a dedicated licensed sender mailbox (e.g. `it-reporting@sccc.edu`) with SMTP AUTH + "Send As" on `itech` (Option A). `SMTP_FROM=itech@sccc.edu`, `SMTP_USER`=the sender. Azure VM blocks outbound port 25, so only authenticated submission on 587 works.
