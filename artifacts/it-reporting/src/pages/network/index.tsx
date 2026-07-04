@@ -35,7 +35,7 @@ import {
   Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
   Activity, Wrench, Save, Pencil, Trash2, X, History, Download, FileDown,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -1528,8 +1528,19 @@ function CampusMapPanel() {
 }
 
 export default function Network() {
+  const searchString = useSearch();
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("buildings");
   const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const q = params.get("q");
+    const t = params.get("tab");
+    if (q !== null) setSearch(q);
+    if (t && ["buildings", "switches", "vlans"].includes(t)) setTab(t);
+  }, [searchString]);
+
   const [exportAllOpen, setExportAllOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const askAI = (prompt: string) => {
@@ -1621,7 +1632,7 @@ export default function Network() {
 
       <CloudRemotePanel />
 
-      <Tabs defaultValue="buildings">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="buildings">
             <Building2 className="h-4 w-4 mr-2" /> Buildings ({buildings.length})

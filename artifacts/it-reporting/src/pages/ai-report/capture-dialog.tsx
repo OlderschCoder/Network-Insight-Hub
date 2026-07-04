@@ -47,11 +47,15 @@ export function CaptureDialog({
   onOpenChange,
   sourceText,
   authorName,
+  sourceHref = "/ai-report",
+  sourceLabel = "AI Assistant",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   sourceText: string;
   authorName?: string | null;
+  sourceHref?: string;
+  sourceLabel?: string;
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -72,9 +76,9 @@ export function CaptureDialog({
     }
   }, [open, sourceText]);
 
-  const provenance = `\n\n— Captured from AI Assistant on ${new Date().toLocaleDateString()}${
+  const provenance = `\n\n— Captured from ${sourceLabel} on ${new Date().toLocaleDateString()}${
     authorName ? ` by ${authorName}` : ""
-  }`;
+  }\nSource: [${sourceLabel}](${sourceHref})`;
 
   const handleSubmit = async () => {
     if (!title.trim() || !details.trim()) {

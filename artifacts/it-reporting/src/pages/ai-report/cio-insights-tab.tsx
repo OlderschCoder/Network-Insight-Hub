@@ -18,6 +18,8 @@ import {
   Check,
   X,
   Trash2,
+  Save,
+  Pencil,
 } from "lucide-react";
 import { CaptureDialog } from "./capture-dialog";
 
@@ -309,6 +311,10 @@ function ShadowNotesPanel({ weekOf }: { weekOf: string }) {
   const [filterWeek, setFilterWeek] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<{ id: number; content: string; category: string } | null>(
+    null,
+  );
+  const [savingEdit, setSavingEdit] = useState(false);
   const [capture, setCapture] = useState<{ open: boolean; text: string }>({
     open: false,
     text: "",
@@ -370,6 +376,38 @@ function ShadowNotesPanel({ weekOf }: { weekOf: string }) {
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, status } : n)));
     } catch (e: any) {
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing || !editing.content.trim()) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`${API_BASE}/cio-shadow-notes/${editing.id}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: editing.content.trim(),
+          category: editing.category.trim() || "general",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === editing.id
+            ? { ...n, content: editing.content.trim(), category: editing.category.trim() || "general" }
+            : n,
+        ),
+      );
+      setEditing(null);
+      toast({ title: "Note updated" });
+    } catch (e: any) {
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -466,43 +504,96 @@ function ShadowNotesPanel({ weekOf }: { weekOf: string }) {
                       <span className="text-xs text-muted-foreground">week {n.weekOf}</span>
                     )}
                   </div>
-                  <p className="text-sm mt-2 whitespace-pre-wrap">{n.content}</p>
+                  {editing?.id === n.id ? (
+                    <div className="mt-2 space-y-2">
+                      <Input
+                        value={editing.category}
+                        onChange={(e) =>
+                          setEditing((prev) => (prev ? { ...prev, category: e.target.value } : prev))
+                        }
+                        placeholder="Category"
+                        className="h-8 text-xs"
+                      />
+                      <Textarea
+                        rows={3}
+                        value={editing.content}
+                        onChange={(e) =>
+                          setEditing((prev) => (prev ? { ...prev, content: e.target.value } : prev))
+                        }
+                        className="text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-2 whitespace-pre-wrap">{n.content}</p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {n.createdByName ?? "Unknown"} · {new Date(n.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCapture({ open: true, text: n.content })}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Capture
-                </Button>
-                {n.status !== "approved" && (
-                  <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "approved")}>
-                    <Check className="h-3.5 w-3.5 mr-1" /> Approve
-                  </Button>
+                {editing?.id === n.id ? (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={saveEdit}
+                      disabled={savingEdit || !editing.content.trim()}
+                    >
+                      {savingEdit ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      Save
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCapture({ open: true, text: n.content })}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Capture
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setEditing({ id: n.id, content: n.content, category: n.category })
+                      }
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                    {n.status !== "approved" && (
+                      <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "approved")}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> Approve
+                      </Button>
+                    )}
+                    {n.status !== "dismissed" && (
+                      <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "dismissed")}>
+                        <X className="h-3.5 w-3.5 mr-1" /> Dismiss
+                      </Button>
+                    )}
+                    {n.status !== "open" && (
+                      <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "open")}>
+                        Reopen
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => remove(n.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
                 )}
-                {n.status !== "dismissed" && (
-                  <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "dismissed")}>
-                    <X className="h-3.5 w-3.5 mr-1" /> Dismiss
-                  </Button>
-                )}
-                {n.status !== "open" && (
-                  <Button variant="ghost" size="sm" onClick={() => setStatus(n.id, "open")}>
-                    Reopen
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => remove(n.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
               </div>
             </div>
           ))}
@@ -512,6 +603,7 @@ function ShadowNotesPanel({ weekOf }: { weekOf: string }) {
         open={capture.open}
         onOpenChange={(v) => setCapture((c) => ({ ...c, open: v }))}
         sourceText={capture.text}
+        sourceLabel="CIO Insights shadow memory"
       />
     </Card>
   );
