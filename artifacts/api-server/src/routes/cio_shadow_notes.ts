@@ -3,7 +3,7 @@ import { db, cioShadowNotesTable, usersTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, requireCIO } from "./auth";
-import { containsSecretLike, SECRET_REJECTION_MESSAGE } from "../lib/ai_knowledge";
+import { redactSecretLike } from "../lib/ai_knowledge";
 
 // CIO-only "shadow memory": a private staging area of AI/CIO observations and
 // suggestions surfaced at reporting time. These notes never modify any actual
@@ -57,13 +57,10 @@ router.post("/", requireAuth, requireCIO, async (req: any, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
   }
-  if (containsSecretLike(parsed.data.content)) {
-    return res.status(400).json({ error: SECRET_REJECTION_MESSAGE });
-  }
   const [row] = await db
     .insert(cioShadowNotesTable)
     .values({
-      content: parsed.data.content,
+      content: redactSecretLike(parsed.data.content).text,
       category: (parsed.data.category ?? "general").toLowerCase().slice(0, 50),
       weekOf: parsed.data.weekOf,
       source: "manual",
@@ -91,10 +88,8 @@ router.patch("/:id", requireAuth, requireCIO, async (req: any, res) => {
   if (Object.keys(parsed.data).length === 0) {
     return res.status(400).json({ error: "No fields to update" });
   }
-  if (parsed.data.content && containsSecretLike(parsed.data.content)) {
-    return res.status(400).json({ error: SECRET_REJECTION_MESSAGE });
-  }
   const updates: any = { ...parsed.data, updatedAt: new Date() };
+  if (parsed.data.content) updates.content = redactSecretLike(parsed.data.content).text;
   if (parsed.data.category) updates.category = parsed.data.category.toLowerCase().slice(0, 50);
   const [row] = await db
     .update(cioShadowNotesTable)

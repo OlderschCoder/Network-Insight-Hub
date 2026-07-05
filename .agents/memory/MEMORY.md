@@ -1,3 +1,4 @@
+- [AI open to team](ai-open-to-team.md) — owner directive: AI + net diagnostics open to ALL authed users (not role-gated); redact secrets, don't reject; keep only DoS caps.
 - [it-reporting frontend](it-reporting-frontend.md) — SCCC theming: whole app re-themes via shadcn `:root` tokens in index.css; brief-zip "Saints green" is canonical palette.
 - [e2e testing](e2e-testing.md) — Playwright specs need CHROMIUM_EXECUTABLE_PATH; register→activate-in-DB→login (register no longer returns a token); seed creds in replit.md are stale.
 - [FortiGate whitelist](fortigate-whitelist.md) — Network Tool: REST API-token auth (not password), webfilter-only (no SSH ssl-exempt), private-IP so on-network/VPN only (off-net = 502).

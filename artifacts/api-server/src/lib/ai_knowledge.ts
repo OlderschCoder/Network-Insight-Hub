@@ -17,29 +17,67 @@ export type { NetworkUpdate, PendingNetworkChange };
 
 const MAX_CONTEXT_CHARS = 60_000;
 
-const SECRET_PATTERNS: RegExp[] = [
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-  /\bAKIA[0-9A-Z]{16}\b/, // AWS access key id
-  /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/, // JWT
-  /\bxox[baprs]-[A-Za-z0-9-]{10,}/, // Slack token
-  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b/, // GitHub token
-  /\bgithub_pat_[A-Za-z0-9_]{30,}\b/,
-  /\bsk-[A-Za-z0-9_-]{20,}\b/, // OpenAI-style API key
-  /\b(?:password|passwd|pwd|passphrase|api[_-]?key|apikey|access[_-]?token|client[_-]?secret|secret[_-]?key)\s*(?:is|[:=])\s*['"]?[^\s'"]{6,}/i,
-  /\bAuthorization:\s*(?:Bearer|Basic)\s+[A-Za-z0-9._\-+/=]{16,}/i,
+const REDACTED = "[REDACTED]";
+
+/**
+ * Secret redaction rules. Each rule replaces a detected credential with a
+ * placeholder instead of rejecting the whole submission — the surrounding,
+ * non-sensitive content is preserved and saved. `replace` may keep a leading
+ * label (e.g. "password:") while scrubbing only the value after it.
+ *
+ * All regexes are global so `.replace()` scrubs every occurrence. Because the
+ * AI knowledge base is readable by all authenticated users and injected into
+ * every AI prompt, secrets are always stripped before persistence. This is a
+ * best-effort policy backstop, not a substitute for a real secrets vault.
+ */
+const SECRET_REDACTIONS: { re: RegExp; replace: string | ((...m: string[]) => string) }[] = [
+  // Full PEM private-key block (to END, or to end-of-text if no END marker).
+  {
+    re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+    replace: "[REDACTED PRIVATE KEY]",
+  },
+  { re: /\bAKIA[0-9A-Z]{16}\b/g, replace: REDACTED }, // AWS access key id
+  { re: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]+)?/g, replace: REDACTED }, // JWT
+  { re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/g, replace: REDACTED }, // Slack token
+  { re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b/g, replace: REDACTED }, // GitHub token
+  { re: /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g, replace: REDACTED },
+  { re: /\bsk-[A-Za-z0-9_-]{20,}\b/g, replace: REDACTED }, // OpenAI-style API key
+  // "password: hunter2" / "api_key = abc123" — keep the label, scrub the value.
+  {
+    re: /\b(password|passwd|pwd|passphrase|api[_-]?key|apikey|access[_-]?token|client[_-]?secret|secret[_-]?key)(\s*(?:is|[:=])\s*)['"]?[^\s'"]{6,}['"]?/gi,
+    replace: (_m: string, label: string, sep: string) => `${label}${sep}${REDACTED}`,
+  },
+  // Authorization: Bearer/Basic <token> — keep the scheme, scrub the token.
+  {
+    re: /\b(Authorization:\s*(?:Bearer|Basic)\s+)[A-Za-z0-9._\-+/=]{16,}/gi,
+    replace: (_m: string, label: string) => `${label}${REDACTED}`,
+  },
 ];
 
 /**
- * Best-effort server-side guard against persisting credentials into the shared
- * AI knowledge base (which is readable by all authenticated users and injected
- * into AI prompts). Not exhaustive — a policy backstop, not a vault.
+ * Scrub credential-like substrings from `text`, replacing each with a
+ * placeholder. Returns the cleaned text plus whether anything was redacted.
  */
-export function containsSecretLike(text: string): boolean {
-  return SECRET_PATTERNS.some((re) => re.test(text));
+export function redactSecretLike(text: string): { text: string; redacted: boolean } {
+  let out = text;
+  for (const { re, replace } of SECRET_REDACTIONS) {
+    out = out.replace(re, replace as string & ((...m: string[]) => string));
+  }
+  return { text: out, redacted: out !== text };
 }
 
-export const SECRET_REJECTION_MESSAGE =
-  "Content appears to contain a credential, token, or password. Secrets must never be stored in AI memory — remove the sensitive value and describe where the credential is managed instead.";
+/**
+ * Best-effort detector: true when `text` contains something that looks like a
+ * credential. Derived from the redaction rules so detection and scrubbing stay
+ * in lockstep.
+ */
+export function containsSecretLike(text: string): boolean {
+  return redactSecretLike(text).redacted;
+}
+
+/** Appended to a tool result so the AI can tell the user a secret was scrubbed. */
+export const SECRET_REDACTION_NOTICE =
+  "Note: a credential/token/password was detected and automatically replaced with [REDACTED] before saving — the rest of the content was kept. Secrets are never stored in AI memory; keep them in a proper vault.";
 
 /**
  * Load all active AI knowledge entries and format them as a text block for
@@ -128,19 +166,23 @@ async function executeSaveMemory(
   let category = typeof args?.category === "string" ? args.category.trim().toLowerCase() : "general";
   if (!ALLOWED_CATEGORIES.has(category)) category = "general";
 
-  if (containsSecretLike(title) || containsSecretLike(content)) {
-    logger.warn({ title }, "save_memory rejected: content looked like a secret");
-    return { result: `Error: ${SECRET_REJECTION_MESSAGE}`, saved: null };
+  const titleScrub = redactSecretLike(title);
+  const contentScrub = redactSecretLike(content);
+  const wasRedacted = titleScrub.redacted || contentScrub.redacted;
+  const safeTitle = titleScrub.text;
+  const safeContent = contentScrub.text;
+  if (wasRedacted) {
+    logger.warn({ title: safeTitle }, "save_memory: redacted secret-like content before saving");
   }
 
   const [row] = await db
     .insert(aiKnowledgeTable)
-    .values({ category, title, content, source: "ai", updatedBy: userId ?? undefined })
+    .values({ category, title: safeTitle, content: safeContent, source: "ai", updatedBy: userId ?? undefined })
     .returning();
 
-  logger.info({ id: row.id, category, title }, "AI saved a memory to the knowledge base");
+  logger.info({ id: row.id, category, title: safeTitle }, "AI saved a memory to the knowledge base");
   return {
-    result: `Saved to knowledge base (id ${row.id}).`,
+    result: `Saved to knowledge base (id ${row.id}).${wasRedacted ? ` ${SECRET_REDACTION_NOTICE}` : ""}`,
     saved: { id: row.id, category: row.category, title: row.title },
   };
 }
@@ -391,20 +433,21 @@ async function executeSaveShadowNote(
   let category = typeof args?.category === "string" ? args.category.trim().toLowerCase().slice(0, 50) : "general";
   if (!category) category = "general";
 
-  if (containsSecretLike(content)) {
-    logger.warn("save_shadow_note rejected: content looked like a secret");
-    return { result: `Error: ${SECRET_REJECTION_MESSAGE}`, saved: null };
+  const contentScrub = redactSecretLike(content);
+  const safeContent = contentScrub.text;
+  if (contentScrub.redacted) {
+    logger.warn("save_shadow_note: redacted secret-like content before saving");
   }
 
   const weekOf = isoWeekStart(todayInCentral());
   const [row] = await db
     .insert(cioShadowNotesTable)
-    .values({ weekOf, category, content, source: "ai", createdBy: userId ?? undefined })
+    .values({ weekOf, category, content: safeContent, source: "ai", createdBy: userId ?? undefined })
     .returning();
 
   logger.info({ id: row.id, weekOf }, "AI saved a CIO shadow note");
   return {
-    result: `Saved a CIO suggestion for the week of ${weekOf} (id ${row.id}). It will surface as a reviewable suggestion and does not change any report.`,
+    result: `Saved a CIO suggestion for the week of ${weekOf} (id ${row.id}). It will surface as a reviewable suggestion and does not change any report.${contentScrub.redacted ? ` ${SECRET_REDACTION_NOTICE}` : ""}`,
     saved: { id: row.id, content: row.content },
   };
 }
@@ -685,6 +728,13 @@ export async function runChatWithMemory(
     preview,
   };
 
+  // Live network diagnostics (ping / TCP connect) are available to every
+  // signed-in team member — this is a shared troubleshooting tool for the whole
+  // IT team. The only guardrail is a per-request probe budget below so a single
+  // chat turn can't fan out into a scan.
+  const MAX_DIAG_CALLS = 12;
+  let diagCalls = 0;
+
   const tools = [
     SAVE_MEMORY_TOOL,
     ...(allowTaskCapture ? [CREATE_TASK_TOOL] : []),
@@ -775,18 +825,28 @@ export async function runChatWithMemory(
           resultText = "Error: failed to save shadow note";
         }
       } else if (call.type === "function" && call.function.name === "ping_host") {
-        try {
-          resultText = await executePingHost(call.function.arguments);
-        } catch (err) {
-          logger.error({ err }, "ping_host tool failed");
-          resultText = "Error: failed to run ping";
+        if (diagCalls >= MAX_DIAG_CALLS) {
+          resultText = "Error: diagnostic probe limit for this request reached; ask again to run more.";
+        } else {
+          diagCalls++;
+          try {
+            resultText = await executePingHost(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "ping_host tool failed");
+            resultText = "Error: failed to run ping";
+          }
         }
       } else if (call.type === "function" && call.function.name === "test_net_connection") {
-        try {
-          resultText = await executeTestNetConnection(call.function.arguments);
-        } catch (err) {
-          logger.error({ err }, "test_net_connection tool failed");
-          resultText = "Error: failed to run TCP connectivity test";
+        if (diagCalls >= MAX_DIAG_CALLS) {
+          resultText = "Error: diagnostic probe limit for this request reached; ask again to run more.";
+        } else {
+          diagCalls++;
+          try {
+            resultText = await executeTestNetConnection(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "test_net_connection tool failed");
+            resultText = "Error: failed to run TCP connectivity test";
+          }
         }
       }
       messages.push({ role: "tool", tool_call_id: call.id, content: resultText });

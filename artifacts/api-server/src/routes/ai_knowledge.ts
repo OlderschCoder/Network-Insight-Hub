@@ -3,7 +3,7 @@ import { db, aiKnowledgeTable, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, requireCIO } from "./auth";
-import { containsSecretLike, SECRET_REJECTION_MESSAGE } from "../lib/ai_knowledge";
+import { redactSecretLike } from "../lib/ai_knowledge";
 
 const router = Router();
 
@@ -43,12 +43,11 @@ router.post("/", requireAuth, async (req: any, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
   }
-  if (containsSecretLike(parsed.data.title) || containsSecretLike(parsed.data.content)) {
-    return res.status(400).json({ error: SECRET_REJECTION_MESSAGE });
-  }
+  const title = redactSecretLike(parsed.data.title).text;
+  const content = redactSecretLike(parsed.data.content).text;
   const [row] = await db
     .insert(aiKnowledgeTable)
-    .values({ ...parsed.data, source: "manual", updatedBy: req.user.id })
+    .values({ ...parsed.data, title, content, source: "manual", updatedBy: req.user.id })
     .returning();
   return res.status(201).json(row);
 });
@@ -72,15 +71,12 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
   if (Object.keys(parsed.data).length === 0) {
     return res.status(400).json({ error: "No fields to update" });
   }
-  if (
-    (parsed.data.title && containsSecretLike(parsed.data.title)) ||
-    (parsed.data.content && containsSecretLike(parsed.data.content))
-  ) {
-    return res.status(400).json({ error: SECRET_REJECTION_MESSAGE });
-  }
+  const scrubbed = { ...parsed.data };
+  if (scrubbed.title) scrubbed.title = redactSecretLike(scrubbed.title).text;
+  if (scrubbed.content) scrubbed.content = redactSecretLike(scrubbed.content).text;
   const [row] = await db
     .update(aiKnowledgeTable)
-    .set({ ...parsed.data, updatedBy: req.user.id, updatedAt: new Date() })
+    .set({ ...scrubbed, updatedBy: req.user.id, updatedAt: new Date() })
     .where(eq(aiKnowledgeTable.id, id))
     .returning();
   if (!row) return res.status(404).json({ error: "Not found" });
