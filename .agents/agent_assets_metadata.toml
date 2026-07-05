@@ -24,3 +24,9 @@ id = "PgW-kvv9nxsCFq5yyKDcA"
 uri = "file://docs/azure-vm-deployment-runbook.md"
 type = "text"
 title = "SCCC IT Hub — Azure VM Deployment & Security Runbook"
+
+[[outputs]]
+id = "t9rknOEnF4cKk9_gelYps"
+uri = "file://exports/sccc-it-reporting-workspace-db-20260705.sql.gz"
+type = "unspecified"
+title = "Workspace DB dump (gzipped SQL — schema + data, 23 tables)"
