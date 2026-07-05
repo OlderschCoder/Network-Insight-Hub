@@ -60,11 +60,11 @@ describe("flagVmRisks", () => {
     "Standard_A7",
     "standard_a3",
     "Standard_A5_v1",
-  ])("flags retiring size '%s' as medium severity", (size) => {
+  ])("flags retiring size '%s' as low severity", (size) => {
     const flags = flagVmRisks({ status: "running", size });
     expect(flags).toHaveLength(1);
     expect(flags[0].code).toBe("retiring_size");
-    expect(flags[0].severity).toBe("medium");
+    expect(flags[0].severity).toBe("low");
     expect(flags[0].detail).toContain(size);
   });
 
@@ -135,8 +135,8 @@ describe("summarizeVmRisks", () => {
     expect(summary.unhealthy).toBe(1);
     expect(summary.retiringSize).toBe(1);
     expect(summary.high).toBe(1);
-    expect(summary.medium).toBe(2);
-    expect(summary.low).toBe(0);
+    expect(summary.medium).toBe(1); // unhealthy
+    expect(summary.low).toBe(1); // retiring size is informational
   });
 
   it("counts every flag on a VM that trips multiple rules", () => {
@@ -149,22 +149,23 @@ describe("summarizeVmRisks", () => {
     expect(summary.publicIp).toBe(1);
     expect(summary.unhealthy).toBe(1);
     expect(summary.retiringSize).toBe(1);
-    expect(summary.high).toBe(1);
-    expect(summary.medium).toBe(2);
+    expect(summary.high).toBe(1); // public IP
+    expect(summary.medium).toBe(1); // unhealthy
+    expect(summary.low).toBe(1); // retiring size
   });
 
   it("orders highest-severity VMs first, then by name", () => {
     const vms: (VmRiskInput & { id: number; name: string })[] = [
       { id: 1, name: "zeta-medium", status: "unknown" },
       { id: 2, name: "alpha-high", status: "running", publicIp: "20.0.0.1" },
-      { id: 3, name: "beta-medium", status: "running", size: "Standard_A0" },
+      { id: 3, name: "beta-low", status: "running", size: "Standard_A0" },
     ];
 
     const { items } = summarizeVmRisks(vms);
     expect(items.map((i) => i.name)).toEqual([
       "alpha-high", // high severity first
-      "beta-medium", // then mediums alphabetically
-      "zeta-medium",
+      "zeta-medium", // then medium
+      "beta-low", // then low (retiring size)
     ]);
   });
 

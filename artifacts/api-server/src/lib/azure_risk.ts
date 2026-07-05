@@ -82,9 +82,12 @@ export function flagVmRisks(vm: VmRiskInput): VmRiskFlag[] {
   if (isRetiringSize(vm.size)) {
     flags.push({
       code: "retiring_size",
-      severity: "medium",
+      // Low, not medium: series retirements are long-lead (typically ~a year
+      // out), so this is an informational "plan ahead" item — never a P1/P2 that
+      // should page the CIO or top the priority list.
+      severity: "low",
       label: "Retiring VM series",
-      detail: `Size "${vm.size}" is on a VM series Azure is retiring. Plan a resize to a supported series before end of life.`,
+      detail: `Size "${vm.size}" is on a VM series Azure is retiring. Plan a resize to a supported series before end of life (typically a long lead time — informational, not urgent).`,
     });
   }
 
