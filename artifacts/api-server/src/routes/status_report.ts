@@ -10,6 +10,7 @@ import {
   strategicObjectivesTable,
   networkSwitchesTable,
   vlansTable,
+  usersTable,
 } from "@workspace/db";
 import { and, eq, gte, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
@@ -510,7 +511,6 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 router.post(
   "/chat",
   requireAuth,
-  requireCIO,
   async (req: Request, res: Response) => {
     if (!isAIConfigured()) {
       return res.status(503).json({ error: "AI service is not configured." });
@@ -534,6 +534,10 @@ router.post(
       const since = new Date();
       since.setDate(since.getDate() - lookbackDays);
       const sinceStr = since.toISOString().slice(0, 10);
+      // Team items: always pull last 7 days for all users (gives Fred current team context)
+      const teamItemsDate = new Date();
+      teamItemsDate.setDate(teamItemsDate.getDate() - 7);
+      const teamItemsSince = teamItemsDate.toISOString().slice(0, 10);
 
       const [
         entriesData,
@@ -555,8 +559,11 @@ router.post(
             challenges: entries.challenges,
             ticketCount: entries.ticketCount,
             entryDate: entries.entryDate,
+            userName: usersTable.name,
+            userRole: usersTable.role,
           })
           .from(entries)
+          .innerJoin(usersTable, eq(entries.userId, usersTable.id))
           .where(gte(entries.entryDate, sinceStr))
           .limit(100),
         db
@@ -609,12 +616,17 @@ router.post(
             id: logItemsTable.id,
             title: logItemsTable.title,
             category: logItemsTable.category,
+            notes: logItemsTable.notes,
             itemDate: logItemsTable.itemDate,
             weekOf: logItemsTable.weekOf,
+            userName: usersTable.name,
+            userRole: usersTable.role,
           })
           .from(logItemsTable)
-          .where(gte(logItemsTable.itemDate, sinceStr))
-          .limit(200),
+          .innerJoin(usersTable, eq(logItemsTable.userId, usersTable.id))
+          .where(gte(logItemsTable.itemDate, teamItemsSince))
+          .orderBy(logItemsTable.itemDate)
+          .limit(300),
         db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
         db.select().from(vlansTable).orderBy(vlansTable.vlanId),
       ]);
@@ -630,7 +642,8 @@ router.post(
         afterActionReports: aarData,
         projects: projectsData,
         strategicObjectives: objectivesData,
-        recentTasks: tasksData,
+        // Team items: last 7 days, all users, with names — gives Fred current team activity
+        teamRecentItems: tasksData,
         networkInventory: {
           switchCount: switchRows.length,
           vlanCount: vlanRows.length,
@@ -645,7 +658,7 @@ router.post(
         ? `You are currently assisting ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — their role is "${authUser.role}"${authUser.jobTitle ? `, job title "${authUser.jobTitle}"` : ""}. You already know who they are, so never ask; address them by first name when natural and attribute anything they report (work done, updates, requests) to this person.`
         : "";
 
-      const systemPrompt = `You are an AI assistant for the Seward County Community College IT Department reporting platform. You have read-only access to the department's operational data: weekly log entries, individual tasks (log items), weekly reports, risks/issues/design suggestions, after-action (post-incident) reviews, projects, department strategic objectives, and the full network inventory — every switch and VLAN grouped by campus building, including IP addresses, models, status, subnets, and gateways. You do NOT have access to any credentials, passwords, tokens, or user login details; never claim to.
+      const systemPrompt = `You are Fred, the AI assistant for the Seward County Community College IT Department. You serve the entire team — help desk, network engineers, security, and the CIO. You have read-only access to the department's operational data: weekly log entries, individual tasks (log items) with who did them, risks/issues/design suggestions, after-action reviews, projects, strategic objectives, and the full network inventory (every switch and VLAN, by building, with IPs and status). You do NOT have access to credentials, passwords, tokens, or login details; never claim to. When anyone pastes a switch config or diagnostic output that contains a password or secret, note that it will be redacted before saving — do not ask them to remove it, just proceed.
 ${identityLine ? `\n${identityLine}\n` : ""}
 Help the user understand the data, summarize trends, draft sections of executive reports, identify risks, and answer specific questions — including questions about the campus network such as which buildings contain which switches and VLANs, IP/subnet/gateway details, and device status. Be concise and professional. If the data does not support an answer, say so.
 

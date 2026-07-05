@@ -1,6 +1,6 @@
 import type OpenAI from "openai";
 import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable, networkSwitchesTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, gte } from "drizzle-orm";
 import { logger } from "./logger";
 import { pingHost, testNetConnection, pingHosts } from "./net_diag";
 import {
@@ -768,6 +768,93 @@ const CAPTURE_INTENT_PATTERNS: RegExp[] = [
  * task? The CIO's chat does not auto-capture, so capture only fires when they
  * ask for it; ordinary staff always auto-capture regardless of this result.
  */
+
+// ---- search_team_work tool -----------------------------------------------
+
+export const SEARCH_TEAM_WORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "search_team_work",
+    description:
+      "Search recent team activity across all staff — log items (My Tasks) and weekly log entries — by keyword, person name, building, or device. Use when the user asks what someone has been working on, whether a building or device was recently serviced, who handled a specific issue, or wants to find context across the whole team. Returns matching items with the person's name, role, and date. Always search before saying 'I don't have that information' — the answer may be in a recent task.",
+    parameters: {
+      type: "object",
+      properties: {
+        keyword: {
+          type: "string",
+          description: "Word or phrase to search for in task titles and notes (case-insensitive). Optional if filtering by person.",
+        },
+        person: {
+          type: "string",
+          description: "Filter to a specific team member by first name, last name, or email. Optional.",
+        },
+        days: {
+          type: "number",
+          description: "How many days back to search. Defaults to 30. Max 90.",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+async function executeSearchTeamWork(rawArgs: string): Promise<string> {
+  let args: any;
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON arguments";
+  }
+
+  const keyword: string = typeof args?.keyword === "string" ? args.keyword.trim() : "";
+  const person: string = typeof args?.person === "string" ? args.person.trim().toLowerCase() : "";
+  const days: number = Math.max(1, Math.min(90, Number(args?.days) || 30));
+
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  // Search log_items with user join
+  const itemRows = await db
+    .select({
+      id: logItemsTable.id,
+      title: logItemsTable.title,
+      notes: logItemsTable.notes,
+      category: logItemsTable.category,
+      itemDate: logItemsTable.itemDate,
+      userName: usersTable.name,
+      userRole: usersTable.role,
+      userEmail: usersTable.email,
+    })
+    .from(logItemsTable)
+    .innerJoin(usersTable, eq(logItemsTable.userId, usersTable.id))
+    .where(gte(logItemsTable.itemDate, sinceStr))
+    .orderBy(logItemsTable.itemDate)
+    .limit(200);
+
+  // Filter by keyword and/or person
+  const kw = keyword.toLowerCase();
+  const filtered = itemRows.filter((r) => {
+    const matchesKw = !kw ||
+      r.title.toLowerCase().includes(kw) ||
+      (r.notes ?? "").toLowerCase().includes(kw);
+    const matchesPerson = !person ||
+      r.userName.toLowerCase().includes(person) ||
+      r.userEmail.toLowerCase().includes(person);
+    return matchesKw && matchesPerson;
+  });
+
+  if (filtered.length === 0) {
+    const scope = [keyword && `keyword "${keyword}"`, person && `person "${person}"`].filter(Boolean).join(", ");
+    return `No matching team work items found in the last ${days} days${scope ? ` for ${scope}` : ""}.`;
+  }
+
+  const lines = filtered.slice(0, 50).map((r) =>
+    `[${r.itemDate}] ${r.userName} (${r.userRole}): ${r.title}${r.notes ? ` — ${r.notes.slice(0, 120)}` : ""}`
+  );
+  return `Found ${filtered.length} item(s) (showing up to 50):\n${lines.join("\n")}`;
+}
+
 export function messageRequestsCapture(text: string | null | undefined): boolean {
   if (!text) return false;
   return CAPTURE_INTENT_PATTERNS.some((re) => re.test(text));
@@ -834,6 +921,7 @@ export async function runChatWithMemory(
     PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
     SCAN_NETWORK_TOOL,
+    SEARCH_TEAM_WORK_TOOL,
   ];
 
   const done = (reply: string) => ({
@@ -953,6 +1041,13 @@ export async function runChatWithMemory(
             logger.error({ err }, "scan_network tool failed");
             resultText = "Error: failed to run the network scan";
           }
+        }
+      } else if (call.type === "function" && call.function.name === "search_team_work") {
+        try {
+          resultText = await executeSearchTeamWork(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "search_team_work tool failed");
+          resultText = "Error: failed to search team work";
         }
       }
       messages.push({ role: "tool", tool_call_id: call.id, content: resultText });
