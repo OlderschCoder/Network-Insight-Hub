@@ -1,8 +1,8 @@
 import type OpenAI from "openai";
-import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable } from "@workspace/db";
+import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable, networkSwitchesTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { logger } from "./logger";
-import { pingHost, testNetConnection } from "./net_diag";
+import { pingHost, testNetConnection, pingHosts } from "./net_diag";
 import {
   upsertSwitchByHostname,
   upsertVlanByVlanId,
@@ -566,6 +566,93 @@ async function executeTestNetConnection(rawArgs: string): Promise<string> {
   return `TCP ${res.host}:${res.port} is CLOSED or unreachable${res.error ? ` (${res.error})` : ""}.`;
 }
 
+export const SCAN_NETWORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "scan_network",
+    description:
+      "Run a live on-prem health sweep: ping every switch in the SCCC network inventory (or just one building) at once and report which devices are UP and which are DOWN right now. Use this to size up an outage's blast radius — e.g. when the user says a switch or building 'is down', asks 'what's affected', or wants to know 'what's up right now'. This pings the real recorded IPs, so it only works when the server is on the SCCC network or VPN (off-network, everything reports down — say so). Cross-check the results against the recorded status to spot newly-down or recovered devices.",
+    parameters: {
+      type: "object",
+      properties: {
+        building: {
+          type: "string",
+          description:
+            "Optional. Limit the sweep to switches in this building (case-insensitive substring match against the building field, e.g. 'library', 'BB', 'Hobble'). Omit to scan the entire inventory.",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+const MAX_SCAN_TARGETS = 80;
+
+async function executeScanNetwork(rawArgs: string): Promise<string> {
+  let args: { building?: unknown } = {};
+  try {
+    args = rawArgs ? JSON.parse(rawArgs) : {};
+  } catch {
+    return "Error: invalid JSON arguments for scan_network";
+  }
+  const buildingFilter =
+    typeof args.building === "string" && args.building.trim() ? args.building.trim().toLowerCase() : null;
+
+  let rows: { hostname: string; building: string; ipAddress: string; status: string }[];
+  try {
+    rows = await db
+      .select({
+        hostname: networkSwitchesTable.hostname,
+        building: networkSwitchesTable.building,
+        ipAddress: networkSwitchesTable.ipAddress,
+        status: networkSwitchesTable.status,
+      })
+      .from(networkSwitchesTable);
+  } catch (err) {
+    logger.error({ err }, "scan_network inventory load failed");
+    return "Error: could not load the switch inventory to scan.";
+  }
+
+  const filtered = buildingFilter
+    ? rows.filter((r) => (r.building ?? "").toLowerCase().includes(buildingFilter))
+    : rows;
+
+  if (filtered.length === 0) {
+    return buildingFilter
+      ? `No switches in the inventory match building "${String(args.building)}".`
+      : "The switch inventory is empty — nothing to scan.";
+  }
+
+  const truncated = filtered.length > MAX_SCAN_TARGETS;
+  const targets = filtered.slice(0, MAX_SCAN_TARGETS).map((r) => ({
+    host: r.ipAddress,
+    label: `${r.hostname} [${r.building}] (recorded: ${r.status})`,
+  }));
+
+  const results = await pingHosts(targets, { concurrency: 16, count: 1, deadlineSec: 2 });
+
+  const up = results.filter((r) => r.reachable);
+  const down = results.filter((r) => !r.reachable);
+  const scopeLabel = buildingFilter ? `building "${String(args.building)}"` : "entire inventory";
+
+  const lines: string[] = [];
+  lines.push(
+    `On-prem health sweep of ${scopeLabel}: ${results.length} switch(es) scanned — ${up.length} UP, ${down.length} DOWN.`,
+  );
+  if (truncated) lines.push(`(Scan capped at the first ${MAX_SCAN_TARGETS} switches.)`);
+  if (down.length) {
+    lines.push("", "DOWN (no ICMP reply):");
+    for (const r of down) lines.push(`- ${r.label ?? r.host} @ ${r.host}${r.error ? ` — ${r.error}` : ""}`);
+  }
+  lines.push("", "UP (responded):");
+  if (up.length) {
+    for (const r of up) lines.push(`- ${r.label ?? r.host} @ ${r.host}`);
+  } else {
+    lines.push("- (none responded — the server is likely not on the SCCC network/VPN)");
+  }
+  return lines.join("\n").slice(0, 6000);
+}
+
 function cleanStr(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim();
@@ -734,6 +821,9 @@ export async function runChatWithMemory(
   // chat turn can't fan out into a scan.
   const MAX_DIAG_CALLS = 12;
   let diagCalls = 0;
+  // A fan-out sweep is hard-capped at one per chat turn regardless of the
+  // per-probe budget, since each sweep can spawn dozens of pings.
+  let scanUsed = false;
 
   const tools = [
     SAVE_MEMORY_TOOL,
@@ -743,6 +833,7 @@ export async function runChatWithMemory(
     SAVE_SHADOW_NOTE_TOOL,
     PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
+    SCAN_NETWORK_TOOL,
   ];
 
   const done = (reply: string) => ({
@@ -846,6 +937,21 @@ export async function runChatWithMemory(
           } catch (err) {
             logger.error({ err }, "test_net_connection tool failed");
             resultText = "Error: failed to run TCP connectivity test";
+          }
+        }
+      } else if (call.type === "function" && call.function.name === "scan_network") {
+        // A sweep fans out into dozens of pings, so it is hard-capped at one per
+        // chat turn and also consumes the remaining per-probe budget.
+        if (scanUsed || diagCalls >= MAX_DIAG_CALLS) {
+          resultText = "Error: a full network sweep has already run this request; ask again to run another.";
+        } else {
+          scanUsed = true;
+          diagCalls = MAX_DIAG_CALLS;
+          try {
+            resultText = await executeScanNetwork(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "scan_network tool failed");
+            resultText = "Error: failed to run the network scan";
           }
         }
       }
