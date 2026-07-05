@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, azureVmsTable, azureSyncRunsTable, cioShadowNotesTable } from "@workspace/db";
+import { db, azureVmsTable, azureSyncRunsTable, cioShadowNotesTable, usersTable } from "@workspace/db";
 import type { AzureSyncDiff, AzureSyncFieldChange } from "@workspace/db";
 import { eq, asc, desc, ilike, or, and, notInArray } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getAzureConfig, fetchAzureVms } from "../lib/azure";
 import type { AzureVmRecord } from "../lib/azure";
 import { summarizeVmRisks, flagVmRisks } from "../lib/azure_risk";
+import { sendReportEmail, isEmailConfigured } from "../lib/email";
 
 // Monday (ISO week start) for a YYYY-MM-DD date, used to scope the auto-created
 // CIO shadow note to the current reporting week.
@@ -315,6 +316,50 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
       alertedCount = newlyHighRisk.length;
     } catch (e) {
       req.log.error({ err: e }, "Failed to create Azure risk shadow note");
+    }
+
+    // Push the alert to the CIO(s) by email so newly-introduced risks surface
+    // even when they're not signed in. Degrades gracefully: no email if SMTP is
+    // unconfigured or no active CIO has an address, mirroring the report-email flow.
+    if (isEmailConfigured()) {
+      try {
+        const cios = await db
+          .select({ name: usersTable.name, email: usersTable.email })
+          .from(usersTable)
+          .where(and(eq(usersTable.role, "cio"), eq(usersTable.isActive, true)));
+        const recipients = cios.map((c) => c.email).filter((e): e is string => !!e);
+        if (recipients.length > 0) {
+          const count = newlyHighRisk.length;
+          const subject = `Azure alert: ${count} newly high-risk VM${count === 1 ? "" : "s"}`;
+          const textLines = newlyHighRisk.map((v) => {
+            const rg = v.resourceGroup ? ` (${v.resourceGroup})` : "";
+            return `- ${v.name}${rg} — ${v.flags.join(", ")}`;
+          });
+          const text =
+            `The latest Azure sync flagged ${count} newly high-risk VM${count === 1 ? "" : "s"}:\n\n` +
+            `${textLines.join("\n")}\n\n` +
+            `Review these on the Azure VMs page and confirm exposure is intended.\n\n` +
+            `Sent automatically by SCCC IT Reporting Platform.`;
+          const htmlItems = newlyHighRisk
+            .map((v) => {
+              const rg = v.resourceGroup
+                ? ` <span style="color:#888">(${v.resourceGroup})</span>`
+                : "";
+              return `<li><strong>${v.name}</strong>${rg} — ${v.flags.join(", ")}</li>`;
+            })
+            .join("");
+          const html =
+            `<p>The latest Azure sync flagged <strong>${count}</strong> newly high-risk VM${count === 1 ? "" : "s"}:</p>` +
+            `<ul>${htmlItems}</ul>` +
+            `<p>Review these on the Azure VMs page and confirm exposure is intended.</p>` +
+            `<p style="color:#888;font-size:12px">Sent automatically by SCCC IT Reporting Platform.</p>`;
+          await sendReportEmail({ to: recipients, subject, text, html });
+          req.log.info({ recipients: recipients.length, count }, "Sent Azure risk digest email");
+        }
+      } catch (e) {
+        // Never let a mail failure break the sync response.
+        req.log.error({ err: e }, "Failed to send Azure risk digest email");
+      }
     }
   }
 
