@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { logger } from "./logger";
+import { pingHost, testNetConnection } from "./net_diag";
 import {
   upsertSwitchByHostname,
   upsertVlanByVlanId,
@@ -457,6 +458,71 @@ export const UPSERT_VLAN_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 };
 
+export const PING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "ping_host",
+    description:
+      "Run a live ICMP ping from the reporting server to a host (hostname or IP) to check whether it is reachable and measure round-trip latency. Use this to diagnose connectivity to switches, servers, gateways, printers, or any device — e.g. when the user asks 'can you ping X' or 'is X up'. The server can only reach devices it has a network path to; internal/private IPs require the server to be on the SCCC network or VPN, so an off-network probe may report unreachable. Always report the outcome to the user in plain language.",
+    parameters: {
+      type: "object",
+      properties: {
+        host: { type: "string", description: "Hostname or IP address to ping, e.g. '192.168.1.1' or 'sw-core-a48'." },
+        count: { type: "integer", description: "Number of echo requests to send (1-8, default 4)." },
+      },
+      required: ["host"],
+    },
+  },
+};
+
+export const TEST_NET_CONNECTION_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "test_net_connection",
+    description:
+      "Test live TCP connectivity from the reporting server to a specific host and port, the way PowerShell's Test-NetConnection -Port does. Use this to check whether a service/port is open and reachable — e.g. HTTPS (443), RDP (3389), SSH (22), SMB (445), DNS (53), a web console, or a switch management port. Returns whether the port is open plus the connection latency. Internal/private hosts require the server to be on the SCCC network or VPN.",
+    parameters: {
+      type: "object",
+      properties: {
+        host: { type: "string", description: "Hostname or IP address, e.g. '10.0.0.5' or 'dc01.sccc.edu'." },
+        port: { type: "integer", description: "TCP port to test (1-65535), e.g. 443, 3389, 22." },
+      },
+      required: ["host", "port"],
+    },
+  },
+};
+
+async function executePingHost(rawArgs: string): Promise<string> {
+  let args: { host?: unknown; count?: unknown };
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON arguments for ping_host";
+  }
+  const host = typeof args.host === "string" ? args.host.trim() : "";
+  const count = Number.isInteger(args.count) ? (args.count as number) : 4;
+  const res = await pingHost(host, count);
+  if (!res.ok && res.error) return `Ping to "${host || "(none)"}" could not run: ${res.error}`;
+  const status = res.reachable ? "REACHABLE" : "NOT reachable (no reply)";
+  return `Ping ${res.host}: ${status}.\n${res.output || "(no output)"}`.slice(0, 4000);
+}
+
+async function executeTestNetConnection(rawArgs: string): Promise<string> {
+  let args: { host?: unknown; port?: unknown };
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON arguments for test_net_connection";
+  }
+  const host = typeof args.host === "string" ? args.host.trim() : "";
+  const port = typeof args.port === "number" ? args.port : NaN;
+  const res = await testNetConnection(host, port);
+  if (res.error === "invalid host") return `Error: "${host}" is not a valid host.`;
+  if (res.error === "invalid port") return `Error: ${String(args.port)} is not a valid TCP port (1-65535).`;
+  if (res.open) return `TCP ${res.host}:${res.port} is OPEN (connected in ${res.latencyMs} ms).`;
+  return `TCP ${res.host}:${res.port} is CLOSED or unreachable${res.error ? ` (${res.error})` : ""}.`;
+}
+
 function cleanStr(v: unknown, max: number): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim();
@@ -625,6 +691,8 @@ export async function runChatWithMemory(
     UPSERT_SWITCH_TOOL,
     UPSERT_VLAN_TOOL,
     SAVE_SHADOW_NOTE_TOOL,
+    PING_TOOL,
+    TEST_NET_CONNECTION_TOOL,
   ];
 
   const done = (reply: string) => ({
@@ -705,6 +773,20 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "save_shadow_note tool failed");
           resultText = "Error: failed to save shadow note";
+        }
+      } else if (call.type === "function" && call.function.name === "ping_host") {
+        try {
+          resultText = await executePingHost(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "ping_host tool failed");
+          resultText = "Error: failed to run ping";
+        }
+      } else if (call.type === "function" && call.function.name === "test_net_connection") {
+        try {
+          resultText = await executeTestNetConnection(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "test_net_connection tool failed");
+          resultText = "Error: failed to run TCP connectivity test";
         }
       }
       messages.push({ role: "tool", tool_call_id: call.id, content: resultText });
