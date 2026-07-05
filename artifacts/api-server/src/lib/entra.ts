@@ -20,11 +20,31 @@ const GRAPH_ME =
   "https://graph.microsoft.com/v1.0/me?$select=id,displayName,givenName,surname,mail,userPrincipalName,jobTitle";
 
 export function getEntraConfig(): EntraConfig | null {
-  const tenantId = process.env.ENTRA_TENANT_ID;
-  const clientId = process.env.ENTRA_CLIENT_ID;
-  const clientSecret = process.env.ENTRA_CLIENT_SECRET;
   const redirectUri = process.env.ENTRA_REDIRECT_URI;
-  if (!tenantId || !clientId || !clientSecret || !redirectUri) return null;
+  if (!redirectUri) return null;
+
+  // Prefer dedicated ENTRA_* SSO credentials. If none are set, fall back to the
+  // AZURE_* service-principal app registration so a single Entra app can power
+  // both VM inventory and staff sign-in — the operator just adds the redirect
+  // URI (above) plus an access gate. Each credential set is taken all-or-nothing
+  // so a client id from one app is never paired with a secret from the other.
+  const entraTrio = [
+    process.env.ENTRA_TENANT_ID,
+    process.env.ENTRA_CLIENT_ID,
+    process.env.ENTRA_CLIENT_SECRET,
+  ];
+  const azureTrio = [
+    process.env.AZURE_TENANT_ID,
+    process.env.AZURE_CLIENT_ID,
+    process.env.AZURE_CLIENT_SECRET,
+  ];
+  const trio = entraTrio.every(Boolean)
+    ? entraTrio
+    : azureTrio.every(Boolean)
+      ? azureTrio
+      : null;
+  if (!trio) return null;
+  const [tenantId, clientId, clientSecret] = trio as [string, string, string];
   return { tenantId, clientId, clientSecret, redirectUri };
 }
 
