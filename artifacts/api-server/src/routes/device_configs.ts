@@ -11,7 +11,7 @@ import { Router } from "express";
 import { db, deviceConfigsTable, usersTable } from "@workspace/db";
 import { eq, desc, or, ilike } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { requireAuth } from "../lib/auth";
+import { requireAuth } from "./auth";
 
 const router = Router();
 
