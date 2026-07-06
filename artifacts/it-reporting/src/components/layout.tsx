@@ -182,16 +182,16 @@ function QuickAddMaintenanceDialog({
   );
 }
 
-function QuickAddMenu() {
+function QuickAddMenu({ iconOnly = false }: { iconOnly?: boolean }) {
   const [taskOpen, setTaskOpen] = useState(false);
   const [maintOpen, setMaintOpen] = useState(false);
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Zap className="h-4 w-4 mr-2" />
-            Quick Add
+          <Button variant="outline" size={iconOnly ? "icon" : "sm"} title="Quick Add">
+            <Zap className="h-4 w-4" />
+            {!iconOnly && <span className="ml-2">Quick Add</span>}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -328,17 +328,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button:hover]:bg-white/20">
-            <QuickAddMenu />
+            <QuickAddMenu iconOnly />
           </div>
 
           <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
             <Button
               variant="outline"
               size="sm"
-              className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              className="border-violet-400/30 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30 hover:text-white"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Ask AI</span>
+              <Sparkles className="h-4 w-4 mr-1.5" />
+              Fred
             </Button>
           </Link>
 

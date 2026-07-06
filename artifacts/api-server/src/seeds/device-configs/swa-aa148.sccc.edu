@@ -1,0 +1,766 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 04:49:52 =~=~=~=~=~=~=~=~=~=~=~=
+sho running-config 
+Current configuration:
+!
+!Version ArubaOS-CX PL.10.13.1031
+!export-password: default
+hostname swa-aa148
+user admin group administrators password ciphertext AQBapaqtd/1YjCf1zV7ADnyKJA8y7DfCIBHBxi3dWCEUqHnVYgAAAJYKcEdT9cYdc0/QhwkFZPFjXXWLYGksINTWByohNaq13jxeeE2a8SOap8nD83GqRdMzQLogAQB7Xx2gn23rQrzudva3JQcDTqXcqHtv/1LknEzAQ2W3wOs7hDsXn+M7xSjx
+clock timezone us/central
+ntp server 10.40.1.77
+ntp enable
+!
+!
+tacacs-server auth-type chap
+!
+!
+!
+!
+ssh server vrf default
+ssh key-exchange-algorithms curve25519-sha256 curve25519-sha256@libssh.org ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 diffie-hellman-group-exchange-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group14-sha256 diffie-hellman-group14-sha1
+crypto pki ta-profile DigicertIntermediate
+    revocation-check OCSP
+    ocsp url primary http://crl3.digicert.com/DigiCertGlobalRootCA.crl
+    ta-certificate
+        -----BEGIN CERTIFICATE-----
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                       MIIEvjCCA6agAwIBAgIQBtjZBNVYQ0b2ii+nVCJ+xDANBgkqhkiG9w0BAQsFADBh
+        MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
+        d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExdEaWdpQ2VydCBHbG9iYWwgUm9vdCBD
+        QTAeFw0yMTA0MTQwMDAwMDBaFw0zMTA0MTMyMzU5NTlaME8xCzAJBgNVBAYTAlVT
+        MRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxKTAnBgNVBAMTIERpZ2lDZXJ0IFRMUyBS
+        U0EgU0hBMjU2IDIwMjAgQ0ExMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+        AQEAwUuzZUdwvN1PWNvsnO3DZuUfMRNUrUpmRh8sCuxkB+Uu3Ny5CiDt3+PE0J6a
+        qXodgojlEVbbHp9YwlHnLDQNLtKS4VbL8Xlfs7uHyiUDe5pSQWYQYE9XE0nw6Ddn
+        g9/n00tnTCJRpt8OmRDtV1F0JuJ9x8piLhMbfyOIJVNvwTRYAIuE//i+p1hJInuW
+        raKImxW8oHzf6VGo1bDtN+I2tIJLYrVJmuzHZ9bjPvXj1hJeRPG/cUJ9WIQDgLGB
+        Afr5yjK7tI4nhyfFK3TUqNaX3sNk+crOU6JWvHgXjkkDKa77SU+kFbnO8lwZV21r
+        eacroicgE7XQPUDTITAHk+qZ9QIDAQABo4IBgjCCAX4wEgYDVR0TAQH/BAgwBgEB
+        /wIBADAdBgNVHQ4EFgQUt2ui6qiqhIx56rTaD5iyxZV2ufQwHwYDVR0jBBgwFoAU
+        A95QNVbRTLtm8KPiGxvDl7I90VUwDgYDVR0PAQH/BAQDAgGGMB0GA1UdJQQWMBQG
+        CCsGAQUFBwMBBggrBgEFBQcDAjB2BggrBgEFBQcBAQRqMGgwJAYIKwYBBQUHMAGG
+        GGh0dHA6Ly9vY3NwLmRpZ2ljZXJ0LmNvbTBABggrBgEFBQcwAoY0aHR0cDovL2Nh
+        Y2VydHMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0R2xvYmFsUm9vdENBLmNydDBCBgNV
+        HR8EOzA5MDegNaAzhjFodHRwOi8vY3JsMy5kaWdpY2VydC5jb20vRGlnaUNlcnRH
+        bG9iYWxSb290Q0EuY3JsMD0GA1UdIAQ2MDQwCwYJYIZIAYb9bAIBMAcGBWeBDAEB
+        MAgGBmeBDAECATAIBgZngQwBAgIwCAYGZ4EMAQIDMA0GCSqGSIb3DQEBCwUAA4IB
+        AQCAMs5eC91uWg0Kr+HWhMvAjvqFcO3aXbMM9yt1QP6FCvrzMXi3cEsaiVi6gL3z
+        ax3pfs8LulicWdSQ0/1s/dCYbbdxglvPbQtaCdB73sRD2Cqk3p5BJl+7j5nL3a7h
+        qG+fh/50tx8bIKuxT8b1Z11dmzzp/2n3YWzW2fP9NsarA4h20ksudYbj/NhVfSbC
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                       EXffPgK2fPOre3qGNm+499iTcc+G33Mw+nur7SpZyEKEOxEXGlLzyQ4UfaJbcme6
+        ce1XR2bFuAJKZTRei9AqPCCcUZlM51Ke92sRKw2Sfh3oius2FkOH6ipjv3U/697E
+        A7sKPPcw7+uvTPyLNhBzPvOk
+        -----END CERTIFICATE-----
+        END_OF_CERTIFICATE
+crypto pki ta-profile DigicertRoot
+    revocation-check OCSP
+    ocsp url primary http://crl3.digicert.com/DigiCertGlobalRootCA.crl
+    ta-certificate
+        -----BEGIN CERTIFICATE-----
+        MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdWrJWZHHSjANBgkqhkiG9w0BAQUFADBh
+        MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
+        d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExdEaWdpQ2VydCBHbG9iYWwgUm9vdCBD
+        QTAeFw0wNjExMTAwMDAwMDBaFw0zMTExMTAwMDAwMDBaMGExCzAJBgNVBAYTAlVT
+        MRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5j
+        b20xIDAeBgNVBAMTF0RpZ2lDZXJ0IEdsb2JhbCBSb290IENBMIIBIjANBgkqhkiG
+        9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4jvhEXLeqKTTo1eqUKKPC3eQyaKl7hLOllsB
+        CSDMAZOnTjC3U/dDxGkAV53ijSLdhwZAAIEJzs4bg7/fzTtxRuLWZscFs3YnFo97
+        nh6Vfe63SKMI2tavegw5BmV/Sl0fvBf4q77uKNd0f3p4mVmFaG5cIzJLv07A6Fpt
+        43C/dxC//AH2hdmoRBBYMql1GNXRor5H4idq9Joz+EkIYIvUX7Q6hL+hqkpMfT7P
+        T19sdl6gSzeRntwi5m3OFBqOasv+zbMUZBfHWymeMr/y7vrTC0LUq7dBMtoM1O/4
+        gdW7jVg/tRvoSSiicNoxBN33shbyTApOB6jtSj1etX+jkMOvJwIDAQABo2MwYTAO
+        BgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUA95QNVbR
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                       TLtm8KPiGxvDl7I90VUwHwYDVR0jBBgwFoAUA95QNVbRTLtm8KPiGxvDl7I90VUw
+        DQYJKoZIhvcNAQEFBQADggEBAMucN6pIExIK+t1EnE9SsPTfrgT1eXkIoyQY/Esr
+        hMAtudXH/vTBH1jLuG2cenTnmCmrEbXjcKChzUyImZOMkXDiqw8cvpOp/2PV5Adg
+        06O/nVsJ8dWO41P0jmP6P6fbtGbfYmbW0W5BjfIttep3Sp+dWOIrWcBAI+0tKIJF
+        PnlUkiaY4IBIqDfv8NZ5YBberOgOzW6sRBc4L0na4UU+Krk2U886UAb3LujEV0ls
+        YSEY1QSteDwsOoBrp+uvFRTp2InBuThs4pFsiv9kuXclVzDAGySj4dzp30d8tbQk
+        CAUw7C29C79Fv1C5qfPrmAESrciIxpg0X40KPMbp1ZWVbd4=
+        -----END CERTIFICATE-----
+        END_OF_CERTIFICATE
+debug rpvst event vlan 1 severity info
+crypto pki certificate sw-aa148
+crypto pki application https-server certificate sw-aa148
+vlan 1
+    ip igmp snooping enable
+vlan 200
+    name SLC_students
+vlan 201
+    name SLC-Guest2-Aruba
+vlan 202
+    name SLC-Staff-Aruba
+vlan 203
+    name SLC-ESports-Aruba
+vlan 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name SLC-Student2-Aruba
+vlan 300
+    name VLAN0300
+vlan 301
+    name VOIP-A
+    voice
+    ip igmp snooping enable
+vlan 302
+    name VOIP-AA
+    voice
+    ip igmp snooping enable
+vlan 303
+    name VOIP-S
+    voice
+vlan 304
+    name VOIP-H
+vlan 305
+    name VOIP-COS
+vlan 306
+    name VOIP-V
+vlan 307
+    name VOIP-SLC
+vlan 308
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name VOIP-SLCCDE
+vlan 309
+    name VOIP-SLCAB
+vlan 310
+    name VOIP-B
+vlan 311
+    name VOIP-M
+vlan 312
+    name VOIP-C
+vlan 313
+    name VOIP-E
+    voice
+    ip igmp snooping enable
+vlan 314
+    name VOIP-EA
+vlan 316
+    name VOIP-T
+    voice
+    ip igmp snooping enable
+vlan 317
+    name VOIP-TA
+    voice
+vlan 318
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name VOIP-TB
+    voice
+vlan 319
+    name VOIP-TD
+    voice
+vlan 320
+    name VOIP-TT
+    voice
+vlan 321
+    name VOIP-SLCT
+vlan 322
+    name VOIP-CAH
+vlan 332
+    name TestingAndGI
+vlan 348
+    name PSEC-ServersGi2/31
+vlan 349
+    name PSEC-A-AA
+vlan 350
+    name PSEC-S-B-H-Cos-V-M
+vlan 351
+    name PSEC-SLC
+vlan 352
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name PSEC-T-TA-TB-TD-TT
+vlan 353
+    name PSEC-C-E-EAnnex-CAH
+vlan 372
+    name DAC-Servers
+vlan 373
+    name DAC-A-AA
+vlan 375
+    name SC-IoT
+vlan 377
+    name DAC-C-E-Eannex-CAH
+vlan 401
+    name Servers
+vlan 402
+    name Printers
+vlan 403
+    name Citrix
+vlan 404
+    name 3CXPBX
+    voice
+    ip igmp snooping enable
+vlan 405
+    name DigitalSignage
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 408
+    name DR-site-equipment
+vlan 410
+    name HPiSCSI-410
+vlan 414
+    name Nutanix-IPMI
+vlan 415
+    name Nutan-VMWareVmotion
+vlan 416
+    name Nutanix-VMMgmtCVMClst
+vlan 500
+    name Wireless1
+vlan 501
+    name Wireless2
+vlan 502
+    name WLAN-APs-WCS
+vlan 504
+    name WLAN-Private
+vlan 506
+    name WLAN-IPads
+vlan 508
+    name WLAN-Public
+vlan 518
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name OSPF-SLC151-9KA48
+vlan 564
+    name Projectors
+vlan 568
+    name HDMI
+vlan 601
+    name LAN2
+vlan 610
+    name IT-Staff
+vlan 611
+    name OSPF1
+vlan 614
+    name OSPF10-AA144-A48
+vlan 615
+    name OSPF10-T48-A48
+vlan 616
+    name OSPF10-Epworth
+vlan 617
+    name OSPF10-TechSchool
+vlan 618
+    name OSPF-SLC151-Aruba
+vlan 619
+    name OSPF10-V201
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 620
+    name OSPF10-B101
+vlan 621
+    name OSPF10-TA107
+vlan 622
+    name OSPF10-Temp
+vlan 623
+    name OSPF10-Temp2
+vlan 624
+    name OSPF10-Temp3
+vlan 625
+    name OSPF10-Temp4
+vlan 626
+    name OSPF10-Temp5
+vlan 660
+    name VDI-Desktops
+vlan 670
+    name P2P-AA109-AA144
+vlan 680
+    name A001
+vlan 701
+    name A144-Staff
+vlan 702
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name A103
+vlan 703
+    name A136
+vlan 706
+    name A149
+vlan 707
+    name A166A
+vlan 708
+    name A166
+vlan 722
+    name ArubaAP-A
+vlan 723
+    name ArubaAP-Outdoor
+vlan 726
+    name AA131
+vlan 728
+    name AA137
+vlan 729
+    name AA155
+vlan 730
+    name AA159
+vlan 731
+    name AA163
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 733
+    name AA105-Wireless-Staff
+vlan 734
+    name AA101
+vlan 735
+    name AA109
+vlan 736
+    name AA112
+vlan 737
+    name AA113
+vlan 740
+    name test-vlan
+vlan 749
+    name CosmoBuilding
+vlan 750
+    name ArubaAP-COS
+vlan 764
+    name V103-AgLab
+vlan 765
+    name AgBuilding
+vlan 766
+    name ArubaAP-V
+vlan 772
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name E117-E213-EpworthLabs
+vlan 773
+    name EpworthBuilding
+vlan 774
+    name MM-Equipment-in-E
+vlan 775
+    name ArubaAP-E
+vlan 780
+    name ColvinBuilding
+vlan 788
+    name H109-HumLab
+vlan 789
+    name HumanitiesBuilding
+vlan 790
+    name HumanitiesTest
+vlan 791
+    name ArubaAP-H
+vlan 801
+    name TechSchool-Data
+vlan 802
+    name TechSchoolLabs
+vlan 803
+    name TechLectureCapture
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 804
+    name TechHVAC
+vlan 806
+    name ArubaAP-T
+vlan 809
+    name T-WorkForceCenter
+vlan 816
+    name MaintenanceBuilding
+vlan 817
+    name HVAC
+vlan 818
+    name Fire-Alarm-System
+vlan 819
+    name HVAC-maintenance
+vlan 820
+    name Gym-Pressbox
+vlan 821
+    name SA-building
+vlan 824
+    name SLC-Buildings
+vlan 826
+    name ArubaAP-SLC
+vlan 832
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name SU108-Bookstore
+vlan 833
+    name StudentBuilding
+vlan 835
+    name ArubaAP-S
+vlan 840
+    name CAH-General
+vlan 841
+    name CAH-Labs
+vlan 842
+    name CAH-Sim-Record
+vlan 845
+    name ArubaAP-CAH
+vlan 848
+    name SharpChampions
+vlan 997
+    name TempVoiceVlan997
+vlan 998
+    name TempVoiceVlan998
+vlan 999
+    name Gym-Video
+spanning-tree mode rpvst
+spanning-tree
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree priority 15
+spanning-tree vlan 1,303,402,610,611,614-626,801-804,806,809,820,848
+spanning-tree vlan 1 priority 15
+spanning-tree vlan 402 priority 15
+spanning-tree vlan 610 priority 15
+spanning-tree vlan 614 priority 15
+spanning-tree vlan 615 priority 15
+spanning-tree vlan 616 priority 15
+spanning-tree vlan 617 priority 15
+spanning-tree vlan 618 priority 15
+spanning-tree vlan 619 priority 15
+spanning-tree vlan 620 priority 15
+spanning-tree vlan 621 priority 15
+spanning-tree vlan 622 priority 15
+spanning-tree vlan 623 priority 15
+spanning-tree vlan 624 priority 15
+spanning-tree vlan 625 priority 15
+spanning-tree vlan 626 priority 15
+spanning-tree vlan 801 priority 15
+spanning-tree vlan 802 priority 15
+spanning-tree vlan 803 priority 15
+spanning-tree vlan 804 priority 15
+spanning-tree vlan 806 priority 15
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree vlan 809 priority 15
+spanning-tree vlan 820 priority 15
+spanning-tree vlan 848 priority 15
+interface 1/1/1
+    description AAP-AA148
+    no shutdown
+    vlan trunk native 722
+    vlan trunk allowed 1,201-204,302,375,402,610,722,733,820,999
+interface 1/1/2
+    description Printer - for setup
+    no shutdown
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 1/1/3
+    description PRNT - AA148 MFP
+    no shutdown
+    ! invalid config - speed
+    vlan access 402
+interface 1/1/4
+    description COMP - AA148 Sys Admin
+    no shutdown
+    vlan access 610
+interface 1/1/5
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description AAP-Temp-SLC
+    no shutdown
+    speed auto 1g
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/6
+    description AAP-SharpCenter-1
+    no shutdown
+    speed auto 1g
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/7
+    description AAP-SharpCenter-1
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/8
+    description AAP-SharpCenter-1
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/9
+    description FAXGW-Maintenance
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    vlan trunk native 610
+    vlan trunk allowed 302,610
+interface 1/1/10
+    no shutdown
+    vlan trunk native 610
+    vlan trunk allowed 404,610
+interface 1/1/11
+    description 1/1/11 Old Cisco Phone
+    no shutdown
+    vlan access 302
+    spanning-tree port-type admin-edge
+interface 1/1/12
+    no shutdown
+    vlan trunk native 610
+    vlan trunk allowed 302,610
+interface 1/1/13
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/14
+    no shutdown
+    vlan access 375
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 1/1/15
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed 1,203
+interface 1/1/16
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+interface vlan 1
+    ip address 192.168.2.40/16
+    ip dhcp
+        ! ip dhcp is ignored when static ip is configured
+    ip igmp enable
+snmp-server vrf default
+snmp-server system-location AA148
+snmp-server system-contact Louie Lemert
+ip route 0.0.0.0/0 192.168.2.5
+ip dns domain-list sccc.edu
+ip dns server-address 10.40.1.68
+ip dns server-address 10.40.1.77
+!
+!
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               !
+!
+!
+https-server vrf default
+swa-aa148#           sho ver
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2024 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : PL.10.13.1031                                                 
+Build Date   : 2024-07-09 16:35:13 UTC                                       
+Build ID     : ArubaOS-CX:PL.10.13.1031:fe0ff9572b38:202407091608            
+Build SHA    : fe0ff9572b38cc4ab913ab4c52a01acdf013dc1c                      
+Hot Patches  :                                                               
+Active Image : secondary                     
+
+Service OS Version : PL.01.14.0002                 
+BIOS Version       : PL.01.0002                    
+swa-aa148# sho ip int bi
+Invalid input: bi
+swa-aa148# sho ip int biswa-aa148# sho ip int bi ri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            192.168.2.40/16           up/up
+
+
+swa-aa148# sho int sttus
+Unknown interface sttus.
+swa-aa148# sho int sttus    atus
+Unknown interface satus.
+swa-aa148# sho int satus    tatus
+Unknown interface status.
+swa-aa148# sho clock
+Tue May 13 03:50:21 CDT 2025
+System is configured for timezone : US/Central
+swa-aa148# sho cdp nr eighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+1/1/11      SEPF8A5C59E8DC0          Cisco IP Phone 8851      HPM         
+1/1/12      ATA34DBFD18FCFE          Cisco ATA 190            HP          
+1/1/13      SW-AA144-Access.sccc.edu cisco WS-C3750G-48PS     IRS         
+swa-aa148# sho cdp neighbor-info 
+  IFNAME  Specify the interface name 
+  <cr>    
+swa-aa148# sho cdp neighbor-info                       sho lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 4
+Total Neighbor Entries Deleted  : 50
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 50
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/1       f0:5c:19:c6:f5:3e  f0:5c:19:c6:f5:3e            bond0                        120      AAP-AA148                          
+1/1/4       SUR-COS            1c:1a:df:b7:5f:68                                         3601                                        
+1/1/11      10.30.2.231        F8A5C59E8DC0:P1              SW PORT                      180      SEPF8A5C59E8DC0.sccc.edu           
+1/1/13      00:1d:a1:35:8f:00  Gi1/0/18                     GigabitEthernet1/0/18        120      SW-AA144-Access.sccc.edu           
+swa-aa148# sho lldp neighbor-info 
+  IFNAME   Specify the interface name 
+  IFRANGE  Interface range(e.g. 1/1/1-1/1/10) 
+  detail   Show detailed LLDP neighbors on all interfaces 
+  <cr>     
+swa-aa148# sho lldp neighbor-info detail 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 4
+Total Neighbor Entries Deleted  : 50
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 50
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/1
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : AAP-AA148
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : f0:5c:19:c6:f5:3e
+Neighbor Management-Address    : 10.70.22.76
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : f0:5c:19:c6:f5:3e
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/4
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 14
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 14
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Chassis-ID            : SUR-COS
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 1c:1a:df:b7:5f:68
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/11
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 26
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 26
+Neighbor System-Name           : SEPF8A5C59E8DC0.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 8851, V1, sip88xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.2.231
+Neighbor Management-Address    : 10.30.2.231
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : F8A5C59E8DC0:P1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 8.80 W
+PSE Allocated Power Value      : 8.80 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class3
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 4095
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : false
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 4095
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : false
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/13
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : SW-AA144-Access.sccc.edu
+Neighbor System-Description    : Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 15.0(2)SE10a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 03-Nov-16 14:17 by prod_rel_team
+Neighbor Chassis-ID            : 00:1d:a1:35:8f:00
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Management-Address    : 192.168.2.4
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : Gi1/0/18
+Neighbor Port-Desc             : GigabitEthernet1/0/18
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+swa-aa148#           exit

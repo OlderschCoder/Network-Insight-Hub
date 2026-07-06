@@ -1,0 +1,383 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.14 05:30:06 =~=~=~=~=~=~=~=~=~=~=~=
+sho running-config 
+Current configuration:
+!
+!Version ArubaOS-CX FL.10.07.0030
+!export-password: default
+hostname SWA-SLF
+user admin group administrators password ciphertext AQBapRiqbyip1eyHcy5gXY/Vo+Waad3Owag05n4xiefumUDHYgAAAA0T59PZ++8zssROXSAP93xF/C+jnicWJV4roFiO2a/qHRHp2mGf6JcwLfWAq48pkxCO2YrTH7M9RoYzN3ZIO8YEoXdzrWNEw11nfBPM4Yw1Vyo+8JPBGymn9TI/ZlRf6vrt
+user owen.local group administrators password ciphertext AQBapeM7qyfCCSKPvsu7pH3RyEU9HO0GNgjzJ87+SrTDnxkKYgAAACFk1XLm8jroNjHXP9JGtX61/KsV2bag2ACAfDZvUM9Hz8eItMECA+tgTFIbMff89trcvo7AdANf6PaE+RfvO/gxQt5h3g1Xc6QwNZp4rUt1s87mNYlF7GtMlN5qEfxIWCL3
+ntp server 10.40.1.68 iburst
+ntp enable
+!
+!
+!
+!
+!
+!
+logging 10.40.1.232
+ssh server vrf default
+ssh server vrf mgmt
+ssh ciphers aes256-ctr
+ssh key-exchange-algorithms diffie-hellman-group-exchange-sha1
+vsf member 1 
+    type jl660a
+vlan 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 200
+    name SLC_students
+vlan 201
+    name SLC-Students-Aruba
+vlan 202
+    name SLC-Staff-Aruba
+vlan 203
+    name SLC-Appliance-Aruba
+vlan 204
+    name SLC-Guest-Aruba
+vlan 321
+    name VOIP-SLCT
+    voice
+vlan 352
+    name PSEC-T-TA-TB-TD-TT
+vlan 375
+    name SC-IoT
+vlan 404
+    name 3CXPBX-Phone
+vlan 733
+    name AA105-Staff
+vlan 826
+    name ArubaAP-SLC
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree mode rpvst
+spanning-tree
+spanning-tree priority 15
+spanning-tree vlan 1,200-204,321,352,404,733,826
+spanning-tree vlan 1 priority 15
+spanning-tree vlan 201 priority 15
+spanning-tree vlan 202 priority 15
+spanning-tree vlan 203 priority 15
+spanning-tree vlan 204 priority 15
+spanning-tree vlan 321 priority 15
+spanning-tree vlan 352 priority 15
+spanning-tree vlan 404 priority 15
+spanning-tree vlan 733 priority 15
+spanning-tree vlan 826 priority 15
+interface mgmt
+    no shutdown
+    ip dhcp
+interface 1/1/1
+    no shutdown
+    description 1/1/1 CAM..F-In-Front
+    no routing
+    vlan access 352
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/2
+    no shutdown
+    description 1/1/2 CAM..F-In-Front
+    no routing
+    vlan access 352
+    spanning-tree port-type admin-edge
+interface 1/1/3
+    no shutdown
+    description 1/1/3 DAC
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 1/1/4
+    no shutdown
+    description 1/1/4 DAC
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 1/1/5
+    no shutdown
+    description 1/1/5 open
+    no routing
+    vlan access 200
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 1/1/6
+    no shutdown
+    description 1/1/6 open
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/7
+    no shutdown
+    description 1/1/7 VOIP-SLCT
+    no routing
+    vlan access 321
+    spanning-tree port-type admin-edge
+interface 1/1/8
+    no shutdown
+    description 1/1/8 AP-SLCF
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,733,826
+interface 1/1/9
+    no shutdown
+    description 1/1/9
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/10
+    no shutdown
+    description 1/1/10
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/11
+    no shutdown
+    description 1/1/11
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/12
+    no shutdown
+    description 1/1/12
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/13
+    no shutdown
+    description 1/1/13
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/14
+    no shutdown
+    description 1/1/14 F3-port6
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/15
+    no shutdown
+    description 1/1/15
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/16
+    no shutdown
+    description 1/1/16
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/17
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 1/1/17
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/18
+    no shutdown
+    description 1/1/18
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/19
+    no shutdown
+    description 1/1/19
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/20
+    no shutdown
+    description 1/1/20
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/21
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    description 1/1/21
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/22
+    no shutdown
+    description 1/1/22
+    no routing
+    vlan access 200
+    spanning-tree port-type admin-edge
+interface 1/1/23
+    no shutdown
+    description 1/1/23 DAC
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 1/1/24
+    no shutdown
+    description 1/1/24 UPS
+    no routing
+    vlan access 1
+interface 1/1/25
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    description Uplink to COS-Fiber switch
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed 1,200-204,321,352,375,404,733,826
+interface 1/1/26
+    no shutdown
+    no routing
+    vlan access 1
+interface 1/1/27
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed 1,200-204,321,352,404,733,826
+interface 1/1/28
+    no shutdown
+    no routing
+    vlan access 1
+interface vlan 1
+    ip address 192.168.2.178/16
+    no ip dhcp
+    ip pim-sparse enable
+snmp-server community 2006sccc
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   access-level rw
+snmp-server community sccc
+ip route 0.0.0.0/0 192.168.2.1
+ip dns domain-name sccc.edu
+ip dns server-address 10.40.1.68
+ip dns server-address 10.40.1.77
+!
+!
+!
+!
+!
+router pim
+    enable
+https-server vrf default
+https-server vrf mgmt
+SWA-SLF#               sho ver
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2021 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : FL.10.07.0030                                                 
+Build Date   : 2021-09-21 18:29:51 UTC                                       
+Build ID     : ArubaOS-CX:FL.10.07.0030:4a3777072c7a:202109211719            
+Build SHA    : 4a3777072c7abb9b48fadfb8f3487220a5061cab                      
+Active Image : primary                       
+
+Service OS Version : FL.01.09.0002                 
+BIOS Version       : FL.01.0002                    
+SWA-SLF# sho ip in bri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            192.168.2.178/16          up/up
+
+
+SWA-SLF# sho clock
+Wed May 14 09:30:37 UTC 2025
+System is configured for timezone : UTC
+SWA-SLF# sho int status
+Unknown interface status.
+SWA-SLF# sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+1/1/25      SW-COS109.sccc.edu       cisco WS-C3750G-48PS     IRS         
+SWA-SLF# sho cdp neighbor-info de                    lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 2
+Total Neighbor Entries Deleted  : 10
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 10
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/8       84:d4:7e:cb:c7:1a  84:d4:7e:cb:c7:1a            bond0                        120      AP-SLCF                            
+1/1/25      00:1a:2f:fb:41:80  Gi2/0/1                      GigabitEthernet2/0/1         120      SW-COS109.sccc.edu                 
+SWA-SLF# sho lldp neighbor-info det
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 2
+Total Neighbor Entries Deleted  : 10
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 10
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/8
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 10
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 10
+Neighbor Chassis-Name          : AP-SLCF
+Neighbor Chassis-Description   : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:cb:c7:1a
+Neighbor Management-Address    : 10.80.26.70
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:cb:c7:1a
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/25
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor Chassis-Name          : SW-COS109.sccc.edu
+Neighbor Chassis-Description   : Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+Neighbor Chassis-ID            : 00:1a:2f:fb:41:80
+Neighbor Management-Address    : 192.168.2.19
+Chassis Capabilities Available : Bridge, Router
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : Gi2/0/1
+Neighbor Port-Desc             : GigabitEthernet2/0/1
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : false
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_XFD
+Neighbor MAU type              : 1000 BASESXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+SWA-SLF#     exit

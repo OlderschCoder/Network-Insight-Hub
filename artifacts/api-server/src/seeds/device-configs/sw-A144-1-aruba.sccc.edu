@@ -1,0 +1,3272 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 04:22:49 =~=~=~=~=~=~=~=~=~=~=~=
+sho runin  ng ing-config 
+Current configuration:
+!
+!Version ArubaOS-CX FL.10.10.1070
+!export-password: default
+hostname SW-A144-1-aruba
+domain-name sccc.edu
+user admin group administrators password ciphertext AQBapYB4UJIHKpxfruZwLNh3/F2VH3+tQ0zvmkLjuT+JrSsCYgAAAN566m+4gxZYYFUdsFVdM5QJ87AWFw6QMlLBn+rq0cNI2xkWe8xKf5j3rbznTZSpoTz0eggXyQ42CJuzFyx+leExb1G/62Ciz3lu6/GTw+fSGslCb5vDWlj9SiOoHPCdS1ep
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+ntp server pool.ntp.org minpoll 4 maxpoll 4 iburst
+ntp enable
+!
+!
+!
+!
+!
+!
+ssh server vrf default
+ssh server vrf mgmt
+vsf member 1 
+    type jl659a
+    link 1 1/1/50
+    link 2 1/1/49
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vsf member 2 
+    type jl659a
+    link 1 2/1/50
+    link 2 2/1/49
+vsf member 3 
+    type jl659a
+    link 1 3/1/50
+    link 2 3/1/49
+vsf member 4 
+    type jl659a
+    link 1 4/1/50
+    link 2 4/1/49
+vsf member 5 
+    type jl659a
+    link 1 5/1/50
+    link 2 5/1/49
+vlan 1
+vlan 2
+    name san00
+vlan 10
+    name videovlan10
+vlan 200
+    name slc_students
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 201
+    name slc-guest-aruba
+vlan 202
+    name slc-staff-aruba
+vlan 203
+    name slc-appliance-aruba
+vlan 204
+    name slc-students-aruba
+vlan 301
+    name voip-a
+    voice
+vlan 348
+    name psec-servers
+vlan 375
+    name sc-iot
+vlan 401
+    name main_server_vlan
+vlan 402
+    name printers
+vlan 405
+    name digitalsignage
+vlan 564
+    name projectors
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 568
+    name HDMI
+vlan 610
+    name it-staff
+vlan 622
+    name OSPF10-A144-1
+vlan 701
+    name a144-staff
+vlan 702
+    name a163-tesingcenter
+vlan 703
+    name Unknown_703
+vlan 706
+    name a149
+vlan 707
+    name a153
+vlan 708
+    name a166
+vlan 714
+    name a192
+vlan 722
+    name arubaap-a
+vlan 723
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name arubaap-outdoor
+vlan 726
+    name Unknown_726
+vlan 728
+    name aa137
+vlan 729
+    name aa155
+vlan 730
+    name aa159
+vlan 731
+    name aa163
+vlan 733
+    name aa105-staff-wireless
+vlan 817
+    name hvac-maintenance
+spanning-tree mode rpvst
+spanning-tree
+spanning-tree priority 10
+spanning-tree vlan 1,2,10,200-204,301,348,375,401,402,405,564,568,610,622,701-703,706-708,714,722,723,726,728-731,733,817
+spanning-tree vlan 1 priority 10
+spanning-tree vlan 2 priority 10
+spanning-tree vlan 10 priority 10
+spanning-tree vlan 200 priority 10
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree vlan 201 priority 10
+spanning-tree vlan 202 priority 10
+spanning-tree vlan 203 priority 10
+spanning-tree vlan 204 priority 10
+spanning-tree vlan 301 priority 10
+spanning-tree vlan 348 priority 10
+spanning-tree vlan 375 priority 10
+spanning-tree vlan 401 priority 10
+spanning-tree vlan 402 priority 10
+spanning-tree vlan 405 priority 10
+spanning-tree vlan 564 priority 10
+spanning-tree vlan 568 priority 15
+spanning-tree vlan 610 priority 10
+spanning-tree vlan 622 priority 10
+spanning-tree vlan 701 priority 10
+spanning-tree vlan 702 priority 10
+spanning-tree vlan 703 priority 10
+spanning-tree vlan 706 priority 10
+spanning-tree vlan 707 priority 10
+spanning-tree vlan 708 priority 10
+spanning-tree vlan 714 priority 10
+spanning-tree vlan 722 priority 10
+spanning-tree vlan 723 priority 10
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree vlan 726 priority 10
+spanning-tree vlan 728 priority 10
+spanning-tree vlan 729 priority 10
+spanning-tree vlan 730 priority 10
+spanning-tree vlan 731 priority 10
+spanning-tree vlan 733 priority 10
+spanning-tree vlan 817 priority 10
+interface mgmt
+    no shutdown
+    ip dhcp
+interface 1/1/1
+    description port 1/1/1 TV-Library-Pod
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+    power-over-ethernet pre-std-detect
+    power-over-ethernet assigned-class 4
+interface 1/1/2
+    description 1/1/2 VC-A169
+    no shutdown
+    no routing
+    vlan trunk native 10
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 10,301
+interface 1/1/3
+    description 1/1/3 VC-AA158
+    no shutdown
+    no routing
+    vlan trunk native 10
+    vlan trunk allowed 10,301
+interface 1/1/4
+    description 1/1/4 OPEN VC
+    no shutdown
+    no routing
+    vlan trunk native 10
+    vlan trunk allowed 10,301
+interface 1/1/5
+    description 1/1/5 VC-A163
+    no shutdown
+    no routing
+    vlan trunk native 10
+    vlan trunk allowed 10,301
+interface 1/1/6
+    description 1/1/6 SW-PIONEER NETWORK
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 10
+    vlan trunk allowed 10,301
+interface 1/1/7
+    description 1/1/7 OPEN AP possibly bad
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/8
+    description 1/1/8 AP-A103
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/9
+    description 1/1/9 AP-A111
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/10
+    description 1/1/10 AP-A134
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/11
+    description 1/1/11 AP-A136
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/12
+    description 1/1/12 AP-A138
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/13
+    description 1/1/13 AP-A140
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/14
+    description 1/1/14 AP-A149
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/15
+    description 1/1/15 AP-A153
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/16
+    description 1/1/16 AP-A163
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/17
+    description 1/1/17 AP-A166-1
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/18
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 1/1/18 AP-A166-2
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/19
+    description 1/1/19 AP-A172
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/20
+    description 1/1/20 AP-A169
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/21
+    description 1/1/21 AP-A177
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/22
+    description 1/1/22 AP-A193
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/23
+    description 1/1/23 AP-AA001
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/24
+    description 1/1/24 AP-AA101
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/25
+    description 1/1/25 AP-AA112
+    no shutdown
+    no routing
+    vlan trunk native 722
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/26
+    description 1/1/26 AP-AA113
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/27
+    description 1/1/27 AP-AA137
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/28
+    description 1/1/28 AP-AA140
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/29
+    description 1/1/29 AP-AA154
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/30
+    description 1/1/30 AP-AA163
+    no shutdown
+    no routing
+    vlan trunk native 722
+    vlan trunk allowed 1,200-204,375,722,733
+interface 1/1/31
+    description 1/1/31 COMP AA159 Security Office
+    no shutdown
+    no routing
+    vlan trunk native 348
+    vlan trunk allowed 301,348
+interface 1/1/32
+    description DAC connection
+    no shutdown
+    no routing
+    vlan access 375
+interface 1/1/33
+    description DAC connection
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 375
+interface 1/1/34
+    description 1/1/34 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 348
+    vlan trunk allowed 301,348
+interface 1/1/35
+    description 1/1/35 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 348
+    vlan trunk allowed 301,348
+interface 1/1/36
+    description 1/1/36 PH-A155
+    no shutdown
+    no routing
+    vlan trunk native 707
+    vlan trunk allowed 301,707
+interface 1/1/37
+    no shutdown
+    no routing
+    vlan access 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/38
+    description 1/1/38 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed 301,707
+interface 1/1/39
+    description 1/1/39 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 707
+    vlan trunk allowed 301,707
+interface 1/1/40
+    description 1/1/41 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 707
+    vlan trunk allowed 301,707
+interface 1/1/41
+    description 1/1/41 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 707
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,707
+interface 1/1/42
+    description 1/1/42 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 707
+    vlan trunk allowed 301,707
+interface 1/1/43
+    description A151-Braille-Printer
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree port-type admin-edge
+interface 1/1/44
+    description A151-Braille-Printer
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree port-type admin-edge
+interface 1/1/45
+    description 1/1/45 PRNT Admissions Color
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 402
+interface 1/1/46
+    description 1/1/46 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 1/1/47
+    description 1/1/47 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 1,402,702
+interface 1/1/48
+    description 1/1/40 PRNT - Admissions BW
+    no shutdown
+    no routing
+    vlan access 402
+interface 1/1/49
+    no shutdown
+interface 1/1/50
+    no shutdown
+interface 1/1/51
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description SW-AA144 connection
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed 1-2,10,200-204,301,348,375,401-402,405,564,568,610,622,701-703,706-708,714,722-723,726,728-731,733,817
+interface 1/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/1
+    description 2/1/1 SIPGW-A144
+    no shutdown
+    no routing
+    vlan trunk native 301
+    vlan trunk allowed 301
+interface 2/1/2
+    description 2/1/2 PH-AA159 Security Office
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/3
+    description 2/1/3 COMP-A161-Login Test Cntr
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 2/1/4
+    description 2/1/4 PH-AA159 Security Office
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/5
+    description 2/1/5 PH-A149B
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/6
+    description 2/1/6 PH-A151
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/7
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 2/1/7 PH-A159
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 2/1/8
+    description 2/1/8 PH-A127
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/9
+    description 2/1/9 PH-A123
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/10
+    description 2/1/10 PH-A102
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/11
+    description 2/1/11 PH-AA159
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/12
+    description 2/1/12 PH-AA130-temp wall jack
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/13
+    description 2/1/13 PH-A134-H40
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/14
+    description 2/1/14 PH-A125
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 2/1/15
+    description 2/1/15 PH-A149A
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/16
+    description 2/1/16 PH-A150
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/17
+    description 2/1/17 PH-A178
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/18
+    description 2/1/18 Unknown
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/19
+    description 2/1/19 PH-AA132
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/20
+    description 2/1/20 PH-A160
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/21
+    description 2/1/21 PH-AA130
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/22
+    description 2/1/22 PH-A134A
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/23
+    description 2/1/23 PH-A134B
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/24
+    description 2/1/24 PH-A104B
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/25
+    description 2/1/25 PH-A179
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/26
+    description 2/1/26 PH-A104A
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/27
+    description 2/1/27 PH-A135-W
+    no shutdown
+    no routing
+    vlan trunk native 405
+    vlan trunk allowed 301,405
+    power-over-ethernet pre-std-detect
+interface 2/1/28
+    description 2/1/28 PH-A120
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/29
+    description 2/1/29 PH-A135
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/30
+    description 2/1/30 PH-A135A
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/31
+    description 2/1/31 PH-A104
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/32
+    description 2/1/32 PH-A195
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/33
+    description 2/1/33 PH-A181
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 2/1/34
+    description 2/1/34 PH-A136
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/35
+    description 2/1/35 PH-A179
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/36
+    description 2/1/36 PH-A134
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/37
+    description 2/1/37 PH-A180
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/38
+    description 2/1/38 PH-A185
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/39
+    description 2/1/39 PH-A187
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+    power-over-ethernet pre-std-detect
+interface 2/1/40
+    description 2/1/40 PH-A184
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/41
+    description 2/1/41 PH-A132A
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/42
+    description 2/1/42 PH-A132
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/43
+    description 2/1/43 PH-A135-CENTER-WINDOW
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/44
+    description 2/1/44 PH-A132B
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/45
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 2/1/45 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/46
+    description 2/1/46 PH-A193
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/47
+    description 2/1/47 PH-A124
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 2/1/48
+    description 2/1/48 PH-A186
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/49
+    no shutdown
+interface 2/1/50
+    no shutdown
+interface 2/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface 3/1/1
+    description 4/1 COMP-A193-Instructor
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/2
+    description 4/2 COMP-A165-ID.COMP
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 3/1/3
+    description 4/3 COMP-A134B
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/4
+    description 3/1/4 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/5
+    description 3/1/5 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/6
+    description 4/6 COMP - AA154
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/7
+    description 3/1/7 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/8
+    description 3/1/8 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/9
+    description 3/1/9 PRNT SSS Lab
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 3/1/10
+    description 3/1/10 MFP-PRNT-A160 North copier
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 402
+interface 3/1/11
+    description 3/1/11 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/12
+    description 3/1/12 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/13
+    description 3/1/13 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/14
+    description 3/1/14 PRNT-A104 HP BW
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/15
+    description 3/1/15 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/16
+    description 3/1/16 PRNT-AA150 HP LJ4050 BW
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/17
+    description 3/1/17 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/18
+    description 3/1/18 OPEN
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/19
+    description 3/1/19 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 301
+    vlan trunk allowed 301
+interface 3/1/20
+    description 3/1/20 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/21
+    description 3/1/21 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/22
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 3/1/22 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/23
+    description 3/1/23 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/24
+    description 3/1/24 COMP-A128-2
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/25
+    description 3/1/25 COMP - AA159 Security
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 3/1/26
+    description 3/1/26 MFP-PRNT-A160 North copier
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 3/1/27
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/28
+    description 3/1/28 PRNT-A190-Color
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/29
+    description 3/1/29 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 3/1/30
+    description 3/1/30 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/31
+    description 3/1/31 COMP-A128-4
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/32
+    description 3/1/32 Prnt-A125-color-SSS
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/33
+    description 3/1/33 COMP-A128-5
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 3/1/34
+    description 3/1/34 MFP-PRNT-A160 South copier
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/35
+    description 3/1/35 SW-AA131-A
+    no shutdown
+    no routing
+    vlan access 1
+interface 3/1/36
+    description 3/1/36 PRNT-AA130 HP
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/37
+    description 3/1/37 PRNT - AA151 HP Laserjet 400
+    no shutdown
+    no routing
+    vlan trunk native 402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,402
+interface 3/1/38
+    description 3/1/38 OPEN
+    no shutdown
+    no routing
+    vlan access 817
+interface 3/1/39
+    description 3/1/39 PRNT - A132 AAC Office
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/40
+    description 3/1/40 MFP-A104 Sharp copier Model MXM263N
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 3/1/41
+    description 3/1/41 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,402
+interface 3/1/42
+    description 3/1/42 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 3/1/43
+    description 3/1/43 HVAC-AA133
+    no shutdown
+    no routing
+    vlan trunk native 817
+    vlan trunk allowed 301,817
+interface 3/1/44
+    description 3/1/44 HVAC-JACE
+    no shutdown
+    no routing
+    vlan access 817
+    spanning-tree port-type admin-edge
+interface 3/1/45
+    description 3/1/45 HVAC-JACE
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 817
+    spanning-tree port-type admin-edge
+interface 3/1/46
+    description 3/1/46 UPS-Vertiv
+    no shutdown
+    no routing
+    vlan access 1
+    spanning-tree port-type admin-edge
+interface 3/1/47
+    description 3/1/47 DS-A144-FRONT SIGN
+    no shutdown
+    no routing
+    vlan access 401
+interface 3/1/48
+    description 3/1/48 DS-A144-CH17
+    no shutdown
+    no routing
+    vlan trunk native 405
+    vlan trunk allowed 301,405
+interface 3/1/49
+    no shutdown
+interface 3/1/50
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 3/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 3/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface 4/1/1
+    description 4/1/1 COMP-A149-1
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/2
+    description 4/1/2 COMP-A149-2
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/3
+    description 4/1/3 COMP-A149-3
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/4
+    description 4/1/4 COMP-A149-4
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/5
+    description 4/1/5 COMP-A149-5
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/6
+    description 4/1/6 COMP-A149-6
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/7
+    description 4/1/7 COMP-A149-7
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/8
+    description 4/1/8 COMP-A149-8
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/9
+    description 4/1/9 OPEN-COMP-A149-9
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/10
+    description 4/1/10 OPEN-COMP-A149-10
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/11
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 4/1/11 OPEN-COMP-A149-11
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/12
+    description 4/1/12 COMP A135
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/13
+    description 4/1/13 PRNT - A149B Counseling OFfice
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/14
+    description 4/1/14 PRNT - A134 Sharp Copier
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 4/1/15
+    description 4/1/15 PRNT-AA131-
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/16
+    description 4/1/16 PRNT-A149 HP BW
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/17
+    description 4/1/17 COMP-A149-16
+    no shutdown
+    no routing
+    vlan trunk native 706
+    vlan trunk allowed 301,706
+interface 4/1/18
+    description 4/1/18 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 706
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,706
+interface 4/1/19
+    description 4/1/19 PRNT A183-HP Color
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/20
+    description 4/1/20 JACE-HVAC (above A144)
+    no shutdown
+    no routing
+    vlan access 817
+interface 4/1/21
+    description 4/1/21 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/22
+    description 4/1/22 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,402
+interface 4/1/23
+    description 4/1/22 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/24
+    description 4/1/24 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/25
+    description 4/1/25 PRNT A134
+    no shutdown
+    no routing
+    vlan access 402
+interface 4/1/26
+    description 4/1/26 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 4/1/27
+    description 4/1/27 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/28
+    description 4/1/28 COMP
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/29
+    description 4/1/29 COMP
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/30
+    description 4/1/30 AA131
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 726
+interface 4/1/31
+    description 4/1/31 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 4/1/32
+    description 4/1/32 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 4/1/33
+    description 4/1/33 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 4/1/34
+    description 4/1/34 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/35
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 4/1/35 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/36
+    description 4/1/36 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/37
+    description 4/1/37 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/38
+    description 4/1/38 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 4/1/39
+    description 4/1/39 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/40
+    description 4/1/40 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/41
+    description 4/1/41 PRNT-A134-HP Color Laserjet CP4525
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/42
+    description 4/1/42 PRNT-A103-HP-Color
+    no shutdown
+    no routing
+    vlan trunk native 402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,402
+interface 4/1/43
+    description 4/1/43 PRNT-A134-HP-BW
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/44
+    description 4/1/44 PRNT-A125
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/45
+    description 4/1/45 PRNT-AA151-HP-LFCOLOR
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 4/1/46
+    description 4/1/46 BS-Marketing
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 405
+    spanning-tree port-type admin-edge
+interface 4/1/47
+    description 4/1/47 COMP-A135-GUEST2
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 4/1/48
+    description 4/1/48 PRNT A149 Counseling
+    no shutdown
+    no routing
+    vlan access 402
+interface 4/1/49
+    no shutdown
+interface 4/1/50
+    no shutdown
+interface 4/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 4/1/52
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 1
+interface 5/1/1
+    description 5/1/1 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/2
+    description 5/1/2 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/3
+    description 5/1/3 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/4
+    description 5/1/4 Unknown
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/5
+    description 5/1/5 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/6
+    description 5/1/6 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/7
+    description 5/1/7 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/8
+    description 5/1/8 Unknown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/9
+    description 5/1/9 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/10
+    description 5/1/10 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/11
+    description 5/1/11 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/12
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description 5/1/12 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/13
+    description 5/1/13 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/14
+    description 5/1/14 PRNT-AA155
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 5/1/15
+    description 5/1/15 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 5/1/16
+    description 5/1/16 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 729
+    vlan trunk allowed 301,729
+interface 5/1/17
+    description 5/1/17 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/18
+    description 5/1/18 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/19
+    description 5/1/19 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,702
+interface 5/1/20
+    description 5/1/20 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/21
+    description 5/1/21 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/22
+    description 5/1/22 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/23
+    description 5/1/23 AA131
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 726
+interface 5/1/24
+    description 5/1/24 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/25
+    description 5/1/25 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 5/1/26
+    description 5/1/26 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/27
+    description 5/1/27 AA131
+    no shutdown
+    no routing
+    vlan access 726
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 5/1/28
+    description 5/1/28 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 5/1/29
+    description 5/1/29 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/30
+    description 5/1/30 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/31
+    description 5/1/31 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 5/1/32
+    description 5/1/32 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/33
+    description 5/1/33 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/34
+    description 5/1/34 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/35
+    description 5/1/35 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,702
+interface 5/1/36
+    description 5/1/36 Comp-A103
+    no shutdown
+    no routing
+    vlan trunk native 702
+    vlan trunk allowed 301,702
+interface 5/1/37
+    description 5/1/37 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/38
+    description 5/1/38 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/39
+    description 5/1/39 AA131
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 726
+interface 5/1/40
+    description 5/1/40 AA131
+    no shutdown
+    no routing
+    vlan access 726
+interface 5/1/41
+    description 5/1/41 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 733
+    vlan trunk allowed 301,733
+interface 5/1/42
+    description 5/1/42 PRNT - A160 Library workroom HP4250
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 301,402
+interface 5/1/43
+    description 5/1/43 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 301,701
+interface 5/1/44
+    description 5/1/44 Unknown
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/45
+    description 5/1/45 COMP - A163 Instructor
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/46
+    description 5/1/46 OPEN
+    no shutdown
+    no routing
+    vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/47
+    description 5/1/47 COMP A166 Shuttle computer north of main desk
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 701
+    vlan trunk allowed 301,701
+interface 5/1/48
+    description 5/1/48 BS-Library-A166
+    no shutdown
+    no routing
+    vlan access 405
+interface 5/1/49
+    no shutdown
+interface 5/1/50
+    no shutdown
+interface 5/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 5/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface vlan 1
+    ip address 192.168.2.201/16
+    ip dhcp
+        ! ip dhcp is ignored when static ip is configured
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+interface vlan 405
+interface vlan 622
+    description OSPF-A144-1-Cisco48
+    ip address 172.20.2.42/30
+    ip ospf 10 area 0.0.0.0
+    ip ospf network point-to-point
+interface vlan 701
+    ip address 10.70.1.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+interface vlan 702
+    description VLAN - Staff attached to the A144 switch stack
+    ip address 10.70.2.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 703
+    description VLAN - A136 AACII Lab
+    ip address 10.70.3.1/24
+    ip helper-address 10.40.1.40
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 706
+    description VLAN - A149 SSC Lab
+    ip address 10.70.6.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 707
+    description VLAN - A166A Math Lab addition in the LRC
+    ip address 10.70.7.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 708
+    description VLAN - A166 Library Lab
+    ip address 10.70.8.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip pim-sparse enable
+interface vlan 714
+    description VLAN - A192 Math Lab
+    ip address 10.70.14.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 722
+    description Aruba AP in A and AA Buildings
+    ip address 10.70.22.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip pim-sparse enable
+interface vlan 723
+    description Aruba AP Outdoor APs
+    ip address 10.70.23.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip pim-sparse enable
+interface vlan 726
+    description VLAN - AA131 Crusader lab
+    ip address 10.70.26.1/24
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 728
+    description VLAN - AA137 Virtual Learning Center Lab
+    ip address 10.70.28.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 729
+    description VLAN - AA155 Biology Lab
+    ip address 10.70.29.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 730
+    description VLAN - AA159 Maintennce/Part-time Hangout Lab
+    ip address 10.70.30.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 731
+    description VLAN - AA163 Biology/Chemistry Lab
+    ip address 10.70.31.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip pim-sparse enable
+snmp-server community 2006sccc
+    access-level rw
+snmp-server community sccc
+ip route 0.0.0.0/0 192.168.2.5
+ip dns server-address 10.40.1.68
+ip dns server-address 10.40.1.77
+!
+!
+!
+!
+!
+router ospf 10
+    redistribute connected
+    area 0.0.0.0
+router pim
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   enable
+https-server vrf default
+https-server vrf mgmt
+SW-A144-1-aruba#       sho int status
+Unknown interface status.
+SW-A144-1-aruba# sho log
+% Ambiguous command.
+SW-A144-1-aruba# sho clock
+Tue May 13 08:23:12 UTC 2025
+System is configured for timezone : UTC
+SW-A144-1-aruba# sho vers
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2023 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : FL.10.10.1070                                                 
+Build Date   : 2023-06-20 15:24:56 UTC                                       
+Build ID     : ArubaOS-CX:FL.10.10.1070:d61e5d16a67a:202306201320            
+Build SHA    : d61e5d16a67a3903fce6dab4dddc0a03738c1c6c                      
+Hot Patches  :                                                               
+Active Image : secondary                     
+
+Service OS Version : FL.01.11.0001                 
+BIOS Version       : FL.01.0004                    
+SW-A144-1-aruba# sho ip int bri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            192.168.2.201/16          up/up
+
+vlan405          No Address                up/up
+
+vlan622          172.20.2.42/30            up/up
+
+vlan701          10.70.1.1/24              up/up
+
+vlan702          10.70.2.1/24              up/up
+
+vlan703          10.70.3.1/24              up/up
+
+vlan706          10.70.6.1/24              up/up
+
+vlan707          10.70.7.1/24              up/up
+
+vlan708          10.70.8.1/24              up/up
+
+vlan714          10.70.14.1/24             up/up
+
+vlan722          10.70.22.1/24             up/up
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+vlan723          10.70.23.1/24             up/up
+
+vlan726          10.70.26.1/24             up/up
+
+vlan728          10.70.28.1/24             up/up
+
+vlan729          10.70.29.1/24             up/up
+
+vlan730          10.70.30.1/24             up/up
+
+vlan731          10.70.31.1/24             up/up
+
+
+SW-A144-1-aruba#   sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+2/1/32      SEP001B2A89F05A          Cisco IP Phone 7941      HPM         
+2/1/6       SEP701F5387F092          Cisco IP Phone 7821      HPM         
+2/1/19      SEP54781ae08be5          Cisco IP Phone 3905      CHP         
+2/1/39      SEPC444A074796F          Cisco IP Phone 7821      HPM         
+2/1/37      SEP007278267F64          Cisco IP Phone 7821      HPM         
+2/1/38      SEP701F5387F0B1          Cisco IP Phone 7821      HPM         
+2/1/13      SEPC444A0747960          Cisco IP Phone 7821      HPM         
+3/1/3       SEP701F53876A11          Cisco IP Phone 7821      HPM         
+2/1/34      SEP6886a7c42c83          Cisco IP Phone 3905      CHP         
+2/1/48      SEP001B2A89E4C7          Cisco IP Phone 7941      HPM         
+4/1/45      SEP00727826816A          Cisco IP Phone 7821      HPM         
+2/1/10      SEP6886a7c42ac9          Cisco IP Phone 3905      CHP         
+2/1/36      SEP706BB949B621          Cisco IP Phone 7841      HPM         
+2/1/35      SEP706BB949B44E          Cisco IP Phone 7841      HPM         
+1/1/37      00:22:BD:FC:B5:38        CIVS-IPC-3520            H           
+2/1/27      SEP706BB949675C          Cisco IP Phone 7841      HPM         
+3/1/25      SEP007E9578A424          Cisco IP Phone 7821      HPM         
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/22      SEPC444A07478FF          Cisco IP Phone 7821      HPM         
+2/1/30      SEPF8A5C59E3B14          Cisco IP Phone 8851      HPM         
+5/1/15      SEP007E9578A43E          Cisco IP Phone 7821      HPM         
+2/1/33      SEPC444A07478C3          Cisco IP Phone 7821      HPM         
+1/1/36      SEP706BB9496382          Cisco IP Phone 7841      HPM         
+2/1/46      SEP08cc6830fb4e          Cisco IP Phone 3905      CHP         
+1/1/51      sw-aa144-A48.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+2/1/5       SEP0072782680F3          Cisco IP Phone 7821      HPM         
+2/1/40      SEPC444A07478FD          Cisco IP Phone 7821      HPM         
+2/1/25      SEPC444A0747968          Cisco IP Phone 7821      HPM         
+4/1/43      SEP706BB949B846          Cisco IP Phone 7841      HPM         
+2/1/20      SEP001B2A89E44E          Cisco IP Phone 7941      HPM         
+2/1/21      SEP50060472fdc7          Cisco IP Phone 3905      CHP         
+2/1/7       SEP007278268EE4          Cisco IP Phone 7821      HPM         
+2/1/15      SEP706BB949B325          Cisco IP Phone 7841      HPM         
+SW-A144-1-aruba#   sho cdp neighbor-info  de et
+Invalid input: det
+SW-A144-1-aruba# sho cdp neig det
+Invalid input: det
+SW-A144-1-aruba# sho cdp neig det
+% There is no matched command.
+SW-A144-1-aruba# sho cdp neig det
+% There is no matched command.
+SW-A144-1-aruba# sho cdp neig det    
+  neighbor-info  Shows Global CDP neighbor information 
+SW-A144-1-aruba# sho cdp neig 
+  IFNAME  Specify the interface name 
+  <cr>    
+SW-A144-1-aruba# sho cdp neig           llp    cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+2/1/32      SEP001B2A89F05A          Cisco IP Phone 7941      HPM         
+2/1/6       SEP701F5387F092          Cisco IP Phone 7821      HPM         
+2/1/19      SEP54781ae08be5          Cisco IP Phone 3905      CHP         
+2/1/39      SEPC444A074796F          Cisco IP Phone 7821      HPM         
+2/1/37      SEP007278267F64          Cisco IP Phone 7821      HPM         
+2/1/38      SEP701F5387F0B1          Cisco IP Phone 7821      HPM         
+2/1/13      SEPC444A0747960          Cisco IP Phone 7821      HPM         
+3/1/3       SEP701F53876A11          Cisco IP Phone 7821      HPM         
+2/1/34      SEP6886a7c42c83          Cisco IP Phone 3905      CHP         
+2/1/48      SEP001B2A89E4C7          Cisco IP Phone 7941      HPM         
+4/1/45      SEP00727826816A          Cisco IP Phone 7821      HPM         
+2/1/10      SEP6886a7c42ac9          Cisco IP Phone 3905      CHP         
+2/1/36      SEP706BB949B621          Cisco IP Phone 7841      HPM         
+2/1/35      SEP706BB949B44E          Cisco IP Phone 7841      HPM         
+1/1/37      00:22:BD:FC:B5:38        CIVS-IPC-3520            H           
+2/1/27      SEP706BB949675C          Cisco IP Phone 7841      HPM         
+3/1/25      SEP007E9578A424          Cisco IP Phone 7821      HPM         
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/22      SEPC444A07478FF          Cisco IP Phone 7821      HPM         
+2/1/30      SEPF8A5C59E3B14          Cisco IP Phone 8851      HPM         
+5/1/15      SEP007E9578A43E          Cisco IP Phone 7821      HPM         
+2/1/33      SEPC444A07478C3          Cisco IP Phone 7821      HPM         
+1/1/36      SEP706BB9496382          Cisco IP Phone 7841      HPM         
+2/1/46      SEP08cc6830fb4e          Cisco IP Phone 3905      CHP         
+1/1/51      sw-aa144-A48.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+2/1/5       SEP0072782680F3          Cisco IP Phone 7821      HPM         
+2/1/40      SEPC444A07478FD          Cisco IP Phone 7821      HPM         
+2/1/25      SEPC444A0747968          Cisco IP Phone 7821      HPM         
+4/1/43      SEP706BB949B846          Cisco IP Phone 7841      HPM         
+2/1/20      SEP001B2A89E44E          Cisco IP Phone 7941      HPM         
+2/1/21      SEP50060472fdc7          Cisco IP Phone 3905      CHP         
+2/1/7       SEP007278268EE4          Cisco IP Phone 7821      HPM         
+2/1/15      SEP706BB949B325          Cisco IP Phone 7841      HPM         
+SW-A144-1-aruba#   sho lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 94
+Total Neighbor Entries Deleted  : 2265
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 2265
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/8       84:d4:7e:cb:c9:16  84:d4:7e:cb:c9:16            bond0                        120      AP-A103                            
+1/1/9       94:b4:0f:cd:f8:a4  94:b4:0f:cd:f8:a4            bond0                        120      AP-A111                            
+1/1/10      94:b4:0f:cd:f6:fc  94:b4:0f:cd:f6:fc            bond0                        120      AP-A134                            
+1/1/11      94:b4:0f:cb:da:64  94:b4:0f:cb:da:64            bond0                        120      AP-A136                            
+1/1/12      70:3a:0e:c4:ec:fc  70:3a:0e:c4:ec:fc            bond0                        120      AP-A138                            
+1/1/13      70:3a:0e:c4:ee:0e  70:3a:0e:c4:ee:0e            bond0                        120      AP-A140                            
+1/1/14      94:b4:0f:cb:db:6a  94:b4:0f:cb:db:6a            bond0                        120      AP-A149                            
+1/1/15      94:b4:0f:cb:db:6e  94:b4:0f:cb:db:6e            bond0                        120      AP-A153                            
+1/1/16      94:b4:0f:cd:f5:00  94:b4:0f:cd:f5:00            bond0                        120      AP-A163                            
+1/1/17      94:b4:0f:cb:dc:e2  94:b4:0f:cb:dc:e2            bond0                        120      AP-A166-1                          
+1/1/18      34:fc:b9:c0:a1:ea  34:fc:b9:c0:a1:ea            bond0                        120      AP-A166-2                          
+1/1/19      94:b4:0f:cd:f8:ac  94:b4:0f:cd:f8:ac            bond0                        120      AP-A172                            
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/20      94:b4:0f:cb:db:6c  94:b4:0f:cb:db:6c            bond0                        120      AP-A169                            
+1/1/21      94:b4:0f:cb:da:9a  94:b4:0f:cb:da:9a            bond0                        120      AP-A177                            
+1/1/22      94:b4:0f:cd:f4:f6  94:b4:0f:cd:f4:f6            bond0                        120      AP-A193                            
+1/1/23      84:d4:7e:cb:c9:26  84:d4:7e:cb:c9:26            bond0                        120      AP-AA001                           
+1/1/24      70:3a:0e:c4:eb:a0  70:3a:0e:c4:eb:a0            bond0                        120      AP-AA101                           
+1/1/25      94:b4:0f:cd:f8:80  94:b4:0f:cd:f8:80            bond0                        120      AP-AA112                           
+1/1/26      94:b4:0f:cd:f8:c2  94:b4:0f:cd:f8:c2            bond0                        120      AP-AA113                           
+1/1/27      94:b4:0f:cd:f8:2c  94:b4:0f:cd:f8:2c            bond0                        120      AP-AA131                           
+1/1/28      94:b4:0f:cd:f8:90  94:b4:0f:cd:f8:90            bond0                        120      AP-AA140                           
+1/1/29      94:b4:0f:cd:f8:74  94:b4:0f:cd:f8:74            bond0                        120      AP-AA154                           
+1/1/30      94:b4:0f:cb:db:28  94:b4:0f:cb:db:28            bond0                        120      AP-AA163                           
+1/1/36      10.30.1.244        706BB9496382:P1              SW PORT                      180      SEP706BB9496382.sccc.edu           
+1/1/51      3c:51:0e:39:cd:00  Ethernet1/25                 A144 Aruba switch stack 1    120      sw-aa144-A48.sccc.edu              
+2/1/5       10.30.1.230        0072782680F3:P1              SW PORT                      180      SEP0072782680F3.sccc.edu           
+2/1/6       10.30.1.158        701F5387F092:P1              SW PORT                      180      SEP701F5387F092.sccc.edu           
+2/1/7       10.30.1.140        007278268EE4:P1              SW PORT                      180      SEP007278268EE4.sccc.edu           
+2/1/10      10.30.1.34         6886a7c42ac9:P1              SW PORT                      180      SEP6886a7c42ac9.sccc.edu           
+2/1/13      10.30.1.239        C444A0747960:P1              SW PORT                      180      SEPC444A0747960.sccc.edu           
+2/1/15      10.30.1.249        706BB949B325:P1              SW PORT                      180      SEP706BB949B325.sccc.edu           
+2/1/19      10.30.1.223        54781ae08be5:P1              SW PORT                      180      SEP54781ae08be5.sccc.edu           
+2/1/20      10.30.1.235        001B2A89E44E:P1              SW PORT                      180      SEP001B2A89E44E.sccc.edu           
+2/1/21      10.30.1.63         50060472fdc7:P1              SW PORT                      180      SEP50060472fdc7.sccc.edu           
+2/1/22      10.30.1.242        C444A07478FF:P1              SW PORT                      180      SEPC444A07478FF.sccc.edu           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/25      10.30.1.51         C444A0747968:P1              SW PORT                      180      SEPC444A0747968.sccc.edu           
+2/1/27      10.30.1.237        706BB949675C:P1              SW PORT                      180      SEP706BB949675C.sccc.edu           
+2/1/30      10.30.1.243        F8A5C59E3B14:P1              SW PORT                      180      SEPF8A5C59E3B14.sccc.edu           
+2/1/32      10.30.1.91         001B2A89F05A:P1              SW PORT                      180      SEP001B2A89F05A.sccc.edu           
+2/1/33      10.30.1.164        C444A07478C3:P1              SW PORT                      180      SEPC444A07478C3.sccc.edu           
+2/1/34      10.30.1.156        6886a7c42c83:P1              SW PORT                      180      SEP6886a7c42c83.sccc.edu           
+2/1/35      10.30.1.36         706BB949B44E:P1              SW PORT                      180      SEP706BB949B44E.sccc.edu           
+2/1/36      10.30.1.241        706BB949B621:P1              SW PORT                      180      SEP706BB949B621.sccc.edu           
+2/1/37      10.30.1.145        007278267F64:P1              SW PORT                      180      SEP007278267F64.sccc.edu           
+2/1/38      10.30.1.119        701F5387F0B1:P1              SW PORT                      180      SEP701F5387F0B1.sccc.edu           
+2/1/39      10.30.1.236        C444A074796F:P1              SW PORT                      180      SEPC444A074796F.sccc.edu           
+2/1/40      10.30.1.41         C444A07478FD:P1              SW PORT                      180      SEPC444A07478FD.sccc.edu           
+2/1/46      10.30.1.74         08cc6830fb4e:P1              SW PORT                      180      SEP08cc6830fb4e.sccc.edu           
+2/1/48      10.30.1.99         001B2A89E4C7:P1              SW PORT                      180      SEP001B2A89E4C7.sccc.edu           
+3/1/1       IN-A193-01A        a8:a1:59:dd:e2:4b                                         3601                                        
+3/1/3       10.30.1.238        701F53876A11:P1              SW PORT                      180      SEP701F53876A11.sccc.edu           
+3/1/5       IN-A170-01         00:be:43:d7:12:33                                         3601                                        
+3/1/6       IN-AA154-01A       a8:a1:59:dc:57:ab                                         3601                                        
+3/1/8       18:66:da:05:7e:12  18:66:da:05:7e:12                                         3601                                        
+3/1/12      18:66:da:05:70:33  18:66:da:05:70:33                                         3601                                        
+3/1/15      00:23:24:ef:d9:ae  00:23:24:ef:d9:ae                                         3601                                        
+3/1/23      f8:b1:56:c9:b3:03  f8:b1:56:c9:b3:03                                         3601                                        
+3/1/25      10.30.1.101        007E9578A424:P1              SW PORT                      180      SEP007E9578A424.sccc.edu           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               3/1/35      00:be:43:da:eb:f4  00:be:43:da:eb:f4                                         3601                                        
+3/1/47      10:4f:58:2d:87:60  10                           10                           120      HP-2530-8G-PoEP                    
+4/1/1       LA-A149-01         a8:a1:59:dc:5d:b1                                         3601                                        
+4/1/4       LA-A149-04         a8:a1:59:dc:57:40                                         3601                                        
+4/1/5       LA-A149-05         a8:a1:59:dc:55:82                                         3601                                        
+4/1/6       LA-A149-06         a8:a1:59:dc:56:f5                                         3601                                        
+4/1/7       LA-A149-07         a8:a1:59:dc:66:2c                                         3601                                        
+4/1/8       LA-A149-08         a8:a1:59:dc:56:df                                         3601                                        
+4/1/27      IN-A168-01A        a8:a1:59:dc:5e:b2                                         3601                                        
+4/1/30      LA-AA131-09        00:be:43:da:69:09                                         3601                                        
+4/1/31      LA-AA131-10        00:be:43:da:ed:d5                                         3601                                        
+4/1/32      LA-AA131-08        00:be:43:da:6a:06                                         3601                                        
+4/1/43      10.30.1.106        706BB949B846:P1              SW PORT                      180      SEP706BB949B846.sccc.edu           
+4/1/45      10.30.1.221        00727826816A:P1              SW PORT                      180      SEP00727826816A.sccc.edu           
+4/1/46      90:ac:3f:2a:84:ac  90:ac:3f:2a:84:ac            eth0                         120      BrightSign-M1E35D003981            
+5/1/1       LA-AA155-09        a8:a1:59:dc:56:dc                                         3601                                        
+5/1/2       LA-AA155-10        a8:a1:59:dc:65:cd                                         3601                                        
+5/1/4       LA-AA155-12        a8:a1:59:dd:e4:3c                                         3601                                        
+5/1/5       LA-AA155-05        a8:a1:59:d9:c0:75                                         3601                                        
+5/1/8       LA-AA155-08        a8:a1:59:da:20:14                                         3601                                        
+5/1/10      LA-AA155-02        a8:a1:59:dc:5f:3c                                         3601                                        
+5/1/11      LA-AA155-03        a8:a1:59:dc:58:ac                                         3601                                        
+5/1/12      LA-AA155-04        a8:a1:59:dd:e3:f5                                         3601                                        
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/13      00:23:24:ef:fa:89  00:23:24:ef:fa:89                                         3601                                        
+5/1/15      10.30.1.147        007E9578A43E:P1              SW PORT                      180      SEP007E9578A43E.sccc.edu           
+5/1/18      LA-A104-01         a8:a1:59:dc:58:b5                                         3601                                        
+5/1/19      ST-A104-02         a8:a1:59:dc:5a:30                                         3601                                        
+5/1/22      74:e6:e2:02:04:44  74:e6:e2:02:04:44                                         3601                                        
+5/1/23      LA-AA131-06        00:be:43:d6:c8:05                                         3601                                        
+5/1/27      LA-AA131-03        00:be:43:da:69:89                                         3601                                        
+5/1/28      LA-AA131-05        00:be:43:da:68:a9                                         3601                                        
+5/1/39      LA-AA131-04        c0:25:a5:b5:06:4f                                         3601                                        
+5/1/40      LA-AA131-02        00:be:43:d7:16:fa                                         3601                                        
+5/1/43      30:9c:23:08:94:ac  30:9c:23:08:94:ac                                         3601                                        
+5/1/44      IN-AA137-01A       a8:a1:59:dc:55:7b                                         3601                                        
+5/1/48      90:ac:3f:0e:74:ce  90:ac:3f:0e:74:ce            eth0                         120      BrightSign-33D7AK002431            
+SW-A144-1-aruba#   sho lldp 
+  configuration  Show LLDP configuration 
+  local-device   Show LLDP local device information 
+  neighbor-info  Show global LLDP neighbor information 
+  statistics     Show LLDP statistics 
+  tlv            Show TLVs advertised by LLDP 
+SW-A144-1-aruba# sho lldp 
+% Command incomplete.
+SW-A144-1-aruba# 
+SW-A144-1-aruba# sho lldp 
+% Command incomplete.
+SW-A144-1-aruba# sho lldp configuration 
+
+LLDP Global Configuration
+=========================
+
+LLDP Enabled                 : Yes
+LLDP Transmit Interval       : 30
+LLDP Hold Time Multiplier    : 4
+LLDP Transmit Delay Interval : 2
+LLDP Reinit Time Interval    : 2
+LLDP Trap Enabled            : No
+
+TLVs Advertised 
+===============
+
+Management Address 
+Port Description 
+Port VLAN-ID 
+System Capabilities 
+System Description 
+System Name 
+OUI 
+
+LLDP Port Configuration
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               =======================
+
+PORT           TX-ENABLED          RX-ENABLED          INTF-TRAP-ENABLED  
+--------------------------------------------------------------------------
+1/1/1          Yes                 Yes                 Yes                
+1/1/2          Yes                 Yes                 Yes                
+1/1/3          Yes                 Yes                 Yes                
+1/1/4          Yes                 Yes                 Yes                
+1/1/5          Yes                 Yes                 Yes                
+1/1/6          Yes                 Yes                 Yes                
+1/1/7          Yes                 Yes                 Yes                
+1/1/8          Yes                 Yes                 Yes                
+1/1/9          Yes                 Yes                 Yes                
+1/1/10         Yes                 Yes                 Yes                
+1/1/11         Yes                 Yes                 Yes                
+1/1/12         Yes                 Yes                 Yes                
+1/1/13         Yes                 Yes                 Yes                
+1/1/14         Yes                 Yes                 Yes                
+1/1/15         Yes                 Yes                 Yes                
+1/1/16         Yes                 Yes                 Yes                
+1/1/17         Yes                 Yes                 Yes                
+1/1/18         Yes                 Yes                 Yes                
+1/1/19         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/20         Yes                 Yes                 Yes                
+1/1/21         Yes                 Yes                 Yes                
+1/1/22         Yes                 Yes                 Yes                
+1/1/23         Yes                 Yes                 Yes                
+1/1/24         Yes                 Yes                 Yes                
+1/1/25         Yes                 Yes                 Yes                
+1/1/26         Yes                 Yes                 Yes                
+1/1/27         Yes                 Yes                 Yes                
+1/1/28         Yes                 Yes                 Yes                
+1/1/29         Yes                 Yes                 Yes                
+1/1/30         Yes                 Yes                 Yes                
+1/1/31         Yes                 Yes                 Yes                
+1/1/32         Yes                 Yes                 Yes                
+1/1/33         Yes                 Yes                 Yes                
+1/1/34         Yes                 Yes                 Yes                
+1/1/35         Yes                 Yes                 Yes                
+1/1/36         Yes                 Yes                 Yes                
+1/1/37         Yes                 Yes                 Yes                
+1/1/38         Yes                 Yes                 Yes                
+1/1/39         Yes                 Yes                 Yes                
+1/1/40         Yes                 Yes                 Yes                
+1/1/41         Yes                 Yes                 Yes                
+1/1/42         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/43         Yes                 Yes                 Yes                
+1/1/44         Yes                 Yes                 Yes                
+1/1/45         Yes                 Yes                 Yes                
+1/1/46         Yes                 Yes                 Yes                
+1/1/47         Yes                 Yes                 Yes                
+1/1/48         Yes                 Yes                 Yes                
+1/1/51         Yes                 Yes                 Yes                
+1/1/52         Yes                 Yes                 Yes                
+2/1/1          Yes                 Yes                 Yes                
+2/1/2          Yes                 Yes                 Yes                
+2/1/3          Yes                 Yes                 Yes                
+2/1/4          Yes                 Yes                 Yes                
+2/1/5          Yes                 Yes                 Yes                
+2/1/6          Yes                 Yes                 Yes                
+2/1/7          Yes                 Yes                 Yes                
+2/1/8          Yes                 Yes                 Yes                
+2/1/9          Yes                 Yes                 Yes                
+2/1/10         Yes                 Yes                 Yes                
+2/1/11         Yes                 Yes                 Yes                
+2/1/12         Yes                 Yes                 Yes                
+2/1/13         Yes                 Yes                 Yes                
+2/1/14         Yes                 Yes                 Yes                
+2/1/15         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/16         Yes                 Yes                 Yes                
+2/1/17         Yes                 Yes                 Yes                
+2/1/18         Yes                 Yes                 Yes                
+2/1/19         Yes                 Yes                 Yes                
+2/1/20         Yes                 Yes                 Yes                
+2/1/21         Yes                 Yes                 Yes                
+2/1/22         Yes                 Yes                 Yes                
+2/1/23         Yes                 Yes                 Yes                
+2/1/24         Yes                 Yes                 Yes                
+2/1/25         Yes                 Yes                 Yes                
+2/1/26         Yes                 Yes                 Yes                
+2/1/27         Yes                 Yes                 Yes                
+2/1/28         Yes                 Yes                 Yes                
+2/1/29         Yes                 Yes                 Yes                
+2/1/30         Yes                 Yes                 Yes                
+2/1/31         Yes                 Yes                 Yes                
+2/1/32         Yes                 Yes                 Yes                
+2/1/33         Yes                 Yes                 Yes                
+2/1/34         Yes                 Yes                 Yes                
+2/1/35         Yes                 Yes                 Yes                
+2/1/36         Yes                 Yes                 Yes                
+2/1/37         Yes                 Yes                 Yes                
+2/1/38         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/39         Yes                 Yes                 Yes                
+2/1/40         Yes                 Yes                 Yes                
+2/1/41         Yes                 Yes                 Yes                
+2/1/42         Yes                 Yes                 Yes                
+2/1/43         Yes                 Yes                 Yes                
+2/1/44         Yes                 Yes                 Yes                
+2/1/45         Yes                 Yes                 Yes                
+2/1/46         Yes                 Yes                 Yes                
+2/1/47         Yes                 Yes                 Yes                
+2/1/48         Yes                 Yes                 Yes                
+2/1/51         Yes                 Yes                 Yes                
+2/1/52         Yes                 Yes                 Yes                
+3/1/1          Yes                 Yes                 Yes                
+3/1/2          Yes                 Yes                 Yes                
+3/1/3          Yes                 Yes                 Yes                
+3/1/4          Yes                 Yes                 Yes                
+3/1/5          Yes                 Yes                 Yes                
+3/1/6          Yes                 Yes                 Yes                
+3/1/7          Yes                 Yes                 Yes                
+3/1/8          Yes                 Yes                 Yes                
+3/1/9          Yes                 Yes                 Yes                
+3/1/10         Yes                 Yes                 Yes                
+3/1/11         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               3/1/12         Yes                 Yes                 Yes                
+3/1/13         Yes                 Yes                 Yes                
+3/1/14         Yes                 Yes                 Yes                
+3/1/15         Yes                 Yes                 Yes                
+3/1/16         Yes                 Yes                 Yes                
+3/1/17         Yes                 Yes                 Yes                
+3/1/18         Yes                 Yes                 Yes                
+3/1/19         Yes                 Yes                 Yes                
+3/1/20         Yes                 Yes                 Yes                
+3/1/21         Yes                 Yes                 Yes                
+3/1/22         Yes                 Yes                 Yes                
+3/1/23         Yes                 Yes                 Yes                
+3/1/24         Yes                 Yes                 Yes                
+3/1/25         Yes                 Yes                 Yes                
+3/1/26         Yes                 Yes                 Yes                
+3/1/27         Yes                 Yes                 Yes                
+3/1/28         Yes                 Yes                 Yes                
+3/1/29         Yes                 Yes                 Yes                
+3/1/30         Yes                 Yes                 Yes                
+3/1/31         Yes                 Yes                 Yes                
+3/1/32         Yes                 Yes                 Yes                
+3/1/33         Yes                 Yes                 Yes                
+3/1/34         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               3/1/35         Yes                 Yes                 Yes                
+3/1/36         Yes                 Yes                 Yes                
+3/1/37         Yes                 Yes                 Yes                
+3/1/38         Yes                 Yes                 Yes                
+3/1/39         Yes                 Yes                 Yes                
+3/1/40         Yes                 Yes                 Yes                
+3/1/41         Yes                 Yes                 Yes                
+3/1/42         Yes                 Yes                 Yes                
+3/1/43         Yes                 Yes                 Yes                
+3/1/44         Yes                 Yes                 Yes                
+3/1/45         Yes                 Yes                 Yes                
+3/1/46         Yes                 Yes                 Yes                
+3/1/47         Yes                 Yes                 Yes                
+3/1/48         Yes                 Yes                 Yes                
+3/1/51         Yes                 Yes                 Yes                
+3/1/52         Yes                 Yes                 Yes                
+4/1/1          Yes                 Yes                 Yes                
+4/1/2          Yes                 Yes                 Yes                
+4/1/3          Yes                 Yes                 Yes                
+4/1/4          Yes                 Yes                 Yes                
+4/1/5          Yes                 Yes                 Yes                
+4/1/6          Yes                 Yes                 Yes                
+4/1/7          Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               4/1/8          Yes                 Yes                 Yes                
+4/1/9          Yes                 Yes                 Yes                
+4/1/10         Yes                 Yes                 Yes                
+4/1/11         Yes                 Yes                 Yes                
+4/1/12         Yes                 Yes                 Yes                
+4/1/13         Yes                 Yes                 Yes                
+4/1/14         Yes                 Yes                 Yes                
+4/1/15         Yes                 Yes                 Yes                
+4/1/16         Yes                 Yes                 Yes                
+4/1/17         Yes                 Yes                 Yes                
+4/1/18         Yes                 Yes                 Yes                
+4/1/19         Yes                 Yes                 Yes                
+4/1/20         Yes                 Yes                 Yes                
+4/1/21         Yes                 Yes                 Yes                
+4/1/22         Yes                 Yes                 Yes                
+4/1/23         Yes                 Yes                 Yes                
+4/1/24         Yes                 Yes                 Yes                
+4/1/25         Yes                 Yes                 Yes                
+4/1/26         Yes                 Yes                 Yes                
+4/1/27         Yes                 Yes                 Yes                
+4/1/28         Yes                 Yes                 Yes                
+4/1/29         Yes                 Yes                 Yes                
+4/1/30         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               4/1/31         Yes                 Yes                 Yes                
+4/1/32         Yes                 Yes                 Yes                
+4/1/33         Yes                 Yes                 Yes                
+4/1/34         Yes                 Yes                 Yes                
+4/1/35         Yes                 Yes                 Yes                
+4/1/36         Yes                 Yes                 Yes                
+4/1/37         Yes                 Yes                 Yes                
+4/1/38         Yes                 Yes                 Yes                
+4/1/39         Yes                 Yes                 Yes                
+4/1/40         Yes                 Yes                 Yes                
+4/1/41         Yes                 Yes                 Yes                
+4/1/42         Yes                 Yes                 Yes                
+4/1/43         Yes                 Yes                 Yes                
+4/1/44         Yes                 Yes                 Yes                
+4/1/45         Yes                 Yes                 Yes                
+4/1/46         Yes                 Yes                 Yes                
+4/1/47         Yes                 Yes                 Yes                
+4/1/48         Yes                 Yes                 Yes                
+4/1/51         Yes                 Yes                 Yes                
+4/1/52         Yes                 Yes                 Yes                
+5/1/1          Yes                 Yes                 Yes                
+5/1/2          Yes                 Yes                 Yes                
+5/1/3          Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/4          Yes                 Yes                 Yes                
+5/1/5          Yes                 Yes                 Yes                
+5/1/6          Yes                 Yes                 Yes                
+5/1/7          Yes                 Yes                 Yes                
+5/1/8          Yes                 Yes                 Yes                
+5/1/9          Yes                 Yes                 Yes                
+5/1/10         Yes                 Yes                 Yes                
+5/1/11         Yes                 Yes                 Yes                
+5/1/12         Yes                 Yes                 Yes                
+5/1/13         Yes                 Yes                 Yes                
+5/1/14         Yes                 Yes                 Yes                
+5/1/15         Yes                 Yes                 Yes                
+5/1/16         Yes                 Yes                 Yes                
+5/1/17         Yes                 Yes                 Yes                
+5/1/18         Yes                 Yes                 Yes                
+5/1/19         Yes                 Yes                 Yes                
+5/1/20         Yes                 Yes                 Yes                
+5/1/21         Yes                 Yes                 Yes                
+5/1/22         Yes                 Yes                 Yes                
+5/1/23         Yes                 Yes                 Yes                
+5/1/24         Yes                 Yes                 Yes                
+5/1/25         Yes                 Yes                 Yes                
+5/1/26         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/27         Yes                 Yes                 Yes                
+5/1/28         Yes                 Yes                 Yes                
+5/1/29         Yes                 Yes                 Yes                
+5/1/30         Yes                 Yes                 Yes                
+5/1/31         Yes                 Yes                 Yes                
+5/1/32         Yes                 Yes                 Yes                
+5/1/33         Yes                 Yes                 Yes                
+5/1/34         Yes                 Yes                 Yes                
+5/1/35         Yes                 Yes                 Yes                
+5/1/36         Yes                 Yes                 Yes                
+5/1/37         Yes                 Yes                 Yes                
+5/1/38         Yes                 Yes                 Yes                
+5/1/39         Yes                 Yes                 Yes                
+5/1/40         Yes                 Yes                 Yes                
+5/1/41         Yes                 Yes                 Yes                
+5/1/42         Yes                 Yes                 Yes                
+5/1/43         Yes                 Yes                 Yes                
+5/1/44         Yes                 Yes                 Yes                
+5/1/45         Yes                 Yes                 Yes                
+5/1/46         Yes                 Yes                 Yes                
+5/1/47         Yes                 Yes                 Yes                
+5/1/48         Yes                 Yes                 Yes                
+5/1/51         Yes                 Yes                 Yes                
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/52         Yes                 Yes                 Yes                
+mgmt           Yes                 Yes                 Yes                
+SW-A144-1-aruba#       sho lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 94
+Total Neighbor Entries Deleted  : 2265
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 2265
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/8       84:d4:7e:cb:c9:16  84:d4:7e:cb:c9:16            bond0                        120      AP-A103                            
+1/1/9       94:b4:0f:cd:f8:a4  94:b4:0f:cd:f8:a4            bond0                        120      AP-A111                            
+1/1/10      94:b4:0f:cd:f6:fc  94:b4:0f:cd:f6:fc            bond0                        120      AP-A134                            
+1/1/11      94:b4:0f:cb:da:64  94:b4:0f:cb:da:64            bond0                        120      AP-A136                            
+1/1/12      70:3a:0e:c4:ec:fc  70:3a:0e:c4:ec:fc            bond0                        120      AP-A138                            
+1/1/13      70:3a:0e:c4:ee:0e  70:3a:0e:c4:ee:0e            bond0                        120      AP-A140                            
+1/1/14      94:b4:0f:cb:db:6a  94:b4:0f:cb:db:6a            bond0                        120      AP-A149                            
+1/1/15      94:b4:0f:cb:db:6e  94:b4:0f:cb:db:6e            bond0                        120      AP-A153                            
+1/1/16      94:b4:0f:cd:f5:00  94:b4:0f:cd:f5:00            bond0                        120      AP-A163                            
+1/1/17      94:b4:0f:cb:dc:e2  94:b4:0f:cb:dc:e2            bond0                        120      AP-A166-1                          
+1/1/18      34:fc:b9:c0:a1:ea  34:fc:b9:c0:a1:ea            bond0                        120      AP-A166-2                          
+1/1/19      94:b4:0f:cd:f8:ac  94:b4:0f:cd:f8:ac            bond0                        120      AP-A172                            
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/20      94:b4:0f:cb:db:6c  94:b4:0f:cb:db:6c            bond0                        120      AP-A169                            
+1/1/21      94:b4:0f:cb:da:9a  94:b4:0f:cb:da:9a            bond0                        120      AP-A177                            
+1/1/22      94:b4:0f:cd:f4:f6  94:b4:0f:cd:f4:f6            bond0                        120      AP-A193                            
+1/1/23      84:d4:7e:cb:c9:26  84:d4:7e:cb:c9:26            bond0                        120      AP-AA001                           
+1/1/24      70:3a:0e:c4:eb:a0  70:3a:0e:c4:eb:a0            bond0                        120      AP-AA101                           
+1/1/25      94:b4:0f:cd:f8:80  94:b4:0f:cd:f8:80            bond0                        120      AP-AA112                           
+1/1/26      94:b4:0f:cd:f8:c2  94:b4:0f:cd:f8:c2            bond0                        120      AP-AA113                           
+1/1/27      94:b4:0f:cd:f8:2c  94:b4:0f:cd:f8:2c            bond0                        120      AP-AA131                           
+1/1/28      94:b4:0f:cd:f8:90  94:b4:0f:cd:f8:90            bond0                        120      AP-AA140                           
+1/1/29      94:b4:0f:cd:f8:74  94:b4:0f:cd:f8:74            bond0                        120      AP-AA154                           
+1/1/30      94:b4:0f:cb:db:28  94:b4:0f:cb:db:28            bond0                        120      AP-AA163                           
+1/1/36      10.30.1.244        706BB9496382:P1              SW PORT                      180      SEP706BB9496382.sccc.edu           
+1/1/51      3c:51:0e:39:cd:00  Ethernet1/25                 A144 Aruba switch stack 1    120      sw-aa144-A48.sccc.edu              
+2/1/5       10.30.1.230        0072782680F3:P1              SW PORT                      180      SEP0072782680F3.sccc.edu           
+2/1/6       10.30.1.158        701F5387F092:P1              SW PORT                      180      SEP701F5387F092.sccc.edu           
+2/1/7       10.30.1.140        007278268EE4:P1              SW PORT                      180      SEP007278268EE4.sccc.edu           
+2/1/10      10.30.1.34         6886a7c42ac9:P1              SW PORT                      180      SEP6886a7c42ac9.sccc.edu           
+2/1/13      10.30.1.239        C444A0747960:P1              SW PORT                      180      SEPC444A0747960.sccc.edu           
+2/1/15      10.30.1.249        706BB949B325:P1              SW PORT                      180      SEP706BB949B325.sccc.edu           
+2/1/19      10.30.1.223        54781ae08be5:P1              SW PORT                      180      SEP54781ae08be5.sccc.edu           
+2/1/20      10.30.1.235        001B2A89E44E:P1              SW PORT                      180      SEP001B2A89E44E.sccc.edu           
+2/1/21      10.30.1.63         50060472fdc7:P1              SW PORT                      180      SEP50060472fdc7.sccc.edu           
+2/1/22      10.30.1.242        C444A07478FF:P1              SW PORT                      180      SEPC444A07478FF.sccc.edu           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/25      10.30.1.51         C444A0747968:P1              SW PORT                      180      SEPC444A0747968.sccc.edu           
+2/1/27      10.30.1.237        706BB949675C:P1              SW PORT                      180      SEP706BB949675C.sccc.edu           
+2/1/30      10.30.1.243        F8A5C59E3B14:P1              SW PORT                      180      SEPF8A5C59E3B14.sccc.edu           
+2/1/32      10.30.1.91         001B2A89F05A:P1              SW PORT                      180      SEP001B2A89F05A.sccc.edu           
+2/1/33      10.30.1.164        C444A07478C3:P1              SW PORT                      180      SEPC444A07478C3.sccc.edu           
+2/1/34      10.30.1.156        6886a7c42c83:P1              SW PORT                      180      SEP6886a7c42c83.sccc.edu           
+2/1/35      10.30.1.36         706BB949B44E:P1              SW PORT                      180      SEP706BB949B44E.sccc.edu           
+2/1/36      10.30.1.241        706BB949B621:P1              SW PORT                      180      SEP706BB949B621.sccc.edu           
+2/1/37      10.30.1.145        007278267F64:P1              SW PORT                      180      SEP007278267F64.sccc.edu           
+2/1/38      10.30.1.119        701F5387F0B1:P1              SW PORT                      180      SEP701F5387F0B1.sccc.edu           
+2/1/39      10.30.1.236        C444A074796F:P1              SW PORT                      180      SEPC444A074796F.sccc.edu           
+2/1/40      10.30.1.41         C444A07478FD:P1              SW PORT                      180      SEPC444A07478FD.sccc.edu           
+2/1/46      10.30.1.74         08cc6830fb4e:P1              SW PORT                      180      SEP08cc6830fb4e.sccc.edu           
+2/1/48      10.30.1.99         001B2A89E4C7:P1              SW PORT                      180      SEP001B2A89E4C7.sccc.edu           
+3/1/1       IN-A193-01A        a8:a1:59:dd:e2:4b                                         3601                                        
+3/1/3       10.30.1.238        701F53876A11:P1              SW PORT                      180      SEP701F53876A11.sccc.edu           
+3/1/5       IN-A170-01         00:be:43:d7:12:33                                         3601                                        
+3/1/6       IN-AA154-01A       a8:a1:59:dc:57:ab                                         3601                                        
+3/1/8       18:66:da:05:7e:12  18:66:da:05:7e:12                                         3601                                        
+3/1/12      18:66:da:05:70:33  18:66:da:05:70:33                                         3601                                        
+3/1/15      00:23:24:ef:d9:ae  00:23:24:ef:d9:ae                                         3601                                        
+3/1/23      f8:b1:56:c9:b3:03  f8:b1:56:c9:b3:03                                         3601                                        
+3/1/25      10.30.1.101        007E9578A424:P1              SW PORT                      180      SEP007E9578A424.sccc.edu           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               3/1/35      00:be:43:da:eb:f4  00:be:43:da:eb:f4                                         3601                                        
+3/1/47      10:4f:58:2d:87:60  10                           10                           120      HP-2530-8G-PoEP                    
+4/1/1       LA-A149-01         a8:a1:59:dc:5d:b1                                         3601                                        
+4/1/4       LA-A149-04         a8:a1:59:dc:57:40                                         3601                                        
+4/1/5       LA-A149-05         a8:a1:59:dc:55:82                                         3601                                        
+4/1/6       LA-A149-06         a8:a1:59:dc:56:f5                                         3601                                        
+4/1/7       LA-A149-07         a8:a1:59:dc:66:2c                                         3601                                        
+4/1/8       LA-A149-08         a8:a1:59:dc:56:df                                         3601                                        
+4/1/27      IN-A168-01A        a8:a1:59:dc:5e:b2                                         3601                                        
+4/1/30      LA-AA131-09        00:be:43:da:69:09                                         3601                                        
+4/1/31      LA-AA131-10        00:be:43:da:ed:d5                                         3601                                        
+4/1/32      LA-AA131-08        00:be:43:da:6a:06                                         3601                                        
+4/1/43      10.30.1.106        706BB949B846:P1              SW PORT                      180      SEP706BB949B846.sccc.edu           
+4/1/45      10.30.1.221        00727826816A:P1              SW PORT                      180      SEP00727826816A.sccc.edu           
+4/1/46      90:ac:3f:2a:84:ac  90:ac:3f:2a:84:ac            eth0                         120      BrightSign-M1E35D003981            
+5/1/1       LA-AA155-09        a8:a1:59:dc:56:dc                                         3601                                        
+5/1/2       LA-AA155-10        a8:a1:59:dc:65:cd                                         3601                                        
+5/1/4       LA-AA155-12        a8:a1:59:dd:e4:3c                                         3601                                        
+5/1/5       LA-AA155-05        a8:a1:59:d9:c0:75                                         3601                                        
+5/1/8       LA-AA155-08        a8:a1:59:da:20:14                                         3601                                        
+5/1/10      LA-AA155-02        a8:a1:59:dc:5f:3c                                         3601                                        
+5/1/11      LA-AA155-03        a8:a1:59:dc:58:ac                                         3601                                        
+5/1/12      LA-AA155-04        a8:a1:59:dd:e3:f5                                         3601                                        
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/13      00:23:24:ef:fa:89  00:23:24:ef:fa:89                                         3601                                        
+5/1/15      10.30.1.147        007E9578A43E:P1              SW PORT                      180      SEP007E9578A43E.sccc.edu           
+5/1/18      LA-A104-01         a8:a1:59:dc:58:b5                                         3601                                        
+5/1/19      ST-A104-02         a8:a1:59:dc:5a:30                                         3601                                        
+5/1/22      74:e6:e2:02:04:44  74:e6:e2:02:04:44                                         3601                                        
+5/1/23      LA-AA131-06        00:be:43:d6:c8:05                                         3601                                        
+5/1/27      LA-AA131-03        00:be:43:da:69:89                                         3601                                        
+5/1/28      LA-AA131-05        00:be:43:da:68:a9                                         3601                                        
+5/1/39      LA-AA131-04        c0:25:a5:b5:06:4f                                         3601                                        
+5/1/40      LA-AA131-02        00:be:43:d7:16:fa                                         3601                                        
+5/1/43      30:9c:23:08:94:ac  30:9c:23:08:94:ac                                         3601                                        
+5/1/44      IN-AA137-01A       a8:a1:59:dc:55:7b                                         3601                                        
+5/1/48      90:ac:3f:0e:74:ce  90:ac:3f:0e:74:ce            eth0                         120      BrightSign-33D7AK002431            
+SW-A144-1-aruba#   sho lldp 
+  configuration  Show LLDP configuration 
+  local-device   Show LLDP local device information 
+  neighbor-info  Show global LLDP neighbor information 
+  statistics     Show LLDP statistics 
+  tlv            Show TLVs advertised by LLDP 
+SW-A144-1-aruba# sho lldp local-device 
+
+Global Data
+===========
+
+Chassis-ID             : e4:de:40:c7:64:00
+System Name            : SW-A144-1-aruba
+System Description     : Aruba JL659A  FL.10.10.1070                            
+Management Address     : e4:de:40:c7:64:00
+Capabilities Available : Bridge, Router
+Capabilities Enabled   : Bridge, Router
+TTL                    : 120
+
+Port Based Data
+===============
+
+Port-ID           : 1/1/8
+Port-Desc         : "1/1/8 AP-A103"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/8
+
+Port-ID           : 1/1/9
+Port-Desc         : "1/1/9 AP-A111"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/9
+
+Port-ID           : 1/1/10
+Port-Desc         : "1/1/10 AP-A134"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/10
+
+Port-ID           : 1/1/11
+Port-Desc         : "1/1/11 AP-A136"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/11
+
+Port-ID           : 1/1/12
+Port-Desc         : "1/1/12 AP-A138"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/12
+
+Port-ID           : 1/1/13
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "1/1/13 AP-A140"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/13
+
+Port-ID           : 1/1/14
+Port-Desc         : "1/1/14 AP-A149"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/14
+
+Port-ID           : 1/1/15
+Port-Desc         : "1/1/15 AP-A153"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/15
+
+Port-ID           : 1/1/16
+Port-Desc         : "1/1/16 AP-A163"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/16
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-ID           : 1/1/17
+Port-Desc         : "1/1/17 AP-A166-1"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/17
+
+Port-ID           : 1/1/18
+Port-Desc         : "1/1/18 AP-A166-2"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/18
+
+Port-ID           : 1/1/19
+Port-Desc         : "1/1/19 AP-A172"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/19
+
+Port-ID           : 1/1/20
+Port-Desc         : "1/1/20 AP-A169"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/20
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port-ID           : 1/1/21
+Port-Desc         : "1/1/21 AP-A177"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/21
+
+Port-ID           : 1/1/22
+Port-Desc         : "1/1/22 AP-A193"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/22
+
+Port-ID           : 1/1/23
+Port-Desc         : "1/1/23 AP-AA001"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/23
+
+Port-ID           : 1/1/24
+Port-Desc         : "1/1/24 AP-AA101"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Parent Interface  : interface 1/1/24
+
+Port-ID           : 1/1/25
+Port-Desc         : "1/1/25 AP-AA112"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/25
+
+Port-ID           : 1/1/26
+Port-Desc         : "1/1/26 AP-AA113"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/26
+
+Port-ID           : 1/1/27
+Port-Desc         : "1/1/27 AP-AA137"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/27
+
+Port-ID           : 1/1/28
+Port-Desc         : "1/1/28 AP-AA140"
+Port Mgmt-Address : 192.168.2.201
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port VLAN ID      : 722
+Parent Interface  : interface 1/1/28
+
+Port-ID           : 1/1/29
+Port-Desc         : "1/1/29 AP-AA154"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/29
+
+Port-ID           : 1/1/30
+Port-Desc         : "1/1/30 AP-AA163"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 722
+Parent Interface  : interface 1/1/30
+
+Port-ID           : 1/1/32
+Port-Desc         : "DAC connection"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 375
+Parent Interface  : interface 1/1/32
+
+Port-ID           : 1/1/36
+Port-Desc         : "1/1/36 PH-A155"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 10.70.7.1
+Port VLAN ID      : 707
+Parent Interface  : interface 1/1/36
+
+Port-ID           : 1/1/37
+Port-Desc         : "1/1/37"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 1
+Parent Interface  : interface 1/1/37
+
+Port-ID           : 1/1/45
+Port-Desc         : "1/1/45 PRNT Admissions Color"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 1/1/45
+
+Port-ID           : 1/1/48
+Port-Desc         : "1/1/40 PRNT - Admissions BW"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 1/1/48
+
+Port-ID           : 1/1/51
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "SW-AA144 connection"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 1
+Parent Interface  : interface 1/1/51
+
+Port-ID           : 2/1/1
+Port-Desc         : "2/1/1 SIPGW-A144"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 301
+Parent Interface  : interface 2/1/1
+
+Port-ID           : 2/1/5
+Port-Desc         : "2/1/5 PH-A149B"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/5
+
+Port-ID           : 2/1/6
+Port-Desc         : "2/1/6 PH-A151"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/6
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-ID           : 2/1/7
+Port-Desc         : "2/1/7 PH-A159"
+Port Mgmt-Address : 10.70.2.1
+Port VLAN ID      : 702
+Parent Interface  : interface 2/1/7
+
+Port-ID           : 2/1/10
+Port-Desc         : "2/1/10 PH-A102"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/10
+
+Port-ID           : 2/1/13
+Port-Desc         : "2/1/13 PH-A134-H40"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/13
+
+Port-ID           : 2/1/15
+Port-Desc         : "2/1/15 PH-A149A"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/15
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port-ID           : 2/1/17
+Port-Desc         : "2/1/17 PH-A178"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/17
+
+Port-ID           : 2/1/19
+Port-Desc         : "2/1/19 PH-AA132"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/19
+
+Port-ID           : 2/1/20
+Port-Desc         : "2/1/20 PH-A160"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/20
+
+Port-ID           : 2/1/21
+Port-Desc         : "2/1/21 PH-AA130"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Parent Interface  : interface 2/1/21
+
+Port-ID           : 2/1/22
+Port-Desc         : "2/1/22 PH-A134A"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/22
+
+Port-ID           : 2/1/25
+Port-Desc         : "2/1/25 PH-A179"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/25
+
+Port-ID           : 2/1/27
+Port-Desc         : "2/1/27 PH-A135-W"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 405
+Parent Interface  : interface 2/1/27
+
+Port-ID           : 2/1/30
+Port-Desc         : "2/1/30 PH-A135A"
+Port Mgmt-Address : 10.70.1.1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port VLAN ID      : 701
+Parent Interface  : interface 2/1/30
+
+Port-ID           : 2/1/32
+Port-Desc         : "2/1/32 PH-A195"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/32
+
+Port-ID           : 2/1/33
+Port-Desc         : "2/1/33 PH-A181"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/33
+
+Port-ID           : 2/1/34
+Port-Desc         : "2/1/34 PH-A136"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/34
+
+Port-ID           : 2/1/35
+Port-Desc         : "2/1/35 PH-A179"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/35
+
+Port-ID           : 2/1/36
+Port-Desc         : "2/1/36 PH-A134"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/36
+
+Port-ID           : 2/1/37
+Port-Desc         : "2/1/37 PH-A180"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/37
+
+Port-ID           : 2/1/38
+Port-Desc         : "2/1/38 PH-A185"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/38
+
+Port-ID           : 2/1/39
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "2/1/39 PH-A187"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/39
+
+Port-ID           : 2/1/40
+Port-Desc         : "2/1/40 PH-A184"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/40
+
+Port-ID           : 2/1/46
+Port-Desc         : "2/1/46 PH-A193"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/46
+
+Port-ID           : 2/1/48
+Port-Desc         : "2/1/48 PH-A186"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 2/1/48
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-ID           : 3/1/1
+Port-Desc         : "4/1 COMP-A193-Instructor"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/1
+
+Port-ID           : 3/1/3
+Port-Desc         : "4/3 COMP-A134B"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/3
+
+Port-ID           : 3/1/5
+Port-Desc         : "3/1/5 Unknown"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/5
+
+Port-ID           : 3/1/6
+Port-Desc         : "4/6 COMP - AA154"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/6
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port-ID           : 3/1/8
+Port-Desc         : "3/1/8 Unknown"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/8
+
+Port-ID           : 3/1/9
+Port-Desc         : "3/1/9 PRNT SSS Lab"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/9
+
+Port-ID           : 3/1/10
+Port-Desc         : "3/1/10 MFP-PRNT-A160 North copier"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/10
+
+Port-ID           : 3/1/12
+Port-Desc         : "3/1/12 Unknown"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Parent Interface  : interface 3/1/12
+
+Port-ID           : 3/1/15
+Port-Desc         : "3/1/15 OPEN"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/15
+
+Port-ID           : 3/1/16
+Port-Desc         : "3/1/16 PRNT-AA150 HP LJ4050 BW"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/16
+
+Port-ID           : 3/1/23
+Port-Desc         : "3/1/23 OPEN"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 3/1/23
+
+Port-ID           : 3/1/25
+Port-Desc         : "3/1/25 COMP - AA159 Security"
+Port Mgmt-Address : 10.70.1.1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port VLAN ID      : 701
+Parent Interface  : interface 3/1/25
+
+Port-ID           : 3/1/26
+Port-Desc         : "3/1/26 MFP-PRNT-A160 North copier"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/26
+
+Port-ID           : 3/1/28
+Port-Desc         : "3/1/28 PRNT-A190-Color"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/28
+
+Port-ID           : 3/1/34
+Port-Desc         : "3/1/34 MFP-PRNT-A160 South copier"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 3/1/34
+
+Port-ID           : 3/1/35
+Port-Desc         : "3/1/35 SW-AA131-A"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 1
+Parent Interface  : interface 3/1/35
+
+Port-ID           : 3/1/43
+Port-Desc         : "3/1/43 HVAC-AA133"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 817
+Parent Interface  : interface 3/1/43
+
+Port-ID           : 3/1/44
+Port-Desc         : "3/1/44 HVAC-JACE"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 817
+Parent Interface  : interface 3/1/44
+
+Port-ID           : 3/1/46
+Port-Desc         : "3/1/46 UPS-Vertiv"
+Port Mgmt-Address : 192.168.2.201
+Port VLAN ID      : 1
+Parent Interface  : interface 3/1/46
+
+Port-ID           : 3/1/47
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "3/1/47 DS-A144-FRONT SIGN"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 401
+Parent Interface  : interface 3/1/47
+
+Port-ID           : 4/1/1
+Port-Desc         : "4/1/1 COMP-A149-1"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/1
+
+Port-ID           : 4/1/2
+Port-Desc         : "4/1/2 COMP-A149-2"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/2
+
+Port-ID           : 4/1/3
+Port-Desc         : "4/1/3 COMP-A149-3"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/3
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-ID           : 4/1/4
+Port-Desc         : "4/1/4 COMP-A149-4"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/4
+
+Port-ID           : 4/1/5
+Port-Desc         : "4/1/5 COMP-A149-5"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/5
+
+Port-ID           : 4/1/6
+Port-Desc         : "4/1/6 COMP-A149-6"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/6
+
+Port-ID           : 4/1/7
+Port-Desc         : "4/1/7 COMP-A149-7"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/7
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port-ID           : 4/1/8
+Port-Desc         : "4/1/8 COMP-A149-8"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/8
+
+Port-ID           : 4/1/14
+Port-Desc         : "4/1/14 PRNT - A134 Sharp Copier"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/14
+
+Port-ID           : 4/1/15
+Port-Desc         : "4/1/15 PRNT-AA131-"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/15
+
+Port-ID           : 4/1/16
+Port-Desc         : "4/1/16 PRNT-A149 HP BW"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Parent Interface  : interface 4/1/16
+
+Port-ID           : 4/1/17
+Port-Desc         : "4/1/17 COMP-A149-16"
+Port Mgmt-Address : 10.70.6.1
+Port VLAN ID      : 706
+Parent Interface  : interface 4/1/17
+
+Port-ID           : 4/1/19
+Port-Desc         : "4/1/19 PRNT A183-HP Color"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/19
+
+Port-ID           : 4/1/20
+Port-Desc         : "4/1/20 JACE-HVAC (above A144)"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 817
+Parent Interface  : interface 4/1/20
+
+Port-ID           : 4/1/25
+Port-Desc         : "4/1/25 PRNT A134"
+Port Mgmt-Address : e4:de:40:c7:64:00
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port VLAN ID      : 402
+Parent Interface  : interface 4/1/25
+
+Port-ID           : 4/1/26
+Port-Desc         : "4/1/26 OPEN"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 4/1/26
+
+Port-ID           : 4/1/27
+Port-Desc         : "4/1/27 OPEN"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 4/1/27
+
+Port-ID           : 4/1/30
+Port-Desc         : "4/1/30 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 4/1/30
+
+Port-ID           : 4/1/31
+Port-Desc         : "4/1/31 AA131"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 4/1/31
+
+Port-ID           : 4/1/32
+Port-Desc         : "4/1/32 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 4/1/32
+
+Port-ID           : 4/1/41
+Port-Desc         : "4/1/41 PRNT-A134-HP Color Laserjet CP4525"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/41
+
+Port-ID           : 4/1/43
+Port-Desc         : "4/1/43 PRNT-A134-HP-BW"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/43
+
+Port-ID           : 4/1/45
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "4/1/45 PRNT-AA151-HP-LFCOLOR"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/45
+
+Port-ID           : 4/1/46
+Port-Desc         : "4/1/46 BS-Marketing"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 405
+Parent Interface  : interface 4/1/46
+
+Port-ID           : 4/1/48
+Port-Desc         : "4/1/48 PRNT A149 Counseling"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 4/1/48
+
+Port-ID           : 5/1/1
+Port-Desc         : "5/1/1 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/1
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-ID           : 5/1/2
+Port-Desc         : "5/1/2 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/2
+
+Port-ID           : 5/1/3
+Port-Desc         : "5/1/3 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/3
+
+Port-ID           : 5/1/4
+Port-Desc         : "5/1/4 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/4
+
+Port-ID           : 5/1/5
+Port-Desc         : "5/1/5 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/5
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port-ID           : 5/1/8
+Port-Desc         : "5/1/8 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/8
+
+Port-ID           : 5/1/10
+Port-Desc         : "5/1/10 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/10
+
+Port-ID           : 5/1/11
+Port-Desc         : "5/1/11 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/11
+
+Port-ID           : 5/1/12
+Port-Desc         : "5/1/12 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Parent Interface  : interface 5/1/12
+
+Port-ID           : 5/1/13
+Port-Desc         : "5/1/13 Unknown"
+Port Mgmt-Address : 10.70.29.1
+Port VLAN ID      : 729
+Parent Interface  : interface 5/1/13
+
+Port-ID           : 5/1/15
+Port-Desc         : "5/1/15 Unknown"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 5/1/15
+
+Port-ID           : 5/1/18
+Port-Desc         : "5/1/18 Comp-A103"
+Port Mgmt-Address : 10.70.2.1
+Port VLAN ID      : 702
+Parent Interface  : interface 5/1/18
+
+Port-ID           : 5/1/19
+Port-Desc         : "5/1/19 Comp-A103"
+Port Mgmt-Address : 10.70.2.1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port VLAN ID      : 702
+Parent Interface  : interface 5/1/19
+
+Port-ID           : 5/1/22
+Port-Desc         : "5/1/22 Comp-A103"
+Port Mgmt-Address : 10.70.2.1
+Port VLAN ID      : 702
+Parent Interface  : interface 5/1/22
+
+Port-ID           : 5/1/23
+Port-Desc         : "5/1/23 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 5/1/23
+
+Port-ID           : 5/1/27
+Port-Desc         : "5/1/27 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 5/1/27
+
+Port-ID           : 5/1/28
+Port-Desc         : "5/1/28 AA131"
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 5/1/28
+
+Port-ID           : 5/1/39
+Port-Desc         : "5/1/39 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 5/1/39
+
+Port-ID           : 5/1/40
+Port-Desc         : "5/1/40 AA131"
+Port Mgmt-Address : 10.70.26.1
+Port VLAN ID      : 726
+Parent Interface  : interface 5/1/40
+
+Port-ID           : 5/1/42
+Port-Desc         : "5/1/42 PRNT - A160 Library workroom HP4250"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 402
+Parent Interface  : interface 5/1/42
+
+Port-ID           : 5/1/43
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Port-Desc         : "5/1/43 Unknown"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 5/1/43
+
+Port-ID           : 5/1/44
+Port-Desc         : "5/1/44 Unknown"
+Port Mgmt-Address : 10.70.1.1
+Port VLAN ID      : 701
+Parent Interface  : interface 5/1/44
+
+Port-ID           : 5/1/48
+Port-Desc         : "5/1/48 BS-Library-A166"
+Port Mgmt-Address : e4:de:40:c7:64:00
+Port VLAN ID      : 405
+Parent Interface  : interface 5/1/48
+
+Port-ID           : mgmt
+Port-Desc         : "mgmt"
+Port Mgmt-Address : e4:de:40:c7:64:00
+
+SW-A144-1-aruba#         sho cdp 
+  neighbor-info  Shows Global CDP neighbor information 
+  traffic        Shows CDP each interface packet statistics 
+  voice-vlan     Shows CDP each interface pre-standard-voice mode 
+  <cr>           
+SW-A144-1-aruba# sho cdp traffic 
+
+CDP frame Statistics
+====================
+Port        Transmitted Frames       Received Frames          Discarded Frames         
+--------------------------------------------------------------------------------
+1/1/1          92                       15957                    0                        
+1/1/2          0                        0                        0                        
+1/1/3          0                        0                        0                        
+1/1/4          0                        0                        0                        
+1/1/5          0                        0                        0                        
+1/1/6          0                        0                        0                        
+1/1/7          0                        0                        0                        
+1/1/8          0                        0                        0                        
+1/1/9          0                        0                        0                        
+1/1/10         0                        0                        0                        
+1/1/11         0                        0                        0                        
+1/1/12         0                        0                        0                        
+1/1/13         0                        0                        0                        
+1/1/14         0                        0                        0                        
+1/1/15         0                        0                        0                        
+1/1/16         0                        0                        0                        
+1/1/17         0                        0                        0                        
+1/1/18         0                        0                        0                        
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/19         0                        0                        0                        
+1/1/20         0                        0                        0                        
+1/1/21         0                        0                        0                        
+1/1/22         0                        0                        0                        
+1/1/23         0                        0                        0                        
+1/1/24         0                        0                        0                        
+1/1/25         0                        0                        0                        
+1/1/26         0                        0                        0                        
+1/1/27         0                        0                        0                        
+1/1/28         0                        0                        0                        
+1/1/29         0                        0                        0                        
+1/1/30         0                        0                        0                        
+1/1/31         0                        0                        0                        
+1/1/32         0                        0                        0                        
+1/1/33         0                        0                        0                        
+1/1/34         0                        0                        0                        
+1/1/35         0                        0                        0                        
+1/1/36         645910                   721347                   0                        
+1/1/37         0                        721349                   0                        
+1/1/38         0                        0                        0                        
+1/1/39         0                        0                        0                        
+1/1/40         0                        0                        0                        
+1/1/41         0                        0                        0                        
+ -- MORE --, next page: Space, next line: Enter, quit: q
+SW-A144-1-aruba# sho cdp 
+  neighbor-info  Shows Global CDP neighbor information 
+  traffic        Shows CDP each interface packet statistics 
+  voice-vlan     Shows CDP each interface pre-standard-voice mode 
+  <cr>           
+SW-A144-1-aruba# sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+2/1/32      SEP001B2A89F05A          Cisco IP Phone 7941      HPM         
+2/1/6       SEP701F5387F092          Cisco IP Phone 7821      HPM         
+2/1/19      SEP54781ae08be5          Cisco IP Phone 3905      CHP         
+2/1/39      SEPC444A074796F          Cisco IP Phone 7821      HPM         
+2/1/37      SEP007278267F64          Cisco IP Phone 7821      HPM         
+2/1/38      SEP701F5387F0B1          Cisco IP Phone 7821      HPM         
+2/1/13      SEPC444A0747960          Cisco IP Phone 7821      HPM         
+3/1/3       SEP701F53876A11          Cisco IP Phone 7821      HPM         
+2/1/34      SEP6886a7c42c83          Cisco IP Phone 3905      CHP         
+2/1/48      SEP001B2A89E4C7          Cisco IP Phone 7941      HPM         
+4/1/45      SEP00727826816A          Cisco IP Phone 7821      HPM         
+2/1/10      SEP6886a7c42ac9          Cisco IP Phone 3905      CHP         
+2/1/36      SEP706BB949B621          Cisco IP Phone 7841      HPM         
+2/1/35      SEP706BB949B44E          Cisco IP Phone 7841      HPM         
+1/1/37      00:22:BD:FC:B5:38        CIVS-IPC-3520            H           
+2/1/27      SEP706BB949675C          Cisco IP Phone 7841      HPM         
+3/1/25      SEP007E9578A424          Cisco IP Phone 7821      HPM         
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/22      SEPC444A07478FF          Cisco IP Phone 7821      HPM         
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/30      SEPF8A5C59E3B14          Cisco IP Phone 8851      HPM         
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               5/1/15      SEP007E9578A43E          Cisco IP Phone 7821      HPM         
+2/1/33      SEPC444A07478C3          Cisco IP Phone 7821      HPM         
+1/1/36      SEP706BB9496382          Cisco IP Phone 7841      HPM         
+2/1/46      SEP08cc6830fb4e          Cisco IP Phone 3905      CHP         
+1/1/51      sw-aa144-A48.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+2/1/5       SEP0072782680F3          Cisco IP Phone 7821      HPM         
+2/1/40      SEPC444A07478FD          Cisco IP Phone 7821      HPM         
+2/1/25      SEPC444A0747968          Cisco IP Phone 7821      HPM         
+4/1/43      SEP706BB949B846          Cisco IP Phone 7841      HPM         
+2/1/20      SEP001B2A89E44E          Cisco IP Phone 7941      HPM         
+2/1/21      SEP50060472fdc7          Cisco IP Phone 3905      CHP         
+2/1/7       SEP007278268EE4          Cisco IP Phone 7821      HPM         
+2/1/15      SEP706BB949B325          Cisco IP Phone 7841      HPM         
+SW-A144-1-aruba#       sho cdp neighbor-info   
+  IFNAME  Specify the interface name 
+  <cr>    
+SW-A144-1-aruba# sho cdp neighbor-info exit
+Invalid input: exit
+SW-A144-1-aruba# exit

@@ -1,0 +1,251 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.15 05:26:23 =~=~=~=~=~=~=~=~=~=~=~=
+sho running-config 
+Current configuration:
+!
+!Version ArubaOS-CX PL.10.13.0005
+!export-password: default
+hostname SW-SoftBallPB
+domain-name sccc.edu
+user admin group administrators password ciphertext AQBapTvOCCpoj5OhQfQ+U8ggz0Ot5wwWPa/IDYggExOIMklfYgAAAP0n/nnWuGLUTr7OVdQJUwwJV9iDh2TNjj2QU6SkjqJNLVrSR+DgQFXGxrkEnGDVb8PYGl/arQj0BHA9VWNbZdjag9Mki4ouqZtM/3+dBnVTIqnswiJaD27EcEH3ZyIEBgeL
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+ntp server pool.ntp.org minpoll 4 maxpoll 4 iburst
+ntp enable
+!
+!
+!
+!
+!
+!
+ssh server vrf default
+ssh key-exchange-algorithms curve25519-sha256 curve25519-sha256@libssh.org ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 diffie-hellman-group-exchange-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group14-sha256 diffie-hellman-group14-sha1
+vlan 1
+vlan 201
+    name SLC-Guest2-Aruba
+vlan 202
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name SLC-Staff-Aruba
+vlan 203
+    name SLC-ESports-Aruba
+vlan 204
+    name SLC-Student2-Aruba
+vlan 733
+    name AA105-Staff
+vlan 820
+    name Gym-Pressbox
+vlan 835
+    name ArubaAP-S
+spanning-tree mode rpvst
+spanning-tree
+spanning-tree priority 15
+spanning-tree vlan 1,201-204,733
+spanning-tree vlan 1 priority 15
+spanning-tree vlan 201 priority 15
+spanning-tree vlan 202 priority 15
+spanning-tree vlan 203 priority 15
+spanning-tree vlan 204 priority 15
+spanning-tree vlan 733 priority 15
+interface 1/1/1
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 835
+    vlan trunk allowed 201-204,733,820,835
+interface 1/1/2
+    no shutdown
+    vlan access 203
+interface 1/1/3
+    no shutdown
+    vlan access 203
+interface 1/1/4
+    no shutdown
+    vlan access 203
+interface 1/1/5
+    no shutdown
+    vlan access 203
+interface 1/1/6
+    no shutdown
+    vlan access 203
+interface 1/1/7
+    no shutdown
+    vlan access 203
+interface 1/1/8
+    no shutdown
+    vlan access 203
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/9
+    no shutdown
+    vlan access 203
+interface 1/1/10
+    no shutdown
+    vlan access 203
+interface 1/1/11
+    no shutdown
+    vlan access 203
+interface 1/1/12
+    no shutdown
+    vlan access 203
+interface 1/1/13
+    no shutdown
+    vlan access 203
+interface 1/1/14
+    no shutdown
+    vlan access 203
+interface 1/1/15
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed 1,201-204,733,820,835
+interface 1/1/16
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    vlan access 203
+interface vlan 1
+    ip address 192.168.2.204/16
+    ip dhcp
+        ! ip dhcp is ignored when static ip is configured
+ip route 0.0.0.0/0 192.168.2.71
+ip dns server-address 10.40.1.77
+ip dns server-address 10.40.1.68
+!
+!
+!
+!
+!
+https-server vrf default
+SW-SoftBallPB#       sho ip int bri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            192.168.2.204/16          up/up
+
+
+SW-SoftBallPB# sho version 
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2023 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : PL.10.13.0005                                                 
+Build Date   : 2023-11-10 15:08:58 UTC                                       
+Build ID     : ArubaOS-CX:PL.10.13.0005:1fa38ed04bef:202311101456            
+Build SHA    : 1fa38ed04bef1b6d1f01d4342fe12f3a2ea2a72f                      
+Hot Patches  :                                                               
+Active Image : secondary                     
+
+Service OS Version : PL.01.12.0003                 
+BIOS Version       : PL.01.0002                    
+SW-SoftBallPB# sho clock 
+Thu May 15 09:26:25 UTC 2025
+System is configured for timezone : UTC
+SW-SoftBallPB# sho log
+% Ambiguous command.
+SW-SoftBallPB# sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+1/1/5       AP-SB-X-MAP.sccc.edu     cisco AIR-CAP1532I-B-K9  IBT         
+1/1/15      sw-aa144-A24.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+SW-SoftBallPB# sho cdp neighbor-info de                      o lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 2
+Total Neighbor Entries Deleted  : 15
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 15
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/1       84:d4:7e:cb:c9:38  84:d4:7e:cb:c9:38            bond0                        120      AAP-SoftBallPB                     
+1/1/15      3c:51:0e:39:d0:79  Ethernet1/34                 Ethernet1/34                 120      sw-aa144-A24.sccc.edu              
+SW-SoftBallPB# sho lldp neighbor-info detail 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 2
+Total Neighbor Entries Deleted  : 15
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 15
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/1
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 15
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 15
+Neighbor System-Name           : AAP-SoftBallPB
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:cb:c9:38
+Neighbor Management-Address    : 10.80.35.71
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:cb:c9:38
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/15
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : sw-aa144-A24.sccc.edu
+Neighbor System-Description    : Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Neighbor Chassis-ID            : 3c:51:0e:39:d0:79
+Neighbor Management-Address    : 3c:51:0e:39:d0:79
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : Ethernet1/34
+Neighbor Port-Desc             : Ethernet1/34
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               SW-SoftBallPB#   exit

@@ -1,0 +1,912 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 03:35:09 =~=~=~=~=~=~=~=~=~=~=~=
+
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# 
+sw-t122-T24# sho runsw-t122-T24# sho running-config 
+
+!Command: show running-config
+!Running configuration last done at: Wed Feb 26 18:41:45 2025
+!Time: Tue May 13 07:35:28 2025
+
+version 10.2(6) Bios:version 07.69 
+hostname sw-t122-T24
+vdc sw-t122-T24 id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+feature telnet
+cfs eth distribute
+feature interface-vlan
+feature lacp
+feature vpc
+feature lldp
+feature vtp
+
+no password strength-check
+--More--username admin password 5 $5$Vw7UER8r$VUyrL7BPuMlXbvzAHBYvDdK/p/zkssxSFTW.aZW6PL
+D  role network-admin
+ip domain-lookup
+ip domain-name sccc.edu
+ip name-server 10.40.1.68 192.168.1.111
+copp profile strict
+vtp domain blob
+snmp-server user admin network-admin auth md5 0xcb4f9c8a1240d82948711ee6283651b9
+ priv des 0xcb4f9c8a1240d82948711ee6283651b9 localizedkey
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+
+ip route 0.0.0.0/0 192.168.2.5
+vlan 1,51,200-204,300-314,316-322,332,348-353,372-373,375,377,401-405,408,410,41
+2,414-416,500-502,504,506,508,518,564,568,601,610-612,614-628,660,670,680,701-70
+3,706-708,722-723,726,728-731,733-737,740,749-750,764-766,772-775,780,788-791,80
+1-804,806,809,816-821,824,826,832-833,835,840-842,845,848,997-999
+vlan 51
+  name CiscoDMZ
+vlan 200
+--More--  name SLC_students
+vlan 201
+  name SLC-Guest2-Aruba
+vlan 202
+  name SLC-Staff-Aruba
+vlan 203
+  name SLC-ESports-Aruba
+vlan 204
+  name SLC-Student2-Aruba
+vlan 301
+  name VOIP-A
+vlan 302
+  name VOIP-AA
+vlan 303
+  name VOIP-S
+vlan 304
+  name VOIP-H
+vlan 305
+  name VOIP-COS
+vlan 306
+  name VOIP-V
+vlan 307
+  name VOIP-SLC
+--More--vlan 308
+  name VOIP-SLCCDE
+vlan 309
+  name VOIP-SLCAB
+vlan 310
+  name VOIP-B
+vlan 311
+  name VOIP-M
+vlan 312
+  name VOIP-C
+vlan 313
+  name VOIP-E
+vlan 314
+  name VOIP-EA
+vlan 316
+  name VOIP-T
+vlan 317
+  name VOIP-TA
+vlan 318
+  name VOIP-TB
+vlan 319
+  name VOIP-TD
+vlan 320
+--More--  name VOIP-TT
+vlan 321
+  name VOIP-SLCT
+vlan 322
+  name VOIP-CAH
+vlan 332
+  name TestingAndGI
+vlan 348
+  name PSEC-ServersGi2/31
+vlan 349
+  name PSEC-A-AA
+vlan 350
+  name PSEC-S-B-H-Cos-V-M
+vlan 351
+  name PSEC-SLC
+vlan 352
+  name PSEC-T-TA-TB-TD-TT
+vlan 353
+  name PSEC-C-E-EAnnex-CAH
+vlan 372
+  name DAC-Servers
+vlan 373
+  name DAC-A-AA
+--More--vlan 375
+  name SC-IoT
+vlan 377
+  name DAC-C-E-Eannex-CAH
+vlan 401
+  name Servers
+vlan 402
+  name Printers
+vlan 403
+  name Citrix
+vlan 404
+  name 3CXPBX
+vlan 405
+  name DigitalSignage
+vlan 408
+  name DR-site-equipment
+vlan 410
+  name HPiSCSI-410
+vlan 412
+  name NMBL-Stor
+vlan 414
+  name Nutan-IPMI
+vlan 415
+--More--  name Nutan-VMWareVmotion
+vlan 416
+  name Nutan-VMMgmtCVMClst
+vlan 500
+  name Wireless1
+vlan 501
+  name Wireless2
+vlan 502
+  name WLAN-APs-WCS
+vlan 504
+  name WLAN-Private
+vlan 506
+  name WLAN-IPads
+vlan 508
+  name WLAN-Public
+vlan 518
+  name OSPF-SLC151-9KA48
+vlan 564
+  name Projectors
+vlan 568
+  name HDMI
+vlan 601
+  name LAN2
+--More--vlan 610
+  name IT-Staff
+vlan 611
+  name OSPF1
+vlan 612
+  name OSPF2
+vlan 614
+  name OSPF10-AA144-A48
+vlan 615
+  name OSPF10-T48-A48
+vlan 617
+  name OSPF10-TechSchool
+vlan 618
+  name OSPF-SLC151-Aruba
+vlan 619
+  name OSPF10-V201
+vlan 620
+  name OSPF10-B101
+vlan 621
+  name OSPF10-TA107
+vlan 622
+  name OSPF10-A144-1
+vlan 623
+--More--  name OSPF10-A144-2
+vlan 624
+  name OSPF10-SharpCC
+vlan 625
+  name OSPF10-AA105
+vlan 626
+  name OSPF10-SU121
+vlan 627
+  name OSPF10-COS109
+vlan 628
+  name OSPF10-HealthCenter
+vlan 660
+  name VDI-Desktops
+vlan 670
+  name P2P-AA109-AA144
+vlan 680
+  name A001
+vlan 701
+  name A144-Staff
+vlan 702
+  name A103
+vlan 703
+  name A136
+--More--vlan 706
+  name A149
+vlan 707
+  name A166A
+vlan 708
+  name A166
+vlan 722
+  name ArubaAP-A
+vlan 723
+  name ArubaAP-Outdoor
+vlan 726
+  name AA131
+vlan 728
+  name AA137
+vlan 729
+  name AA155
+vlan 730
+  name AA159
+vlan 731
+  name AA163
+vlan 733
+  name AA105-Staff
+vlan 734
+--More--  name AA101
+vlan 735
+  name AA109
+vlan 736
+  name AA112
+vlan 737
+  name AA113
+vlan 740
+  name test-vlan
+vlan 749
+  name CosmoBuilding
+vlan 750
+  name ArubaAP-COS
+vlan 764
+  name V103-AgLab
+vlan 765
+  name AgBuilding
+vlan 766
+  name ArubaAP-V
+vlan 772
+  name E117-E213-EpworthLabs
+vlan 773
+  name EpworthBuilding
+--More--vlan 774
+  name MM-Equipment-in-E
+vlan 775
+  name ArubaAP-E
+vlan 780
+  name ColvinBuilding
+vlan 788
+  name H109-HumLab
+vlan 789
+  name HumanitiesBuilding
+vlan 790
+  name HumanitiesTest
+vlan 791
+  name ArubaAP-H
+vlan 801
+  name SWKTS-Data
+vlan 802
+  name TechSchoolLabs
+vlan 803
+  name TechLectureCapture
+vlan 804
+  name TechHVAC
+vlan 806
+--More--  name ArubaAP-T
+vlan 809
+  name TA-WorkForceCenter
+vlan 816
+  name MaintenanceBuilding
+vlan 817
+  name HVAC-Maintenance
+vlan 818
+  name Fire-Alarm-System
+vlan 819
+  name HVAC-maintenance
+vlan 820
+  name Gym-Pressbox
+vlan 821
+  name SA-building
+vlan 824
+  name SLC-Buildings
+vlan 826
+  name ArubaAP-SLC
+vlan 832
+  name SU108-Bookstore
+vlan 833
+  name StudentBuilding
+--More--vlan 835
+  name ArubaAP-S
+vlan 840
+  name CAH-General
+vlan 841
+  name CAH-Labs
+vlan 842
+  name CAH-Sim-Record
+vlan 845
+  name ArubaAP-CAH
+vlan 848
+  name SharpChampions
+vlan 997
+  name TempVoiceVlan997
+vlan 998
+  name TempVoiceVlan998
+vlan 999
+  name Gym-Video
+
+vrf context management
+vpc domain 50
+  role priority 40
+  peer-keepalive destination 172.20.11.5 source 172.20.11.6 vrf default
+--More--
+interface Vlan1
+  no shutdown
+  ip address 192.168.2.72/16
+
+interface port-channel15
+  description **VPC Peer link**
+  switchport
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/1
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/2
+--More--  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/3
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/4
+  switchport
+
+interface Ethernet1/5
+--More--  switchport
+
+interface Ethernet1/6
+  description T122 to T122-T24
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/7
+  switchport
+
+interface Ethernet1/8
+  switchport
+
+interface Ethernet1/9
+  switchport
+
+interface Ethernet1/10
+  switchport
+
+interface Ethernet1/11
+  switchport
+--More--
+interface Ethernet1/12
+  switchport
+
+interface Ethernet1/13
+  switchport
+
+interface Ethernet1/14
+  switchport
+
+interface Ethernet1/15
+  switchport
+
+interface Ethernet1/16
+  description ***keepalivefor VPC**
+  ip address 172.20.11.6/30
+  no shutdown
+
+interface Ethernet1/17
+  switchport
+
+interface Ethernet1/18
+  switchport
+--More--
+interface Ethernet1/19
+  switchport
+
+interface Ethernet1/20
+  switchport
+
+interface Ethernet1/21
+  switchport
+
+interface Ethernet1/22
+  switchport
+
+interface Ethernet1/23
+  switchport
+
+interface Ethernet1/24
+  switchport
+
+interface Ethernet1/25
+  switchport
+
+interface Ethernet1/26
+--More--  switchport
+
+interface Ethernet1/27
+  switchport
+
+interface Ethernet1/28
+  switchport
+
+interface Ethernet1/29
+  switchport
+
+interface Ethernet1/30
+  switchport
+
+interface Ethernet1/31
+  switchport
+
+interface Ethernet1/32
+  switchport
+
+interface Ethernet1/33
+  switchport
+
+--More--interface Ethernet1/34
+  switchport
+
+interface Ethernet1/35
+  switchport
+
+interface Ethernet1/36
+  switchport
+
+interface Ethernet1/37
+  switchport
+
+interface Ethernet1/38
+  switchport
+
+interface Ethernet1/39
+  switchport
+
+interface Ethernet1/40
+  switchport
+
+interface Ethernet1/41
+  switchport
+--More--
+interface Ethernet1/42
+  switchport
+
+interface Ethernet1/43
+  switchport
+
+interface Ethernet1/44
+  switchport
+
+interface Ethernet1/45
+  switchport
+
+interface Ethernet1/46
+  switchport
+
+interface Ethernet1/47
+  switchport
+
+interface Ethernet1/48
+  switchport
+
+interface Ethernet1/49
+--More--  description ** SW-T122-T24 CONNECTION TO  SW-T122-T48 *
+  switchport
+  switchport mode trunk
+  channel-group 15 mode active
+  no shutdown
+
+interface Ethernet1/50
+  switchport
+
+interface Ethernet1/51
+  switchport
+
+interface Ethernet1/52
+  switchport
+
+interface Ethernet1/53
+  switchport
+
+interface Ethernet1/54
+  switchport
+
+interface mgmt0
+  vrf member management
+--More--line console
+line vty
+boot nxos bootflash:/nxos64-cs.10.2.6.M.bin 
+
+
+
+sw-t122-T24#     sho ip ntin bri
+                     ^
+% Ambiguous command at '^' marker.
+sw-t122-T24# sho ip int br
+
+IP Interface Status for VRF "default"(1)
+Interface            IP Address      Interface Status
+Vlan1                192.168.2.72    protocol-up/link-up/admin-up       
+Eth1/16              172.20.11.6     protocol-up/link-up/admin-up       
+sw-t122-T24# sho int status
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+mgmt0         --                 notconnec routed    auto    auto    --         
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Eth1/1        --                 connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/2        --                 connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/3        --                 connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/4        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/5        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/6        T122 to T122-T24   connected trunk     full    25G     SFP-H25GB-L
+R
+Eth1/7        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/8        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/9        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/10       --                 xcvrAbsen 1         auto    auto    --         
+--More--Eth1/11       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/12       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/13       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/14       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/15       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/16       ***keepalivefor VP connected routed    full    1000    1000base-SX
+Eth1/17       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/18       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/19       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/20       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/21       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/22       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/23       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/24       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/25       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/26       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/27       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/28       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/29       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/30       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/31       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/32       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/33       --                 xcvrAbsen 1         auto    auto    --         
+--More--Eth1/34       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/35       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/36       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/37       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/38       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/39       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/40       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/41       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/42       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/43       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/44       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/45       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/46       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/47       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/48       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/49       ** SW-T122-T24 CON connected trunk     full    100G    QSFP-100G-C
+R4
+Eth1/50       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/51       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/52       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/53       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/54       --                 xcvrAbsen 1         auto    auto    --         
+
+--More----------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Po15          **VPC Peer link**  connected trunk     full    100G    --         
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Vlan1         --                 connected routed    auto    auto    --
+sw-t122-T24#   sho clock
+Warning: No NTP peer/server configured. Time may be out of sync.
+07:36:07.602 UTC Tue May 13 2025
+Time source is NTP
+sw-t122-T24# sho versw-t122-T24# sho version 
+Cisco Nexus Operating System (NX-OS) Software
+TAC support: http://www.cisco.com/tac
+Copyright (C) 2002-2023, Cisco and/or its affiliates.
+All rights reserved.
+The copyrights to certain works contained in this software are
+owned by other third parties and used and distributed under their own
+licenses, such as open source.  This software is provided "as is," and unless
+otherwise stated, there is no warranty, express or implied, including but not
+limited to warranties of merchantability and fitness for a particular purpose.
+Certain components of this software are licensed under
+the GNU General Public License (GPL) version 2.0 or 
+GNU General Public License (GPL) version 3.0  or the GNU
+Lesser General Public License (LGPL) Version 2.1 or 
+Lesser General Public License (LGPL) Version 2.0. 
+A copy of each such license is available at
+http://www.opensource.org/licenses/gpl-2.0.php and
+http://opensource.org/licenses/gpl-3.0.html and
+http://www.opensource.org/licenses/lgpl-2.1.php and
+http://www.gnu.org/licenses/old-licenses/library.txt.
+
+Software
+  BIOS: version 07.69
+  NXOS: version 10.2(6) [Maintenance Release]
+--More--  BIOS compile time:  04/07/2021
+  NXOS image file is: bootflash:///nxos64-cs.10.2.6.M.bin
+  NXOS compile time:  8/31/2023 12:00:00 [08/29/2023 21:07:36]
+
+Hardware
+  cisco Nexus9000 C93180YC-EX chassis 
+  Intel(R) Xeon(R) CPU  @ 1.80GHz with 24617872 kB of memory.
+  Processor Board ID FDO23440YY0
+  Device name: sw-t122-T24
+  bootflash:   53298520 kB
+
+Kernel uptime is 468 day(s), 18 hour(s), 19 minute(s), 11 second(s)
+
+Last reset at 483011 usecs after Tue Jan 30 13:16:06 2024
+  Reason: Reset due to upgrade
+  System version: 9.3(9)
+  Service: 
+
+plugin
+  Core Plugin, Ethernet Plugin
+
+Active Package(s):
+        
+sw-t122-T24#  sho cdp neghigh
+Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater,
+                  V - VoIP-Phone, D - Remotely-Managed-Device,
+                  s - Supports-STP-Dispute
+
+Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+NC2N2               Eth1/1         117    S H       Linux            eth2       
+   
+NC2N1               Eth1/2         117    S H       Linux            eth2       
+   
+NC2N3               Eth1/3         117    S H       Linux            eth2       
+   
+sw-t122-T48.sccc.edu(FDO23440YY1)
+                    Eth1/16        166    R S s     N9K-C93180YC-EX- Eth1/16    
+   
+sw-t122-T48.sccc.edu(FDO23440YY1)
+                    Eth1/49        166    R S I s   N9K-C93180YC-EX- Eth1/49    
+   
+
+Total entries displayed: 5
+sw-t122-T24# sho cdp neigsw-t122-T24# sho cdp neighbors det
+----------------------------------------
+Device ID:NC2N2
+
+Interface address(es): 1
+    IPv4 Address: 10.40.16.25
+Platform: Linux, Capabilities: Switch Host
+Interface: Ethernet1/1, Port ID (outgoing port): eth2
+Holdtime: 112 sec
+
+Version:
+NutanixAHV
+
+Advertisement Version: 2
+Local Interface MAC: 6c:31:0e:9b:0e:58
+Remote Interface MAC: 02:e0:ed:84:59:0f
+DC_UUID:  
+----------------------------------------
+Device ID:NC2N1
+
+Interface address(es): 1
+    IPv4 Address: 10.40.16.24
+Platform: Linux, Capabilities: Switch Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth2
+--More--Holdtime: 112 sec
+
+Version:
+NutanixAHV
+
+Advertisement Version: 2
+Local Interface MAC: 6c:31:0e:9b:0e:59
+Remote Interface MAC: 02:e0:ed:84:58:c5
+DC_UUID:  
+----------------------------------------
+Device ID:NC2N3
+
+Interface address(es): 1
+    IPv4 Address: 10.40.16.26
+Platform: Linux, Capabilities: Switch Host
+Interface: Ethernet1/3, Port ID (outgoing port): eth2
+Holdtime: 112 sec
+
+Version:
+NutanixAHV
+
+Advertisement Version: 2
+Local Interface MAC: 6c:31:0e:9b:0e:5a
+--More--Remote Interface MAC: 02:e0:ed:84:58:e1
+DC_UUID:  
+----------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.5
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch Supports-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 161 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+Duplex: full
+
+MTU: 1500
+Local Interface MAC: 6c:31:0e:9b:0e:67
+Remote Interface MAC: 3c:51:0e:39:cc:47
+DC_UUID: FDO23440YY1
+--More------------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.73
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+s-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 161 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Local Interface MAC: 6c:31:0e:9b:0e:88
+Remote Interface MAC: 3c:51:0e:39:cc:47
+--More--DC_UUID: FDO23440YY1
+sw-t122-T24#  sho lldp nesw-t122-T24# sho lldp neighbors 
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+NC2N2                Eth1/1          120        B           eth2          
+NC2N1                Eth1/2          120        B           eth2          
+NC2N3                Eth1/3          120        B           eth2          
+swa-t122             Eth1/6          120        BR          1/1/49        
+sw-t122-T48.sccc.edu 
+                     Eth1/16         120        BR          Ethernet1/16  
+sw-t122-T48.sccc.edu 
+                     Eth1/49         120        BR          Ethernet1/49  
+Total entries displayed: 6
+sw-t122-T24# sho lldp neig detsw-t122-T24# sho lldp neig detail 
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: ac1f.6bbc.9882
+Port id: eth2
+Local Port id: Eth1/1
+Port Description: eth2
+System Name: NC2N2
+System Description: NutanixAHV
+Time remaining: 91 seconds
+System Capabilities: B, W, R, S
+Enabled Capabilities: B
+Management Address: 10.40.16.25
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: ac1f.6bbc.a014
+Port id: eth2
+Local Port id: Eth1/2
+Port Description: eth2
+--More--System Name: NC2N1
+System Description: NutanixAHV
+Time remaining: 91 seconds
+System Capabilities: B, W, R, S
+Enabled Capabilities: B
+Management Address: 10.40.16.24
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: ac1f.6bbc.9b08
+Port id: eth2
+Local Port id: Eth1/3
+Port Description: eth2
+System Name: NC2N3
+System Description: NutanixAHV
+Time remaining: 91 seconds
+System Capabilities: B, W, R, S
+Enabled Capabilities: B
+Management Address: 10.40.16.26
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+--More--
+Chassis id: 0c97.5faf.d840
+Port id: 1/1/49
+Local Port id: Eth1/6
+Port Description: SW-AA144-PRIM
+System Name: swa-t122
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 112 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.190
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.cc57
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: **keepalive for vpc***
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+--More--Time remaining: 93 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc57
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+System UUID: FDO23440YY1
+
+
+Chassis id: 3c51.0e39.cc78
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: SW-T122-T48 CONNECTION TO  SW-T122-T24
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 93 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc78
+Management Address IPV6: not advertised
+Vlan ID: 1
+--More--System UUID: FDO23440YY1
+
+Total entries displayed: 6
+sw-t122-T24#  exit

@@ -6,8 +6,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
@@ -29,32 +31,44 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        {group.items.map((it) => {
+        {group.items.map((it, idx) => {
           const Icon = it.icon;
           const active = isNavItemActive(it, location);
+          const showSep = group.separator?.includes(idx);
           return (
-            <DropdownMenuItem key={it.href} asChild>
-              <Link
-                href={it.href}
-                className={cn(
-                  "flex cursor-pointer items-start gap-2.5",
-                  active && "bg-accent",
-                )}
-              >
-                <span
+            <div key={it.href}>
+              {showSep && <DropdownMenuSeparator />}
+              <DropdownMenuItem asChild>
+                <Link
+                  href={it.href}
                   className={cn(
-                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                    active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    "flex cursor-pointer items-start gap-2.5",
+                    active && "bg-accent",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium leading-tight">{it.label}</span>
-                  <span className="block text-xs leading-snug text-muted-foreground">{it.desc}</span>
-                </span>
-              </Link>
-            </DropdownMenuItem>
+                  <span
+                    className={cn(
+                      "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                      active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="block text-sm font-medium leading-tight">{it.label}</span>
+                      {it.cioBadge && (
+                        <Badge variant="outline" className="h-4 px-1 text-[10px] text-muted-foreground">CIO</Badge>
+                      )}
+                      {it.netBadge && (
+                        <Badge variant="outline" className="h-4 px-1 text-[10px] text-muted-foreground">NET</Badge>
+                      )}
+                    </span>
+                    <span className="block text-xs leading-snug text-muted-foreground">{it.desc}</span>
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+            </div>
           );
         })}
       </DropdownMenuContent>

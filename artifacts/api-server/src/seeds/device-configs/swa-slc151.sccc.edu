@@ -1,0 +1,5106 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.15 05:29:46 =~=~=~=~=~=~=~=~=~=~=~=
+sho running-config 
+Current configuration:
+!
+!Version ArubaOS-CX FL.10.13.0005
+!export-password: default
+hostname SWA-SLC151
+user admin group administrators password ciphertext AQBapSvo17WDso9RB7RtpfJuWbYSeG6rMQSMzjkz3WEIaxeMYgAAAC9YXlL9RrTgNcCtOTbgqS+keeu8AzfJgI7QnmT9ns6JGBwNgLwEe5YsNVnoR9HmgYW3q9BeXSVmWNYYsubH8dkzckUbRex72Eh/ABMayKiggslXN5vU5CNNjyBIh5HStbyr
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+ntp server pool.ntp.org minpoll 4 maxpoll 4 iburst
+ntp enable
+!
+!
+!
+!
+!
+!
+logging 10.40.1.232
+ssh server vrf default
+ssh server vrf mgmt
+ssh key-exchange-algorithms curve25519-sha256 curve25519-sha256@libssh.org ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 diffie-hellman-group-exchange-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group14-sha256 diffie-hellman-group14-sha1
+vsf member 1 
+    type jl659a
+    link 1 1/1/51
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   link 2 1/1/50
+vsf member 2 
+    type jl659a
+    link 1 2/1/51
+    link 2 2/1/50
+vsf member 3 
+    type jl659a
+    link 1 3/1/51
+    link 2 3/1/50
+vsf member 4 
+    type jl659a
+    link 1 4/1/51
+    link 2 4/1/50
+vsf member 5 
+    type jl659a
+    link 1 5/1/51
+    link 2 5/1/50
+vsf member 6 
+    type jl659a
+    link 1 6/1/51
+    link 2 6/1/50
+vsf member 7 
+    type jl659a
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   link 1 7/1/51
+    link 2 7/1/50
+vsf member 8 
+    type jl659a
+    link 1 8/1/51
+    link 2 8/1/50
+vlan 1
+vlan 200
+    name SLC_students
+vlan 201
+    name SLC-Students-Aruba
+vlan 202
+    name SLC-Staff-Aruba
+vlan 203
+    name SLC-ESports-Aruba
+vlan 204
+    name SLC-Guest-Aruba
+vlan 307
+    name VOIP-SLC
+    voice
+vlan 348
+    name PSEC-Servers
+vlan 352
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   name Cameras1
+vlan 375
+    name DAC-SLC
+vlan 402
+    name Printers
+vlan 404
+    name 3CXPBX
+vlan 405
+    name ESignage
+vlan 618
+    name OSPF10-SLC151-To-Cisco9k-A48
+vlan 701
+    name A144-Staff
+vlan 723
+    name ArubaAP-Outdoor
+vlan 733
+    name AA105-Wireless-Staff
+vlan 824
+    name SLC-Buildings
+vlan 826
+    name ArubaAP-SLC
+vlan 833
+    name StudentBuilding
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree mode rpvst
+spanning-tree
+spanning-tree priority 15
+spanning-tree vlan 1,200-204,307,348,352,375,402,405,701,733,824,826,833
+spanning-tree vlan 1 priority 10
+spanning-tree vlan 200 priority 10
+spanning-tree vlan 201 priority 15
+spanning-tree vlan 202 priority 15
+spanning-tree vlan 203 priority 15
+spanning-tree vlan 204 priority 15
+spanning-tree vlan 307 priority 10
+spanning-tree vlan 348 priority 10
+spanning-tree vlan 352 priority 10
+spanning-tree vlan 375 priority 10
+spanning-tree vlan 402 priority 10
+spanning-tree vlan 405 priority 10
+spanning-tree vlan 701 priority 10
+spanning-tree vlan 733 priority 10
+spanning-tree vlan 824 priority 10
+spanning-tree vlan 826 priority 10
+spanning-tree vlan 833 priority 10
+interface mgmt
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   ip dhcp
+interface 1/1/1
+    description Camera DVR SLC151
+    no shutdown
+    no routing
+    vlan trunk native 348
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/2
+    description CAM..SLC-In-1st-Lobby
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/3
+    description CAM..SLC-In-1st-L-NE-Entr
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/4
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description CAM..SLC-In-1st-L-SE-Entr
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/5
+    description AAP-SLC-VC
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 1/1/6
+    description OPEN-BAD-POE
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed all
+    spanning-tree bpdu-guard
+interface 1/1/7
+    description CAM..SLC-In-1st-N-S
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/8
+    description CAM..SLC-In-1st-Laundry
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/9
+    description OPEN
+    no shutdown
+    no routing
+    vlan access 375
+interface 1/1/10
+    description CAM..SLC-In-1st-E-E
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/11
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description CAM..SLC-Ext-W-Circle
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/12
+    description NP-SLC106-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/13
+    description 1/1/13 AAP-SLC107
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+    spanning-tree bpdu-guard
+interface 1/1/14
+    description NP-SLC107-N2
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/15
+    description NP-SLC108-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/16
+    description NP-SLC108-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/17
+    description CAM..SLC-Ext-W-Park
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/18
+    description CAM..SLC-Ext-N-Volleyball
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/19
+    description NP-SLC109-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/20
+    description NP-SLC109-S1
+    no shutdown
+    no routing
+    vlan access 204
+interface 1/1/21
+    description CAM..SLC-Ext-S-Volleyball
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/22
+    description CAM..SLC-Ext-S-Baseball
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/23
+    description NP-SLC110-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/24
+    description PH-SLC151
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/25
+    description PH-SLC102-N3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 307,402
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/26
+    description PH-SLC136
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/27
+    description PH-SLC233
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/28
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description PH-SLC120
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/29
+    description PH-SLC104
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/30
+    description PH-SLC216
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/31
+    description PH-SLC101-BED-S
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+    power-over-ethernet pre-std-detect
+interface 1/1/32
+    description NP-SLC202-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 1/1/33
+    description COMP-SLC104-02 Port B Don't know why it's here.
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+interface 1/1/34
+    description NP-SLC219-N1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/35
+    description NP-SLC133-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/36
+    description NP-SLC125-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/37
+    description NP-SLC133-E
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/38
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/39
+    description NP-SLC233-W2
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+interface 1/1/40
+    description NP-SLC233-W3
+    no shutdown
+    no routing
+    vlan trunk native 824
+    vlan trunk allowed 307,824
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/41
+    description PRNT-SLC233-W4
+    no shutdown
+    no routing
+    vlan trunk native 402
+    vlan trunk allowed 307,402
+    spanning-tree bpdu-guard
+interface 1/1/42
+    description NP-SLC107-S
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 307,352
+    spanning-tree bpdu-guard
+interface 1/1/43
+    description Camera DVR SLC151
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/44
+    description Camera DVR SLC151
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/45
+    description Camera DVR SLC151
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+interface 1/1/46
+    description TV-Upstairs Lobby
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/47
+    description 1/1/47 SIPGW-SLC151
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 307
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 1/1/48
+    description 1/1/48 ups-slc151
+    no shutdown
+    no routing
+    vlan access 1
+interface 1/1/49
+    description SWA-SLC151 -> SW-AA144-A24 1/30
+    no shutdown
+    error-control base-r-fec
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 1/1/50
+    no shutdown
+interface 1/1/51
+    no shutdown
+interface 1/1/52
+    description 1/1/52 Trunk for Mansions
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 1
+    vlan trunk allowed all
+interface 2/1/1
+    description UNKNOWN
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/2
+    description COMP-SLC104-S4
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/3
+    description COMP-SLC104-S1
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/4
+    description COMP-SLC104-S2
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/5
+    description UNKNOWN-81'
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/6
+    description COMP-SLC104-E2
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/7
+    description COMP-SLC104-N4
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/8
+    description COMP-SLC104-N2
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/9
+    description COMP-SLC104-N1
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/10
+    description UNKNOWN-81'
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/11
+    description COMP-SLC104-E1
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/12
+    description PH-SLC101-BED-N
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/13
+    description UNKNOWN-75'
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 2/1/14
+    description PRNT-SLC104-N3
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/15
+    description Verizon Network Extender
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/16
+    description NP-SLC103-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/17
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC103-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/18
+    description NP-SLC103-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/19
+    description NP-SLC105-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/20
+    description NP-SLC105-S2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/21
+    description NP-SLC105-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/22
+    description NP-SLC106-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/23
+    description CAM..SLC-In-1st-N-N
+    no shutdown
+    no routing
+    vlan trunk native 352
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/24
+    description NP-SLC106-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/25
+    description NP-SLC219-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/26
+    description NP-SLC109-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 2/1/27
+    description NP-SLC108-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/28
+    description NP-SLC110-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/29
+    description NP-SLC110-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/30
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description CAM..SLC-E-LOT3
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/31
+    description CAM..SLC-Ext-E-AB
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/32
+    description CAM..SLC-In-1st-E-W
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/33
+    description OPspanning-tree bpdu-guard
+    no shutdown
+    no routing
+    vlan access 352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/34
+    description CAM..SLC-In-1st-S-S
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/35
+    description CAM..SLC-In-1st-S-N
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/36
+    description CAM..SLC-In-1st-Game
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/37
+    description CAM..SLC-In-2nd-Lobby
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/38
+    description Comp-SLC102-N1-Sec
+    no shutdown
+    no routing
+    vlan access 348
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/39
+    description CAM..SLC-2nd-N-N
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/40
+    description CAM..SLC-In-2nd-N-S
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/41
+    description CAM..SLC-In-2nd-Laundry
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 2/1/42
+    description OPEN
+    no shutdown
+    no routing
+    vlan access 352
+interface 2/1/43
+    description CAM..SLC-In-2nd-E-E
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/44
+    description CAM..SLC-In-2nd-E-W
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/45
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description OPEN
+    no shutdown
+    no routing
+    vlan access 352
+interface 2/1/46
+    description CAM..SLC-In-2nd-S-S
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/47
+    description CAM..SLC-In-2nd-S-N
+    no shutdown
+    no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/48
+    description CAM..SLC-Ext-E-ABCDE
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 352
+    vlan trunk allowed 348,352
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 2/1/49
+    description 2/1/49 and 2/1/52 Trunk for Mansions
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 2/1/50
+    no shutdown
+interface 2/1/51
+    no shutdown
+interface 2/1/52
+    description 2/1/49 and 2/1/52 Trunk for Mansions
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 3/1/1
+    description NP-SLC111-N2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/2
+    description NP-SLC112-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/3
+    description NP-SLC111-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/4
+    description 3/1/4 AAP-SLC112
+    no shutdown
+    speed auto 1g 2.5g
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 3/1/5
+    description NP-SLC111-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/6
+    description 3/1/6 AAP-SLC112
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 3/1/7
+    description NP-SLC113-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 3/1/8
+    description NP-SLC113-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/9
+    description NP-SLC113-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/10
+    description NP-SLC114-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree port-type admin-edge
+interface 3/1/11
+    description NP-SLC114-N2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/12
+    description NP-SLC114-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/13
+    description NP-SLC116-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/14
+    description NP-SLC116-S2
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/15
+    description NP-SLC116-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+interface 3/1/16
+    description NP-SLC117-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/17
+    description NP-SLC117-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/18
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC117-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/19
+    description NP-SLC130-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/20
+    description NP-SLC119-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/21
+    description NP-SLC119-S
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/22
+    description NP-SLC119-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/23
+    description NP-SLC121-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/24
+    description NP-SLC121-S2
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/25
+    description NP-SLC121-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/26
+    description NP-SLC122-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/27
+    description NP-SLC122-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 3/1/28
+    description NP-SLC123-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/29
+    description NP-SLC123-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/30
+    description NP-SLC124-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/31
+    description NP-SLC123-S
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/32
+    description NP-SLC124-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/33
+    description NP-SLC124-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/34
+    description NP-SLC127-N1
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/35
+    description NP-SLC125-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/36
+    description NP-SLC126-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/37
+    description NP-SLC126-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 3/1/38
+    description NP-SLC125-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/39
+    description NP-SLC127-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/40
+    description NP-SLC126-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/41
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC127-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/42
+    description NP-SLC117-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/43
+    description NP-SLC128-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/44
+    description NP-SLC128-N2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/45
+    description NP-SLC129-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/46
+    description NP-SLC129-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/47
+    description NP-SLC129-N
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 3/1/48
+    description 3/1/48 AAP-SLC101-Residence
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+    spanning-tree bpdu-guard
+interface 3/1/49
+    no shutdown
+    no routing
+    vlan access 352
+interface 3/1/50
+    no shutdown
+interface 3/1/51
+    no shutdown
+interface 3/1/52
+    no shutdown
+    no routing
+    vlan access 352
+interface 4/1/1
+    description NP-SLC131-S
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/2
+    description NP-SLC132-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/3
+    description NP-SLC132-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/4
+    description NP-SLC132-S
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/5
+    description NP-SLC136-W
+    shutdown
+    no routing
+    vlan access 701
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/6
+    description OPEN
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/7
+    description NP-SLC135-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 4/1/8
+    description NP-SLC135-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/9
+    description NP-SLC135-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/10
+    description NP-SLC122-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/11
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC133-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/12
+    description NP-SLC136-N
+    shutdown
+    no routing
+    vlan access 701
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/13
+    description NP-SLC136-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/14
+    description NP-SLC137-W1
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/15
+    description NP-SLC137-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/16
+    description NP-SLC137-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/17
+    description NP-SLC138-W1
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/18
+    description NP-SLC138-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/19
+    description NP-SLC138-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/20
+    description NP-SLC139-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 4/1/21
+    description NP-SLC139-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/22
+    description NP-SLC139-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/23
+    description NP-SLC140-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/24
+    description NP-SLC140-E2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/25
+    description NP-SLC140-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/26
+    description NP-SLC141-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/27
+    description NP-SLC141-W2
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/28
+    description NP-SLC141-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/29
+    description NP-SLC142-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/30
+    description NP-SLC142-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 4/1/31
+    description NP-SLC142-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/32
+    description NP-SLC143-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/33
+    description NP-SLC143-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/34
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC143-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/35
+    description 4/1/35 NP-SLC144-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree port-type admin-edge
+interface 4/1/36
+    description 4/1/36 NP-SLC144-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/37
+    description 4/1/37 NP-SLC144-E2
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/38
+    description NP-SLC145-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/39
+    description NP-SLC145-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/40
+    description NP-SLC145-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 4/1/41
+    description NP-SLC146-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/42
+    description NP-SLC146-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/43
+    description NP-SLC146-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/44
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC147-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/45
+    description NP-SLC130-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/46
+    description NP-SLC130-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/47
+    description NP-SLC131-N1
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/48
+    description NP-SLC131-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 4/1/49
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 4/1/50
+    no shutdown
+interface 4/1/51
+    no shutdown
+interface 4/1/52
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 1
+    vlan trunk allowed all
+interface 5/1/1
+    description 5/1/1 NP-SLC148-E2
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/2
+    description NP-SLC147-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/3
+    description 5/1/3 AAP-SLC-148
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan trunk native 826
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 1,200-204,375,701,733,826
+    spanning-tree bpdu-guard
+interface 5/1/4
+    description NP-SLC147-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/5
+    description NP-SLC128-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/6
+    description 5/1/6 NP-SLC148-W
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 5/1/7
+    description NP-SLC201-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/8
+    description NP-SLC201-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/9
+    description NP-SLC201-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/10
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC202-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/11
+    description NP-SLC202-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/12
+    description NP-SLC203-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/13
+    description NP-SLC203-S2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/14
+    description NP-SLC203-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/15
+    description NP-SLC204-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/16
+    description NP-SLC204-N2
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/17
+    description NP-SLC205-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/18
+    description NP-SLC204-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/19
+    description NP-SLC205-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 5/1/20
+    description NP-SLC205-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/21
+    description 5/1/21 NP-SLC206-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/22
+    description 5/1/22 NP-SLC206-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/23
+    description 5/1/23 NP-SLC206-N
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/24
+    description NP-SLC207-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/25
+    description NP-SLC207-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/26
+    description NP-SLC207-N
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/27
+    description NP-SLC208-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/28
+    description NP-SLC209-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/29
+    description NP-SLC208-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 5/1/30
+    description NP-SLC208-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/31
+    description NP-SLC209-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/32
+    description NP-SLC209-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/33
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC210-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/34
+    description NP-SLC210-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/35
+    description NP-SLC210-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/36
+    description NP-SLC211-S1
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/37
+    description NP-SLC211-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/38
+    description NP-SLC211-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/39
+    description NP-SLC212-N1
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/40
+    description NP-SLC212-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/41
+    description NP-SLC212-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/42
+    description NP-SLC213-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 5/1/43
+    description NP-SLC213-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/44
+    description NP-SLC214-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/45
+    description NP-SLC214-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/46
+    description NP-SLC215-S1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/47
+    description NP-SLC214-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/48
+    description NP-SLC119-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 5/1/49
+    no shutdown
+    no routing
+    vlan trunk native 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed all
+interface 5/1/50
+    no shutdown
+interface 5/1/51
+    no shutdown
+interface 5/1/52
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 6/1/1
+    description NP-SLC215-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/2
+    description NP-SLC217-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 6/1/3
+    description NP-SLC215-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/4
+    description NP-SLC218-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/5
+    description NP-SLC217-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/6
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC218-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/7
+    description NP-SLC217-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/8
+    description NP-SLC219-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/9
+    description NP-SLC218-S2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/10
+    description NP-SLC220-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/11
+    description NP-SLC227-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/12
+    description NP-SLC220-S
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/13
+    description NP-SLC220-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/14
+    description NP-SLC221-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/15
+    description NP-SLC221-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 6/1/16
+    description NP-SLC222-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/17
+    description NP-SLC221-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/18
+    description NP-SLC222-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/19
+    description NP-SLC222-S2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/20
+    description NP-SLC223-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/21
+    description NP-SLC223-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/22
+    description NP-SLC224-N1
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/23
+    description NP-SLC223-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/24
+    description NP-SLC224-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/25
+    description NP-SLC224-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 6/1/26
+    description NP-SLC225-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/27
+    description NP-SLC225-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/28
+    description NP-SLC226-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/29
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC101-LIVING-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/30
+    description NP-SLC226-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/31
+    description NP-SLC226-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/32
+    description NP-SLC225-N
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/33
+    description NP-SLC227-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/34
+    description NP-SLC228-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/35
+    description NP-SLC227-S
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/36
+    description NP-SLC228-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/37
+    description NP-SLC228-S
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/38
+    description NP-SLC229-S2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 6/1/39
+    description NP-SLC229-S1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/40
+    description NP-SLC231-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/41
+    description NP-SLC229-N
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/42
+    description NP-SLC231-S
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/43
+    description NP-SLC231-N2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/44
+    description NP-SLC232-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/45
+    description NP-SLC232-W1
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/46
+    description uNKNOWN-57'
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/47
+    description NP-SLC232-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 6/1/48
+    description NP-SLC213-N1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 6/1/49
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 6/1/50
+    no shutdown
+interface 6/1/51
+    no shutdown
+interface 6/1/52
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 7/1/1
+    description NP-SLC233-W
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC233-N
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/3
+    description NP-SLC234-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/4
+    description NP-SLC234-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/5
+    description NP-SLC233-E
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/6
+    description NP-SLC234-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/7
+    description 7/1/7 AAP-235 NP-SLC235-W2
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+    spanning-tree bpdu-guard
+interface 7/1/8
+    description 7/1/8 NP-SLC235-W1
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/9
+    description 7/1/9 NP-SLC235-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/10
+    description NP-SLC236-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/11
+    description NP-SLC236-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 7/1/12
+    description NP-SLC236-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/13
+    description NP-SLC237-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/14
+    description NP-SLC237-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/15
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC237-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/16
+    description NP-SLC238-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/17
+    description NP-SLC238-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/18
+    description NP-SLC239-W2
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/19
+    description NP-SLC239-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/20
+    description NP-SLC28-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/21
+    description NP-SLC239-E
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/22
+    description NP-SLC240-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/23
+    description NP-SLC241-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/24
+    description NP-SLC240-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 7/1/25
+    description NP-SLC241-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/26
+    description NP-SLC241-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/27
+    description NP-SLC242-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/28
+    description NP-SLC240-W2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/29
+    description NP-SLC243-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/30
+    description NP-SLC242-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/31
+    description NP-SLC244-W2
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/32
+    description NP-SLC242-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/33
+    description NP-SLC243-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/34
+    description NP-SLC243-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 7/1/35
+    description NP-SLC245-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/36
+    description NP-SLC244-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/37
+    description NP-SLC246-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/38
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description NP-SLC244-E
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/39
+    description NP-SLC246-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/40
+    description NP-SLC245-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/41
+    description NP-SLC247-E
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/42
+    description NP-SLC245-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/43
+    description NP-SLC247-W1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/44
+    description NP-SLC245-E2
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/45
+    description NP-SLC249-W
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/46
+    description NP-SLC247-W2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/47
+    description NP-SLC249-E2
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 7/1/48
+    description NP-SLC249-E1
+    no shutdown
+    no routing
+    vlan access 204
+    spanning-tree bpdu-guard
+    spanning-tree port-type admin-edge
+interface 7/1/49
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 7/1/50
+    no shutdown
+interface 7/1/51
+    no shutdown
+interface 7/1/52
+    no shutdown
+    no routing
+    vlan trunk native 1
+    vlan trunk allowed all
+interface 8/1/1
+    description AAP-SLC111
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/2
+    description AAP-SLC140
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/3
+    description AAP-SLC119
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/4
+    description AAP-SLC129
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/5
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description AAP-SLC136
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/6
+    description AAP-SLC146
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/7
+    no shutdown
+    no routing
+    vlan access 824
+    spanning-tree port-type admin-edge
+interface 8/1/8
+    description AAP-SLC201
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/9
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description AAP-SLC221
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/10
+    description AAP-SLC229
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/11
+    description AAP-SLC234
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/12
+    description OPEN Bad POE
+    no shutdown
+    no routing
+    vlan trunk native 826
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/13
+    description AAP-SLC149
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/14
+    description AAP-SLC233
+    no shutdown
+    speed auto 1g 2.5g 5g
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/15
+    description AAP-SLC213
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/16
+    description AAP-SLC244
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/17
+    description AAP-SLC101
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/18
+    description AAP-SLC126
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/19
+    description AAP-SLC110
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/20
+    description 8/1/20 BS-SLC-Lobby
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 405
+    spanning-tree port-type admin-edge
+interface 8/1/21
+    description 8/1/21 AP-SLC201
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/22
+    description AAP-SLC220
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/23
+    description AAP-SLC110
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+    power-over-ethernet pre-std-detect
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 8/1/24
+    description AAP-SLC238
+    no shutdown
+    no routing
+    vlan trunk native 826
+    vlan trunk allowed 1,200-204,375,701,733,826
+interface 8/1/25
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/26
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/27
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/28
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/29
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 204
+interface 8/1/30
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/31
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/32
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/33
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/34
+    no shutdown
+    no routing
+    vlan access 204
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 8/1/35
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/36
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/37
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/38
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/39
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/40
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 204
+interface 8/1/41
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/42
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/43
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/44
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/45
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/46
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 204
+interface 8/1/47
+    no shutdown
+    no routing
+    vlan access 204
+interface 8/1/48
+    no shutdown
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 8/1/49
+    no shutdown
+    no routing
+    vlan access 352
+interface 8/1/50
+    no shutdown
+interface 8/1/51
+    no shutdown
+interface 8/1/52
+    no shutdown
+    no routing
+    vlan access 352
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface vlan 1
+    ip address 192.168.2.175/16
+    ip dhcp
+        ! ip dhcp is ignored when static ip is configured
+interface vlan 618
+    ip address 172.20.2.26/30
+    ip ospf 10 area 0.0.0.0
+    ip ospf network point-to-point
+snmp-server community 2006sccc
+    access-level rw
+snmp-server community sccc
+snmp-server host 10.50.2.12 inform version v2c community sccc 
+ip dns domain-name sccc.edu
+ip dns server-address 10.40.1.68
+ip dns server-address 10.40.1.77
+ip dns server-address 192.168.1.111
+!
+!
+!
+!
+!
+router ospf 10
+    redistribute connected
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   redistribute static
+    area 0.0.0.0
+router pim
+    enable
+https-server vrf default
+https-server vrf mgmt
+SWA-SLC151#     sho ip int bri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            192.168.2.175/16          up/up
+
+vlan618          172.20.2.26/30            up/up
+
+
+SWA-SLC151# sho version 
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2023 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : FL.10.13.0005                                                 
+Build Date   : 2023-11-10 15:26:12 UTC                                       
+Build ID     : ArubaOS-CX:FL.10.13.0005:1fa38ed04bef:202311101456            
+Build SHA    : 1fa38ed04bef1b6d1f01d4342fe12f3a2ea2a72f                      
+Hot Patches  :                                                               
+Active Image : primary                       
+
+Service OS Version : FL.01.14.0002                 
+BIOS Version       : FL.01.0007                    
+SWA-SLC151# sho int status
+Unknown interface status.
+SWA-SLC151# sho clock
+Thu May 15 09:30:12 UTC 2025
+System is configured for timezone : UTC
+SWA-SLC151# sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+1/1/49      sw-aa144-A24.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+8/1/19      AP-SLC-X-RAP.sccc.edu    cisco AIR-CAP1532I-B-K9  IBT         
+1/1/28      SEP54781ae1211a          Cisco IP Phone 3905      CHP         
+1/1/27      SEP6886a7c42906          Cisco IP Phone 3905      CHP         
+1/1/29      SEPf02929e3d4f2          Cisco IP Phone 3905      CHP         
+1/1/25      SEP001B0CDB492B          Cisco IP Phone 7941      HPM         
+SWA-SLC151# sho lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 41
+Total Neighbor Entries Deleted  : 2651
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 2651
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/13      84:d4:7e:c9:96:d8  84:d4:7e:c9:96:d8            bond0                        120      AAP-SLC-RmTemp4                    
+1/1/25      10.30.7.236        001B0CDB492B:P1              SW PORT                      180      SEP001B0CDB492B.sccc.edu           
+1/1/27      10.30.7.240        6886a7c42906:P1              SW PORT                      180      SEP6886a7c42906.sccc.edu           
+1/1/28      10.30.7.249        54781ae1211a:P1              SW PORT                      180      SEP54781ae1211a.sccc.edu           
+1/1/29      10.30.7.250        f02929e3d4f2:P1              SW PORT                      180      SEPf02929e3d4f2.sccc.edu           
+1/1/39      LA-SLC233-03       00:be:43:d7:13:8f                                         3601                                        
+1/1/40      LA-SLC233-02       00:be:43:da:6b:a5                                         3601                                        
+1/1/49      3c:51:0e:39:d0:6b  Ethernet1/20                 SLC1151 to AA144 9k          120      sw-aa144-A24.sccc.edu              
+2/1/1       LA-SLC104-09A      a8:a1:59:dc:55:6d                                         3601                                        
+2/1/2       LA-SLC104-07       00:be:43:da:69:cf                                         3601                                        
+2/1/4       LA-SLC104-06       00:be:43:da:ec:40                                         3601                                        
+2/1/6       LA-SLC104-05       00:be:43:da:69:94                                         3601                                        
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/7       LA-SLC104-03A      a8:a1:59:dc:5a:32                                         3601                                        
+2/1/8       LA-SLC104-02A      88:88:88:88:87:88                                         3601                                        
+2/1/9       LA-SLC104-01       00:be:43:da:6b:aa                                         3601                                        
+2/1/11      LA-SLC104-04A      a8:a1:59:dc:5d:fc                                         3601                                        
+2/1/49      0c:97:5f:af:48:00  1/1/49                       SW-SLC151-PRIM               120      SWA-SLCDE                          
+2/1/52      0c:97:5f:af:46:00  1/1/49                       SW-SLC151-PRIM               120      SWA-SLAB                           
+3/1/6       84:d4:7e:cb:c7:72  84:d4:7e:cb:c7:72            bond0                        120      AAP-SLC-RmTemp0-112                
+5/1/3       70:3a:0e:c4:ed:b6  70:3a:0e:c4:ed:b6            bond0                        120      70:3a:0e:c4:ed:b6                  
+8/1/1       f0:5c:19:c7:1c:fa  f0:5c:19:c7:1c:fa            bond0                        120      AP-SLC111                          
+8/1/2       68:51:34:cb:9a:58  68:51:34:cb:9a:58            eth0                         120      AAP-SLC-635-13                     
+8/1/3       ec:fc:c6:c5:39:c3  ec:fc:c6:c5:39:c3            eth0                         120      AAP-SLC-635-3                      
+8/1/4       68:51:34:cb:96:5f  68:51:34:cb:96:5f            eth0                         120      AAP-SLC-635-15                     
+8/1/5       ec:fc:c6:c5:30:09  ec:fc:c6:c5:30:09            eth0                         120      AAP-SLC-635-2                      
+8/1/6       68:51:34:cb:ea:f2  68:51:34:cb:ea:f2            eth0                         120      AAP-SLC-635-14                     
+8/1/7       ST-SLC102-01       a8:a1:59:dc:53:f7                                         3601                                        
+8/1/8       f0:5c:19:c6:f5:38  f0:5c:19:c6:f5:38            bond0                        120      AAP-SLC201                         
+8/1/9       84:d4:7e:cb:c9:9c  84:d4:7e:cb:c9:9c            bond0                        120      AP-SLC221                          
+8/1/10      ec:fc:c6:c5:2c:ac  ec:fc:c6:c5:2c:ac            eth0                         120      AAP-SLC-635-4                      
+8/1/11      f0:5c:19:c7:1f:d4  f0:5c:19:c7:1f:d4            bond0                        120      AP-SLC234                          
+8/1/13      84:d4:7e:cb:c9:94  84:d4:7e:cb:c9:94            bond0                        120      AP-SLC149                          
+8/1/14      ec:fc:c6:c6:2f:4b  ec:fc:c6:c6:2f:4b            eth0                         120      AAP-SLC-635-7                      
+8/1/15      ec:fc:c6:c6:28:7f  ec:fc:c6:c6:28:7f            eth0                         120      AAP-SLC-635-6                      
+8/1/16      ec:fc:c6:c6:41:2a  ec:fc:c6:c6:41:2a            eth1                         120      AAP-SLC-635-5                      
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               8/1/17      ec:fc:c6:c5:3e:ac  ec:fc:c6:c5:3e:ac            eth0                         120      AAP-SLC-635-1                      
+8/1/18      68:51:34:cb:a7:de  68:51:34:cb:a7:de            eth0                         120      AAP-SLC-635-9                      
+8/1/20      90:ac:3f:0c:92:db  90:ac:3f:0c:92:db            eth0                         120      BrightSign-33D777002468            
+8/1/21      68:51:34:cb:c6:0e  68:51:34:cb:c6:0e            eth0                         120      AAP-SLC-635-10                     
+8/1/22      68:51:34:cb:f7:43  68:51:34:cb:f7:43            eth0                         120      AAP-SLC-635-11                     
+8/1/24      ec:fc:c6:c6:5a:35  ec:fc:c6:c6:5a:35            eth1                         120      AAP-SLC-635-8                      
+SWA-SLC151#    sho lldp neighbor-info detail 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 41
+Total Neighbor Entries Deleted  : 2651
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 2651
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/13
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : AAP-SLC-RmTemp4
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:c9:96:d8
+Neighbor Management-Address    : 10.80.26.92
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:c9:96:d8
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/25
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : SEP001B0CDB492B.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7941G,V1, SCCP41.9-4-2SR3-1S
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Chassis-ID            : 10.30.7.236
+Neighbor Management-Address    : 10.30.7.236
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 001B0CDB492B:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 6.30 W
+PSE Allocated Power Value      : 6.30 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/27
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : SEP6886a7c42906.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 3905,CP3905.9-4-1SR3
+Neighbor Chassis-ID            : 10.30.7.240
+Neighbor Management-Address    : 10.30.7.240
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 6886a7c42906:P1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 3.50 W
+PSE Allocated Power Value      : 3.50 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 3
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/28
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 6
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 6
+Neighbor System-Name           : SEP54781ae1211a.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 3905,CP3905.9-4-1SR3
+Neighbor Chassis-ID            : 10.30.7.249
+Neighbor Management-Address    : 10.30.7.249
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 54781ae1211a:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 3.50 W
+PSE Allocated Power Value      : 3.50 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 3
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port                           : 1/1/29
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : SEPf02929e3d4f2.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 3905,CP3905.9-4-1SR3
+Neighbor Chassis-ID            : 10.30.7.250
+Neighbor Management-Address    : 10.30.7.250
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : f02929e3d4f2:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 3.50 W
+PSE Allocated Power Value      : 3.50 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 307
+Neighbor Med Policy Priority   : 3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/39
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 132
+Neighbor Entries Dropped       : 0
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Aged-Out      : 132
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC233-03
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:d7:13:8f
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/40
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 55
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 55
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC233-02
+Neighbor Management-Address    : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:6b:a5
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/49
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : sw-aa144-A24.sccc.edu
+Neighbor System-Description    : Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Neighbor Chassis-ID            : 3c:51:0e:39:d0:6b
+Neighbor Management-Address    : 3c:51:0e:39:d0:6b
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : Ethernet1/20
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : SLC1151 to AA144 9k
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/1
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 51
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 51
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-09A
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : a8:a1:59:dc:55:6d
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/2
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 82
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 82
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-07
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:69:cf
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/4
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 39
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 39
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-06
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:ec:40
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/6
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 83
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 83
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-05
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:69:94
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/7
+Neighbor Entries               : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Deleted       : 206
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 206
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-03A
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : a8:a1:59:dc:5a:32
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/8
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 69
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 69
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Chassis-ID            : LA-SLC104-02A
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 88:88:88:88:87:88
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/9
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 161
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 161
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-01
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:6b:aa
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/11
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 118
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 118
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-SLC104-04A
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : a8:a1:59:dc:5d:fc
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port                           : 2/1/49
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : SWA-SLCDE
+Neighbor System-Description    : Aruba JL659A  FL.10.07.0030
+Neighbor Chassis-ID            : 0c:97:5f:af:48:00
+Neighbor Management-Address    : 192.168.2.177
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : 1/1/49
+Neighbor Port-Desc             : SW-SLC151-PRIM
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_XFD
+Neighbor MAU type              : 1000 BASESXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/52
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : SWA-SLAB
+Neighbor System-Description    : Aruba JL659A  FL.10.07.0030
+Neighbor Chassis-ID            : 0c:97:5f:af:46:00
+Neighbor Management-Address    : 192.168.2.176
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : 1/1/49
+Neighbor Port-Desc             : SW-SLC151-PRIM
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_XFD, Other
+Neighbor MAU type              : 1000 BASESXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 3/1/6
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : AAP-SLC-RmTemp0-112
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:cb:c7:72
+Neighbor Management-Address    : 10.80.26.97
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:cb:c7:72
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 5/1/3
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : 70:3a:0e:c4:ed:b6
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 70:3a:0e:c4:ed:b6
+Neighbor Management-Address    : 10.80.26.102
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 70:3a:0e:c4:ed:b6
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/1
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : AP-SLC111
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : f0:5c:19:c7:1c:fa
+Neighbor Management-Address    : 10.80.26.44
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : f0:5c:19:c7:1c:fa
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/2
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-13
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:9a:58
+Neighbor Management-Address    : 10.80.26.131
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:9a:58
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/3
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-3
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c5:39:c3
+Neighbor Management-Address    : 10.80.26.109
+Chassis Capabilities Available : Bridge, WLAN
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c5:39:c3
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/4
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-15
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:96:5f
+Neighbor Management-Address    : 10.80.26.122
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:96:5f
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port                           : 8/1/5
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-2
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c5:30:09
+Neighbor Management-Address    : 10.80.26.108
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c5:30:09
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/6
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor System-Name           : AAP-SLC-635-14
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:ea:f2
+Neighbor Management-Address    : 10.80.26.121
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:ea:f2
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/7
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 11
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 11
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : ST-SLC102-01
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-ID               : a8:a1:59:dc:53:f7
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/8
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC201
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : f0:5c:19:c6:f5:38
+Neighbor Management-Address    : 10.80.26.60
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : f0:5c:19:c6:f5:38
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/9
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+Neighbor System-Name           : AP-SLC221
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:cb:c9:9c
+Neighbor Management-Address    : 10.80.26.62
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-ID               : 84:d4:7e:cb:c9:9c
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/10
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-4
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c5:2c:ac
+Neighbor Management-Address    : 10.80.26.107
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c5:2c:ac
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/11
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : AP-SLC234
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : f0:5c:19:c7:1f:d4
+Neighbor Management-Address    : 10.80.26.130
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : f0:5c:19:c7:1f:d4
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/13
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AP-SLC149
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Chassis-ID            : 84:d4:7e:cb:c9:94
+Neighbor Management-Address    : 10.80.26.124
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:cb:c9:94
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 3522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/14
+Neighbor Entries               : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-7
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c6:2f:4b
+Neighbor Management-Address    : 10.80.26.114
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c6:2f:4b
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/15
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-6
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c6:28:7f
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Management-Address    : 10.80.26.111
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c6:28:7f
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/16
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-5
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c6:41:2a
+Neighbor Management-Address    : 10.80.26.110
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c6:41:2a
+Neighbor Port-Desc             : eth1
+Neighbor Port VLAN ID          : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/17
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 0
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 0
+Neighbor System-Name           : AAP-SLC-635-1
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c5:3e:ac
+Neighbor Management-Address    : 10.80.26.104
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c5:3e:ac
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/18
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-9
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:a7:de
+Neighbor Management-Address    : 10.80.26.116
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:a7:de
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/20
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : BrightSign-33D777002468
+Neighbor System-Description    : BrightSign HD223 REVD 6.2.138 33D777002468
+Neighbor Chassis-ID            : 90:ac:3f:0c:92:db
+Neighbor Management-Address    : 10.40.5.13,fe80::92ac:3fff:fe0c:92db
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Available : Station
+Chassis Capabilities Enabled   : Station
+Neighbor Port-ID               : 90:ac:3f:0c:92:db
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 
+Neighbor Port VLAN Name        : 
+Neighbor Port MFS              : 0
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_II
+MED capabilities enabled       : Capabilities, Inventory
+MED capabilities supported     : Capabilities, Network Policy, Location, PSE, PD, Inventory
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 1000 BASE_T, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/21
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-10
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:c6:0e
+Neighbor Management-Address    : 10.80.26.117
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:c6:0e
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/22
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-11
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : 68:51:34:cb:f7:43
+Neighbor Management-Address    : 10.80.26.118
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 68:51:34:cb:f7:43
+Neighbor Port-Desc             : eth0
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 8/1/24
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : AAP-SLC-635-8
+Neighbor System-Description    : ArubaOS (MODEL: 635), Version Aruba AP
+Neighbor Chassis-ID            : ec:fc:c6:c6:5a:35
+Neighbor Management-Address    : 10.80.26.115
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : ec:fc:c6:c6:5a:35
+Neighbor Port-Desc             : eth1
+Neighbor Port VLAN ID          : 1
+Neighbor Port VLAN Name        : VLAN 1
+Neighbor Port MFS              : 1522
+Link aggregation supported     : 
+Link aggregation enabled       : 
+Aggregation port ID            : 
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 3 Single Signature PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 30.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PSE Allocated Power Value      : 30.00 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class5
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+PSE Allocated Power Value Alt A: 0.00 W
+PD Requested Power Value Mode A: 0.00 W
+PSE Allocated Power Value Alt B: 0.00 W
+PD Requested Power Value Mode B: 0.00 W
+Power At PD Powered Interface  : 0.00 W
+Neighbor Powered Status        : Single Signature PD
+Neighbor Power Class Pair A    : -
+Neighbor Power Class Pair B    : -
+Powering on both PD modes      : No
+PD load electrically isolated  : No
+Neighbor PD Autoclass Request  : No
+Neighbor Power Down Request    : No
+PD Power down Time             : 0
+PD Associated TLV              : dot3-ext
+PD Requested TLV types         : dot3-ext, dot3
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, Other
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+SWA-SLC151#     exit

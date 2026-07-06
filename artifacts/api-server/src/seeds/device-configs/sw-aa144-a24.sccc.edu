@@ -1,0 +1,1190 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.14 05:59:56 =~=~=~=~=~=~=~=~=~=~=~=
+sho runn
+sw-aa144-A24# sho running-config 
+
+
+!Command: show running-config
+!Running configuration last done at: Thu Jan 16 22:38:51 2025
+!Time: Wed May 14 09:58:40 2025
+
+version 10.2(6) Bios:version 07.69 
+hostname sw-aa144-A24
+vdc sw-aa144-A24 id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+feature telnet
+cfs eth distribute
+feature interface-vlan
+feature lacp
+feature dhcp
+feature vpc
+feature lldp
+feature vtp
+
+--More--
+logging level otm 5
+username admin password Redacted
+ip domain-lookup
+ip domain-name sccc.edu
+ip name-server 10.40.1.68 192.168.1.111
+copp profile strict
+vtp domain blob
+snmp-server user
+ priv des 0x731d176cbdfd0c83a2f0338c8c53ad2d localizedkey
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+
+ip route 0.0.0.0/0 192.168.2.5
+vlan 1-2,17,51,150-151,200-204,301-314,316-322,348-353,372-373,375,377,401-405,4
+08,412-416,506,508,564,568,601,610-612,614-628,660,680,701-703,706-708,714,722-7
+23,726,728-731,733-737,740,749-750,764-766,772-775,780,788-791,801-804,806,809,8
+16-821,824,826,832-833,835,840-842,845,848,999
+vlan 2
+  name SAN00
+--More--
+vlan 17
+  name keepalivesVPC
+vlan 51
+  name DMZ2
+vlan 150
+  name ASA-LAN-FO
+vlan 151
+  name ASA-STFUL-FO
+vlan 200
+  name SLC_students
+vlan 201
+  name SLC-Students-Aruba
+vlan 202
+  name SLC-Staff-Aruba
+vlan 203
+  name SLC-Appliance-Aruba
+vlan 204
+  name SLC-Guest-Aruba
+vlan 301
+  name VOIP-A
+vlan 302
+  name VOIP-AA
+vlan 303
+--More--
+  name VOIP-S
+vlan 304
+  name VOIP-H
+vlan 305
+  name VOIP-COS
+vlan 306
+  name VOIP-V
+vlan 307
+  name VOIP-SLC
+vlan 308
+  name VOIP-SLCCDE
+vlan 309
+  name VOIP-SLCAB
+vlan 310
+  name VOIP-B
+vlan 311
+  name VOIP-M
+vlan 312
+  name VOIP-C
+vlan 313
+  name VOIP-E
+vlan 314
+  name VOIP-EA
+--More--
+vlan 316
+  name VOIP-T
+vlan 317
+  name VOIP-TA
+vlan 318
+  name VOIP-TB
+vlan 319
+  name VOIP-TD
+vlan 320
+  name VOIP-TT
+vlan 321
+  name VOIP-SLCT
+vlan 322
+  name VOIP-CAH
+vlan 348
+  name PSEC-Servers
+vlan 349
+  name PSEC-A-AA
+vlan 350
+  name PSEC-S-B-H-Cos-V-M
+vlan 351
+  name PSEC-SLC
+vlan 352
+--More--
+  name PSEC-T-TA-TB-TD-TT
+vlan 353
+  name PSEC-C-E-EAnnex-CAH
+vlan 372
+  name DAC-Servers
+vlan 373
+  name DAC-A-AA
+vlan 375
+  name DAC-SLC
+vlan 377
+  name DAC-C-E-Eannex-CAH
+vlan 401
+  name Servers
+vlan 402
+  name Printers
+vlan 403
+  name Citrix
+vlan 404
+  name VMotionLive
+vlan 405
+  name DigitalSignage
+vlan 408
+  name DR-site-equipment
+--More--
+vlan 412
+  name Stor2
+vlan 413
+  name Stor413
+vlan 414
+  name Nutan-IPMI
+vlan 415
+  name Nutan-VMWareVmotion
+vlan 416
+  name Nutan-VMMgmtCVMClst
+vlan 506
+  name WLAN-IPads
+vlan 508
+  name WLAN-Public
+vlan 564
+  name Projectors
+vlan 568
+  name HDMI
+vlan 601
+  name LAN2
+vlan 610
+  name IT-Staff
+vlan 611
+--More--
+  name OSPF1
+vlan 612
+  name OSPF2
+vlan 614
+  name OSPF10-AA144-A48
+vlan 615
+  name OSPF10-T48-A48
+vlan 616
+  name OSPF10-Epworth
+vlan 617
+  name OSPF10-TechSchool
+vlan 618
+  name OSPF-SLC151-Aruba
+vlan 619
+  name OSPF10-V201
+vlan 620
+  name OSPF10-B101
+vlan 621
+  name OSPF10-TA107
+vlan 622
+  name OSPF10-A144-1
+vlan 623
+  name OSPF10-A144-2
+--More--
+vlan 624
+  name OSPF10-SharpCC
+vlan 625
+  name OSPF10-AA105
+vlan 626
+  name OSPF10-SU121
+vlan 627
+  name OSPF10-COS109
+vlan 628
+  name OSPF10-HealthCenter
+vlan 660
+  name VDI-Desktops
+vlan 680
+  name A001
+vlan 701
+  name A144-Staff
+vlan 702
+  name A103
+vlan 703
+  name A136
+vlan 706
+  name A149
+vlan 707
+--More--
+  name A166A
+vlan 708
+  name A166
+vlan 714
+  name A192
+vlan 722
+  name ArubaAP-A
+vlan 723
+  name ArubaAP-Outdoor
+vlan 726
+  name AA131
+vlan 728
+  name AA137
+vlan 729
+  name AA155
+vlan 730
+  name AA159
+vlan 731
+  name AA163
+vlan 733
+  name AA105-Staff
+vlan 734
+  name AA101
+--More--
+vlan 735
+  name AA109
+vlan 736
+  name AA112
+vlan 737
+  name AA113
+vlan 740
+  name test-vlan
+vlan 749
+  name CosmoBuilding
+vlan 750
+  name ArubaAP-COS
+vlan 764
+  name V103-AgLab
+vlan 765
+  name AgBuilding
+vlan 766
+  name ArubaAP-V
+vlan 772
+  name E117-E213-EpworthLabs
+vlan 773
+  name EpworthBuilding
+vlan 774
+--More--
+  name MM-Equipment-in-E
+vlan 775
+  name ArubaAP-E
+vlan 780
+  name ColvinBuilding
+vlan 788
+  name H109-HumLab
+vlan 789
+  name HumanitiesBuilding
+vlan 790
+  name HumanitiesTest
+vlan 791
+  name ArubaAP-H
+vlan 801
+  name SWKTS-Data
+vlan 802
+  name TechSchoolLabs
+vlan 803
+  name TechLectureCapture
+vlan 804
+  name TechHVAC
+vlan 806
+  name ArubaAP-T
+--More--
+vlan 809
+  name TA-WorkForceCenter
+vlan 816
+  name MaintenanceBuilding
+vlan 817
+  name HVAC-Maintenance
+vlan 818
+  name Fire-Alarm-System
+vlan 819
+  name HVAC-maintenance
+vlan 820
+  name Gym-Pressbox
+vlan 821
+  name SA-building
+vlan 824
+  name SLC-Buildings
+vlan 826
+  name ArubaAP-SLC
+vlan 832
+  name SU108-Bookstore
+vlan 833
+  name StudentBuilding
+vlan 835
+--More--
+  name ArubaAP-S
+vlan 840
+  name CAH-General
+vlan 841
+  name CAH-Labs
+vlan 842
+  name CAH-Sim-Record
+vlan 845
+  name ArubaAP-CAH
+vlan 848
+  name SCCWiredNetwork
+vlan 999
+  name Gym-Video
+
+spanning-tree port type edge bpduguard default
+service dhcp
+ip dhcp relay
+ip dhcp relay information option trust
+ip dhcp relay information trust-all
+ipv6 dhcp relay
+vrf context management
+vpc domain 10
+  role priority 20
+--More--
+  peer-keepalive destination 172.20.11.1 source 172.20.11.2 vrf default
+
+
+interface Vlan1
+  no shutdown
+  ip address 192.168.2.71/16
+  ip dhcp relay address 10.40.1.40 
+
+interface Vlan17
+  no shutdown
+  ip address 172.20.11.2/30
+
+interface port-channel15
+  description connection to port 24 switch-peer link
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1-16,18-4094
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/1
+  description Nutanix Node 1 port 0
+  switchport
+--More--
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/2
+  description Nutanix Node 2 port 0
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/3
+  description Nutanix Node 3 port 0
+  switchport
+  switchport mode trunk
+--More--
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/4
+  switchport
+
+interface Ethernet1/5
+  switchport
+  no shutdown
+
+interface Ethernet1/6
+  switchport
+
+interface Ethernet1/7
+  description SW-A163-Aruba-TestingCenter
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,201-204,301,351-353,375,402,404,610,702,722,73
+3
+--More--
+  spanning-tree port type edge trunk
+  no shutdown
+
+interface Ethernet1/8
+  description SW-AA144-access 49
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/9
+  description SW-COS109-PRIM
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/10
+  switchport
+
+interface Ethernet1/11
+  switchport
+
+interface Ethernet1/12
+  switchport
+--More--
+
+
+interface Ethernet1/13
+  switchport
+
+interface Ethernet1/14
+  switchport
+
+interface Ethernet1/15
+  switchport
+
+interface Ethernet1/16
+  description Heartbeat to SW-AA144-A48 port 16
+  switchport
+  switchport access vlan 17
+  no shutdown
+
+interface Ethernet1/17
+  switchport
+  switchport access vlan 401
+  no shutdown
+
+interface Ethernet1/18
+  switchport
+--More--
+
+
+interface Ethernet1/19
+  switchport
+
+interface Ethernet1/20
+  description SLC1151 to AA144 9k
+  switchport
+  switchport mode trunk
+  flowcontrol receive on
+  no shutdown
+
+interface Ethernet1/21
+  switchport
+  speed 25000
+  duplex full
+  no shutdown
+
+interface Ethernet1/22
+  description COS109 to AA144 port 22
+  switchport
+  switchport mode trunk
+  flowcontrol receive on
+  fec fc-fec
+--More--
+  no shutdown
+
+interface Ethernet1/23
+  description test of sfp25
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/24
+  description SharpChampionCenter
+  no shutdown
+
+interface Ethernet1/25
+  switchport
+
+interface Ethernet1/26
+  description SW-AA144-A24 To SWA-V201
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,200-204,306,352-353,375,402,404,564,619,723,73
+3,764-766,806,817
+  fec fc-fec
+  no shutdown
+--More--
+
+
+interface Ethernet1/27
+  switchport
+
+interface Ethernet1/28
+  description SW-AA144-A24 TO SWA-AA105
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/29
+  switchport
+
+interface Ethernet1/30
+  description SU121 to AA144 9k 24
+  switchport
+  switchport mode trunk
+  flowcontrol receive on
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/31
+--More--
+  description B101 to AA144 port 1/22
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/32
+  description B101 to AA144 port 1/22
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/33
+  switchport
+
+interface Ethernet1/34
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,201-204,733,820,835
+  flowcontrol receive on
+  no shutdown
+
+--More--
+interface Ethernet1/35
+  description 1/35 SW-SoftballPB-Aruba
+  switchport
+  flowcontrol receive on
+  no shutdown
+
+interface Ethernet1/36
+  description FortiGate2-Port36-United-ISP
+  switchport
+  speed 10000
+
+interface Ethernet1/37
+  description UNITED-ISP(internet-connection)
+  switchport
+
+interface Ethernet1/38
+  switchport
+
+interface Ethernet1/39
+  switchport
+
+interface Ethernet1/40
+  description E208 to AA144-A24
+--More--
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/41
+
+interface Ethernet1/42
+  description SA208 to AA144-A24
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/43
+  switchport
+
+interface Ethernet1/44
+  description HealthCenter to AA144-A24
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+--More--
+
+
+interface Ethernet1/45
+  description SWA-AA148 6100 Cecil's Office
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/46
+  switchport
+
+interface Ethernet1/47
+  switchport
+
+interface Ethernet1/48
+  switchport
+
+interface Ethernet1/49
+  description SW-AA144-A24 CONNECTION TO  SW-AA144-A48
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1-16,18-4094
+  channel-group 15 mode active
+  no shutdown
+--More--
+
+
+interface Ethernet1/50
+  switchport
+
+interface Ethernet1/51
+  switchport
+
+interface Ethernet1/52
+  switchport
+
+interface Ethernet1/53
+  switchport
+
+interface Ethernet1/54
+  switchport
+
+interface mgmt0
+  shutdown force
+  vrf member management
+  ip address 192.168.2.71/24
+line console
+line vty
+boot nxos bootflash:/nxos64-cs.10.2.6.M.bin 
+--More--
+
+
+
+
+
+sw-aa144-A24#      s     h     o           i     p           i     n     t           b     r     i     
+
+
+IP Interface Status for VRF "default"(1)
+Interface            IP Address      Interface Status
+Vlan1                192.168.2.71    protocol-up/link-up/admin-up       
+Vlan17               172.20.11.2     protocol-up/link-up/admin-up       
+
+sw-aa144-A24# sho cdp ne
+sw-aa144-A24# sho cdp neighbors 
+
+Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater,
+                  V - VoIP-Phone, D - Remotely-Managed-Device,
+                  s - Supports-STP-Dispute
+
+Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+cucn02.sccc.edu     Eth1/1         171    H         VMware           eth0       
+   
+CER02.sccc.edu.sccc.edu
+                    Eth1/2         169    H         VMware           eth0       
+   
+IMP02.sccc.edu.sccc.edu
+                    Eth1/2         123    H         VMware           eth0       
+   
+CUCM02.sccc.edu.sccc.edu
+                    Eth1/2         177    H         VMware           eth0       
+   
+cucn01.sccc.edu     Eth1/3         149    H         VMware           eth0       
+   
+SW-AA144-Access.sccc.edu
+                    Eth1/8         132    R S I     WS-C3750G-48PS   Gig1/0/49  
+   
+SW-COS109.sccc.edu
+--More--
+
+
+...skipping 1 line
+
+sw-aa144-A48.sccc.edu(FDO23440YYP)
+                    Eth1/16        151    R S I s   N9K-C93180YC-EX- Eth1/16    
+   
+sw-aa144-A48.sccc.edu(FDO23440YYP)
+                    Eth1/49        151    R S I s   N9K-C93180YC-EX- Eth1/49    
+   
+
+Total entries displayed: 9
+
+sw-aa144-A24# ho cdp
+sw-aa144-A24# sho cdp neighbors 
+
+Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater,
+                  V - VoIP-Phone, D - Remotely-Managed-Device,
+                  s - Supports-STP-Dispute
+
+Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+cucn02.sccc.edu     Eth1/1         163    H         VMware           eth0       
+   
+CER02.sccc.edu.sccc.edu
+                    Eth1/2         161    H         VMware           eth0       
+   
+IMP02.sccc.edu.sccc.edu
+                    Eth1/2         175    H         VMware           eth0       
+   
+CUCM02.sccc.edu.sccc.edu
+                    Eth1/2         169    H         VMware           eth0       
+   
+cucn01.sccc.edu     Eth1/3         141    H         VMware           eth0       
+   
+SW-AA144-Access.sccc.edu
+                    Eth1/8         124    R S I     WS-C3750G-48PS   Gig1/0/49  
+   
+SW-COS109.sccc.edu
+--More--
+                    Eth1/9         158    R S I     WS-C3750G-48PS   Gig1/0/49  
+   
+sw-aa144-A48.sccc.edu(FDO23440YYP)
+                    Eth1/16        143    R S I s   N9K-C93180YC-EX- Eth1/16    
+   
+sw-aa144-A48.sccc.edu(FDO23440YYP)
+                    Eth1/49        143    R S I s   N9K-C93180YC-EX- Eth1/49    
+   
+
+Total entries displayed: 9
+
+sw-aa144-A24# sho 
+sw-aa144-A24# sho cdp neighbors de
+
+----------------------------------------
+Device ID:cucn02.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.2.2
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/1, Port ID (outgoing port): eth0
+Holdtime: 157 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-23.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:d0:58
+Remote Interface MAC: 00:50:56:9e:63:66
+DC_UUID:  
+----------------------------------------
+Device ID:CER02.sccc.edu.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.2.8
+--More--
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth0
+Holdtime: 155 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-7.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:d0:59
+Remote Interface MAC: 00:50:56:9e:dd:ba
+DC_UUID:  
+----------------------------------------
+Device ID:IMP02.sccc.edu.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.2.7
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth0
+Holdtime: 169 sec
+
+Version:
+--More--
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-22.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:d0:59
+Remote Interface MAC: 00:50:56:9e:dd:ba
+DC_UUID:  
+----------------------------------------
+Device ID:CUCM02.sccc.edu.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.2.5
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth0
+Holdtime: 163 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-22.i386
+
+Advertisement Version: 2
+Duplex: full
+--More--
+Local Interface MAC: 3c:51:0e:39:d0:59
+Remote Interface MAC: 00:50:56:9e:dd:ba
+DC_UUID:  
+----------------------------------------
+Device ID:cucn01.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.13.2
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/3, Port ID (outgoing port): eth0
+Holdtime: 135 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-23.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:d0:5a
+Remote Interface MAC: 00:50:56:9e:7c:5f
+DC_UUID:  
+----------------------------------------
+Device ID:SW-AA144-Access.sccc.edu
+--More--
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.4
+Platform: cisco WS-C3750G-48PS, Capabilities: Router Switch IGMP Filtering 
+Interface: Ethernet1/8, Port ID (outgoing port): GigabitEthernet1/0/49
+Holdtime: 178 sec
+
+Version:
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 15.0(2)SE10a,
+ RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 03-Nov-16 14:17 by prod_rel_team
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+Mgmt address(es):
+    IPv4 Address: 192.168.2.4
+Local Interface MAC: 3c:51:0e:39:d0:5f
+Remote Interface MAC: 00:1d:a1:35:8f:31
+--More--
+DC_UUID:  
+----------------------------------------
+Device ID:SW-COS109.sccc.edu
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.19
+Platform: cisco WS-C3750G-48PS, Capabilities: Router Switch IGMP Filtering 
+Interface: Ethernet1/9, Port ID (outgoing port): GigabitEthernet1/0/49
+Holdtime: 152 sec
+
+Version:
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, 
+RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+Mgmt address(es):
+--More--
+    IPv4 Address: 192.168.2.19
+Local Interface MAC: 3c:51:0e:39:d0:60
+Remote Interface MAC: 00:1a:2f:fb:41:b1
+DC_UUID:  
+----------------------------------------
+Device ID:sw-aa144-A48.sccc.edu(FDO23440YYP)
+System Name: sw-aa144-A48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.1
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+s-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 137 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 17
+Duplex: full
+--More--
+
+
+MTU: 1500
+Local Interface MAC: 3c:51:0e:39:d0:67
+Remote Interface MAC: 3c:51:0e:39:cc:f7
+DC_UUID: FDO23440YYP
+----------------------------------------
+Device ID:sw-aa144-A48.sccc.edu(FDO23440YYP)
+System Name: sw-aa144-A48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.70
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+s-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 137 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+--More--
+Duplex: full
+
+MTU: 1500
+Local Interface MAC: 3c:51:0e:39:d0:88
+Remote Interface MAC: 3c:51:0e:39:cc:e7
+DC_UUID: FDO23440YYP
+
+sw-aa144-A24#     s    h    o         l    l    d    p         n    e    
+sw-aa144-A24# sho lldp ne    
+
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+swa-a161             Eth1/7          120        BR          1/1/49        
+SW-AA144-Access.sccc.edu
+                     Eth1/8          120        BR          Gi1/0/49      
+SW-COS109.sccc.edu   Eth1/9          120        BR          Gi1/0/49      
+sw-aa144-A48.sccc.edu
+                     Eth1/16         120        BR          Ethernet1/16  
+SWA-SLC151           Eth1/20         120        BR          1/1/49        
+SWA-AA144-Access     Eth1/24         120        BR          1/1/51        
+SWA-V201             Eth1/26         120        BR          1/1/49        
+SWA-AA105            Eth1/28         120        BR          1/1/51        
+SWA-SU121            Eth1/30         120        BR          1/1/51        
+SW-SoftBallPB        Eth1/34         120        BR          1/1/15        
+sw-sa208             Eth1/42         120        BR          1/1/49        
+sw-healthcenter      Eth1/44         120        BR          1/1/49        
+sw-aa144-A48.sccc.edu
+                     Eth1/49         120        BR          Ethernet1/49  
+Total entries displayed: 13
+
+sw-aa144-A24# sho l
+sw-aa144-A24# sho lldp ne    de
+
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: 0c97.5f9e.4180
+Port id: 1/1/49
+Local Port id: Eth1/7
+Port Description: 1/1/49
+System Name: swa-a161
+System Description: Aruba JL659A  FL.10.10.1071
+Time remaining: 102 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.197
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 001d.a135.8f00
+Port id: Gi1/0/49
+Local Port id: Eth1/8
+Port Description: GigabitEthernet1/0/49
+--More--
+System Name: SW-AA144-Access.sccc.edu
+System Description: Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), V
+ersion 15.0(2)SE10a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 03-Nov-16 14:17 by prod_rel_team
+Time remaining: 94 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.4
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 001a.2ffb.4180
+Port id: Gi1/0/49
+Local Port id: Eth1/9
+Port Description: GigabitEthernet1/0/49
+System Name: SW-COS109.sccc.edu
+System Description: Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), V
+ersion 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+--More--
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+Time remaining: 111 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.19
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.ccf7
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: Heartbeat to SW-AA144-A24 port 16
+System Name: sw-aa144-A48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 93 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.ccf7
+Management Address IPV6: not advertised
+Vlan ID: 17
+--More--
+System UUID: FDO23440YYP
+
+
+Chassis id: 0c97.5fac.9500
+Port id: 1/1/49
+Local Port id: Eth1/20
+Port Description: SWA-SLC151 -> SW-AA144-A24 1/30
+System Name: SWA-SLC151
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 118 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.175
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3810.f05c.9480
+Port id: 1/1/51
+Local Port id: Eth1/24
+Port Description: SWA-AA144-Access -> SW-AA144-A24 1/26
+System Name: SWA-AA144-Access
+System Description: Aruba JL659A  FL.10.13.0005
+--More--
+Time remaining: 103 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.210
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5fae.8540
+Port id: 1/1/49
+Local Port id: Eth1/26
+Port Description: SWA-V201 -> SW-AA144-A24
+System Name: SWA-V201
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 110 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.195
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5fac.9340
+--More--
+Port id: 1/1/51
+Local Port id: Eth1/28
+Port Description: SWA-AA105 -> SW-AA144-A24 1/28
+System Name: SWA-AA105
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 111 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.199
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: e4de.40c0.fd80
+Port id: 1/1/51
+Local Port id: Eth1/30
+Port Description: 1/1/51
+System Name: SWA-SU121
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 96 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.200
+--More--
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3810.f0fb.3980
+Port id: 1/1/15
+Local Port id: Eth1/34
+Port Description: 1/1/15
+System Name: SW-SoftBallPB
+System Description: Aruba JL679A  PL.10.13.0005
+Time remaining: 91 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.204
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5faf.a740
+Port id: 1/1/49
+Local Port id: Eth1/42
+Port Description: SA208 to AA144 A24 Port 42
+System Name: sw-sa208
+--More--
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 115 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.194
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5fa8.3600
+Port id: 1/1/49
+Local Port id: Eth1/44
+Port Description: HealthCenter to AA144-A24
+System Name: sw-healthcenter
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 113 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.212
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+--More--
+Chassis id: 3c51.0e39.cd18
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: peerlink to 24port nexus
+System Name: sw-aa144-A48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 93 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cd18
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YYP
+
+Total entries displayed: 13
+
+sw-aa144-A24#    exi
+

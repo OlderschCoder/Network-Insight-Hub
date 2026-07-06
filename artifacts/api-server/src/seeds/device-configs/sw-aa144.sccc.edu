@@ -1,0 +1,3918 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 03:06:18 =~=~=~=~=~=~=~=~=~=~=~=
+sho runn
+SW-AA144-Core-USD480#sho running-config 
+Building configuration...
+
+Current configuration : 44122 bytes
+!
+! Last configuration change at 12:36:36 CDT Fri May 2 2025 by admin
+! NVRAM config last updated at 16:26:44 CDT Wed Apr 2 2025 by admin
+!
+version 15.2
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname SW-AA144-Core-USD480
+!
+boot-start-marker
+boot system flash bootflash:cat4500es8-universal.SPA.03.07.03.E.152-3.E3.bin
+boot-end-marker
+!
+!
+vrf definition mgmtVrf
+ !
+ address-family ipv4
+ --More--          exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+logging buffered emergencies
+no logging rate-limit
+no logging console
+enable secret 5 $1$9LtW$JS9eHLL3G4qUyG8KLgc2W0
+!
+username owen.local privilege 15 secret 5 $1$9nfA$LKdonsXaB9AHOp6aUH95A0
+username louie.local privilege 15 secret 5 $1$0qIr$iG0MPuxB7TO0RabLKDjrM0
+username admin secret 5 $1$E0Dm$7SZWddGT6cG1JIyzwhyJA0
+aaa new-model
+!
+!
+aaa authentication login default local group tacacs+ enable
+!
+!
+!
+!
+!
+!
+ --More--         aaa session-id common
+clock timezone CST -6 0
+clock summer-time CDT recurring
+!
+!
+!
+!
+!
+!
+ip multicast-routing 
+ip domain-name sccc.edu
+ip name-server 10.40.1.77
+ip name-server 10.40.1.68
+!
+!
+!
+no errdisable detect cause gbic-invalid
+power redundancy-mode redundant
+archive
+ log config
+  logging enable
+!
+spanning-tree mode rapid-pvst
+ --More--         spanning-tree extend system-id
+spanning-tree uplinkfast
+spanning-tree vlan 1-2,10,50,100,120,200,300-314,316-321,332,348 priority 8192
+spanning-tree vlan 349-353,372-373,401-405,408,410-412,500-502 priority 8192
+spanning-tree vlan 504,506,508,564,568,601,610-612,660,701-703 priority 8192
+spanning-tree vlan 706-708,714,726,728-731,733-734,736-737,740 priority 8192
+spanning-tree vlan 745,749,764-765,772-774,780,788-790,801-804 priority 8192
+spanning-tree vlan 809,816,818,820,824,832,997-998 priority 8192
+spanning-tree vlan 826 priority 4096
+!
+redundancy
+ mode sso
+!
+!
+vlan access-map 203 10
+ action forward
+!
+vlan internal allocation policy ascending
+lldp run
+!
+!
+!
+!
+ --More--         !
+!
+!
+interface Loopback0
+ ip address 172.22.1.1 255.255.255.255
+ ip pim sparse-mode
+!
+interface Port-channel1
+ description not used at this time
+ switchport
+ switchport mode trunk
+!
+interface Port-channel2
+ description HP-C7A-A SW CHANNEL
+ switchport
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+!
+interface Port-channel3
+ description HP-C7A-B SW CHANNEL
+ switchport
+ switchport trunk native vlan 403
+ --More--          switchport mode trunk
+ switchport nonegotiate
+!
+interface Port-channel4
+ description NetgearNAS CHANNEL
+ switchport
+ switchport access vlan 401
+ switchport mode access
+!
+interface Port-channel5
+ description not used but on 2/45
+ switchport
+ switchport access vlan 401
+ switchport mode access
+!
+interface Port-channel6
+ description HP-C7B-A PORT-CHANNEL-1GB-Backup
+ switchport
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+!
+interface Port-channel7
+ --More--          description HP-C7B-B SW CHANNEL
+ switchport
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+!
+interface Port-channel8
+ description NGRD-Test channel
+ switchport
+ switchport access vlan 410
+ switchport mode access
+!
+interface Port-channel9
+ description NGRD-Live channel
+ switchport
+ switchport access vlan 410
+ switchport mode access
+!
+interface Port-channel10
+ description Link to DR Site-Backup
+ switchport
+ switchport mode trunk
+ switchport nonegotiate
+ --More--         !
+interface Port-channel11
+ description Commvault Backup NIC Team
+ switchport
+ switchport access vlan 401
+ switchport mode access
+ spanning-tree portfast
+!
+interface Port-channel41
+ description NGNAS-10GB PORT-CHANNEL
+ switchport
+ switchport access vlan 412
+ switchport mode access
+ shutdown
+!
+interface Port-channel61
+ description HP-C7B SW CHANNEL 10GB-Primary
+ switchport
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+!
+interface Port-channel81
+ --More--          description NGRD-Test channel 10gb-412
+ switchport
+ switchport access vlan 412
+ switchport mode access
+ switchport nonegotiate
+!
+interface Port-channel91
+ description NGRD-Live channel 10gb-412
+ switchport
+ switchport access vlan 412
+ switchport mode access
+ switchport nonegotiate
+!
+interface FastEthernet1
+ vrf forwarding mgmtVrf
+ no ip address
+ speed auto
+ duplex auto
+!
+interface GigabitEthernet1/1
+ description SW-FTD1-P1-WAN
+ switchport access vlan 100
+ switchport mode access
+ --More--          macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface GigabitEthernet1/2
+ description SW-FTD1-P2-WAN2-PIONEER
+ switchport access vlan 10
+ switchport mode access
+!
+interface GigabitEthernet1/3
+ description SW-FTD1-P3-LAN
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface GigabitEthernet1/4
+ description SW-FTD1-P4-DMZ
+ switchport access vlan 51
+ switchport mode access
+!
+interface GigabitEthernet1/5
+ description SW-FTD1-P5-DORM/PUBLIC
+ switchport access vlan 200
+ switchport mode access
+ --More--         !
+interface GigabitEthernet1/6
+ description SW-FTD1-P6-LAN2
+ switchport access vlan 601
+ switchport mode access
+ spanning-tree portfast disable
+!
+interface GigabitEthernet1/7
+ description SVR-FMC-MANAGE
+ switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet1/8
+ description SRV-MX1-P0-RED CONDOR
+ switchport access vlan 51
+ switchport mode access
+!
+interface GigabitEthernet1/9
+ description SVR-FMC-P1
+ switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet1/10
+ --More--          description open
+ switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet1/11
+ description SW-FTD1-P11-LAN-FO
+ switchport access vlan 150
+ switchport mode access
+!
+interface GigabitEthernet1/12
+ description SW-FTD1-P12-STFUL-FO
+ switchport access vlan 151
+ switchport mode access
+!
+interface GigabitEthernet1/13
+ description SW-FTD1-P7-DORM/GUEST/StaffBYOD/Appliance
+ switchport trunk allowed vlan 201-204
+ switchport mode trunk
+!
+interface GigabitEthernet1/14
+ description SW-SCCC Router 1gb
+ switchport trunk native vlan 100
+ switchport trunk allowed vlan 1,100,1002-1005
+ --More--          switchport mode trunk
+ spanning-tree bpduguard enable
+!
+interface GigabitEthernet1/15
+ description open
+ shutdown
+!
+interface GigabitEthernet1/16
+ description open
+ shutdown
+!
+interface GigabitEthernet1/17
+ description SW-FTD1-P8-AA109
+ switchport access vlan 670
+ switchport mode access
+!
+interface GigabitEthernet1/18
+ description COMP-Vlan670-AA109
+ switchport access vlan 670
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet1/19
+ --More--          description SRV-Commvault Backup LACP port Slot5 port2
+ switchport access vlan 401
+ switchport mode access
+ channel-protocol lacp
+ channel-group 11 mode active
+ spanning-tree portfast
+!
+interface GigabitEthernet1/20
+ description SRV-Commvault Backup LACP port Slot5 port1
+ switchport access vlan 401
+ switchport mode access
+ channel-protocol lacp
+ channel-group 11 mode active
+ spanning-tree portfast
+!
+interface GigabitEthernet1/21
+ description SRV-NGRD-Test-P1
+ switchport access vlan 410
+ switchport mode access
+ channel-protocol lacp
+ channel-group 8 mode active
+!
+interface GigabitEthernet1/22
+ --More--          description open
+ shutdown
+ channel-protocol lacp
+!
+interface GigabitEthernet1/23
+ description STOR-NMBL-Live-CTRLA-Eth1
+ switchport access vlan 410
+ switchport mode access
+!
+interface GigabitEthernet1/24
+ description STOR-NMBL-Live-CTRLB-Eth1
+ switchport access vlan 410
+ switchport mode access
+!
+interface GigabitEthernet1/25
+ description open
+!
+interface GigabitEthernet1/26
+ description open
+!
+interface GigabitEthernet1/27
+ description open
+ shutdown
+ --More--         !
+interface GigabitEthernet1/28
+ description open
+ shutdown
+!
+interface GigabitEthernet1/29
+ description open
+ shutdown
+!
+interface GigabitEthernet1/30
+ description open
+ shutdown
+!
+interface GigabitEthernet1/31
+ description SIPGW-AA144
+ switchport access vlan 302
+ switchport mode access
+!
+interface GigabitEthernet1/32
+ description open
+ shutdown
+!
+interface GigabitEthernet1/33
+ --More--          description SW-HP-C7B-A1
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet1/34
+ description SW-HP-C7B-B1
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet1/35
+ description SW-HP-C7B-C1
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet1/36
+ description Conectrix
+ switchport mode access
+ --More--          spanning-tree portfast
+!
+interface GigabitEthernet1/37
+ description SW-HP-C7A-A#1
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 2 mode on
+!
+interface GigabitEthernet1/38
+ description SW-HP-C7A-B#1
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 3 mode on
+!
+interface GigabitEthernet1/39
+ description SW-HP-C7A-A#2
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 2 mode on
+!
+ --More--         interface GigabitEthernet1/40
+ description SW-HP-C7A-B#2
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 3 mode on
+!
+interface GigabitEthernet1/41
+ description open
+ shutdown
+!
+interface GigabitEthernet1/42
+ description open
+ shutdown
+!
+interface GigabitEthernet1/43
+ description SRV-CVS1
+ switchport access vlan 352
+ switchport mode access
+ switchport port-security violation restrict
+ switchport port-security aging time 2
+ switchport port-security aging type inactivity
+ switchport port-security
+ --More--          spanning-tree bpduguard enable
+!
+interface GigabitEthernet1/44
+ description open 
+ shutdown
+!
+interface GigabitEthernet1/45
+ description open 
+ shutdown
+!
+interface GigabitEthernet1/46
+ description open 
+ shutdown
+!
+interface GigabitEthernet1/47
+ description open 
+ shutdown
+!
+interface GigabitEthernet1/48
+ description open 
+ switchport access vlan 733
+ switchport mode access
+ spanning-tree portfast
+ --More--         !
+interface GigabitEthernet2/1
+ description SW-FTD2-P1-WAN
+ switchport access vlan 100
+ switchport mode access
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface GigabitEthernet2/2
+ description SW-FTD2-P2-WAN2-PIONEER
+ switchport access vlan 10
+ switchport mode access
+!
+interface GigabitEthernet2/3
+ description SW-FTD2-P3-LAN
+ switchport access vlan 401
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface GigabitEthernet2/4
+ description SW-FTD2-P4-DMZ
+ switchport access vlan 51
+ --More--          switchport mode access
+!
+interface GigabitEthernet2/5
+ description SW-FTD2-P5-DORM/PUBLIC
+ switchport access vlan 200
+ switchport mode access
+!
+interface GigabitEthernet2/6
+ description SW-FTD2-P6-LAN2
+ switchport access vlan 601
+ switchport mode access
+ spanning-tree portfast disable
+!
+interface GigabitEthernet2/7
+ description SW-V201-TEMP
+ switchport mode trunk
+!
+interface GigabitEthernet2/8
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/9
+ description SVR-FMC-P2
+ --More--          switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet2/10
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/11
+ description SW-FTD2-P11-LAN-FO
+ switchport access vlan 150
+ switchport mode access
+!
+interface GigabitEthernet2/12
+ description SW-FTD2-P12-STFUL-FO
+ switchport access vlan 151
+ switchport mode access
+!
+interface GigabitEthernet2/13
+ description SW-FTD2-P7-DORM/GUEST/StaffBYOD/Appliance
+ switchport trunk allowed vlan 201-204
+ switchport mode trunk
+!
+interface GigabitEthernet2/14
+ --More--          description OPEN
+ shutdown
+!
+interface GigabitEthernet2/15
+ description Unknow
+ shutdown
+!
+interface GigabitEthernet2/16
+ description unknow
+ switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet2/17
+ description SW-FTD2-P8-AA109
+ switchport access vlan 670
+ switchport mode access
+!
+interface GigabitEthernet2/18
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/19
+ description SRV-Commvault Backup LACP port NIC4
+ --More--          switchport access vlan 401
+ switchport mode access
+ channel-protocol lacp
+ channel-group 11 mode active
+ spanning-tree portfast
+!
+interface GigabitEthernet2/20
+ description SRV-Commvault Backup LACP port NIC3
+ switchport access vlan 401
+ switchport mode access
+ channel-protocol lacp
+ channel-group 11 mode active
+ spanning-tree portfast
+!
+interface GigabitEthernet2/21
+ description open 
+ shutdown
+ channel-protocol lacp
+!
+interface GigabitEthernet2/22
+ description open 
+ shutdown
+ channel-protocol lacp
+ --More--         !
+interface GigabitEthernet2/23
+ description STOR-NMBL-Live-CTRLA-Eth2
+ switchport access vlan 410
+ switchport mode access
+!
+interface GigabitEthernet2/24
+ description STOR-NMBL-Live-CTRLB-Eth2
+ switchport access vlan 410
+ switchport mode access
+!
+interface GigabitEthernet2/25
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/26
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/27
+ description open 
+ shutdown
+!
+ --More--         interface GigabitEthernet2/28
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/29
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/30
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/31
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/32
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/33
+ description SW-HP-C7B-A2
+ switchport trunk native vlan 403
+ --More--          switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet2/34
+ description SW-HP-C7B-B2
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet2/35
+ description SW-HP-C7B-C2
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 6 mode active
+!
+interface GigabitEthernet2/36
+ description SW-HP-C7B-D2
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ --More--          channel-group 6 mode active
+!
+interface GigabitEthernet2/37
+ description SW-HP-C7A-A#3
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 2 mode on
+!
+interface GigabitEthernet2/38
+ description SW-HP-C7A-B#3
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 3 mode on
+!
+interface GigabitEthernet2/39
+ description SW-HP-C7A-A#4
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 2 mode on
+!
+ --More--         interface GigabitEthernet2/40
+ description SW-HP-C7A-B#4
+ switchport trunk native vlan 403
+ switchport mode trunk
+ switchport nonegotiate
+ channel-group 3 mode on
+!
+interface GigabitEthernet2/41
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/42
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/43
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/44
+ description open 
+ shutdown
+!
+ --More--         interface GigabitEthernet2/45
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/46
+ description open 
+ shutdown
+!
+interface GigabitEthernet2/47
+ description open 
+ switchport access vlan 610
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet2/48
+ description AP-Maint
+ switchport trunk native vlan 835
+ switchport trunk allowed vlan 1,200-204,375,733,835
+ switchport mode trunk
+!
+interface GigabitEthernet3/1
+ description open 
+ shutdown
+ --More--         !
+interface GigabitEthernet3/2
+ description NP-IP Patch 02
+ switchport access vlan 401
+!
+interface GigabitEthernet3/3
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/4
+ description NP-IP Patch 04
+ switchport access vlan 707
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet3/5
+ description COMP LP-OculusIT
+ switchport access vlan 610
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet3/6
+ description open 
+ --More--          shutdown
+!
+interface GigabitEthernet3/7
+ description NP-IP Patch 07
+ switchport access vlan 10
+ switchport mode access
+!
+interface GigabitEthernet3/8
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/9
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/10
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/11
+ description NP-IP Patch 11
+ switchport access vlan 203
+ switchport mode access
+ --More--          spanning-tree portfast
+!
+interface GigabitEthernet3/12
+ description 203 VLAN test
+ switchport access vlan 203
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet3/13
+ description NP-IP Patch 13
+ switchport access vlan 405
+ switchport mode access
+!
+interface GigabitEthernet3/14
+ description NP-IP Patch 14
+ switchport access vlan 402
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet3/15
+ description open 
+ shutdown
+!
+ --More--         interface GigabitEthernet3/16
+ description PH-3CXPBX-phone
+ switchport access vlan 404
+ switchport mode access
+!
+interface GigabitEthernet3/17
+ description NP-IP Patch 
+ switchport access vlan 348
+ switchport mode access
+!
+interface GigabitEthernet3/18
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/19
+ description COMP - AA153
+ switchport access vlan 707
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet3/20
+ description open 
+ shutdown
+ --More--         !
+interface GigabitEthernet3/21
+ description CAM-AA144
+ switchport mode access
+!
+interface GigabitEthernet3/22
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/23
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/24
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/25
+ description 3/25 VLAN 203 for troubleshooting the ESports Cache Server
+ switchport access vlan 203
+ switchport mode access
+!
+interface GigabitEthernet3/26
+ --More--          description 3CXPBX-Test-Phones
+ switchport access vlan 404
+ switchport mode access
+!
+interface GigabitEthernet3/27
+ description 3CXPBX-Test-Phones
+ switchport access vlan 404
+ switchport mode access
+!
+interface GigabitEthernet3/28
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/29
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/30
+ description open 
+ switchport access vlan 701
+ shutdown
+!
+interface GigabitEthernet3/31
+ --More--          description open 
+ shutdown
+!
+interface GigabitEthernet3/32
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/33
+ description NP-IP Patch 33
+ switchport mode access
+!
+interface GigabitEthernet3/34
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/35
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/36
+ description open 
+ shutdown
+!
+ --More--         interface GigabitEthernet3/37
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/38
+ description COMP-AA151-LaptopConferenceTable
+ switchport access vlan 610
+ switchport mode access
+ switchport voice vlan 302
+ spanning-tree portfast
+!
+interface GigabitEthernet3/39
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/40
+ description PDU-AA144-C-S
+!
+interface GigabitEthernet3/41
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/42
+ --More--          description open 
+ shutdown
+!
+interface GigabitEthernet3/43
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/44
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/45
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/46
+ description open 
+ shutdown
+!
+interface GigabitEthernet3/47
+ description open 
+ shutdown
+!
+ --More--         interface GigabitEthernet3/48
+ description open 
+ switchport trunk native vlan 722
+ switchport trunk allowed vlan 1,200-204,375,722,733,820,999
+ switchport mode trunk
+!
+interface GigabitEthernet4/1
+!
+interface GigabitEthernet4/2
+!
+interface GigabitEthernet4/3
+!
+interface GigabitEthernet4/4
+!
+interface GigabitEthernet4/5
+!
+interface GigabitEthernet4/6
+!
+interface GigabitEthernet4/7
+!
+interface GigabitEthernet4/8
+!
+interface GigabitEthernet4/9
+ --More--         !
+interface GigabitEthernet4/10
+!
+interface GigabitEthernet4/11
+!
+interface GigabitEthernet4/12
+!
+interface GigabitEthernet4/13
+!
+interface GigabitEthernet4/14
+!
+interface GigabitEthernet4/15
+!
+interface GigabitEthernet4/16
+!
+interface GigabitEthernet4/17
+!
+interface GigabitEthernet4/18
+!
+interface GigabitEthernet4/19
+!
+interface GigabitEthernet4/20
+!
+ --More--         interface GigabitEthernet4/21
+!
+interface GigabitEthernet4/22
+!
+interface GigabitEthernet4/23
+!
+interface GigabitEthernet4/24
+!
+interface GigabitEthernet4/25
+!
+interface GigabitEthernet4/26
+!
+interface GigabitEthernet4/27
+!
+interface GigabitEthernet4/28
+!
+interface GigabitEthernet4/29
+!
+interface GigabitEthernet4/30
+!
+interface GigabitEthernet4/31
+!
+interface GigabitEthernet4/32
+ --More--         !
+interface GigabitEthernet4/33
+!
+interface GigabitEthernet4/34
+!
+interface GigabitEthernet4/35
+!
+interface GigabitEthernet4/36
+!
+interface GigabitEthernet4/37
+!
+interface GigabitEthernet4/38
+!
+interface GigabitEthernet4/39
+!
+interface GigabitEthernet4/40
+!
+interface GigabitEthernet4/41
+!
+interface GigabitEthernet4/42
+!
+interface GigabitEthernet4/43
+!
+ --More--         interface GigabitEthernet4/44
+!
+interface GigabitEthernet4/45
+!
+interface GigabitEthernet4/46
+!
+interface GigabitEthernet4/47
+!
+interface GigabitEthernet4/48
+!
+interface TenGigabitEthernet5/1
+ description SW-AA105-PRIM
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface TenGigabitEthernet5/2
+ description OPEN Test to 9k1
+ switchport mode trunk
+!
+interface TenGigabitEthernet5/3
+ description SW-E208-PRIM Old Epworth
+ switchport mode trunk
+ --More--          macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface TenGigabitEthernet5/4
+ description SW-SU121-PRIM
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface TenGigabitEthernet5/5
+!
+interface TenGigabitEthernet5/6
+!
+interface TenGigabitEthernet5/7
+!
+interface TenGigabitEthernet5/8
+!
+interface TenGigabitEthernet6/1
+ description SW-A144-PRIM
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+ --More--         interface TenGigabitEthernet6/2
+ description SW-Boiler room-PRIM
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+!
+interface TenGigabitEthernet6/3
+ description SW-SLC151-PRIM
+ switchport mode trunk
+ switchport nonegotiate
+ shutdown
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface TenGigabitEthernet6/4
+ description SW-T122-PRIM
+ switchport mode trunk
+ macro description cisco-switch | cisco-switch | cisco-switch | cisco-switch
+ spanning-tree link-type point-to-point
+!
+interface TenGigabitEthernet6/5
+!
+interface TenGigabitEthernet6/6
+!
+ --More--         interface TenGigabitEthernet6/7
+!
+interface TenGigabitEthernet6/8
+!
+interface GigabitEthernet7/1
+ no switchport
+ no ip address
+!
+interface GigabitEthernet7/2
+ no switchport
+ no ip address
+!
+interface GigabitEthernet7/3
+ no switchport
+ no ip address
+!
+interface GigabitEthernet7/4
+ no switchport
+ no ip address
+!
+interface GigabitEthernet7/5
+!
+interface GigabitEthernet7/6
+ --More--         !
+interface GigabitEthernet7/7
+!
+interface GigabitEthernet7/8
+!
+interface GigabitEthernet7/9
+!
+interface GigabitEthernet7/10
+!
+interface GigabitEthernet7/11
+!
+interface GigabitEthernet7/12
+!
+interface GigabitEthernet7/13
+!
+interface GigabitEthernet7/14
+!
+interface GigabitEthernet7/15
+!
+interface GigabitEthernet7/16
+!
+interface GigabitEthernet7/17
+!
+ --More--         interface GigabitEthernet7/18
+!
+interface GigabitEthernet7/19
+!
+interface GigabitEthernet7/20
+!
+interface GigabitEthernet7/21
+!
+interface GigabitEthernet7/22
+!
+interface GigabitEthernet7/23
+!
+interface GigabitEthernet7/24
+!
+interface GigabitEthernet7/25
+!
+interface GigabitEthernet7/26
+!
+interface GigabitEthernet7/27
+!
+interface GigabitEthernet7/28
+!
+interface GigabitEthernet7/29
+ --More--         !
+interface GigabitEthernet7/30
+!
+interface GigabitEthernet7/31
+!
+interface GigabitEthernet7/32
+!
+interface GigabitEthernet7/33
+!
+interface GigabitEthernet7/34
+!
+interface GigabitEthernet7/35
+!
+interface GigabitEthernet7/36
+!
+interface GigabitEthernet7/37
+!
+interface GigabitEthernet7/38
+!
+interface GigabitEthernet7/39
+!
+interface GigabitEthernet7/40
+!
+ --More--         interface GigabitEthernet7/41
+!
+interface GigabitEthernet7/42
+!
+interface GigabitEthernet7/43
+!
+interface GigabitEthernet7/44
+!
+interface GigabitEthernet7/45
+!
+interface GigabitEthernet7/46
+!
+interface GigabitEthernet7/47
+!
+interface GigabitEthernet7/48
+!
+interface GigabitEthernet8/1
+!
+interface GigabitEthernet8/2
+!
+interface GigabitEthernet8/3
+!
+interface GigabitEthernet8/4
+ --More--         !
+interface GigabitEthernet8/5
+!
+interface GigabitEthernet8/6
+!
+interface GigabitEthernet8/7
+!
+interface GigabitEthernet8/8
+!
+interface GigabitEthernet8/9
+!
+interface GigabitEthernet8/10
+!
+interface GigabitEthernet8/11
+!
+interface GigabitEthernet8/12
+!
+interface GigabitEthernet8/13
+!
+interface GigabitEthernet8/14
+!
+interface GigabitEthernet8/15
+!
+ --More--         interface GigabitEthernet8/16
+!
+interface GigabitEthernet8/17
+!
+interface GigabitEthernet8/18
+!
+interface GigabitEthernet8/19
+!
+interface GigabitEthernet8/20
+!
+interface GigabitEthernet8/21
+!
+interface GigabitEthernet8/22
+!
+interface GigabitEthernet8/23
+!
+interface GigabitEthernet8/24
+!
+interface GigabitEthernet8/25
+!
+interface GigabitEthernet8/26
+!
+interface GigabitEthernet8/27
+ --More--         !
+interface GigabitEthernet8/28
+!
+interface GigabitEthernet8/29
+!
+interface GigabitEthernet8/30
+!
+interface GigabitEthernet8/31
+!
+interface GigabitEthernet8/32
+!
+interface GigabitEthernet8/33
+!
+interface GigabitEthernet8/34
+!
+interface GigabitEthernet8/35
+!
+interface GigabitEthernet8/36
+!
+interface GigabitEthernet8/37
+!
+interface GigabitEthernet8/38
+!
+ --More--         interface GigabitEthernet8/39
+!
+interface GigabitEthernet8/40
+!
+interface GigabitEthernet8/41
+!
+interface GigabitEthernet8/42
+!
+interface GigabitEthernet8/43
+!
+interface GigabitEthernet8/44
+!
+interface GigabitEthernet8/45
+!
+interface GigabitEthernet8/46
+!
+interface GigabitEthernet8/47
+!
+interface GigabitEthernet8/48
+!
+interface GigabitEthernet9/1
+!
+interface GigabitEthernet9/2
+ --More--         !
+interface GigabitEthernet9/3
+!
+interface GigabitEthernet9/4
+!
+interface GigabitEthernet9/5
+!
+interface GigabitEthernet9/6
+!
+interface GigabitEthernet9/7
+!
+interface GigabitEthernet9/8
+!
+interface GigabitEthernet9/9
+!
+interface GigabitEthernet9/10
+!
+interface GigabitEthernet9/11
+!
+interface GigabitEthernet9/12
+!
+interface GigabitEthernet9/13
+!
+ --More--         interface GigabitEthernet9/14
+!
+interface GigabitEthernet9/15
+!
+interface GigabitEthernet9/16
+!
+interface GigabitEthernet9/17
+!
+interface GigabitEthernet9/18
+!
+interface GigabitEthernet9/19
+!
+interface GigabitEthernet9/20
+!
+interface GigabitEthernet9/21
+!
+interface GigabitEthernet9/22
+!
+interface GigabitEthernet9/23
+!
+interface GigabitEthernet9/24
+!
+interface GigabitEthernet9/25
+ --More--         !
+interface GigabitEthernet9/26
+!
+interface GigabitEthernet9/27
+!
+interface GigabitEthernet9/28
+!
+interface GigabitEthernet9/29
+!
+interface GigabitEthernet9/30
+!
+interface GigabitEthernet9/31
+!
+interface GigabitEthernet9/32
+!
+interface GigabitEthernet9/33
+!
+interface GigabitEthernet9/34
+!
+interface GigabitEthernet9/35
+!
+interface GigabitEthernet9/36
+!
+ --More--         interface GigabitEthernet9/37
+!
+interface GigabitEthernet9/38
+!
+interface GigabitEthernet9/39
+!
+interface GigabitEthernet9/40
+!
+interface GigabitEthernet9/41
+!
+interface GigabitEthernet9/42
+!
+interface GigabitEthernet9/43
+!
+interface GigabitEthernet9/44
+!
+interface GigabitEthernet9/45
+!
+interface GigabitEthernet9/46
+!
+interface GigabitEthernet9/47
+!
+interface GigabitEthernet9/48
+ --More--         !
+interface GigabitEthernet10/1
+ switchport access vlan 610
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet10/2
+!
+interface GigabitEthernet10/3
+!
+interface GigabitEthernet10/4
+!
+interface GigabitEthernet10/5
+!
+interface GigabitEthernet10/6
+!
+interface GigabitEthernet10/7
+!
+interface GigabitEthernet10/8
+!
+interface GigabitEthernet10/9
+!
+interface GigabitEthernet10/10
+ --More--         !
+interface GigabitEthernet10/11
+!
+interface GigabitEthernet10/12
+!
+interface GigabitEthernet10/13
+!
+interface GigabitEthernet10/14
+!
+interface GigabitEthernet10/15
+!
+interface GigabitEthernet10/16
+!
+interface GigabitEthernet10/17
+!
+interface GigabitEthernet10/18
+!
+interface GigabitEthernet10/19
+!
+interface GigabitEthernet10/20
+!
+interface GigabitEthernet10/21
+!
+ --More--         interface GigabitEthernet10/22
+!
+interface GigabitEthernet10/23
+!
+interface GigabitEthernet10/24
+!
+interface GigabitEthernet10/25
+!
+interface GigabitEthernet10/26
+!
+interface GigabitEthernet10/27
+!
+interface GigabitEthernet10/28
+!
+interface GigabitEthernet10/29
+!
+interface GigabitEthernet10/30
+!
+interface GigabitEthernet10/31
+!
+interface GigabitEthernet10/32
+!
+interface GigabitEthernet10/33
+ --More--         !
+interface GigabitEthernet10/34
+!
+interface GigabitEthernet10/35
+!
+interface GigabitEthernet10/36
+!
+interface GigabitEthernet10/37
+!
+interface GigabitEthernet10/38
+!
+interface GigabitEthernet10/39
+!
+interface GigabitEthernet10/40
+!
+interface GigabitEthernet10/41
+!
+interface GigabitEthernet10/42
+!
+interface GigabitEthernet10/43
+!
+interface GigabitEthernet10/44
+!
+ --More--         interface GigabitEthernet10/45
+!
+interface GigabitEthernet10/46
+!
+interface GigabitEthernet10/47
+!
+interface GigabitEthernet10/48
+ switchport mode access
+ spanning-tree portfast
+!
+interface Vlan1
+ description Main network
+ ip address 192.168.2.1 255.255.0.0 secondary
+ ip address 192.168.2.10 255.255.0.0 secondary
+ ip address 192.168.2.5 255.255.0.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ no ip redirects
+ ip pim sparse-mode
+ ip summary-address eigrp 10 10.30.0.0 255.255.240.0
+ ip summary-address eigrp 10 10.30.48.0 255.255.248.0
+ ip summary-address eigrp 10 10.30.72.0 255.255.248.0
+ ip summary-address eigrp 10 10.40.0.0 255.255.248.0
+ --More--         !
+interface Vlan2
+ description SAN00
+ ip address 172.16.13.1 255.255.255.192
+ shutdown
+!
+interface Vlan100
+ description SWKO-outside firewall
+ no ip address
+!
+interface Vlan105
+ description United-outside firewall
+ no ip address
+!
+interface Vlan120
+ ip address 10.1.20.1 255.255.255.0
+!
+interface Vlan150
+ description ASA Lan failover
+ no ip address
+!
+interface Vlan151
+ description ASA Stateful failover
+ --More--          no ip address
+!
+interface Vlan300
+ no ip address
+!
+interface Vlan301
+ description VOIP-A building
+ ip address 10.30.1.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan302
+ ip address 10.30.2.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan303
+ ip address 10.30.3.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+ --More--         !
+interface Vlan304
+ description VOIP in H128
+ ip address 10.30.4.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan305
+ description VOIP in COS109
+ ip address 10.30.5.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan306
+ description VOIP in V201 & GH2
+ ip address 10.30.6.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ --More--          ip pim sparse-mode
+!
+interface Vlan307
+ description VOIP in SLC151
+ ip address 10.30.7.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan308
+ description VOIP in SLCCDE
+ ip address 10.30.8.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan309
+ description VOIP in SLCAB
+ ip address 10.30.9.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ --More--          ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan310
+ description VOIP in B101
+ ip address 10.30.10.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan311
+ description VOIP in M201
+ ip address 10.30.11.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan312
+ description VOIP in C105
+ ip address 10.30.12.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ --More--          ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan313
+ description VOIP in E208
+ ip address 10.30.13.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan314
+ description VOIP in Eannex
+ ip address 10.30.14.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan315
+ no ip address
+ ip helper-address 10.40.1.40
+ --More--         !
+interface Vlan322
+ description VOIP in CAH144
+ ip address 10.30.22.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan332
+ description VOIP for Off-campus phones
+ ip address 10.30.32.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan348
+ description Physical Security Servers
+ ip address 10.30.48.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+ --More--         interface Vlan349
+ description Cameras in A, AA,
+ ip address 10.30.49.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan350
+ description Cameras in S, B, H, Cos, V, M
+ ip address 10.30.50.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan351
+ description Cameras in SLC, SLCAB, SLCCDE, SLCF, SLCG, SLCH, SLCJ, SLCR, SLCS, SLCT
+ ip address 10.30.51.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan352
+ --More--          description Cameras in T, TA, TB, TD, TT
+ ip address 10.30.52.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan353
+ description Cameras in C, E, Eannex, CAH
+ ip address 10.30.53.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan372
+ description DAC-Servers
+ ip address 10.30.72.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan373
+ description DAC-A-AA
+ ip address 10.30.73.1 255.255.255.0
+ --More--          ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+!
+interface Vlan374
+ no ip address
+!
+interface Vlan375
+ description DAC-SLC
+ ip address 10.30.75.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan377
+ description DAC-SLC
+ ip address 10.30.77.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan400
+ no ip address
+!
+ --More--         interface Vlan401
+ description Main Server VLAN
+ ip address 10.40.1.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan402
+ description Printer VLAN
+ ip address 10.40.2.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan403
+ description HP equipment VLAN
+ ip address 10.40.3.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan404
+ description VMotionLive
+ ip address 10.40.4.1 255.255.255.0
+ --More--          ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan405
+ description Digital Signage Network
+ ip address 10.40.5.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan410
+ description iSCSI vlan1
+ ip address 10.40.110.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan411
+ description iSCSI vlan2
+ ip address 10.40.111.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ --More--          ip pim sparse-mode
+!
+interface Vlan412
+ description Stor412-non routed
+ no ip address
+!
+interface Vlan413
+ description Stor413-non routed
+ mtu 9000
+ no ip address
+!
+interface Vlan414
+ ip address 10.40.14.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.1.70
+!
+interface Vlan415
+ ip address 10.40.15.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.1.70
+!
+interface Vlan416
+ ip address 10.40.16.1 255.255.255.0
+ --More--          ip helper-address 10.40.1.40
+ ip helper-address 10.40.1.70
+!
+interface Vlan500
+ no ip address
+!
+interface Vlan501
+ ip address 10.50.1.1 255.255.255.0
+!
+interface Vlan502
+ description Wireless Aps, WCS and WISM2's
+ ip address 10.50.2.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan503
+ no ip address
+!
+interface Vlan504
+ description Wireless Private
+ ip address 10.50.4.1 255.255.255.0
+ ip helper-address 192.168.1.112
+ --More--          ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan505
+ no ip address
+!
+interface Vlan506
+ description Wireless IPADS
+ ip address 10.50.6.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan507
+ no ip address
+!
+interface Vlan508
+ description Wireless Public
+ ip address 10.50.8.1 255.255.248.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ --More--          ip pim sparse-mode
+!
+interface Vlan564
+ description Projectors
+ ip address 10.50.64.1 255.255.254.0
+ ip helper-address 192.168.1.112
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan610
+ ip address 172.20.1.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+ ip pim sparse-mode
+!
+interface Vlan611
+ ip address 172.20.2.2 255.255.255.252
+ no ip redirects
+ shutdown
+!
+interface Vlan612
+ --More--          no ip address
+!
+interface Vlan613
+ no ip address
+!
+interface Vlan614
+ ip address 172.20.2.10 255.255.255.252
+ no ip redirects
+!
+interface Vlan615
+ no ip address
+!
+interface Vlan616
+ no ip address
+!
+interface Vlan617
+ no ip address
+!
+interface Vlan618
+ no ip address
+!
+interface Vlan619
+ no ip address
+ --More--         !
+interface Vlan620
+ no ip address
+!
+interface Vlan621
+ no ip address
+!
+interface Vlan622
+ no ip address
+!
+interface Vlan623
+ no ip address
+!
+interface Vlan624
+ no ip address
+!
+interface Vlan625
+ no ip address
+!
+interface Vlan626
+ no ip address
+!
+interface Vlan627
+ --More--          no ip address
+!
+interface Vlan628
+ no ip address
+!
+interface Vlan629
+ no ip address
+!
+interface Vlan630
+ no ip address
+!
+interface Vlan631
+ no ip address
+!
+interface Vlan632
+ no ip address
+!
+interface Vlan633
+ no ip address
+!
+interface Vlan634
+ no ip address
+!
+ --More--         interface Vlan635
+ no ip address
+!
+interface Vlan636
+ no ip address
+!
+interface Vlan637
+ no ip address
+!
+interface Vlan638
+ no ip address
+!
+interface Vlan639
+ no ip address
+!
+interface Vlan640
+ no ip address
+!
+interface Vlan641
+ no ip address
+!
+interface Vlan642
+ no ip address
+ --More--         !
+interface Vlan643
+ no ip address
+!
+interface Vlan644
+ no ip address
+!
+interface Vlan645
+ no ip address
+!
+interface Vlan646
+ no ip address
+!
+interface Vlan647
+ no ip address
+!
+interface Vlan648
+ no ip address
+!
+interface Vlan649
+ no ip address
+!
+interface Vlan650
+ --More--          no ip address
+!
+interface Vlan651
+ no ip address
+!
+interface Vlan652
+ no ip address
+!
+interface Vlan653
+ no ip address
+!
+interface Vlan654
+ no ip address
+!
+interface Vlan655
+ no ip address
+!
+interface Vlan656
+ no ip address
+!
+interface Vlan657
+ no ip address
+!
+ --More--         interface Vlan658
+ no ip address
+!
+interface Vlan659
+ no ip address
+!
+interface Vlan660
+ description VDI-Desktops
+ ip address 172.20.6.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan680
+ ip address 172.20.8.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+ ip helper-address 10.40.1.70
+ ip pim sparse-mode
+!
+interface Vlan733
+ description Staff attached to the AA105 switch stack
+ ip address 10.70.33.1 255.255.255.0
+ --More--          ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan816
+ ip address 10.80.16.1 255.255.255.0
+ ip helper-address 10.40.1.40
+!
+interface Vlan817
+ description HVAC-Maintenance
+ ip address 10.80.17.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan818
+ description Fire alarm System.
+ ip address 10.80.18.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan819
+ --More--          no ip address
+!
+interface Vlan820
+ description Gym-Pressbox
+ ip address 10.80.20.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+!
+interface Vlan821
+ description Gym-Video
+ ip address 10.80.21.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan822
+ no ip address
+!
+interface Vlan823
+ no ip address
+!
+interface Vlan824
+ description SLC Dorm Office and Lab
+ --More--          ip address 10.80.24.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.3.15
+ ip pim sparse-mode
+!
+interface Vlan825
+ no ip address
+!
+interface Vlan826
+ description Aruba AP in SLC
+ ip address 10.80.26.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan832
+ ip address 10.80.32.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+!
+interface Vlan833
+ ip address 10.80.33.1 255.255.255.0
+ --More--          ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+!
+interface Vlan840
+ description CAH General system
+ ip address 10.80.40.1 255.255.255.0
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+!
+interface Vlan841
+ description CAH Student labs
+ ip address 10.80.41.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+!
+interface Vlan842
+ description CAH-Sim-Record
+ ip address 10.80.42.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip helper-address 10.40.3.15
+!
+ --More--         interface Vlan845
+ description Aruba AP in CAH Building
+ ip address 10.80.45.1 255.255.255.0
+ ip helper-address 10.40.1.70
+ ip helper-address 10.40.1.40
+ ip pim sparse-mode
+!
+interface Vlan999
+ description for wireless to gym-video
+ no ip address
+!
+!
+router eigrp 10
+ network 0.0.0.0
+ redistribute static
+ eigrp stub connected summary
+!
+router ospf 100
+ redistribute connected subnets
+ passive-interface default
+ no passive-interface Vlan611
+ network 172.20.2.0 0.0.0.3 area 0
+!
+ --More--         router ospf 10
+ redistribute connected subnets
+ passive-interface default
+ no passive-interface Vlan614
+ network 172.20.2.8 0.0.0.3 area 0
+!
+no ip forward-protocol nd
+ip http server
+ip http authentication local
+ip pim bsr-candidate Loopback0 0
+ip pim rp-candidate Loopback0
+ip route 0.0.0.0 0.0.0.0 192.168.1.1
+ip route 10.255.2.19 255.255.255.255 10.30.2.19
+!
+ip access-list standard ALLOW-SSH
+ permit 192.168.2.70
+ permit 172.20.1.48
+ permit 172.20.1.55
+ permit 172.20.1.40
+ permit 172.20.1.32
+ permit 172.20.2.1
+ permit 172.20.1.71
+ permit 172.20.1.70
+ --More--         !
+ip access-list extended vlan302-AC
+ deny   ip host 10.30.2.5 any
+ permit ip host 10.30.2.19 any
+ deny   ip any any
+ip access-list extended vlan313-AC
+ deny   ip host 10.30.13.5 any
+ permit ip any any
+!
+logging host 10.40.1.232
+!
+snmp-server group sccc v3 noauth access 1
+snmp-server community sccc RO
+snmp-server community 2006sccc RW
+snmp-server location AA144
+snmp-server contact Doug Browne
+tacacs-server host 10.40.1.208
+tacacs-server directed-request
+tacacs-server key 7 002E06151077581222720D405D3A175602581F370A2021
+!
+!
+!
+!
+ --More--         line con 0
+ stopbits 1
+line vty 1 4
+ transport input all
+line vty 5 15
+ transport input all
+line vty 16
+ access-class ALLOW-SSH in
+ transport input all
+!
+!
+monitor session 1 source interface Gi1/3 , Gi1/5 , Gi1/13 rx
+monitor session 1 destination interface Gi1/25
+monitor session 1 filter packet-type good rx
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+!
+end
+
+SW-AA144-Core-USD480#        sho ip int bri
+Interface              IP-Address      OK? Method Status                Protocol
+FastEthernet1          unassigned      YES unset  down                  down    
+GigabitEthernet1/1     unassigned      YES unset  up                    up      
+GigabitEthernet1/2     unassigned      YES unset  down                  down    
+GigabitEthernet1/3     unassigned      YES unset  up                    up      
+GigabitEthernet1/4     unassigned      YES unset  up                    up      
+GigabitEthernet1/5     unassigned      YES unset  up                    up      
+GigabitEthernet1/6     unassigned      YES unset  up                    up      
+GigabitEthernet1/7     unassigned      YES unset  up                    up      
+GigabitEthernet1/8     unassigned      YES unset  up                    up      
+GigabitEthernet1/9     unassigned      YES unset  up                    up      
+GigabitEthernet1/10    unassigned      YES unset  up                    up      
+GigabitEthernet1/11    unassigned      YES unset  up                    up      
+GigabitEthernet1/12    unassigned      YES unset  up                    up      
+GigabitEthernet1/13    unassigned      YES unset  up                    up      
+GigabitEthernet1/14    unassigned      YES unset  down                  down    
+GigabitEthernet1/15    unassigned      YES unset  administratively down down    
+GigabitEthernet1/16    unassigned      YES unset  administratively down down    
+GigabitEthernet1/17    unassigned      YES unset  up                    up      
+GigabitEthernet1/18    unassigned      YES unset  down                  down    
+GigabitEthernet1/19    unassigned      YES unset  up                    up      
+GigabitEthernet1/20    unassigned      YES unset  up                    up      
+GigabitEthernet1/21    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet1/22    unassigned      YES unset  administratively down down    
+GigabitEthernet1/23    unassigned      YES unset  up                    up      
+GigabitEthernet1/24    unassigned      YES unset  up                    up      
+GigabitEthernet1/25    unassigned      YES unset  down                  down    
+GigabitEthernet1/26    unassigned      YES unset  down                  down    
+GigabitEthernet1/27    unassigned      YES unset  administratively down down    
+GigabitEthernet1/28    unassigned      YES unset  administratively down down    
+GigabitEthernet1/29    unassigned      YES unset  administratively down down    
+GigabitEthernet1/30    unassigned      YES unset  administratively down down    
+GigabitEthernet1/31    unassigned      YES unset  up                    up      
+GigabitEthernet1/32    unassigned      YES unset  administratively down down    
+GigabitEthernet1/33    unassigned      YES unset  down                  down    
+GigabitEthernet1/34    unassigned      YES unset  down                  down    
+GigabitEthernet1/35    unassigned      YES unset  down                  down    
+GigabitEthernet1/36    unassigned      YES unset  down                  down    
+GigabitEthernet1/37    unassigned      YES unset  down                  down    
+GigabitEthernet1/38    unassigned      YES unset  down                  down    
+GigabitEthernet1/39    unassigned      YES unset  down                  down    
+GigabitEthernet1/40    unassigned      YES unset  down                  down    
+GigabitEthernet1/41    unassigned      YES unset  administratively down down    
+GigabitEthernet1/42    unassigned      YES unset  administratively down down    
+GigabitEthernet1/43    unassigned      YES unset  up                    up      
+GigabitEthernet1/44    unassigned      YES unset  administratively down down    
+ --More--         GigabitEthernet1/45    unassigned      YES unset  administratively down down    
+GigabitEthernet1/46    unassigned      YES unset  administratively down down    
+GigabitEthernet1/47    unassigned      YES unset  administratively down down    
+GigabitEthernet1/48    unassigned      YES unset  down                  down    
+GigabitEthernet2/1     unassigned      YES unset  up                    up      
+GigabitEthernet2/2     unassigned      YES unset  down                  down    
+GigabitEthernet2/3     unassigned      YES unset  up                    up      
+GigabitEthernet2/4     unassigned      YES unset  up                    up      
+GigabitEthernet2/5     unassigned      YES unset  up                    up      
+GigabitEthernet2/6     unassigned      YES unset  up                    up      
+GigabitEthernet2/7     unassigned      YES unset  down                  down    
+GigabitEthernet2/8     unassigned      YES unset  administratively down down    
+GigabitEthernet2/9     unassigned      YES unset  up                    up      
+GigabitEthernet2/10    unassigned      YES unset  administratively down down    
+GigabitEthernet2/11    unassigned      YES unset  up                    up      
+GigabitEthernet2/12    unassigned      YES unset  up                    up      
+GigabitEthernet2/13    unassigned      YES unset  up                    up      
+GigabitEthernet2/14    unassigned      YES unset  administratively down down    
+GigabitEthernet2/15    unassigned      YES unset  administratively down down    
+GigabitEthernet2/16    unassigned      YES unset  down                  down    
+GigabitEthernet2/17    unassigned      YES unset  up                    up      
+GigabitEthernet2/18    unassigned      YES unset  administratively down down    
+GigabitEthernet2/19    unassigned      YES unset  up                    up      
+ --More--         GigabitEthernet2/20    unassigned      YES unset  up                    up      
+GigabitEthernet2/21    unassigned      YES unset  administratively down down    
+GigabitEthernet2/22    unassigned      YES unset  administratively down down    
+GigabitEthernet2/23    unassigned      YES unset  up                    up      
+GigabitEthernet2/24    unassigned      YES unset  up                    up      
+GigabitEthernet2/25    unassigned      YES unset  administratively down down    
+GigabitEthernet2/26    unassigned      YES unset  administratively down down    
+GigabitEthernet2/27    unassigned      YES unset  administratively down down    
+GigabitEthernet2/28    unassigned      YES unset  administratively down down    
+GigabitEthernet2/29    unassigned      YES unset  administratively down down    
+GigabitEthernet2/30    unassigned      YES unset  administratively down down    
+GigabitEthernet2/31    unassigned      YES unset  administratively down down    
+GigabitEthernet2/32    unassigned      YES unset  administratively down down    
+GigabitEthernet2/33    unassigned      YES unset  down                  down    
+GigabitEthernet2/34    unassigned      YES unset  down                  down    
+GigabitEthernet2/35    unassigned      YES unset  down                  down    
+GigabitEthernet2/36    unassigned      YES unset  down                  down    
+GigabitEthernet2/37    unassigned      YES unset  down                  down    
+GigabitEthernet2/38    unassigned      YES unset  down                  down    
+GigabitEthernet2/39    unassigned      YES unset  down                  down    
+GigabitEthernet2/40    unassigned      YES unset  down                  down    
+GigabitEthernet2/41    unassigned      YES unset  administratively down down    
+GigabitEthernet2/42    unassigned      YES unset  administratively down down    
+ --More--         GigabitEthernet2/43    unassigned      YES unset  administratively down down    
+GigabitEthernet2/44    unassigned      YES unset  administratively down down    
+GigabitEthernet2/45    unassigned      YES unset  administratively down down    
+GigabitEthernet2/46    unassigned      YES unset  administratively down down    
+GigabitEthernet2/47    unassigned      YES unset  down                  down    
+GigabitEthernet2/48    unassigned      YES unset  down                  down    
+GigabitEthernet3/1     unassigned      YES unset  administratively down down    
+GigabitEthernet3/2     unassigned      YES unset  down                  down    
+GigabitEthernet3/3     unassigned      YES unset  administratively down down    
+GigabitEthernet3/4     unassigned      YES unset  down                  down    
+GigabitEthernet3/5     unassigned      YES unset  down                  down    
+GigabitEthernet3/6     unassigned      YES unset  administratively down down    
+GigabitEthernet3/7     unassigned      YES unset  down                  down    
+GigabitEthernet3/8     unassigned      YES unset  administratively down down    
+GigabitEthernet3/9     unassigned      YES unset  administratively down down    
+GigabitEthernet3/10    unassigned      YES unset  administratively down down    
+GigabitEthernet3/11    unassigned      YES unset  down                  down    
+GigabitEthernet3/12    unassigned      YES unset  down                  down    
+GigabitEthernet3/13    unassigned      YES unset  down                  down    
+GigabitEthernet3/14    unassigned      YES unset  down                  down    
+GigabitEthernet3/15    unassigned      YES unset  administratively down down    
+GigabitEthernet3/16    unassigned      YES unset  down                  down    
+GigabitEthernet3/17    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet3/18    unassigned      YES unset  administratively down down    
+GigabitEthernet3/19    unassigned      YES unset  down                  down    
+GigabitEthernet3/20    unassigned      YES unset  administratively down down    
+GigabitEthernet3/21    unassigned      YES unset  down                  down    
+GigabitEthernet3/22    unassigned      YES unset  administratively down down    
+GigabitEthernet3/23    unassigned      YES unset  administratively down down    
+GigabitEthernet3/24    unassigned      YES unset  administratively down down    
+GigabitEthernet3/25    unassigned      YES unset  down                  down    
+GigabitEthernet3/26    unassigned      YES unset  down                  down    
+GigabitEthernet3/27    unassigned      YES unset  down                  down    
+GigabitEthernet3/28    unassigned      YES unset  administratively down down    
+GigabitEthernet3/29    unassigned      YES unset  administratively down down    
+GigabitEthernet3/30    unassigned      YES unset  administratively down down    
+GigabitEthernet3/31    unassigned      YES unset  administratively down down    
+GigabitEthernet3/32    unassigned      YES unset  administratively down down    
+GigabitEthernet3/33    unassigned      YES unset  down                  down    
+GigabitEthernet3/34    unassigned      YES unset  administratively down down    
+GigabitEthernet3/35    unassigned      YES unset  administratively down down    
+GigabitEthernet3/36    unassigned      YES unset  administratively down down    
+GigabitEthernet3/37    unassigned      YES unset  administratively down down    
+GigabitEthernet3/38    unassigned      YES unset  down                  down    
+GigabitEthernet3/39    unassigned      YES unset  administratively down down    
+GigabitEthernet3/40    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet3/41    unassigned      YES unset  administratively down down    
+GigabitEthernet3/42    unassigned      YES unset  administratively down down    
+GigabitEthernet3/43    unassigned      YES unset  administratively down down    
+GigabitEthernet3/44    unassigned      YES unset  administratively down down    
+GigabitEthernet3/45    unassigned      YES unset  administratively down down    
+GigabitEthernet3/46    unassigned      YES unset  administratively down down    
+GigabitEthernet3/47    unassigned      YES unset  administratively down down    
+GigabitEthernet3/48    unassigned      YES unset  down                  down    
+GigabitEthernet4/1     unassigned      YES unset  down                  down    
+GigabitEthernet4/2     unassigned      YES unset  down                  down    
+GigabitEthernet4/3     unassigned      YES unset  down                  down    
+GigabitEthernet4/4     unassigned      YES unset  down                  down    
+GigabitEthernet4/5     unassigned      YES unset  down                  down    
+GigabitEthernet4/6     unassigned      YES unset  down                  down    
+GigabitEthernet4/7     unassigned      YES unset  down                  down    
+GigabitEthernet4/8     unassigned      YES unset  down                  down    
+GigabitEthernet4/9     unassigned      YES unset  down                  down    
+GigabitEthernet4/10    unassigned      YES unset  down                  down    
+GigabitEthernet4/11    unassigned      YES unset  down                  down    
+GigabitEthernet4/12    unassigned      YES unset  down                  down    
+GigabitEthernet4/13    unassigned      YES unset  down                  down    
+GigabitEthernet4/14    unassigned      YES unset  down                  down    
+GigabitEthernet4/15    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet4/16    unassigned      YES unset  down                  down    
+GigabitEthernet4/17    unassigned      YES unset  down                  down    
+GigabitEthernet4/18    unassigned      YES unset  down                  down    
+GigabitEthernet4/19    unassigned      YES unset  down                  down    
+GigabitEthernet4/20    unassigned      YES unset  down                  down    
+GigabitEthernet4/21    unassigned      YES unset  down                  down    
+GigabitEthernet4/22    unassigned      YES unset  down                  down    
+GigabitEthernet4/23    unassigned      YES unset  down                  down    
+GigabitEthernet4/24    unassigned      YES unset  down                  down    
+GigabitEthernet4/25    unassigned      YES unset  down                  down    
+GigabitEthernet4/26    unassigned      YES unset  down                  down    
+GigabitEthernet4/27    unassigned      YES unset  down                  down    
+GigabitEthernet4/28    unassigned      YES unset  down                  down    
+GigabitEthernet4/29    unassigned      YES unset  down                  down    
+GigabitEthernet4/30    unassigned      YES unset  down                  down    
+GigabitEthernet4/31    unassigned      YES unset  down                  down    
+GigabitEthernet4/32    unassigned      YES unset  down                  down    
+GigabitEthernet4/33    unassigned      YES unset  down                  down    
+GigabitEthernet4/34    unassigned      YES unset  down                  down    
+GigabitEthernet4/35    unassigned      YES unset  down                  down    
+GigabitEthernet4/36    unassigned      YES unset  down                  down    
+GigabitEthernet4/37    unassigned      YES unset  down                  down    
+GigabitEthernet4/38    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet4/39    unassigned      YES unset  down                  down    
+GigabitEthernet4/40    unassigned      YES unset  down                  down    
+GigabitEthernet4/41    unassigned      YES unset  down                  down    
+GigabitEthernet4/42    unassigned      YES unset  down                  down    
+GigabitEthernet4/43    unassigned      YES unset  down                  down    
+GigabitEthernet4/44    unassigned      YES unset  down                  down    
+GigabitEthernet4/45    unassigned      YES unset  down                  down    
+GigabitEthernet4/46    unassigned      YES unset  down                  down    
+GigabitEthernet4/47    unassigned      YES unset  down                  down    
+GigabitEthernet4/48    unassigned      YES unset  down                  down    
+TenGigabitEthernet5/1  unassigned      YES unset  down                  down    
+TenGigabitEthernet5/2  unassigned      YES unset  up                    up      
+TenGigabitEthernet5/3  unassigned      YES unset  up                    up      
+TenGigabitEthernet5/4  unassigned      YES unset  down                  down    
+TenGigabitEthernet5/5  unassigned      YES unset  down                  down    
+TenGigabitEthernet5/6  unassigned      YES unset  down                  down    
+TenGigabitEthernet5/7  unassigned      YES unset  down                  down    
+TenGigabitEthernet5/8  unassigned      YES unset  down                  down    
+TenGigabitEthernet6/1  unassigned      YES unset  down                  down    
+TenGigabitEthernet6/2  unassigned      YES unset  up                    up      
+TenGigabitEthernet6/3  unassigned      YES unset  administratively down down    
+TenGigabitEthernet6/4  unassigned      YES unset  down                  down    
+TenGigabitEthernet6/5  unassigned      YES unset  down                  down    
+ --More--         TenGigabitEthernet6/6  unassigned      YES unset  down                  down    
+TenGigabitEthernet6/7  unassigned      YES unset  down                  down    
+TenGigabitEthernet6/8  unassigned      YES unset  down                  down    
+GigabitEthernet7/1     unassigned      YES unset  down                  down    
+GigabitEthernet7/2     unassigned      YES unset  down                  down    
+GigabitEthernet7/3     unassigned      YES unset  down                  down    
+GigabitEthernet7/4     unassigned      YES unset  down                  down    
+GigabitEthernet7/5     unassigned      YES unset  down                  down    
+GigabitEthernet7/6     unassigned      YES unset  down                  down    
+GigabitEthernet7/7     unassigned      YES unset  down                  down    
+GigabitEthernet7/8     unassigned      YES unset  down                  down    
+GigabitEthernet7/9     unassigned      YES unset  down                  down    
+GigabitEthernet7/10    unassigned      YES unset  down                  down    
+GigabitEthernet7/11    unassigned      YES unset  down                  down    
+GigabitEthernet7/12    unassigned      YES unset  down                  down    
+GigabitEthernet7/13    unassigned      YES unset  down                  down    
+GigabitEthernet7/14    unassigned      YES unset  down                  down    
+GigabitEthernet7/15    unassigned      YES unset  down                  down    
+GigabitEthernet7/16    unassigned      YES unset  down                  down    
+GigabitEthernet7/17    unassigned      YES unset  down                  down    
+GigabitEthernet7/18    unassigned      YES unset  down                  down    
+GigabitEthernet7/19    unassigned      YES unset  down                  down    
+GigabitEthernet7/20    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet7/21    unassigned      YES unset  down                  down    
+GigabitEthernet7/22    unassigned      YES unset  down                  down    
+GigabitEthernet7/23    unassigned      YES unset  down                  down    
+GigabitEthernet7/24    unassigned      YES unset  down                  down    
+GigabitEthernet7/25    unassigned      YES unset  down                  down    
+GigabitEthernet7/26    unassigned      YES unset  down                  down    
+GigabitEthernet7/27    unassigned      YES unset  down                  down    
+GigabitEthernet7/28    unassigned      YES unset  down                  down    
+GigabitEthernet7/29    unassigned      YES unset  down                  down    
+GigabitEthernet7/30    unassigned      YES unset  down                  down    
+GigabitEthernet7/31    unassigned      YES unset  down                  down    
+GigabitEthernet7/32    unassigned      YES unset  down                  down    
+GigabitEthernet7/33    unassigned      YES unset  down                  down    
+GigabitEthernet7/34    unassigned      YES unset  down                  down    
+GigabitEthernet7/35    unassigned      YES unset  down                  down    
+GigabitEthernet7/36    unassigned      YES unset  down                  down    
+GigabitEthernet7/37    unassigned      YES unset  down                  down    
+GigabitEthernet7/38    unassigned      YES unset  down                  down    
+GigabitEthernet7/39    unassigned      YES unset  down                  down    
+GigabitEthernet7/40    unassigned      YES unset  down                  down    
+GigabitEthernet7/41    unassigned      YES unset  down                  down    
+GigabitEthernet7/42    unassigned      YES unset  down                  down    
+GigabitEthernet7/43    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet7/44    unassigned      YES unset  down                  down    
+GigabitEthernet7/45    unassigned      YES unset  down                  down    
+GigabitEthernet7/46    unassigned      YES unset  down                  down    
+GigabitEthernet7/47    unassigned      YES unset  down                  down    
+GigabitEthernet7/48    unassigned      YES unset  down                  down    
+GigabitEthernet8/1     unassigned      YES unset  down                  down    
+GigabitEthernet8/2     unassigned      YES unset  down                  down    
+GigabitEthernet8/3     unassigned      YES unset  down                  down    
+GigabitEthernet8/4     unassigned      YES unset  down                  down    
+GigabitEthernet8/5     unassigned      YES unset  down                  down    
+GigabitEthernet8/6     unassigned      YES unset  down                  down    
+GigabitEthernet8/7     unassigned      YES unset  down                  down    
+GigabitEthernet8/8     unassigned      YES unset  down                  down    
+GigabitEthernet8/9     unassigned      YES unset  down                  down    
+GigabitEthernet8/10    unassigned      YES unset  down                  down    
+GigabitEthernet8/11    unassigned      YES unset  down                  down    
+GigabitEthernet8/12    unassigned      YES unset  down                  down    
+GigabitEthernet8/13    unassigned      YES unset  down                  down    
+GigabitEthernet8/14    unassigned      YES unset  down                  down    
+GigabitEthernet8/15    unassigned      YES unset  down                  down    
+GigabitEthernet8/16    unassigned      YES unset  down                  down    
+GigabitEthernet8/17    unassigned      YES unset  down                  down    
+GigabitEthernet8/18    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet8/19    unassigned      YES unset  down                  down    
+GigabitEthernet8/20    unassigned      YES unset  down                  down    
+GigabitEthernet8/21    unassigned      YES unset  down                  down    
+GigabitEthernet8/22    unassigned      YES unset  down                  down    
+GigabitEthernet8/23    unassigned      YES unset  down                  down    
+GigabitEthernet8/24    unassigned      YES unset  down                  down    
+GigabitEthernet8/25    unassigned      YES unset  down                  down    
+GigabitEthernet8/26    unassigned      YES unset  down                  down    
+GigabitEthernet8/27    unassigned      YES unset  down                  down    
+GigabitEthernet8/28    unassigned      YES unset  down                  down    
+GigabitEthernet8/29    unassigned      YES unset  down                  down    
+GigabitEthernet8/30    unassigned      YES unset  down                  down    
+GigabitEthernet8/31    unassigned      YES unset  down                  down    
+GigabitEthernet8/32    unassigned      YES unset  down                  down    
+GigabitEthernet8/33    unassigned      YES unset  down                  down    
+GigabitEthernet8/34    unassigned      YES unset  down                  down    
+GigabitEthernet8/35    unassigned      YES unset  down                  down    
+GigabitEthernet8/36    unassigned      YES unset  down                  down    
+GigabitEthernet8/37    unassigned      YES unset  down                  down    
+GigabitEthernet8/38    unassigned      YES unset  down                  down    
+GigabitEthernet8/39    unassigned      YES unset  down                  down    
+GigabitEthernet8/40    unassigned      YES unset  down                  down    
+GigabitEthernet8/41    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet8/42    unassigned      YES unset  down                  down    
+GigabitEthernet8/43    unassigned      YES unset  down                  down    
+GigabitEthernet8/44    unassigned      YES unset  down                  down    
+GigabitEthernet8/45    unassigned      YES unset  down                  down    
+GigabitEthernet8/46    unassigned      YES unset  down                  down    
+GigabitEthernet8/47    unassigned      YES unset  down                  down    
+GigabitEthernet8/48    unassigned      YES unset  down                  down    
+GigabitEthernet9/1     unassigned      YES unset  down                  down    
+GigabitEthernet9/2     unassigned      YES unset  down                  down    
+GigabitEthernet9/3     unassigned      YES unset  down                  down    
+GigabitEthernet9/4     unassigned      YES unset  down                  down    
+GigabitEthernet9/5     unassigned      YES unset  down                  down    
+GigabitEthernet9/6     unassigned      YES unset  down                  down    
+GigabitEthernet9/7     unassigned      YES unset  down                  down    
+GigabitEthernet9/8     unassigned      YES unset  down                  down    
+GigabitEthernet9/9     unassigned      YES unset  down                  down    
+GigabitEthernet9/10    unassigned      YES unset  down                  down    
+GigabitEthernet9/11    unassigned      YES unset  down                  down    
+GigabitEthernet9/12    unassigned      YES unset  down                  down    
+GigabitEthernet9/13    unassigned      YES unset  down                  down    
+GigabitEthernet9/14    unassigned      YES unset  down                  down    
+GigabitEthernet9/15    unassigned      YES unset  down                  down    
+GigabitEthernet9/16    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet9/17    unassigned      YES unset  down                  down    
+GigabitEthernet9/18    unassigned      YES unset  down                  down    
+GigabitEthernet9/19    unassigned      YES unset  down                  down    
+GigabitEthernet9/20    unassigned      YES unset  down                  down    
+GigabitEthernet9/21    unassigned      YES unset  down                  down    
+GigabitEthernet9/22    unassigned      YES unset  down                  down    
+GigabitEthernet9/23    unassigned      YES unset  down                  down    
+GigabitEthernet9/24    unassigned      YES unset  down                  down    
+GigabitEthernet9/25    unassigned      YES unset  down                  down    
+GigabitEthernet9/26    unassigned      YES unset  down                  down    
+GigabitEthernet9/27    unassigned      YES unset  down                  down    
+GigabitEthernet9/28    unassigned      YES unset  down                  down    
+GigabitEthernet9/29    unassigned      YES unset  down                  down    
+GigabitEthernet9/30    unassigned      YES unset  down                  down    
+GigabitEthernet9/31    unassigned      YES unset  down                  down    
+GigabitEthernet9/32    unassigned      YES unset  down                  down    
+GigabitEthernet9/33    unassigned      YES unset  down                  down    
+GigabitEthernet9/34    unassigned      YES unset  down                  down    
+GigabitEthernet9/35    unassigned      YES unset  down                  down    
+GigabitEthernet9/36    unassigned      YES unset  down                  down    
+GigabitEthernet9/37    unassigned      YES unset  down                  down    
+GigabitEthernet9/38    unassigned      YES unset  down                  down    
+GigabitEthernet9/39    unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet9/40    unassigned      YES unset  down                  down    
+GigabitEthernet9/41    unassigned      YES unset  down                  down    
+GigabitEthernet9/42    unassigned      YES unset  down                  down    
+GigabitEthernet9/43    unassigned      YES unset  down                  down    
+GigabitEthernet9/44    unassigned      YES unset  down                  down    
+GigabitEthernet9/45    unassigned      YES unset  down                  down    
+GigabitEthernet9/46    unassigned      YES unset  down                  down    
+GigabitEthernet9/47    unassigned      YES unset  down                  down    
+GigabitEthernet9/48    unassigned      YES unset  down                  down    
+GigabitEthernet10/1    unassigned      YES unset  down                  down    
+GigabitEthernet10/2    unassigned      YES unset  down                  down    
+GigabitEthernet10/3    unassigned      YES unset  down                  down    
+GigabitEthernet10/4    unassigned      YES unset  down                  down    
+GigabitEthernet10/5    unassigned      YES unset  down                  down    
+GigabitEthernet10/6    unassigned      YES unset  down                  down    
+GigabitEthernet10/7    unassigned      YES unset  down                  down    
+GigabitEthernet10/8    unassigned      YES unset  down                  down    
+GigabitEthernet10/9    unassigned      YES unset  down                  down    
+GigabitEthernet10/10   unassigned      YES unset  down                  down    
+GigabitEthernet10/11   unassigned      YES unset  down                  down    
+GigabitEthernet10/12   unassigned      YES unset  down                  down    
+GigabitEthernet10/13   unassigned      YES unset  down                  down    
+GigabitEthernet10/14   unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet10/15   unassigned      YES unset  down                  down    
+GigabitEthernet10/16   unassigned      YES unset  down                  down    
+GigabitEthernet10/17   unassigned      YES unset  down                  down    
+GigabitEthernet10/18   unassigned      YES unset  down                  down    
+GigabitEthernet10/19   unassigned      YES unset  down                  down    
+GigabitEthernet10/20   unassigned      YES unset  down                  down    
+GigabitEthernet10/21   unassigned      YES unset  down                  down    
+GigabitEthernet10/22   unassigned      YES unset  down                  down    
+GigabitEthernet10/23   unassigned      YES unset  down                  down    
+GigabitEthernet10/24   unassigned      YES unset  down                  down    
+GigabitEthernet10/25   unassigned      YES unset  down                  down    
+GigabitEthernet10/26   unassigned      YES unset  down                  down    
+GigabitEthernet10/27   unassigned      YES unset  down                  down    
+GigabitEthernet10/28   unassigned      YES unset  down                  down    
+GigabitEthernet10/29   unassigned      YES unset  down                  down    
+GigabitEthernet10/30   unassigned      YES unset  down                  down    
+GigabitEthernet10/31   unassigned      YES unset  down                  down    
+GigabitEthernet10/32   unassigned      YES unset  down                  down    
+GigabitEthernet10/33   unassigned      YES unset  down                  down    
+GigabitEthernet10/34   unassigned      YES unset  down                  down    
+GigabitEthernet10/35   unassigned      YES unset  down                  down    
+GigabitEthernet10/36   unassigned      YES unset  down                  down    
+GigabitEthernet10/37   unassigned      YES unset  down                  down    
+ --More--         GigabitEthernet10/38   unassigned      YES unset  down                  down    
+GigabitEthernet10/39   unassigned      YES unset  down                  down    
+GigabitEthernet10/40   unassigned      YES unset  down                  down    
+GigabitEthernet10/41   unassigned      YES unset  down                  down    
+GigabitEthernet10/42   unassigned      YES unset  down                  down    
+GigabitEthernet10/43   unassigned      YES unset  down                  down    
+GigabitEthernet10/44   unassigned      YES unset  down                  down    
+GigabitEthernet10/45   unassigned      YES unset  down                  down    
+GigabitEthernet10/46   unassigned      YES unset  down                  down    
+GigabitEthernet10/47   unassigned      YES unset  down                  down    
+GigabitEthernet10/48   unassigned      YES unset  down                  down    
+Loopback0              172.22.1.1      YES TFTP   up                    up      
+Port-channel1          unassigned      YES unset  down                  down    
+Port-channel2          unassigned      YES unset  down                  down    
+Port-channel3          unassigned      YES unset  down                  down    
+Port-channel4          unassigned      YES unset  down                  down    
+Port-channel5          unassigned      YES unset  down                  down    
+Port-channel6          unassigned      YES unset  down                  down    
+Port-channel7          unassigned      YES unset  down                  down    
+Port-channel8          unassigned      YES unset  down                  down    
+Port-channel9          unassigned      YES unset  down                  down    
+Port-channel10         unassigned      YES unset  down                  down    
+Port-channel11         unassigned      YES unset  up                    up      
+ --More--         Port-channel41         unassigned      YES unset  administratively down down    
+Port-channel61         unassigned      YES unset  down                  down    
+Port-channel81         unassigned      YES unset  down                  down    
+Port-channel91         unassigned      YES unset  down                  down    
+Tunnel0                172.22.1.1      YES unset  up                    up      
+Tunnel1                172.22.1.1      YES unset  up                    up      
+Vlan1                  192.168.2.5     YES TFTP   up                    up      
+Vlan2                  172.16.13.1     YES TFTP   administratively down down    
+Vlan100                unassigned      YES unset  up                    up      
+Vlan105                unassigned      YES unset  down                  down    
+Vlan120                10.1.20.1       YES TFTP   up                    up      
+Vlan150                unassigned      YES unset  up                    up      
+Vlan151                unassigned      YES unset  up                    up      
+Vlan300                unassigned      YES unset  up                    up      
+Vlan301                10.30.1.1       YES manual up                    up      
+Vlan302                10.30.2.1       YES manual up                    up      
+Vlan303                10.30.3.1       YES manual up                    up      
+Vlan304                10.30.4.1       YES TFTP   up                    up      
+Vlan305                10.30.5.1       YES TFTP   up                    up      
+Vlan306                10.30.6.1       YES TFTP   up                    up      
+Vlan307                10.30.7.1       YES TFTP   up                    up      
+Vlan308                10.30.8.1       YES TFTP   up                    up      
+Vlan309                10.30.9.1       YES TFTP   up                    up      
+ --More--         Vlan310                10.30.10.1      YES TFTP   up                    up      
+Vlan311                10.30.11.1      YES TFTP   up                    up      
+Vlan312                10.30.12.1      YES TFTP   up                    up      
+Vlan313                10.30.13.1      YES TFTP   up                    up      
+Vlan314                10.30.14.1      YES TFTP   up                    up      
+Vlan315                unassigned      YES unset  down                  down    
+Vlan322                10.30.22.1      YES TFTP   up                    up      
+Vlan332                10.30.32.1      YES TFTP   up                    up      
+Vlan348                10.30.48.1      YES TFTP   up                    up      
+Vlan349                10.30.49.1      YES TFTP   up                    up      
+Vlan350                10.30.50.1      YES TFTP   up                    up      
+Vlan351                10.30.51.1      YES TFTP   up                    up      
+Vlan352                10.30.52.1      YES TFTP   up                    up      
+Vlan353                10.30.53.1      YES TFTP   up                    up      
+Vlan372                10.30.72.1      YES TFTP   up                    up      
+Vlan373                10.30.73.1      YES TFTP   up                    up      
+Vlan374                unassigned      YES unset  down                  down    
+Vlan375                10.30.75.1      YES TFTP   up                    up      
+Vlan377                10.30.77.1      YES manual up                    up      
+Vlan400                unassigned      YES unset  down                  down    
+Vlan401                10.40.1.1       YES TFTP   up                    up      
+Vlan402                10.40.2.1       YES TFTP   up                    up      
+Vlan403                10.40.3.1       YES TFTP   up                    up      
+ --More--         Vlan404                10.40.4.1       YES TFTP   up                    up      
+Vlan405                10.40.5.1       YES TFTP   up                    up      
+Vlan410                10.40.110.1     YES TFTP   up                    up      
+Vlan411                10.40.111.1     YES TFTP   up                    up      
+Vlan412                unassigned      YES unset  up                    up      
+Vlan413                unassigned      YES unset  up                    up      
+Vlan414                10.40.14.1      YES TFTP   up                    up      
+Vlan415                10.40.15.1      YES TFTP   up                    up      
+Vlan416                10.40.16.1      YES TFTP   up                    up      
+Vlan500                unassigned      YES unset  up                    up      
+Vlan501                10.50.1.1       YES TFTP   up                    up      
+Vlan502                10.50.2.1       YES TFTP   up                    up      
+Vlan503                unassigned      YES unset  down                  down    
+Vlan504                10.50.4.1       YES TFTP   up                    up      
+Vlan505                unassigned      YES unset  down                  down    
+Vlan506                10.50.6.1       YES TFTP   up                    up      
+Vlan507                unassigned      YES unset  down                  down    
+Vlan508                10.50.8.1       YES TFTP   up                    up      
+Vlan564                10.50.64.1      YES TFTP   up                    up      
+Vlan610                172.20.1.1      YES TFTP   up                    up      
+Vlan611                172.20.2.2      YES TFTP   administratively down down    
+Vlan612                unassigned      YES unset  down                  down    
+Vlan613                unassigned      YES unset  down                  down    
+ --More--         Vlan614                172.20.2.10     YES manual up                    up      
+Vlan615                unassigned      YES unset  up                    up      
+Vlan616                unassigned      YES unset  up                    up      
+Vlan617                unassigned      YES unset  up                    up      
+Vlan618                unassigned      YES unset  up                    up      
+Vlan619                unassigned      YES unset  up                    up      
+Vlan620                unassigned      YES unset  up                    up      
+Vlan621                unassigned      YES unset  up                    up      
+Vlan622                unassigned      YES unset  up                    up      
+Vlan623                unassigned      YES unset  up                    up      
+Vlan624                unassigned      YES unset  up                    up      
+Vlan625                unassigned      YES unset  up                    up      
+Vlan626                unassigned      YES unset  up                    up      
+Vlan627                unassigned      YES unset  up                    up      
+Vlan628                unassigned      YES unset  up                    up      
+Vlan629                unassigned      YES unset  down                  down    
+Vlan630                unassigned      YES unset  down                  down    
+Vlan631                unassigned      YES unset  down                  down    
+Vlan632                unassigned      YES unset  down                  down    
+Vlan633                unassigned      YES unset  down                  down    
+Vlan634                unassigned      YES unset  down                  down    
+Vlan635                unassigned      YES unset  down                  down    
+Vlan636                unassigned      YES unset  down                  down    
+ --More--         Vlan637                unassigned      YES unset  down                  down    
+Vlan638                unassigned      YES unset  down                  down    
+Vlan639                unassigned      YES unset  down                  down    
+Vlan640                unassigned      YES unset  down                  down    
+Vlan641                unassigned      YES unset  down                  down    
+Vlan642                unassigned      YES unset  down                  down    
+Vlan643                unassigned      YES unset  down                  down    
+Vlan644                unassigned      YES unset  down                  down    
+Vlan645                unassigned      YES unset  down                  down    
+Vlan646                unassigned      YES unset  down                  down    
+Vlan647                unassigned      YES unset  down                  down    
+Vlan648                unassigned      YES unset  down                  down    
+Vlan649                unassigned      YES unset  down                  down    
+Vlan650                unassigned      YES unset  down                  down    
+Vlan651                unassigned      YES unset  down                  down    
+Vlan652                unassigned      YES unset  down                  down    
+Vlan653                unassigned      YES unset  down                  down    
+Vlan654                unassigned      YES unset  down                  down    
+Vlan655                unassigned      YES unset  down                  down    
+Vlan656                unassigned      YES unset  down                  down    
+Vlan657                unassigned      YES unset  down                  down    
+Vlan658                unassigned      YES unset  down                  down    
+Vlan659                unassigned      YES unset  down                  down    
+ --More--         Vlan660                172.20.6.1      YES TFTP   up                    up      
+Vlan680                172.20.8.1      YES TFTP   up                    up      
+Vlan733                10.70.33.1      YES TFTP   up                    up      
+Vlan816                10.80.16.1      YES manual up                    up      
+Vlan817                10.80.17.1      YES TFTP   up                    up      
+Vlan818                10.80.18.1      YES TFTP   up                    up      
+Vlan819                unassigned      YES unset  up                    up      
+Vlan820                10.80.20.1      YES TFTP   up                    up      
+Vlan821                10.80.21.1      YES TFTP   up                    up      
+Vlan822                unassigned      YES unset  down                  down    
+Vlan823                unassigned      YES unset  down                  down    
+Vlan824                10.80.24.1      YES TFTP   up                    up      
+Vlan825                unassigned      YES unset  down                  down    
+Vlan826                10.80.26.1      YES TFTP   up                    up      
+Vlan832                10.80.32.1      YES manual up                    up      
+Vlan833                10.80.33.1      YES manual up                    up      
+Vlan840                10.80.40.1      YES TFTP   up                    up      
+Vlan841                10.80.41.1      YES TFTP   up                    up      
+Vlan842                10.80.42.1      YES TFTP   up                    up      
+Vlan845                10.80.45.1      YES TFTP   up                    up      
+Vlan999                unassigned      YES unset  up                    up      
+SW-AA144-Core-USD480#      sho int sta
+SW-AA144-Core-USD480#sho int stat
+% Incomplete command.
+
+SW-AA144-Core-USD480#sho int status
+
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi1/1     SW-FTD1-P1-WAN     connected    100        a-full a-1000 10/100/1000-TX
+Gi1/2     SW-FTD1-P2-WAN2-PI notconnect   10           auto   auto 10/100/1000-TX
+Gi1/3     SW-FTD1-P3-LAN     connected    trunk      a-full a-1000 10/100/1000-TX
+Gi1/4     SW-FTD1-P4-DMZ     connected    51         a-full a-1000 10/100/1000-TX
+Gi1/5     SW-FTD1-P5-DORM/PU connected    200        a-full a-1000 10/100/1000-TX
+Gi1/6     SW-FTD1-P6-LAN2    connected    601        a-full a-1000 10/100/1000-TX
+Gi1/7     SVR-FMC-MANAGE     connected    401        a-full a-1000 10/100/1000-TX
+Gi1/8     SRV-MX1-P0-RED CON connected    51         a-half  a-100 10/100/1000-TX
+Gi1/9     SVR-FMC-P1         connected    401        a-full a-1000 10/100/1000-TX
+Gi1/10    open               connected    401        a-full a-1000 10/100/1000-TX
+Gi1/11    SW-FTD1-P11-LAN-FO connected    150        a-full a-1000 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi1/12    SW-FTD1-P12-STFUL- connected    151        a-full a-1000 10/100/1000-TX
+Gi1/13    SW-FTD1-P7-DORM/GU connected    trunk      a-full a-1000 10/100/1000-TX
+Gi1/14    SW-SCCC Router 1gb notconnect   1            auto   auto 10/100/1000-TX
+Gi1/15    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/16    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/17    SW-FTD1-P8-AA109   connected    670        a-full a-1000 10/100/1000-TX
+Gi1/18    COMP-Vlan670-AA109 notconnect   670          auto   auto 10/100/1000-TX
+Gi1/19    SRV-Commvault Back connected    401        a-full a-1000 10/100/1000-TX
+Gi1/20    SRV-Commvault Back connected    401        a-full a-1000 10/100/1000-TX
+Gi1/21    SRV-NGRD-Test-P1   notconnect   410          auto   auto 10/100/1000-TX
+Gi1/22    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/23    STOR-NMBL-Live-CTR connected    410        a-full a-1000 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi1/24    STOR-NMBL-Live-CTR connected    410        a-full a-1000 10/100/1000-TX
+Gi1/25    open               notconnect   1            auto   auto 10/100/1000-TX
+Gi1/26    open               notconnect   1            auto   auto 10/100/1000-TX
+Gi1/27    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/28    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/29    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/30    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/31    SIPGW-AA144        connected    302        a-full a-1000 10/100/1000-TX
+Gi1/32    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/33    SW-HP-C7B-A1       notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/34    SW-HP-C7B-B1       notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/35    SW-HP-C7B-C1       notconnect   trunk        auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi1/36    Conectrix          notconnect   1            auto   auto 10/100/1000-TX
+Gi1/37    SW-HP-C7A-A#1      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/38    SW-HP-C7A-B#1      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/39    SW-HP-C7A-A#2      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/40    SW-HP-C7A-B#2      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi1/41    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/42    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/43    SRV-CVS1           connected    352        a-full a-1000 10/100/1000-TX
+Gi1/44    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/45    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/46    open               disabled     1            auto   auto 10/100/1000-TX
+Gi1/47    open               disabled     1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi1/48    open               notconnect   733          auto   auto 10/100/1000-TX
+Gi2/1     SW-FTD2-P1-WAN     connected    100        a-full a-1000 10/100/1000-TX
+Gi2/2     SW-FTD2-P2-WAN2-PI notconnect   10           auto   auto 10/100/1000-TX
+Gi2/3     SW-FTD2-P3-LAN     connected    trunk      a-full a-1000 10/100/1000-TX
+Gi2/4     SW-FTD2-P4-DMZ     connected    51         a-full a-1000 10/100/1000-TX
+Gi2/5     SW-FTD2-P5-DORM/PU connected    200        a-full a-1000 10/100/1000-TX
+Gi2/6     SW-FTD2-P6-LAN2    connected    601        a-full a-1000 10/100/1000-TX
+Gi2/7     SW-V201-TEMP       notconnect   1            auto   auto 10/100/1000-TX
+Gi2/8     open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/9     SVR-FMC-P2         connected    401        a-full a-1000 10/100/1000-TX
+Gi2/10    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/11    SW-FTD2-P11-LAN-FO connected    150        a-full a-1000 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi2/12    SW-FTD2-P12-STFUL- connected    151        a-full a-1000 10/100/1000-TX
+Gi2/13    SW-FTD2-P7-DORM/GU connected    trunk      a-full a-1000 10/100/1000-TX
+Gi2/14    OPEN               disabled     1            auto   auto 10/100/1000-TX
+Gi2/15    Unknow             disabled     1            auto   auto 10/100/1000-TX
+Gi2/16    unknow             notconnect   401          auto   auto 10/100/1000-TX
+Gi2/17    SW-FTD2-P8-AA109   connected    670        a-full a-1000 10/100/1000-TX
+Gi2/18    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/19    SRV-Commvault Back connected    401        a-full a-1000 10/100/1000-TX
+Gi2/20    SRV-Commvault Back connected    401        a-full a-1000 10/100/1000-TX
+Gi2/21    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/22    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/23    STOR-NMBL-Live-CTR connected    410        a-full a-1000 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi2/24    STOR-NMBL-Live-CTR connected    410        a-full a-1000 10/100/1000-TX
+Gi2/25    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/26    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/27    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/28    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/29    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/30    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/31    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/32    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/33    SW-HP-C7B-A2       notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/34    SW-HP-C7B-B2       notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/35    SW-HP-C7B-C2       notconnect   trunk        auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi2/36    SW-HP-C7B-D2       notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/37    SW-HP-C7A-A#3      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/38    SW-HP-C7A-B#3      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/39    SW-HP-C7A-A#4      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/40    SW-HP-C7A-B#4      notconnect   trunk        auto   auto 10/100/1000-TX
+Gi2/41    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/42    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/43    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/44    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/45    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/46    open               disabled     1            auto   auto 10/100/1000-TX
+Gi2/47    open               notconnect   610          auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi2/48    AP-Maint           notconnect   1            auto   auto 10/100/1000-TX
+Gi3/1     open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/2     NP-IP Patch 02     notconnect   401          auto   auto 10/100/1000-TX
+Gi3/3     open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/4     NP-IP Patch 04     notconnect   707          auto   auto 10/100/1000-TX
+Gi3/5     COMP LP-OculusIT   notconnect   610          auto   auto 10/100/1000-TX
+Gi3/6     open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/7     NP-IP Patch 07     notconnect   10           auto   auto 10/100/1000-TX
+Gi3/8     open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/9     open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/10    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/11    NP-IP Patch 11     notconnect   203          auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi3/12    203 VLAN test      notconnect   203          auto   auto 10/100/1000-TX
+Gi3/13    NP-IP Patch 13     notconnect   405          auto   auto 10/100/1000-TX
+Gi3/14    NP-IP Patch 14     notconnect   402          auto   auto 10/100/1000-TX
+Gi3/15    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/16    PH-3CXPBX-phone    notconnect   404          auto   auto 10/100/1000-TX
+Gi3/17    NP-IP Patch        notconnect   348          auto   auto 10/100/1000-TX
+Gi3/18    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/19    COMP - AA153       notconnect   707          auto   auto 10/100/1000-TX
+Gi3/20    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/21    CAM-AA144          notconnect   1            auto   auto 10/100/1000-TX
+Gi3/22    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/23    open               disabled     1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi3/24    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/25    3/25 VLAN 203 for  notconnect   203          auto   auto 10/100/1000-TX
+Gi3/26    3CXPBX-Test-Phones notconnect   404          auto   auto 10/100/1000-TX
+Gi3/27    3CXPBX-Test-Phones notconnect   404          auto   auto 10/100/1000-TX
+Gi3/28    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/29    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/30    open               disabled     701          auto   auto 10/100/1000-TX
+Gi3/31    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/32    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/33    NP-IP Patch 33     notconnect   1            auto   auto 10/100/1000-TX
+Gi3/34    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/35    open               disabled     1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi3/36    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/37    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/38    COMP-AA151-LaptopC notconnect   610          auto   auto 10/100/1000-TX
+Gi3/39    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/40    PDU-AA144-C-S      notconnect   1            auto   auto 10/100/1000-TX
+Gi3/41    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/42    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/43    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/44    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/45    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/46    open               disabled     1            auto   auto 10/100/1000-TX
+Gi3/47    open               disabled     1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi3/48    open               notconnect   1            auto   auto 10/100/1000-TX
+Gi4/1                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/2                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/3                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/4                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/5                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/6                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/7                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/8                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/9                        notconnect   1            auto   auto 10/100/1000-TX
+Gi4/10                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/11                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi4/12                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/13                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/14                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/15                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/16                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/17                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/18                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/19                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/20                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/21                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/22                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/23                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi4/24                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/25                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/26                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/27                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/28                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/29                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/30                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/31                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/32                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/33                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/34                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/35                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi4/36                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/37                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/38                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/39                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/40                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/41                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/42                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/43                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/44                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/45                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/46                       notconnect   1            auto   auto 10/100/1000-TX
+Gi4/47                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi4/48                       notconnect   1            auto   auto 10/100/1000-TX
+Te5/1     SW-AA105-PRIM      notconnect   1            full   auto 1000BaseSX
+Te5/2     OPEN Test to 9k1   connected    trunk        full  a-10G 10GBase-LR
+Te5/3     SW-E208-PRIM Old E connected    trunk        full a-1000 1000BaseBX10-U
+Te5/4     SW-SU121-PRIM      notconnect   1            full   auto 1000BaseSX
+Te5/5                        inactive     1            full   auto No XCVR
+Te5/6                        inactive     1            full   auto No XCVR
+Te5/7                        inactive     1            full   auto No XCVR
+Te5/8                        inactive     1            full   auto No XCVR
+Te6/1     SW-A144-PRIM       notconnect   1            full   auto 1000BaseSX
+Te6/2     SW-Boiler room-PRI connected    trunk        full a-1000 1000BaseSX
+Te6/3     SW-SLC151-PRIM     disabled     trunk        full   auto No XCVR
+Te6/4     SW-T122-PRIM       notconnect   1            full   auto 1000BaseBX10-U
+Te6/5                        inactive     1            full   auto No XCVR
+Te6/6                        inactive     1            full   auto No XCVR
+Te6/7                        inactive     1            full   auto No XCVR
+Te6/8                        inactive     1            full   auto No XCVR
+Gi7/1                        notconnect   routed       auto   auto 10/100/1000-TX
+Gi7/2                        notconnect   routed       auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi7/3                        notconnect   routed       auto   auto 10/100/1000-TX
+Gi7/4                        notconnect   routed       auto   auto 10/100/1000-TX
+Gi7/5                        notconnect   1            auto   auto 10/100/1000-TX
+Gi7/6                        notconnect   1            auto   auto 10/100/1000-TX
+Gi7/7                        notconnect   1            auto   auto 10/100/1000-TX
+Gi7/8                        notconnect   1            auto   auto 10/100/1000-TX
+Gi7/9                        notconnect   1            auto   auto 10/100/1000-TX
+Gi7/10                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/11                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/12                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/13                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/14                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi7/15                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/16                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/17                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/18                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/19                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/20                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/21                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/22                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/23                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/24                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/25                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/26                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi7/27                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/28                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/29                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/30                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/31                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/32                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/33                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/34                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/35                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/36                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/37                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/38                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi7/39                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/40                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/41                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/42                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/43                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/44                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/45                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/46                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/47                       notconnect   1            auto   auto 10/100/1000-TX
+Gi7/48                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/1                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/2                        notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi8/3                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/4                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/5                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/6                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/7                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/8                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/9                        notconnect   1            auto   auto 10/100/1000-TX
+Gi8/10                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/11                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/12                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/13                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/14                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi8/15                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/16                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/17                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/18                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/19                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/20                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/21                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/22                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/23                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/24                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/25                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/26                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi8/27                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/28                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/29                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/30                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/31                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/32                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/33                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/34                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/35                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/36                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/37                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/38                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi8/39                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/40                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/41                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/42                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/43                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/44                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/45                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/46                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/47                       notconnect   1            auto   auto 10/100/1000-TX
+Gi8/48                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/1                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/2                        notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi9/3                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/4                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/5                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/6                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/7                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/8                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/9                        notconnect   1            auto   auto 10/100/1000-TX
+Gi9/10                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/11                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/12                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/13                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/14                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi9/15                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/16                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/17                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/18                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/19                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/20                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/21                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/22                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/23                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/24                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/25                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/26                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi9/27                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/28                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/29                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/30                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/31                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/32                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/33                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/34                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/35                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/36                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/37                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/38                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi9/39                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/40                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/41                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/42                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/43                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/44                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/45                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/46                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/47                       notconnect   1            auto   auto 10/100/1000-TX
+Gi9/48                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/1                       notconnect   610          auto   auto 10/100/1000-TX
+Gi10/2                       notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi10/3                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/4                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/5                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/6                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/7                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/8                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/9                       notconnect   1            auto   auto 10/100/1000-TX
+Gi10/10                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/11                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/12                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/13                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/14                      notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi10/15                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/16                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/17                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/18                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/19                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/20                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/21                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/22                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/23                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/24                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/25                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/26                      notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi10/27                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/28                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/29                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/30                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/31                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/32                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/33                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/34                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/35                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/36                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/37                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/38                      notconnect   1            auto   auto 10/100/1000-TX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Gi10/39                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/40                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/41                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/42                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/43                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/44                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/45                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/46                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/47                      notconnect   1            auto   auto 10/100/1000-TX
+Gi10/48                      notconnect   1            auto   auto 10/100/1000-TX
+Po1       not used at this t notconnect   0            auto   auto 
+Po2       HP-C7A-A SW CHANNE notconnect   trunk        auto   auto 
+Po3       HP-C7A-B SW CHANNE notconnect   trunk        auto   auto 
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type 
+Po4       NetgearNAS CHANNEL notconnect   401          auto   auto 
+Po5       not used but on 2/ notconnect   401          auto   auto 
+Po6       HP-C7B-A PORT-CHAN notconnect   trunk        auto   auto 
+Po7       HP-C7B-B SW CHANNE notconnect   trunk        auto   auto 
+Po8       NGRD-Test channel  notconnect   410          auto   auto 
+Po9       NGRD-Live channel  notconnect   410          auto   auto 
+Po10      Link to DR Site-Ba notconnect   trunk        auto   auto 
+Po11      Commvault Backup N connected    401        a-full a-1000 
+Po41      NGNAS-10GB PORT-CH disabled     412          auto   auto 
+Po61      HP-C7B SW CHANNEL  notconnect   trunk        auto   auto 
+Po81      NGRD-Test channel  notconnect   412          auto   auto 
+Po91      NGRD-Live channel  notconnect   412          auto   auto 
+SW-AA144-Core-USD480#        sho ver
+SW-AA144-Core-USD480#sho version 
+Cisco IOS Software, IOS-XE Software, Catalyst 4500 L3 Switch  Software (cat4500es8-UNIVERSAL-M), Version 03.07.03.E RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 14-Jan-16 08:32 by prod_rel_team
+
+
+
+Cisco IOS-XE software, Copyright (c) 2005-2015 by cisco Systems, Inc.
+All rights reserved.  Certain components of Cisco IOS-XE software are
+licensed under the GNU General Public License ("GPL") Version 2.0.  The
+software code licensed under GPL Version 2.0 is free software that comes
+with ABSOLUTELY NO WARRANTY.  You can redistribute and/or modify such
+GPL code under the terms of GPL Version 2.0.
+(http://www.gnu.org/licenses/gpl-2.0.html) For more details, see the
+documentation or "License Notice" file accompanying the IOS-XE software,
+or the applicable URL provided on the flyer accompanying the IOS-XE
+software.
+
+
+
+ROM: 15.1(1r)SG5
+SW-AA144-Core-USD480 uptime is 3 years, 6 weeks, 3 days, 12 hours, 19 minutes
+ --More--         Uptime for this control processor is 3 years, 6 weeks, 3 days, 12 hours, 21 minutes
+System returned to ROM by power-on
+System restarted at 13:47:48 CDT Tue Mar 29 2022
+System image file is "usb0:cat4500es8-universal.SPA.03.07.03.E.152-3.bin"
+Jawa Revision 3, RadTrooper Revision 0x0.0x41, Conan Revision 0x1B9E
+
+
+Last reload reason: power-on
+
+
+
+License Information for 'WS-X45-SUP8-E'
+    License Level: ipbase   Type: Permanent
+    Next reboot license Level: ipbase
+
+cisco WS-C4510R+E (P5040) processor (revision 2) with 4194304K bytes of physical memory.
+Processor board ID FXS2013Q1K6
+P5040 CPU at 2.2GHz, Supervisor 8-E
+Last reset from PowerUp
+130 Virtual Ethernet interfaces
+384 Gigabit Ethernet interfaces
+ --More--         16 Ten Gigabit Ethernet interfaces
+511K bytes of non-volatile configuration memory.
+
+Configuration register is 0x40
+
+SW-AA144-Core-USD480#    sho clock
+02:07:21.208 CDT Tue May 13 2025
+SW-AA144-Core-USD480#sho log
+Syslog logging: enabled (115811 messages dropped, 51 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+
+
+No Inactive Message Discriminator.
+
+
+    Console logging: disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+                     filtering disabled
+    Buffer logging:  level emergencies, 0 messages logged, xml disabled,
+                    filtering disabled
+    Exception Logging: size (8192 bytes)
+    Count and timestamp logging messages: disabled
+    Persistent logging: disabled
+
+No active filter modules.
+
+    Trap logging: level informational, 221628 message lines logged
+        Logging to 10.40.1.232  (udp port 514, audit disabled,
+              link up),
+ --More--                       221592 message lines logged, 
+              0 message lines rate-limited, 
+              0 message lines dropped-by-MD, 
+              xml disabled, sequence number disabled
+              filtering disabled
+        Logging Source-Interface:       VRF Name:
+ --More--         
+Log Buffer (32768 bytes):
+SW-AA144-Core-USD480#  sho cdp negh
+SW-AA144-Core-USD480#sho cdp negh   if  eigh
+SW-AA144-Core-USD480#sho cdp neighbors 
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+sw-aa144-A48.sccc.edu(FDO23440YYP)
+                 Ten 5/2           130            R S I C N9K-C9318 Eth 1/7
+SW-E208.sccc.edu Ten 5/3           134             R S I  WS-C3750- Gig 1/0/1
+SW-B101.sccc.edu Ten 6/2           124             R S I  WS-C3560- Gig 0/1
+SIPGW-AA144      Gig 1/31          143             R S I  ISR4431/K Gig 0/0/0
+
+Total cdp entries displayed : 4
+SW-AA144-Core-USD480#sho cdp neig de
+SW-AA144-Core-USD480#sho cdp neig detail 
+-------------------------
+Device ID: sw-aa144-A48.sccc.edu(FDO23440YYP)
+Entry address(es): 
+  IP address: 192.168.2.70
+Platform: N9K-C93180YC-EX-24,  Capabilities: Router Switch IGMP CVTA phone port 
+Interface: TenGigabitEthernet5/2,  Port ID (outgoing port): Ethernet1/7
+Holdtime : 124 sec
+
+Version :
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+advertisement version: 2
+VTP Management Domain: 'blob'
+Native VLAN: 1
+Duplex: full
+Unidirectional Mode: off
+
+-------------------------
+Device ID: SW-E208.sccc.edu
+Entry address(es): 
+  IP address: 192.168.2.24
+Platform: cisco WS-C3750-48TS,  Capabilities: Router Switch IGMP 
+Interface: TenGigabitEthernet5/3,  Port ID (outgoing port): GigabitEthernet1/0/1
+ --More--         Holdtime : 128 sec
+
+Version :
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+
+advertisement version: 2
+Protocol Hello:  OUI=0x00000C, Protocol ID=0x0112; payload len=27, value=00000000FFFFFFFF010221FF0000000000000012012C4B00FF0000
+VTP Management Domain: 'blob'
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 192.168.2.24
+Unidirectional Mode: off
+
+-------------------------
+Device ID: SW-B101.sccc.edu
+Entry address(es): 
+  IP address: 192.168.2.21
+ --More--         Platform: cisco WS-C3560-48PS,  Capabilities: Router Switch IGMP 
+Interface: TenGigabitEthernet6/2,  Port ID (outgoing port): GigabitEthernet0/1
+Holdtime : 178 sec
+
+Version :
+Cisco IOS Software, C3560 Software (C3560-IPSERVICESK9-M), Version 12.2(55)SE10, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2015 by Cisco Systems, Inc.
+Compiled Wed 11-Feb-15 11:34 by prod_rel_team
+
+advertisement version: 2
+Protocol Hello:  OUI=0x00000C, Protocol ID=0x0112; payload len=27, value=00000000FFFFFFFF010221FF0000000000000026CAD10B80FF0000
+VTP Management Domain: 'blob'
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 192.168.2.21
+Unidirectional Mode: off
+
+-------------------------
+Device ID: SIPGW-AA144
+ --More--         Entry address(es): 
+  IP address: 10.30.2.19
+Platform: cisco ISR4431/K9,  Capabilities: Router Switch IGMP 
+Interface: GigabitEthernet1/31,  Port ID (outgoing port): GigabitEthernet0/0/0
+Holdtime : 138 sec
+
+Version :
+Cisco IOS Software [Everest], ISR Software (X86_64_LINUX_IOSD-UNIVERSALK9-M), Version 16.6.2, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2017 by Cisco Systems, Inc.
+Compiled Wed 01-Nov-17 07:09 by mcpre
+
+advertisement version: 2
+VTP Management Domain: ''
+Duplex: full
+Management address(es): 
+  IP address: 10.30.2.19
+
+
+Total cdp entries displayed : 4
+SW-AA144-Core-USD480#  sho lldp ne
+SW-AA144-Core-USD480#sho lldp neighbors 
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+SW-B101.sccc.edu    Te6/2          120        B,R             Gi0/1
+Fortigate1-Sccc     Gi2/3          120        R               INTF-INSIDE-1
+Fortigate1-Sccc     Gi1/6          120        R               INTF-INSIDE-2
+SW-E208.sccc.edu    Te5/3          120        B,R             Gi1/0/1
+sw-aa144-A48.sccc.edTe5/2          120        B,R             Ethernet1/7
+Fortigate2-Sccc     Gi1/3          120        R               INTF-INSIDE-1
+Fortigate2-Sccc     Gi2/6          120        R               INTF-INSIDE-2
+NMBL-LIVE1-A        Gi1/23         120        S               ac1f.6b0b.363c
+NMBL-LIVE1-A        Gi2/23         120        S               ac1f.6b0b.363d
+NMBL-LIVE1-B        Gi2/24         120        S               ac1f.6b0b.35bb
+NMBL-LIVE1-B        Gi1/24         120        S               ac1f.6b0b.35ba
+
+Total entries displayed: 11
+
+SW-AA144-Core-USD480#sho lldp neg
+SW-AA144-Core-USD480#sho lldp neg i
+SW-AA144-Core-USD480#sho lldp neighbors det
+SW-AA144-Core-USD480#sho lldp neighbors detail 
+------------------------------------------------
+Local Intf: Te6/2
+Chassis id: 0026.cad1.0b80
+Port id: Gi0/1
+Port Description: GigabitEthernet0/1
+System Name: SW-B101.sccc.edu
+
+System Description: 
+Cisco IOS Software, C3560 Software (C3560-IPSERVICESK9-M), Version 12.2(55)SE10, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2015 by Cisco Systems, Inc.
+Compiled Wed 11-Feb-15 11:34 by prod_rel_team
+
+Time remaining: 98 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 192.168.2.21
+Auto Negotiation - not supported
+Physical media capabilities:
+    1000baseX(FD)
+Media Attachment Unit type: 26
+ --More--         Vlan ID: 1
+
+------------------------------------------------
+Local Intf: Gi2/3
+Chassis id: 94f3.92d9.46e4
+Port id: INTF-INSIDE-1
+Port Description - not advertised
+System Name: Fortigate1-Sccc
+
+System Description: 
+FortiGate-1801F v7.4.4,build2662,240514 (GA.F)
+
+Time remaining: 97 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses - not advertised
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/6
+ --More--         Chassis id: 94f3.92d9.46e4
+Port id: INTF-INSIDE-2
+Port Description - not advertised
+System Name: Fortigate1-Sccc
+
+System Description: 
+FortiGate-1801F v7.4.4,build2662,240514 (GA.F)
+
+Time remaining: 97 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses - not advertised
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Te5/3
+Chassis id: 0012.012c.4b00
+Port id: Gi1/0/1
+Port Description: GigabitEthernet1/0/1
+System Name: SW-E208.sccc.edu
+ --More--         
+System Description: 
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+
+Time remaining: 90 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 192.168.2.24
+Auto Negotiation - not supported
+Physical media capabilities:
+    1000baseX(FD)
+Media Attachment Unit type: 22
+Vlan ID: 1
+
+------------------------------------------------
+Local Intf: Te5/2
+Chassis id: 3c51.0e39.ccee
+Port id: Ethernet1/7
+ --More--         Port Description: **Connectivity to the switch SW-AA144Core-USD480
+System Name: sw-aa144-A48.sccc.edu
+
+System Description: 
+Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+
+Time remaining: 99 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    Other: 3C 51 0E 39 FF FF 00
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 1
+
+------------------------------------------------
+Local Intf: Gi1/3
+Chassis id: 94f3.92d9.5e00
+Port id: INTF-INSIDE-1
+Port Description - not advertised
+ --More--         System Name: Fortigate2-Sccc
+
+System Description: 
+FortiGate-1801F v7.4.4,build2662,240514 (GA.F)
+
+Time remaining: 92 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses:
+    IP: 192.168.1.1
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi2/6
+Chassis id: 94f3.92d9.5e00
+Port id: INTF-INSIDE-2
+Port Description - not advertised
+System Name: Fortigate2-Sccc
+
+System Description: 
+ --More--         FortiGate-1801F v7.4.4,build2662,240514 (GA.F)
+
+Time remaining: 92 seconds
+System Capabilities: B,R
+Enabled Capabilities: R
+Management Addresses - not advertised
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/23
+Chassis id: ac1f.6b0b.363c
+Port id: ac1f.6b0b.363c
+Port Description: Interface   5 as eth1
+System Name: NMBL-LIVE1-A
+
+System Description: 
+Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+
+Time remaining: 99 seconds
+ --More--         System Capabilities: S
+Enabled Capabilities: S
+Management Addresses:
+    Other: FF 1F 6B 0B 36 3C 00
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi2/23
+Chassis id: ac1f.6b0b.363d
+Port id: ac1f.6b0b.363d
+Port Description: Interface   6 as eth2
+System Name: NMBL-LIVE1-A
+
+System Description: 
+Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+
+Time remaining: 98 seconds
+System Capabilities: S
+Enabled Capabilities: S
+ --More--         Management Addresses:
+    Other: FF 1F 6B 0B 36 3D 00
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi2/24
+Chassis id: ac1f.6b0b.35bb
+Port id: ac1f.6b0b.35bb
+Port Description: Interface   6 as eth2
+System Name: NMBL-LIVE1-B
+
+System Description: 
+Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+
+Time remaining: 113 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Addresses:
+    Other: FF 1F 6B 0B 35 FF 00
+ --More--         Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/24
+Chassis id: ac1f.6b0b.35ba
+Port id: ac1f.6b0b.35ba
+Port Description: Interface   5 as eth1
+System Name: NMBL-LIVE1-B
+
+System Description: 
+Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+
+Time remaining: 113 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Addresses:
+    Other: FF 1F 6B 0B 35 FF 00
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+ --More--         Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+
+Total entries displayed: 11
+
+SW-AA144-Core-USD480#  sho int summ
+SW-AA144-Core-USD480#sho int summary 
+
+ *: interface is up
+ IHQ: pkts in input hold queue     IQD: pkts dropped from input queue
+ OHQ: pkts in output hold queue    OQD: pkts dropped from output queue
+ RXBS: rx rate (bits/sec)          RXPS: rx rate (pkts/sec)
+ TXBS: tx rate (bits/sec)          TXPS: tx rate (pkts/sec)
+ TRTL: throttle count
+
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  FastEthernet1                 0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/1            0         0         0         0     20000        38      1000         1         0
+  GigabitEthernet1/2            0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/3            0         0         0 2806508390  11381000      1872   3210000      1825         0
+* GigabitEthernet1/4            0         0         0         0         0         0      1000         1         0
+* GigabitEthernet1/5            0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+* GigabitEthernet1/6            0         0         0         0         0         0      1000         1         0
+* GigabitEthernet1/7            0         0         0   4798553         0         0      2000         4         0
+* GigabitEthernet1/8            0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/9            0         0         0   4828566      4000         4     18000         9         0
+* GigabitEthernet1/10           0         0         0   4828267         0         0      2000         4         0
+* GigabitEthernet1/11           0         0         0         0      1000         1      1000         1         0
+* GigabitEthernet1/12           0         0         0         0      1000         1      1000         1         0
+* GigabitEthernet1/13           0         0         0 509841233         0         0     53000        49         0
+  GigabitEthernet1/14           0         0         0  15185466         0         0         0         0         0
+  GigabitEthernet1/15           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/16           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+* GigabitEthernet1/17           0         0         0         0         0         0      1000         1         0
+  GigabitEthernet1/18           0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/19           0         0         0      5131      4000         4      3000         3         0
+* GigabitEthernet1/20           0         0         0   4764819      3000         3     11000        13         0
+  GigabitEthernet1/21           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/22           0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/23           0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/24           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/25           0         0         0     62352         0         0         0         0         0
+  GigabitEthernet1/26           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/27           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet1/28           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/29           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/30           0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/31           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/32           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/33           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/34           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/35           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/36           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/37           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/38           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet1/39           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/40           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/41           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/42           0         0         0         0         0         0         0         0         0
+* GigabitEthernet1/43           0         0         0  11935138   3336000      5827  82576000     11060         0
+  GigabitEthernet1/44           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/45           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/46           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/47           0         0         0         0         0         0         0         0         0
+  GigabitEthernet1/48           0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/1            0         0         0         0         0         0     20000        36         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet2/2            0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/3            0         0         0 2796443975         0         0    546000       729         0
+* GigabitEthernet2/4            0         0         0         0    242000       287    277000       349         0
+* GigabitEthernet2/5            0         0         0         0  14714000      1282    333000       561         0
+* GigabitEthernet2/6            0         0         0         0      5000         2      5000         3         0
+  GigabitEthernet2/7            0         0         0 2574104914         0         0         0         0         0
+  GigabitEthernet2/8            0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/9            0         0         0   4828317         0         0      2000         3         0
+  GigabitEthernet2/10           0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/11           0         0         0         0         0         0      1000         1         0
+* GigabitEthernet2/12           0         0         0         0         0         1      1000         1         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+* GigabitEthernet2/13           0         0         0 508753388  86811000      8658   7906000      3005         0
+  GigabitEthernet2/14           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/15           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/16           0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/17           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/18           0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/19           0         0         0       741      3000         3      4000         4         0
+* GigabitEthernet2/20           0         0         0       632      3000         4      2000         1         0
+  GigabitEthernet2/21           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/22           0         0         0         0         0         0         0         0         0
+* GigabitEthernet2/23           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+* GigabitEthernet2/24           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/25           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/26           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/27           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/28           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/29           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/30           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/31           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/32           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/33           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/34           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet2/35           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/36           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/37           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/38           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/39           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/40           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/41           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/42           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/43           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/44           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/45           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet2/46           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/47           0         0         0         0         0         0         0         0         0
+  GigabitEthernet2/48           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/1            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/2            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/3            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/4            0         0         0    147853         0         0         0         0         0
+  GigabitEthernet3/5            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/6            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/7            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/8            0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet3/9            0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/10           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/11           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/12           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/13           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/14           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/15           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/16           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/17           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/18           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/19           0         0         0     17418         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet3/20           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/21           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/22           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/23           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/24           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/25           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/26           0         0         0       256         0         0         0         0         0
+  GigabitEthernet3/27           0         0         0       791         0         0         0         0         0
+  GigabitEthernet3/28           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/29           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/30           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet3/31           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/32           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/33           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/34           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/35           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/36           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/37           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/38           0         0         0      9973         0         0         0         0         0
+  GigabitEthernet3/39           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/40           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/41           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet3/42           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/43           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/44           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/45           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/46           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/47           0         0         0         0         0         0         0         0         0
+  GigabitEthernet3/48           0         0         0     49623         0         0         0         0         0
+  GigabitEthernet4/1            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/2            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/3            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/4            0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet4/5            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/6            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/7            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/8            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/9            0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/10           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/11           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/12           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/13           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/14           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/15           0         0         0         0         0         0         0         0         0
+ --More--         
+  Interface                   IHQ       IQD       OHQ       OQD      RXBS      RXPS      TXBS      TXPS      TRTL
+-----------------------------------------------------------------------------------------------------------------
+  GigabitEthernet4/16           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/17           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/18           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/19           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/20           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/21           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/22           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/23           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/24           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/25           0         0         0         0         0         0         0         0         0
+  GigabitEthernet4/26           0         0         0         0         0         0         0         0         0
+ --More--         
+SW-AA144-Core-USD480#
+SW-AA144-Core-USD480#exit

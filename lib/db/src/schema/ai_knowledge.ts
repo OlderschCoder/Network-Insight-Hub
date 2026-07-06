@@ -9,6 +9,9 @@ export const aiKnowledgeTable = pgTable("ai_knowledge", {
   title: varchar("title", { length: 300 }).notNull(),
   content: text("content").notNull(),
   source: varchar("source", { length: 20 }).notNull().default("manual"),
+  // "team" = shared across all staff (default); "personal" = only visible to ownerId
+  scope: varchar("scope", { length: 20 }).notNull().default("team"),
+  ownerId: integer("owner_id").references(() => usersTable.id),
   isActive: boolean("is_active").notNull().default(true),
   updatedBy: integer("updated_by").references(() => usersTable.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

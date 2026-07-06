@@ -1,0 +1,1310 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 04:47:02 =~=~=~=~=~=~=~=~=~=~=~=
+sho runn
+SW-AA144-Access#sho running-config 
+Building configuration...
+
+Current configuration : 15018 bytes
+!
+! Last configuration change at 16:41:02 UTC Thu Apr 17 2025 by admin
+! NVRAM config last updated at 16:41:07 UTC Thu Apr 17 2025 by admin
+!
+version 15.0
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname SW-AA144-Access
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable secret 5 $1$b06L$Odq9tnL0uqDz61LwUjosE0
+!
+username owen.local privilege 15 secret 5 $1$9iVz$8X34y9lD2ghuk7TlcCEWn.
+username louie.local privilege 15 secret 5 $1$HJue$vSFNexPyBykgJDvPSqH/Y0
+username admin secret 5 $1$3.XJ$1f8VjmTUwsGuaNsKghbYb.
+ --More--         aaa new-model
+!
+!
+aaa authentication login default local group tacacs+ enable
+!
+!
+!
+!
+!
+!
+aaa session-id common
+switch 1 provision ws-c3750g-48ps
+system mtu routing 1500
+ip routing
+ip domain-name sccc.edu
+ip name-server 10.40.1.68
+ip name-server 10.40.1.77
+!
+!
+!
+ip multicast-routing distributed
+!
+mls qos map policed-dscp  0 10 18 24 46 to 8
+ --More--         mls qos map cos-dscp 0 8 16 24 32 46 48 56
+mls qos srr-queue input bandwidth 70 30
+mls qos srr-queue input threshold 1 80 90
+mls qos srr-queue input priority-queue 2 bandwidth 30
+mls qos srr-queue input cos-map queue 1 threshold 2 3
+mls qos srr-queue input cos-map queue 1 threshold 3 6 7
+mls qos srr-queue input cos-map queue 2 threshold 1 4
+mls qos srr-queue input dscp-map queue 1 threshold 2 24
+mls qos srr-queue input dscp-map queue 1 threshold 3 48 49 50 51 52 53 54 55
+mls qos srr-queue input dscp-map queue 1 threshold 3 56 57 58 59 60 61 62 63
+mls qos srr-queue input dscp-map queue 2 threshold 3 32 33 40 41 42 43 44 45
+mls qos srr-queue input dscp-map queue 2 threshold 3 46 47
+mls qos srr-queue output cos-map queue 1 threshold 3 4 5
+mls qos srr-queue output cos-map queue 2 threshold 1 2
+mls qos srr-queue output cos-map queue 2 threshold 2 3
+mls qos srr-queue output cos-map queue 2 threshold 3 6 7
+mls qos srr-queue output cos-map queue 3 threshold 3 0
+mls qos srr-queue output cos-map queue 4 threshold 3 1
+mls qos srr-queue output dscp-map queue 1 threshold 3 32 33 40 41 42 43 44 45
+mls qos srr-queue output dscp-map queue 1 threshold 3 46 47
+mls qos srr-queue output dscp-map queue 2 threshold 1 16 17 18 19 20 21 22 23
+mls qos srr-queue output dscp-map queue 2 threshold 1 26 27 28 29 30 31 34 35
+mls qos srr-queue output dscp-map queue 2 threshold 1 36 37 38 39
+ --More--         mls qos srr-queue output dscp-map queue 2 threshold 2 24
+mls qos srr-queue output dscp-map queue 2 threshold 3 48 49 50 51 52 53 54 55
+mls qos srr-queue output dscp-map queue 2 threshold 3 56 57 58 59 60 61 62 63
+mls qos srr-queue output dscp-map queue 3 threshold 3 0 1 2 3 4 5 6 7
+mls qos srr-queue output dscp-map queue 4 threshold 1 8 9 11 13 15
+mls qos srr-queue output dscp-map queue 4 threshold 2 10 12 14
+mls qos queue-set output 1 threshold 1 100 100 50 200
+mls qos queue-set output 1 threshold 2 125 125 100 400
+mls qos queue-set output 1 threshold 3 100 100 100 400
+mls qos queue-set output 1 threshold 4 60 150 50 200
+mls qos queue-set output 1 buffers 15 25 40 20
+mls qos
+!
+crypto pki trustpoint TP-self-signed-2704641792
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-2704641792
+ revocation-check none
+ rsakeypair TP-self-signed-2704641792
+!
+!
+crypto pki certificate chain TP-self-signed-2704641792
+ certificate self-signed 01
+  3082022B 30820194 A0030201 02020101 300D0609 2A864886 F70D0101 05050030 
+ --More--           31312F30 2D060355 04031326 494F532D 53656C66 2D536967 6E65642D 43657274 
+  69666963 6174652D 32373034 36343137 3932301E 170D3933 30333031 30303036 
+  34335A17 0D323030 31303130 30303030 305A3031 312F302D 06035504 03132649 
+  4F532D53 656C662D 5369676E 65642D43 65727469 66696361 74652D32 37303436 
+  34313739 3230819F 300D0609 2A864886 F70D0101 01050003 818D0030 81890281 
+  8100ABF8 00AEF852 A98DE713 019C5AE5 296C6E2B 99B74F34 17D6C830 4C934CC0 
+  7E390BE6 8F4549AC 328C5C05 383599A5 B4707403 9BF0C013 BEF0E69A A25B9DE9 
+  BFB211B6 A39DE8D3 0654E318 3F1BE66F D238BB10 CC33628D 48724F8D D137D693 
+  2B14E04A 63C5CF17 94505383 71D06F95 B5ABBDFE AAFD81CA 13F4598C ACC4FC9F 
+  3D1B0203 010001A3 53305130 0F060355 1D130101 FF040530 030101FF 301F0603 
+  551D2304 18301680 14F8DB0C 57561DCD 428D8286 D09AABD1 0ACA886C C3301D06 
+  03551D0E 04160414 F8DB0C57 561DCD42 8D8286D0 9AABD10A CA886CC3 300D0609 
+  2A864886 F70D0101 05050003 8181006D D901D160 D069BB3C DF937EFE CD687A8A 
+  3DDA7FCE 199131D3 4319C265 E6569F13 B295D634 2D6D74A6 25A78EF4 D1CA5BF4 
+  BCC87BD8 87C265F0 8E867B08 6BC2A4CF A122567F A36E4831 B955B0ED C4BA786E 
+  7CFFD637 39D5384C 586C2EE2 E77FA880 AEA5A398 4D620A8A 1BF153D9 120ACF76 
+  C552174F 4F3FFB19 92A0AD49 327318
+  quit
+!
+!
+!
+!
+!
+ --More--         archive
+ log config
+  logging enable
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+no spanning-tree vlan 3,201-204,518,613,615-628,723,848
+!
+vlan internal allocation policy ascending
+lldp run
+!
+!
+class-map match-all AUTOQOS_VOIP_DATA_CLASS
+  match ip dscp ef 
+class-map match-all AUTOQOS_DEFAULT_CLASS
+  match access-group name AUTOQOS-ACL-DEFAULT
+class-map match-all AUTOQOS_VOIP_SIGNAL_CLASS
+  match ip dscp cs3 
+!
+policy-map AUTOQOS-SRND4-CISCOPHONE-POLICY
+ class AUTOQOS_VOIP_DATA_CLASS
+   set dscp ef
+  police 128000 8000 exceed-action policed-dscp-transmit
+ --More--          class AUTOQOS_VOIP_SIGNAL_CLASS
+   set dscp cs3
+  police 32000 8000 exceed-action policed-dscp-transmit
+ class AUTOQOS_DEFAULT_CLASS
+   set dscp default
+  police 10000000 8000 exceed-action policed-dscp-transmit
+!
+!
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface GigabitEthernet1/0/1
+ description CAM..A-Ext-170
+ --More--          switchport access vlan 353
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/2
+ description CAM..AA-Ext-163
+ switchport access vlan 353
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/3
+ description CAM..A-Ext-168
+ switchport access vlan 353
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/4
+ description Old GigabitEthernet7/1 
+ switchport access vlan 610
+ switchport mode access
+ switchport voice vlan 302
+ srr-queue bandwidth share 1 30 35 5
+ priority-queue out 
+ --More--          mls qos trust device cisco-phone
+ mls qos trust cos
+ no mdix auto
+ spanning-tree portfast
+ service-policy input AUTOQOS-SRND4-CISCOPHONE-POLICY
+!
+interface GigabitEthernet1/0/5
+ description Old GigabitEthernet7/3
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport voice vlan 302
+ srr-queue bandwidth share 1 30 35 5
+ priority-queue out 
+ mls qos trust device cisco-phone
+ mls qos trust cos
+ no mdix auto
+ spanning-tree portfast
+ service-policy input AUTOQOS-SRND4-CISCOPHONE-POLICY
+!
+interface GigabitEthernet1/0/6
+ description GigabitEthernet7/4 
+ switchport access vlan 610
+ --More--          switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/7
+ description Remote Vendor Jump Box
+ switchport access vlan 610
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/8
+ description TRUNK to the WorkBench Switch
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no mdix auto
+!
+interface GigabitEthernet1/0/9
+ description AA148 8 port switch
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ power inline never
+!
+interface GigabitEthernet1/0/10
+ description AA150 -- Sandon's Office
+ --More--          switchport access vlan 203
+ switchport mode access
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/11
+ description AAP-Outdoor
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 723
+ switchport trunk allowed vlan 1,200-204,375,701,723,733
+ switchport mode trunk
+ power inline never
+ no mdix auto
+!
+interface GigabitEthernet1/0/12
+ description Tracy  Right Bottom Outlet
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode access
+ switchport voice vlan 302
+ no mdix auto
+ spanning-tree portfast
+!
+ --More--         interface GigabitEthernet1/0/13
+ description Old GigabitEthernet7/22 iDRAC Backups Server
+ switchport access vlan 610
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/14
+ description Old GigabitEthernet7/24 TAPE AA144 Spectra Logic
+ switchport access vlan 2
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/15
+ description VLAN 610 Tracys office
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 610
+ switchport trunk allowed vlan 404,610
+ switchport mode trunk
+ switchport voice vlan 404
+ no mdix auto
+!
+interface GigabitEthernet1/0/16
+ --More--          description VLAN 610 Tracys office
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 610
+ switchport trunk allowed vlan 404,610
+ switchport mode trunk
+ switchport voice vlan 404
+ no mdix auto
+!
+interface GigabitEthernet1/0/17
+ description Old GigabitEthernet7/27  SRV-HP-C7A-OA-Main
+ switchport access vlan 403
+ switchport mode access
+!
+interface GigabitEthernet1/0/18
+ description AA
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 1,200-204,302,303,306,316-320,352,353,375
+ switchport trunk allowed vlan add 402-405,414-416,564,610,617,619-626,722,723
+ switchport trunk allowed vlan add 733,801-804,806,809,817,818,820,826,848,999
+ switchport mode trunk
+ no mdix auto
+ --More--         !
+interface GigabitEthernet1/0/19
+ description GigabitEthernet7/28 SRV-HP-C7A-OA-Standby
+ switchport access vlan 403
+ switchport mode access
+ switchport voice vlan 301
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/20
+ description GigabitEthernet7/31 NP-IP Patch 31
+ switchport access vlan 610
+ switchport mode access
+ switchport voice vlan 302
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/21
+ description AA152 - Brians Office
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode access
+ switchport voice vlan 404
+ --More--          no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/22
+ description AA148 - Cecil's phone
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode access
+ switchport voice vlan 302
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/23
+ description Old GigabitEthernet7/37 PH-AA144
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport voice vlan 302
+ srr-queue bandwidth share 1 30 35 5
+ priority-queue out 
+ mls qos trust device cisco-phone
+ mls qos trust cos
+ no mdix auto
+ --More--          spanning-tree portfast
+ service-policy input AUTOQOS-SRND4-CISCOPHONE-POLICY
+!
+interface GigabitEthernet1/0/24
+ description Old GigabitEthernet7/38 PH-AA151
+ switchport access vlan 610
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport voice vlan 302
+ speed 100
+ duplex full
+ srr-queue bandwidth share 1 30 35 5
+ priority-queue out 
+ mls qos trust device cisco-phone
+ mls qos trust cos
+ no mdix auto
+ spanning-tree portfast
+ service-policy input AUTOQOS-SRND4-CISCOPHONE-POLICY
+!
+interface GigabitEthernet1/0/25
+ description Old GigabitEthernet7/39 PDU-AA144-B-N
+ switchport mode access
+ no mdix auto
+ --More--         !
+interface GigabitEthernet1/0/26
+ description Old GigabitEthernet7/40  description PDU-AA144-C-S
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/27
+ description Old GigabitEthernet7/41 PDU-AA144-D28
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/28
+ description Old GigabitEthernet7/42  PDU-AA144-D33
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/29
+ description Old GigabitEthernet7/43  PDU-AA144-D35
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/30
+ description Old GigabitEthernet7/44  PDU-AA144-E-N
+ --More--          switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/31
+ description Open
+ switchport access vlan 412
+ switchport mode access
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/32
+ description Open
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ shutdown
+ no mdix auto
+!
+interface GigabitEthernet1/0/33
+ description Nut-IPMI
+ switchport access vlan 414
+ switchport mode access
+ spanning-tree portfast
+!
+ --More--         interface GigabitEthernet1/0/34
+ description Nut-IPMI
+ switchport access vlan 414
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/35
+ description Nut-IPMI
+ switchport access vlan 414
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/36
+ description Open
+ switchport access vlan 414
+ switchport mode access
+ shutdown
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/37
+ description Open
+ switchport access vlan 375
+ switchport trunk allowed vlan 327,372-375
+ --More--          switchport mode access
+ no mdix auto
+ spanning-tree portfast
+!
+interface GigabitEthernet1/0/38
+ description Open
+ switchport access vlan 501
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport voice vlan 302
+ shutdown
+ srr-queue bandwidth share 1 30 35 5
+ priority-queue out 
+ mls qos trust device cisco-phone
+ mls qos trust cos
+ auto qos voip cisco-phone 
+ no mdix auto
+ spanning-tree portfast
+ service-policy input AUTOQOS-SRND4-CISCOPHONE-POLICY
+!
+interface GigabitEthernet1/0/39
+ description Open
+ shutdown
+ --More--         !
+interface GigabitEthernet1/0/40
+ description Open
+ shutdown
+!
+interface GigabitEthernet1/0/41
+ description Open
+ shutdown
+!
+interface GigabitEthernet1/0/42
+ description Open
+ shutdown
+!
+interface GigabitEthernet1/0/43
+ description Open
+ shutdown
+!
+interface GigabitEthernet1/0/44
+ description Open
+ switchport mode access
+ shutdown
+!
+interface GigabitEthernet1/0/45
+ --More--          description TEST port for Digi
+ switchport access vlan 401
+ switchport mode access
+!
+interface GigabitEthernet1/0/46
+ description Open
+ switchport mode access
+ shutdown
+ no mdix auto
+!
+interface GigabitEthernet1/0/47
+ description SRV-KVM
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/48
+ description UPS-AA144 Yellow
+ switchport mode access
+ no mdix auto
+!
+interface GigabitEthernet1/0/49
+ description SW-AA144-Core-Primary
+ switchport trunk encapsulation dot1q
+ --More--          switchport mode trunk
+ switchport nonegotiate
+!
+interface GigabitEthernet1/0/50
+ description SW-AA144-Core-Backup
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport nonegotiate
+!
+interface GigabitEthernet1/0/51
+!
+interface GigabitEthernet1/0/52
+!
+interface Vlan1
+ ip address 192.168.2.4 255.255.0.0
+!
+ip default-gateway 192.168.2.1
+no ip forward-protocol nd
+ip http server
+ip http authentication local
+ip http secure-server
+!
+!
+ --More--         ip route 0.0.0.0 0.0.0.0 192.168.2.1
+!
+ip access-list standard ALLOW-SSH
+ permit 172.20.1.48
+ permit 10.70.33.225
+ permit 10.70.33.226
+ permit 172.20.1.40
+ permit 172.20.1.71
+ permit 172.20.1.70
+!
+ip access-list extended AUTOQOS-ACL-DEFAULT
+ permit ip any any
+!
+logging host 10.40.1.232
+!
+snmp-server community sccc RO
+snmp-server community 2006sccc RW
+tacacs-server host 10.40.2.207
+tacacs-server host 10.40.1.208
+tacacs-server directed-request
+tacacs-server key 7 143D07181828793F097B723B763015571352456A785851
+!
+!
+ --More--         !
+!
+line con 0
+line vty 0 4
+ length 0
+ transport input telnet ssh
+line vty 5 15
+ transport input telnet ssh
+!
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+end
+
+SW-AA144-Access#          sho ip int bri
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan1                  192.168.2.4     YES NVRAM  up                    up      
+GigabitEthernet1/0/1   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/2   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/3   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/4   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/5   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/6   unassigned      YES unset  down                  down    
+GigabitEthernet1/0/7   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/8   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/9   unassigned      YES unset  down                  down    
+GigabitEthernet1/0/10  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/11  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/12  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/13  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/14  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/15  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/16  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/17  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/18  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/19  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/20  unassigned      YES unset  up                    up      
+ --More--         GigabitEthernet1/0/21  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/22  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/23  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/24  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/25  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/26  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/27  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/28  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/29  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/30  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/31  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/32  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/33  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/34  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/35  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/36  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/37  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/38  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/39  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/40  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/41  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/42  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/43  unassigned      YES unset  administratively down down    
+ --More--         GigabitEthernet1/0/44  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/45  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/46  unassigned      YES unset  administratively down down    
+GigabitEthernet1/0/47  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/48  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/49  unassigned      YES unset  up                    up      
+GigabitEthernet1/0/50  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/51  unassigned      YES unset  down                  down    
+GigabitEthernet1/0/52  unassigned      YES unset  down                  down    
+SW-AA144-Access#    sho clock
+08:47:15.004 UTC Tue May 13 2025
+SW-AA144-Access#sho int status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   CAM..A-Ext-170     connected    353        a-full  a-100 10/100/1000BaseTX
+Gi1/0/2   CAM..AA-Ext-163    connected    353        a-full  a-100 10/100/1000BaseTX
+Gi1/0/3   CAM..A-Ext-168     connected    353        a-full  a-100 10/100/1000BaseTX
+Gi1/0/4   Old GigabitEtherne connected    610        a-full a-1000 10/100/1000BaseTX
+Gi1/0/5   Old GigabitEtherne connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/6   GigabitEthernet7/4 notconnect   610          auto   auto 10/100/1000BaseTX
+Gi1/0/7   Remote Vendor Jump connected    610        a-full a-1000 10/100/1000BaseTX
+Gi1/0/8   TRUNK to the WorkB connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/9   AA148 8 port switc notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/10  AA150 -- Sandon's  notconnect   203          auto   auto 10/100/1000BaseTX
+Gi1/0/11  AAP-Outdoor        notconnect   1            auto   auto 10/100/1000BaseTX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/12  Tracy  Right Botto notconnect   610          auto   auto 10/100/1000BaseTX
+Gi1/0/13  Old GigabitEtherne connected    610        a-full a-1000 10/100/1000BaseTX
+Gi1/0/14  Old GigabitEtherne notconnect   2            auto   auto 10/100/1000BaseTX
+Gi1/0/15  VLAN 610 Tracys of connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/16  VLAN 610 Tracys of connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/17  Old GigabitEtherne notconnect   403          auto   auto 10/100/1000BaseTX
+Gi1/0/18  AA                 connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/19  GigabitEthernet7/2 notconnect   403          auto   auto 10/100/1000BaseTX
+Gi1/0/20  GigabitEthernet7/3 connected    610        a-full a-1000 10/100/1000BaseTX
+Gi1/0/21  AA152 - Brians Off connected    610        a-full a-1000 10/100/1000BaseTX
+Gi1/0/22  AA148 - Cecil's ph notconnect   610          auto   auto 10/100/1000BaseTX
+Gi1/0/23  Old GigabitEtherne notconnect   610          auto   auto 10/100/1000BaseTX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/24  Old GigabitEtherne notconnect   610          full    100 10/100/1000BaseTX
+Gi1/0/25  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/26  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/27  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/28  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/29  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/30  Old GigabitEtherne notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/31  Open               notconnect   412          auto   auto 10/100/1000BaseTX
+Gi1/0/32  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/33  Nut-IPMI           connected    414        a-full a-1000 10/100/1000BaseTX
+Gi1/0/34  Nut-IPMI           connected    414        a-full a-1000 10/100/1000BaseTX
+Gi1/0/35  Nut-IPMI           connected    414        a-full a-1000 10/100/1000BaseTX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/36  Open               disabled     414          auto   auto 10/100/1000BaseTX
+Gi1/0/37  Open               connected    375        a-full a-1000 10/100/1000BaseTX
+Gi1/0/38  Open               disabled     501          auto   auto 10/100/1000BaseTX
+Gi1/0/39  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/40  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/41  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/42  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/43  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/44  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/45  TEST port for Digi notconnect   401          auto   auto 10/100/1000BaseTX
+Gi1/0/46  Open               disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/47  SRV-KVM            connected    1          a-full  a-100 10/100/1000BaseTX
+ --More--         
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/48  UPS-AA144 Yellow   notconnect   1            auto   auto 10/100/1000BaseTX
+Gi1/0/49  SW-AA144-Core-Prim connected    trunk      a-full a-1000 1000BaseLX SFP
+Gi1/0/50  SW-AA144-Core-Back notconnect   trunk        auto   auto Not Present
+Gi1/0/51                     notconnect   1            auto   auto Not Present
+Gi1/0/52                     notconnect   1            auto   auto Not Present
+SW-AA144-Access#  sho ver
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 15.0(2)SE10a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 03-Nov-16 14:17 by prod_rel_team
+
+ROM: Bootstrap program is C3750 boot loader
+BOOTLDR: C3750 Boot Loader (C3750-HBOOT-M) Version 12.2(25r)SEE4, RELEASE SOFTWARE (fc1)
+
+SW-AA144-Access uptime is 2 years, 23 weeks, 5 days, 16 hours, 30 minutes
+System returned to ROM by power-on
+System restarted at 16:04:58 UTC Mon Nov 28 2022
+System image file is "flash:/c3750-ipservicesk9-mz.150-2.SE10a/c3750-ipservicesk9-mz.150-2.SE10a.bin"
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+ --More--         agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+cisco WS-C3750G-48PS (PowerPC405) processor (revision F0) with 131072K bytes of memory.
+Processor board ID FOC1135Z76S
+Last reset from power-on
+1 Virtual Ethernet interface
+52 Gigabit Ethernet interfaces
+The password-recovery mechanism is enabled.
+
+512K bytes of flash-simulated non-volatile configuration memory.
+Base ethernet MAC Address       : 00:1D:A1:35:8F:00
+Motherboard assembly number     : 73-10216-08
+Power supply part number        : 341-0108-03
+Motherboard serial number       : FOC11351DXT
+Power supply serial number      : DCA1133A4S5
+ --More--         Model revision number           : F0
+Motherboard revision number     : C0
+Model number                    : WS-C3750G-48PS-S
+System serial number            : FOC1135Z76S
+Top Assembly Part Number        : 800-26853-01
+Top Assembly Revision Number    : C0
+Version ID                      : V05
+CLEI Code Number                : CNMWN00ARC
+Hardware Board Revision Number  : 0x09
+
+
+Switch Ports Model              SW Version            SW Image                 
+------ ----- -----              ----------            ----------               
+*    1 52    WS-C3750G-48PS     15.0(2)SE10a          C3750-IPSERVICESK9-M     
+
+
+Configuration register is 0xF
+
+SW-AA144-Access#  sho cdp nei
+SW-AA144-Access#sho cdp neighbors 
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+SEPF8A5C59E3A66  Gig 1/0/21        164             H P M  IP Phone  Port 1
+SEPF8A5C59E39C6  Gig 1/0/5         159             H P M  IP Phone  Port 1
+SEPF8A5C59E40D8  Gig 1/0/4         134             H P M  IP Phone  Port 1
+SW-AA144-WB.sccc.edu
+                 Gig 1/0/8         132              S I   WS-C2960C Gig 0/1
+SEPF8A5C59E3C0C  Gig 1/0/20        126             H P M  IP Phone  Port 1
+SEP845A3EC24B07  Gig 1/0/15        138             H P M  IP Phone  Port 1
+sw-aa144-A24.sccc.edu(FDO23440YY6)
+                 Gig 1/0/49        169            R S I C N9K-C9318 Eth 1/8
+SW-AA144-Access#sho cdp  n    neig
+SW-AA144-Access#sho cdp neighbors der
+SW-AA144-Access#sho cdp neighbors der
+                                    ^
+% Invalid input detected at '^' marker.
+
+SW-AA144-Access#sho cdp neighbors der t
+-------------------------
+Device ID: SEPF8A5C59E3A66
+Entry address(es): 
+  IP address: 10.40.4.198
+Platform: Cisco IP Phone 8851,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/21,  Port ID (outgoing port): Port 1
+Holdtime : 154 sec
+Second Port Status: Up
+
+Version :
+sip88xx.12-5-1SR3-74.loads
+
+advertisement version: 2
+Duplex: full
+Power drawn: 9.791 Watts
+Power request id: 26173, Power management id: 4
+Power request levels are:9791 0 0 0 0 
+Power Available TLV:
+
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+Management address(es): 
+
+ --More--         -------------------------
+Device ID: SEPF8A5C59E39C6
+Entry address(es): 
+  IP address: 10.30.2.221
+Platform: Cisco IP Phone 8851,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/5,  Port ID (outgoing port): Port 1
+Holdtime : 149 sec
+Second Port Status: Up
+
+Version :
+sip88xx.12-5-1SR3-74.loads
+
+advertisement version: 2
+Duplex: full
+Power drawn: 9.791 Watts
+Power request id: 50750, Power management id: 3
+Power request levels are:9791 0 0 0 0 
+Power Available TLV:
+
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+Management address(es): 
+
+ --More--         -------------------------
+Device ID: SEPF8A5C59E40D8
+Entry address(es): 
+  IP address: 10.30.2.246
+Platform: Cisco IP Phone 8851,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/4,  Port ID (outgoing port): Port 1
+Holdtime : 124 sec
+Second Port Status: Up
+
+Version :
+sip88xx.12-5-1SR3-74.loads
+
+advertisement version: 2
+Duplex: full
+Power drawn: 9.791 Watts
+Power request id: 55363, Power management id: 4
+Power request levels are:9791 0 0 0 0 
+Power Available TLV:
+
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+Management address(es): 
+
+ --More--         -------------------------
+Device ID: SW-AA144-WB.sccc.edu
+Entry address(es): 
+  IP address: 192.168.2.28
+Platform: cisco WS-C2960C-12PC-L,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/8,  Port ID (outgoing port): GigabitEthernet0/1
+Holdtime : 173 sec
+
+Version :
+Cisco IOS Software, C2960C Software (C2960c405-UNIVERSALK9-M), Version 15.2(2)E4, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Sat 13-Feb-16 01:53 by prod_rel_team
+
+advertisement version: 2
+Protocol Hello:  OUI=0x00000C, Protocol ID=0x0112; payload len=27, value=00000000FFFFFFFF010221FF000000000000F47F351F4680FF0000
+VTP Management Domain: 'blob'
+Native VLAN: 1
+Duplex: full
+Power Available TLV:
+
+ --More--             Power request id: 0, Power management id: 1, Power available: 0, Power management level: -1
+Management address(es): 
+  IP address: 192.168.2.28
+
+-------------------------
+Device ID: SEPF8A5C59E3C0C
+Entry address(es): 
+  IP address: 10.30.2.234
+Platform: Cisco IP Phone 8851,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/20,  Port ID (outgoing port): Port 1
+Holdtime : 176 sec
+Second Port Status: Down
+
+Version :
+sip88xx.12-5-1SR3-74.loads
+
+advertisement version: 2
+Duplex: full
+Power drawn: 9.791 Watts
+Power request id: 3135, Power management id: 4
+Power request levels are:9791 0 0 0 0 
+Power Available TLV:
+ --More--         
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+Management address(es): 
+
+-------------------------
+Device ID: SEP845A3EC24B07
+Entry address(es): 
+  IP address: 10.40.4.225
+Platform: Cisco IP Phone 9871,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/15,  Port ID (outgoing port): Port 1
+Holdtime : 128 sec
+Second Port Status: Up
+
+Version :
+PHONEOS.3-3-1-0002-20250116-78c30efabf
+
+advertisement version: 2
+Duplex: full
+Power drawn: 14.747 Watts
+Power request id: 1869, Power management id: 4
+Power request levels are:14747 0 0 0 0 
+Power Available TLV:
+ --More--         
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+Management address(es): 
+
+-------------------------
+Device ID: sw-aa144-A24.sccc.edu(FDO23440YY6)
+Entry address(es): 
+  IP address: 192.168.2.71
+Platform: N9K-C93180YC-EX-24,  Capabilities: Router Switch IGMP CVTA phone port 
+Interface: GigabitEthernet1/0/49,  Port ID (outgoing port): Ethernet1/8
+Holdtime : 159 sec
+
+Version :
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+advertisement version: 2
+VTP Management Domain: 'blob'
+Native VLAN: 1
+Duplex: full
+Power Available TLV:
+
+    Power request id: 0, Power management id: 0, Power available: 0, Power management level: 0
+ --More--         Management address(es): 
+  IP address: 192.168.2.71
+
+SW-AA144-Access#        sho cdp     lldp
+SW-AA144-Access#sho lldp ne
+SW-AA144-Access#sho lldp neighbors 
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+SEPF8A5C59E39C6     Gi1/0/5        133        B,T             F8A5C59E39C6:P1
+OIT-JUMP2           Gi1/0/7        3230                       a8a1.59dd.e3c9
+SEPF8A5C59E3A66     Gi1/0/21       158        B,T             F8A5C59E3A66:P1
+sw-aa144-A24        Gi1/0/49       110        B,R             Ethernet1/8
+SEPF8A5C59E40D8     Gi1/0/4        136        B,T             F8A5C59E40D8:P1
+SUR-DH-VPSA         Gi1/0/16       3148                       1c1a.dfb7.ec61
+SEPF8A5C59E3C0C     Gi1/0/20       135        B,T             F8A5C59E3C0C:P1
+SEP845A3EC24B07     Gi1/0/15       152        B,T             845A3EC24B07:P1
+SW-AA144-WB         Gi1/0/8        105        B               Gi0/1
+swa-aa148           Gi1/0/18       113        B,R             1/1/13
+
+Total entries displayed: 10
+
+SW-AA144-Access#sho     sho lldp neighbors det
+SW-AA144-Access#sho lldp neighbors detail 
+------------------------------------------------
+Chassis id: 10.30.2.221
+Port id: F8A5C59E39C6:P1
+Port Description: SW PORT
+System Name: SEPF8A5C59E39C6.sccc.edu
+
+System Description: 
+Cisco IP Phone 8851, V1, sip88xx.12-5-1SR3-74.loads
+
+Time remaining: 127 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+Management Addresses:
+    IP: 10.30.2.221
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+ --More--         
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    H/W revision: 1
+    F/W revision: 2345
+    S/W revision: sip88xx.12-5-1SR3-74.loads
+    Serial number: FCH2101DDVG
+    Manufacturer: Cisco Systems, Inc.
+    Model: CP-8851
+    Capabilities: NP, PD, IN
+    Device type: Endpoint Class III
+    Network Policy(Voice): VLAN 302, tagged, Layer-2 priority: 5, DSCP: 46
+    Network Policy(Voice Signal): VLAN 302, tagged, Layer-2 priority: 4, DSCP: 32
+    PD device, Power source: PSE, Power Priority: Unknown, Wattage: 8.8
+    Location - not advertised
+
+------------------------------------------------
+ --More--         Chassis id: OIT-JUMP2
+Port id: a8a1.59dd.e3c9
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 3225 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+ --More--             Inventory information - not advertised
+    Capabilities: 
+    Device type: Endpoint Class I
+    Network Policies - not advertised
+    Power requirements - not advertised
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: 10.40.4.198
+Port id: F8A5C59E3A66:P1
+Port Description: SW PORT
+System Name: SEPF8A5C59E3A66.sccc.edu
+
+System Description: 
+Cisco IP Phone 8851, V1, sip88xx.12-5-1SR3-74.loads
+
+Time remaining: 153 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+Management Addresses:
+    IP: 10.40.4.198
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+ --More--             1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    H/W revision: 1
+    F/W revision: 2345
+    S/W revision: sip88xx.12-5-1SR3-74.loads
+    Serial number: FCH2101DDXU
+    Manufacturer: Cisco Systems, Inc.
+    Model: CP-8851
+    Capabilities: NP, PD, IN
+    Device type: Endpoint Class III
+ --More--             Network Policy(Voice): VLAN 404, tagged, Layer-2 priority: 5, DSCP: 46
+    Network Policy(Voice Signal): VLAN 404, tagged, Layer-2 priority: 4, DSCP: 32
+    PD device, Power source: PSE, Power Priority: Unknown, Wattage: 8.8
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: 3c51.0e39.d05f
+Port id: Ethernet1/8
+Port Description: SW-AA144-access 49
+System Name: sw-aa144-A24.sccc.edu
+
+System Description: 
+Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+
+Time remaining: 104 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    Other: 3C 51 0E 39 FF 5F 00
+Auto Negotiation - not supported
+ --More--         Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 1
+
+------------------------------------------------
+Chassis id: 10.30.2.246
+Port id: F8A5C59E40D8:P1
+Port Description: SW PORT
+System Name: SEPF8A5C59E40D8.sccc.edu
+
+System Description: 
+Cisco IP Phone 8851, V1, sip88xx.12-5-1SR3-74.loads
+
+Time remaining: 131 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+Management Addresses:
+    IP: 10.30.2.246
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+ --More--             10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    H/W revision: 1
+    F/W revision: 2345
+    S/W revision: sip88xx.12-5-1SR3-74.loads
+    Serial number: FCH2101DEN4
+    Manufacturer: Cisco Systems, Inc.
+    Model: CP-8851
+    Capabilities: NP, PD, IN
+    Device type: Endpoint Class III
+    Network Policy(Voice): VLAN 302, tagged, Layer-2 priority: 5, DSCP: 46
+    Network Policy(Voice Signal): VLAN 302, tagged, Layer-2 priority: 4, DSCP: 32
+ --More--             PD device, Power source: PSE, Power Priority: Unknown, Wattage: 8.8
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: SUR-DH-VPSA
+Port id: 1c1a.dfb7.ec61
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 3142 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+ --More--                   (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    Inventory information - not advertised
+    Capabilities: 
+    Device type: Endpoint Class I
+    Network Policies - not advertised
+    Power requirements - not advertised
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: 10.30.2.234
+Port id: F8A5C59E3C0C:P1
+Port Description: SW PORT
+System Name: SEPF8A5C59E3C0C.sccc.edu
+
+System Description: 
+Cisco IP Phone 8851, V1, sip88xx.12-5-1SR3-74.loads
+
+Time remaining: 130 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+ --More--         Management Addresses:
+    IP: 10.30.2.234
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    H/W revision: 1
+    F/W revision: 2345
+    S/W revision: sip88xx.12-5-1SR3-74.loads
+    Serial number: FCH2101DE41
+ --More--             Manufacturer: Cisco Systems, Inc.
+    Model: CP-8851
+    Capabilities: NP, PD, IN
+    Device type: Endpoint Class III
+    Network Policy(Voice): VLAN 302, tagged, Layer-2 priority: 5, DSCP: 46
+    Network Policy(Voice Signal): VLAN 302, tagged, Layer-2 priority: 4, DSCP: 32
+    PD device, Power source: PSE, Power Priority: Unknown, Wattage: 8.8
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: 10.40.4.225
+Port id: 845A3EC24B07:P1
+Port Description: SW PORT
+System Name: SEP845A3EC24B07.sccc.edu
+
+System Description: 
+Cisco IP Phone 9871, V1, PHONEOS.3-3-1-0002-20250116-78c30efabf
+
+Time remaining: 147 seconds
+System Capabilities: B,T
+Enabled Capabilities: B,T
+Management Addresses:
+ --More--             IP: 10.40.4.225
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    H/W revision: 1
+    F/W revision: sb2-9861_71.EM-01-009
+    S/W revision: PHONEOS.3-3-1-0002-20250116-78c3
+    Serial number: FVH28242KDC
+    Manufacturer: Cisco Systems, Inc.
+ --More--             Model: DP-9871
+    Capabilities: NP, PD, IN
+    Device type: Endpoint Class III
+    Network Policy(Voice): VLAN 404, tagged, Layer-2 priority: 5, DSCP: 46
+    Network Policy(Voice Signal): VLAN 404, tagged, Layer-2 priority: 3, DSCP: 24
+    PD device, Power source: PSE, Power Priority: Unknown, Wattage: 12.5
+    Location - not advertised
+
+------------------------------------------------
+Chassis id: f47f.351f.4680
+Port id: Gi0/1
+Port Description: SW-AA144
+System Name: SW-AA144-WB.sccc.edu
+
+System Description: 
+Cisco IOS Software, C2960C Software (C2960c405-UNIVERSALK9-M), Version 15.2(2)E4, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Sat 13-Feb-16 01:53 by prod_rel_team
+
+Time remaining: 100 seconds
+ --More--         System Capabilities: B
+Enabled Capabilities: B
+Management Addresses:
+    IP: 192.168.2.28
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 30
+Vlan ID: 1
+
+------------------------------------------------
+Chassis id: 3810.f0fb.3340
+Port id: 1/1/13
+Port Description: 1/1/13
+System Name: swa-aa148
+
+System Description: 
+Aruba JL679A  PL.10.13.1031
+
+ --More--         Time remaining: 108 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 192.168.2.40
+    OID:
+        1.3.6.1.2.1.31.1.1.1.1.16777217.
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-T4
+    10base-T(FD)
+Media Attachment Unit type: 30
+Vlan ID: 1
+
+
+Total entries displayed: 10
+
+SW-AA144-Access#      exit

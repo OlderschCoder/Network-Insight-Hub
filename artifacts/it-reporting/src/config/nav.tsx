@@ -7,17 +7,14 @@ import {
   Network,
   Activity,
   Users,
-  Sparkles,
   BookOpen,
   Briefcase,
   Target,
   Cloud,
-  BarChart3,
   Gauge,
-  LayoutGrid,
-  Boxes,
   ShieldCheck,
-  LifeBuoy,
+  BarChart3,
+  LayoutGrid,
 } from "lucide-react";
 
 export type NavItem = {
@@ -26,9 +23,11 @@ export type NavItem = {
   desc: string;
   icon: React.ComponentType<any>;
   match?: (loc: string) => boolean;
+  cioBadge?: boolean;
+  netBadge?: boolean;
 };
 
-export type NavGroup = { label: string; items: NavItem[] };
+export type NavGroup = { label: string; items: NavItem[]; separator?: number[] };
 
 export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[] {
   const myWork: NavGroup = {
@@ -46,43 +45,37 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     ],
   };
 
-  const knowledge: NavGroup = {
-    label: "Systems & Tools",
-    items: [
-      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") },
-      ...(canNetworkTools
-        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites and generate setup scripts", icon: ShieldCheck } as NavItem]
-        : []),
-      { href: "/azure-vms", label: "Azure VMs", desc: "Cloud virtual machine inventory", icon: Cloud },
-      { href: "/azure-inventory", label: "Azure Inventory", desc: "Full inventory of all Azure resources by type", icon: Boxes },
-      { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
-      { href: "/it-apps", label: "IT Apps", desc: "Unified view of apps built for IT", icon: LayoutGrid },
-      { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
-      { href: "/ai-report", label: "AI Assistant", desc: "Generate reports and ask questions", icon: Sparkles },
-      { href: "/user-guide", label: "User Guide", desc: "How to use this platform, step by step", icon: LifeBuoy },
-    ],
-  };
-
-  const team: NavGroup = {
-    label: "Reports & Records",
+  const operations: NavGroup = {
+    label: "Operations",
+    separator: [3], // separator index before CIO-only items
     items: [
       { href: "/risks", label: "Risks & Issues", desc: "Open risks, issues, and design notes", icon: ShieldAlert },
       { href: "/after-action", label: "Post-Incident Reviews", desc: "Document incidents and lessons", icon: Activity },
-      { href: "/reports", label: "Reports", desc: "Weekly department reports", icon: Files },
+      { href: "/reports", label: "Weekly Reports", desc: "Department weekly reports", icon: Files },
+      ...(isCIO
+        ? [
+            { href: "/projects", label: "Projects", desc: "Initiatives and progress tracking", icon: Briefcase, cioBadge: true } as NavItem,
+            { href: "/strategic-objectives", label: "Department Goals", desc: "Strategic objectives and KPIs", icon: Target, cioBadge: true } as NavItem,
+            { href: "/admin", label: "Admin", desc: "Manage users and access", icon: Users, cioBadge: true } as NavItem,
+          ]
+        : []),
     ],
   };
 
-  const leadership: NavGroup = {
-    label: "Leadership & Admin",
+  const infrastructure: NavGroup = {
+    label: "Infrastructure",
     items: [
-      { href: "/projects", label: "Projects", desc: "Initiatives and progress tracking", icon: Briefcase },
-      { href: "/strategic-objectives", label: "Department Goals", desc: "Strategic objectives and KPIs", icon: Target },
-      { href: "/analytics", label: "Usage Analytics", desc: "Platform usage insights", icon: BarChart3 },
-      { href: "/admin", label: "Admin", desc: "Manage users and access", icon: Users },
+      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") },
+      { href: "/azure-vms", label: "Azure", desc: "VMs and cloud resource inventory", icon: Cloud },
+      { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
+      { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
+      ...(canNetworkTools
+        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites and generate setup scripts", icon: ShieldCheck, netBadge: true } as NavItem]
+        : []),
     ],
   };
 
-  return isCIO ? [myWork, knowledge, team, leadership] : [myWork, knowledge, team];
+  return [myWork, operations, infrastructure];
 }
 
 export function isNavItemActive(item: NavItem, location: string): boolean {

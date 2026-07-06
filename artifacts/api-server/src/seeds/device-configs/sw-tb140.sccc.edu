@@ -1,0 +1,443 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.15 05:39:53 =~=~=~=~=~=~=~=~=~=~=~=
+sho runn
+SW-TB140#sho running-config 
+Building configuration...
+
+Current configuration : 8165 bytes
+!
+! Last configuration change at 20:30:07 CDT Tue Mar 29 2011
+!
+version 15.2
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+service sequence-numbers
+!
+hostname SW-TB140
+!
+boot-start-marker
+boot-end-marker
+!
+enable secret 5 $1$BeGh$5.CDZ5JKGKAjsuhIBjB9K.
+!
+username owen.local privilege 15 secret 5 $1$9iVz$8X34y9lD2ghuk7TlcCEWn.
+username louie.local privilege 15 secret 5 $1$tUPw$4Bm75BoPI7rxWCnUTmUEm0
+username admin privilege 15 secret 5 $1$miTT$5N53KwYzKLpjNdFi.M23f.
+aaa new-model
+ --More--         !
+!
+aaa authentication login default local group tacacs+ enable
+!
+!
+!
+!
+!
+!
+aaa session-id common
+clock timezone CST -6 0
+clock summer-time CDT recurring
+system mtu routing 1500
+ip routing
+!
+!
+ip domain-list sccc.edu
+ip domain-name sccc.edu
+ip name-server 10.40.1.68
+ip name-server 10.40.1.77
+!
+!
+!
+ --More--         !
+!
+!
+!
+crypto pki trustpoint TP-self-signed-2672155392
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-2672155392
+ revocation-check none
+ rsakeypair TP-self-signed-2672155392
+!
+!
+crypto pki certificate chain TP-self-signed-2672155392
+ certificate self-signed 02
+  3082022B 30820194 A0030201 02020102 300D0609 2A864886 F70D0101 05050030 
+  31312F30 2D060355 04031326 494F532D 53656C66 2D536967 6E65642D 43657274 
+  69666963 6174652D 32363732 31353533 3932301E 170D3137 30353234 31393032 
+  34385A17 0D323030 31303130 30303030 305A3031 312F302D 06035504 03132649 
+  4F532D53 656C662D 5369676E 65642D43 65727469 66696361 74652D32 36373231 
+  35353339 3230819F 300D0609 2A864886 F70D0101 01050003 818D0030 81890281 
+  8100CDAC 02773999 9B632D9C 05303F83 D4B11AEA 42891DB5 DC93E26F C5FA58AE 
+  D97919A5 2A964A18 50E36AC9 1E5E1541 FDD64A00 B1BAAD6B 120A4C15 CE752037 
+  E74B7ED9 D0FF87D5 597CC888 3D910D58 2924CCF6 C82F616E A62030D2 07E58628 
+  BDF3D904 4C6227DF A648A69E CA64FD4B 391E7B04 BC96D3FA AABF66EA 1EB74435 
+ --More--           310B0203 010001A3 53305130 0F060355 1D130101 FF040530 030101FF 301F0603 
+  551D2304 18301680 14CDC97D 278E2365 CE144A4F E8F42474 9636A508 08301D06 
+  03551D0E 04160414 CDC97D27 8E2365CE 144A4FE8 F4247496 36A50808 300D0609 
+  2A864886 F70D0101 05050003 81810080 532D2C50 D1F26767 84390E1C E44E13F5 
+  62F9AC77 12869E8F DBFB16AD E690EF46 6AA52C2E 13561D17 5BFA7E2E A70B2F40 
+  ACC3CCCB 02B4817C 30B56741 0C9174EC 3644ACB1 032AC027 F721C4C5 9166B27C 
+  CC78FB38 181D236E CADE5D17 6E47907C 0E643A9A B1BFC347 67381176 E6CDEB1B 
+  83197303 3EFC6A8D 6A4E3863 A44F48
+  quit
+archive
+ log config
+  logging enable
+!
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+no spanning-tree vlan 723,842,845,997-999
+!
+!
+!
+!
+vlan internal allocation policy ascending
+!
+lldp run
+ --More--         !
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/1
+ description MM-TB140-NEXIA
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/2
+ description MM-TB140-EXTRON
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+ --More--         !
+interface FastEthernet0/3
+ description MM-TB140-CSCOM
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/4
+ description MM-TB140-HDMD400
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/5
+ description MM-TB140-TOUCH
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/6
+ --More--          description MM-TB140-RMC3
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/7
+ description MM-TB140-CAM
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/8
+ description COMP-TB140
+ switchport access vlan 803
+ switchport mode access
+ switchport voice vlan 318
+ spanning-tree portfast
+!
+interface FastEthernet0/9
+ description DAC
+ switchport access vlan 375
+ --More--          switchport mode access
+!
+interface FastEthernet0/10
+ description DAC
+ switchport access vlan 375
+ switchport mode access
+!
+interface FastEthernet0/11
+!
+interface FastEthernet0/12
+!
+interface GigabitEthernet0/1
+ description SW-TB141
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport nonegotiate
+ media-type rj45
+!
+interface GigabitEthernet0/2
+!
+interface Vlan1
+ ip address 192.168.2.31 255.255.0.0
+ ip helper-address 10.40.1.70
+ --More--          ip helper-address 10.40.1.40
+!
+!
+router eigrp 10
+ network 192.168.2.31 0.0.0.0
+ eigrp stub connected summary
+!
+ip default-gateway 192.168.2.1
+no ip forward-protocol nd
+ip http server
+ip http authentication local
+ip http secure-server
+!
+ip route 0.0.0.0 0.0.0.0 192.168.2.1
+!
+ip access-list standard ALLOW-SSH
+ permit 172.20.1.48
+ permit 10.70.33.225
+ permit 10.70.33.226
+ permit 172.20.1.40
+ permit 172.20.1.71
+ permit 172.20.1.70
+!
+ --More--         !
+logging host 10.40.1.232
+snmp-server community sccc RO
+snmp-server community 2006sccc RW
+tacacs-server host 10.40.1.208
+tacacs-server directed-request
+tacacs-server key 7 062C1A3258625A0D284453055827386A347B2006021802
+!
+!
+!
+banner login ^C 
+****************************************************************************
+*                                                                          *
+*                             !!! WARNING !!!                              *
+*                                                                          *
+* Access is restricted to authorized personnel only!                       *
+* Your activity is logged and monitored.                                   *
+* By accessing this device, you consent to monitoring and have no          *
+* expectation of privacy.                                                  *
+*                                                                          *
+* Attempts to view/modify/change or otherwise manipulate this device       *
+* in any way without prior written authorization will be prosecuted.       *
+*                                                                          *
+ --More--         * We will take any course of action allowed under applicable Federal,      *
+* state, or local laws against any intruders or unauthorized personnel.    *
+*                                                                          *
+* If you are not authorized personnel, exit immediately!                   *
+*                                                                          *
+****************************************************************************
+****************************************************************************
+^C
+banner motd ^C 
+****************************************************************************
+*                                                                          *
+*                             !!! WARNING !!!                              *
+*                                                                          *
+* Access is restricted to authorized personnel only!                       *
+* Your activity is logged and monitored.                                   *
+* By accessing this device, you consent to monitoring and have no          *
+* expectation of privacy.                                                  *
+*                                                                          *
+* Attempts to view/modify/change or otherwise manipulate this device       *
+* in any way without prior written authorization will be prosecuted.       *
+*                                                                          *
+* We will take any course of action allowed under applicable Federal,      *
+* state, or local laws against any intruders or unauthorized personnel.    *
+ --More--         *                                                                          *
+* If you are not authorized personnel, exit immediately!                   *
+*                                                                          *
+****************************************************************************
+^C
+!
+line con 0
+line vty 0 4
+ transport input telnet ssh
+line vty 5 15
+ transport input telnet ssh
+!
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+!
+end
+
+SW-TB140#    sho ip int bri
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan1                  192.168.2.31    YES NVRAM  up                    up      
+FastEthernet0/1        unassigned      YES unset  up                    up      
+FastEthernet0/2        unassigned      YES unset  up                    up      
+FastEthernet0/3        unassigned      YES unset  up                    up      
+FastEthernet0/4        unassigned      YES unset  up                    up      
+FastEthernet0/5        unassigned      YES unset  up                    up      
+FastEthernet0/6        unassigned      YES unset  up                    up      
+FastEthernet0/7        unassigned      YES unset  up                    up      
+FastEthernet0/8        unassigned      YES unset  up                    up      
+FastEthernet0/9        unassigned      YES unset  down                  down    
+FastEthernet0/10       unassigned      YES unset  down                  down    
+FastEthernet0/11       unassigned      YES unset  down                  down    
+FastEthernet0/12       unassigned      YES unset  down                  down    
+GigabitEthernet0/1     unassigned      YES unset  up                    up      
+GigabitEthernet0/2     unassigned      YES unset  down                  down    
+SW-TB140#sho ver
+SW-TB140#sho version 
+Cisco IOS Software, C3560C Software (C3560c405-UNIVERSALK9-M), Version 15.2(2)E, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Thu 26-Jun-14 18:35 by prod_rel_team
+
+ROM: Bootstrap program is C3560C boot loader
+BOOTLDR: C3560C Boot Loader (C3560c405-HBOOT-M) Version 12.2(55r)EX9, RELEASE SOFTWARE (fc1)
+
+SW-TB140 uptime is 10 weeks, 19 hours, 43 minutes
+System returned to ROM by power-on
+System restarted at 07:55:16 CST Wed Mar 5 2025
+System image file is "flash:/c3560c405-universalk9-mz.152-2.E.bin"
+Last reload reason: Unknown reason
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+ --More--         compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+License Level: ipbase
+License Type: Permanent
+Next reload license Level: ipbase
+
+cisco WS-C3560C-12PC-S (PowerPC405) processor (revision A0) with 131072K bytes of memory.
+Processor board ID FOC1546W1DH
+Last reset from power-on
+1 Virtual Ethernet interface
+12 FastEthernet interfaces
+2 Gigabit Ethernet interfaces
+The password-recovery mechanism is enabled.
+
+ --More--         512K bytes of flash-simulated non-volatile configuration memory.
+Base ethernet MAC Address       : 08:D0:9F:45:DB:00
+Motherboard assembly number     : 73-13533-02
+Power supply part number        : 341-0407-01
+Motherboard serial number       : FOC15450W4R
+Power supply serial number      : LIT153012A1
+Model revision number           : A0
+Motherboard revision number     : A0
+Model number                    : WS-C3560C-12PC-S
+System serial number            : FOC1546W1DH
+Top Assembly Part Number        : 800-35238-01
+Top Assembly Revision Number    : A0
+Version ID                      : V01
+CLEI Code Number                : CMMGF00ARA
+Hardware Board Revision Number  : 0x01
+
+
+Switch Ports Model                     SW Version            SW Image                 
+------ ----- -----                     ----------            ----------               
+*    1 14    WS-C3560C-12PC-S          15.2(2)E              C3560c405-UNIVERSALK9-M  
+ --More--         
+
+Configuration register is 0xF
+
+SW-TB140# sho cdp ne
+SW-TB140# sho cdp neighbors 
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone, 
+                  D - Remote, C - CVTA, M - Two-port Mac Relay 
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+
+Total cdp entries displayed : 0
+SW-TB140# sho cdp neighbors de
+SW-TB140# sho cdp neighbors detail 
+
+Total cdp entries displayed : 0
+SW-TB140# sho cdp neighbors detail        ?
+  Async              Async interface
+  Auto-Template      Auto-Template interface
+  BVI                Bridge-Group Virtual Interface
+  CTunnel            CTunnel interface
+  Dialer             Dialer interface
+  FastEthernet       FastEthernet IEEE 802.3
+  Filter             Filter interface
+  Filtergroup        Filter Group interface
+  GigabitEthernet    GigabitEthernet IEEE 802.3z
+  GroupVI            Group Virtual interface
+  Lex                Lex interface
+  Lspvif             LSP virtual interface
+  Port-channel       Ethernet Channel of interfaces
+  Portgroup          Portgroup interface
+  Pos-channel        POS Channel of interfaces
+  Tunnel             Tunnel interface
+  Vif                PGM Multicast Host interface
+  Virtual-Template   Virtual Template interface
+  Virtual-TokenRing  Virtual TokenRing
+  Vlan               Catalyst Vlans
+  detail             Show detailed information
+  fcpa               Fiber Channel
+ --More--           |                  Output modifiers
+  <cr>
+
+SW-TB140# sho cdp neighbors sho version            sho ip int brisho version        sho cdp neighbors detail 
+
+Total cdp entries displayed : 0
+SW-TB140#sho llp dp ne
+SW-TB140#sho lldp neighbors 
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+20c6.ebef.11f2      Fa0/7          120                        20c6.ebef.11f2
+
+Total entries displayed: 1
+
+SW-TB140#sho lldp neighbors de
+SW-TB140#sho lldp neighbors detail 
+------------------------------------------------
+Chassis id: 20c6.ebef.11f2
+Port id: 20c6.ebef.11f2
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 96 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+PoE+ Power-via-MDI TLV:
+ Power Pair: Signal
+ Power Class: Class 4
+ Power Device Type: Type 2 PD
+ Power Source: PSE
+ Power Priority: low
+ Power Requested: 25500 mW
+ Power Allocated: 25500 mW
+ --More--         
+
+Total entries displayed: 1
+
+SW-TB140#     exit

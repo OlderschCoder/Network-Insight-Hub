@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Sparkles, Send, Copy, Download, Trash2, BookmarkPlus, Flag } from "lucide-react";
+import { Loader2, Sparkles, Send, Copy, Download, Trash2, BookmarkPlus, Flag, Paperclip, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MemoryTab } from "./memory-tab";
@@ -33,7 +33,14 @@ function authHeaders(): Record<string, string> {
 
 interface ChatMessage {
   role: "user" | "assistant";
-  content: string;
+  content: string | { type: string; text?: string; image_url?: { url: string } }[];
+}
+
+interface AttachedFile {
+  name: string;
+  kind: "text" | "image";
+  textContent?: string;   // for text/config files
+  dataUrl?: string;       // for images
 }
 
 function MarkdownMessage({ content }: { content: string }) {
@@ -400,6 +407,8 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
     });
   };
   const [input, setInput] = useState("");
+  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [capture, setCapture] = useState<{ open: boolean; text: string }>({
     open: false,
     text: "",
@@ -478,9 +487,44 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = "";
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setAttachedFile({ name: file.name, kind: "image", dataUrl: ev.target?.result as string });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setAttachedFile({ name: file.name, kind: "text", textContent: ev.target?.result as string });
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg: ChatMessage = { role: "user", content: input.trim() };
+    if ((!input.trim() && !attachedFile) || loading) return;
+    let userContent: ChatMessage["content"];
+    if (attachedFile?.kind === "image" && attachedFile.dataUrl) {
+      // Vision message: image + text
+      userContent = [
+        { type: "image_url", image_url: { url: attachedFile.dataUrl } },
+        { type: "text", text: input.trim() || `Analyze this image: ${attachedFile.name}` },
+      ];
+    } else if (attachedFile?.kind === "text" && attachedFile.textContent) {
+      // Prepend file content as text block
+      userContent = `[Attached file: ${attachedFile.name}]\n\`\`\`\n${attachedFile.textContent}\n\`\`\`\n\n${input.trim()}`;
+    } else {
+      userContent = input.trim();
+    }
+    const userMsg: ChatMessage = { role: "user", content: userContent };
+    setAttachedFile(null);
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
@@ -663,7 +707,15 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
                   : "bg-muted"
               }`}
             >
-              {m.role === "user" ? m.content : <MarkdownMessage content={m.content} />}
+              {m.role === "user"
+                ? typeof m.content === "string"
+                  ? m.content
+                  : (m.content as any[]).map((p: any, pi: number) =>
+                      p.type === "image_url"
+                        ? <img key={pi} src={p.image_url.url} alt="attachment" className="max-h-40 rounded mb-1 object-contain" />
+                        : <span key={pi}>{p.text}</span>
+                    )
+                : <MarkdownMessage content={typeof m.content === "string" ? m.content : JSON.stringify(m.content)} />}
             </div>
             {m.role === "assistant" && m.content.trim() && (
               <Button
@@ -707,8 +759,42 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
           </div>
         )}
       </CardContent>
-      <div className="border-t p-3 shrink-0">
+      <div className="border-t p-3 shrink-0 space-y-2">
+        {attachedFile && (
+          <div className="flex items-center gap-1.5 text-xs bg-muted rounded px-2 py-1 w-fit max-w-full">
+            {attachedFile.kind === "image" && attachedFile.dataUrl && (
+              <img src={attachedFile.dataUrl} alt={attachedFile.name} className="h-6 w-6 rounded object-cover shrink-0" />
+            )}
+            {attachedFile.kind === "text" && <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            <span className="truncate max-w-[200px] text-muted-foreground">{attachedFile.name}</span>
+            <button
+              type="button"
+              onClick={() => setAttachedFile(null)}
+              className="ml-1 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,.txt,.log,.cfg,.conf,.json,.csv,.md,.yaml,.yml,.xml,.ps1,.sh"
+            onChange={handleFileSelect}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-9 w-9"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            title="Attach file or image (configs, logs, screenshots)"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -718,12 +804,12 @@ function ChatTab({ contextHint }: { contextHint?: string | null }) {
                 handleSend();
               }
             }}
-            placeholder="Ask about entries, risks, AARs, network inventory..."
+            placeholder="Ask about entries, risks, AARs, network inventory — or attach a config/log/screenshot..."
             rows={2}
             className="resize-none"
             disabled={loading}
           />
-          <Button onClick={handleSend} disabled={loading || !input.trim()}>
+          <Button onClick={handleSend} disabled={loading || (!input.trim() && !attachedFile)}>
             <Send className="h-4 w-4" />
           </Button>
         </div>

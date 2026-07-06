@@ -1,0 +1,3149 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.14 05:37:49 =~=~=~=~=~=~=~=~=~=~=~=
+sho runn
+Current configuration:
+!
+!Version ArubaOS-CX FL.10.10.1071
+!export-password: default
+hostname swa-h128
+user admin group administrators password ciphertext AQBapaq99vwQbkDsvNbST7qaPDW3YJYgEECvlg1aUjZ5vTBxYgAAAJw5UezlgA82Bfv7biJu9WuJwhpoqqNyK8VSUUY4TPQaOwCJQ8NAM957owOIa91SLWadLlOYD33hMERlBnU1iIc08Jm6bfw0meyIkFBPmhuwWYJXgKforyB2QJzG+ggMZWKp
+clock timezone cst6cdt
+ntp server 10.40.1.68
+ntp server 10.40.1.77
+ntp server pool.ntp.org minpoll 4 maxpoll 4 iburst
+ntp enable
+!
+!
+!
+!
+!
+!
+ssh server vrf default
+ssh server vrf mgmt
+ssh key-exchange-algorithms curve25519-sha256 curve25519-sha256@libssh.org ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 diffie-hellman-group-exchange-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group14-sha256 diffie-hellman-group14-sha1
+vsf member 1 
+    type jl659a
+    link 1 1/1/50
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vsf member 2 
+    type jl659a
+    link 1 2/1/50
+vlan 1
+vlan 200
+    name SLC_Students
+vlan 201
+    name SLC-Guest-Aruba
+vlan 202
+    name SLC-Staff-Aruba
+vlan 203
+    name SLC-Appliance-Aruba
+vlan 204
+    name SLC-Students-Aruba
+vlan 304
+    name VOIP-H
+    voice
+vlan 351
+    name PSEC-SLC
+vlan 352
+    name PSEC-T-TA-TB-TD-TT
+vlan 353
+    name PSEC-C-E-EAnnex-CAH
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               vlan 375
+    name SC-IoT
+vlan 402
+    name Printers
+vlan 404
+    name 3CXPBX-Phone
+vlan 405
+    name DigitalSignage
+vlan 564
+    name Projectors
+vlan 613
+    name OSPF-Humanities
+vlan 733
+    name AA105-Staff-Wireless
+vlan 788
+    name H109-HumLab
+    description H109 Humanities Student Lab
+vlan 789
+    name HumanitiesBuilding
+vlan 790
+    name HumanitiesTest
+vlan 791
+    name ArubaAP-H
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description Aruba AP in H Humanities building
+vlan 817
+    name HVAC-Maintenance
+vlan 820
+    name Gym-Pressbox-SoundSystem
+spanning-tree mode rpvst
+spanning-tree
+spanning-tree priority 10
+spanning-tree vlan 1,200-204,304,351-353,402,404,405,564,613,733,789-791,817,820
+spanning-tree vlan 200 priority 10
+spanning-tree vlan 201 priority 10
+spanning-tree vlan 202 priority 10
+spanning-tree vlan 203 priority 10
+spanning-tree vlan 204 priority 10
+spanning-tree vlan 304 priority 10
+spanning-tree vlan 351 priority 10
+spanning-tree vlan 352 priority 10
+spanning-tree vlan 353 priority 10
+spanning-tree vlan 402 priority 10
+spanning-tree vlan 404 priority 10
+spanning-tree vlan 405 priority 10
+spanning-tree vlan 564 priority 10
+spanning-tree vlan 613 priority 10
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               spanning-tree vlan 733 priority 10
+spanning-tree vlan 789 priority 10
+spanning-tree vlan 790 priority 10
+spanning-tree vlan 791 priority 10
+spanning-tree vlan 817 priority 10
+spanning-tree vlan 820 priority 10
+interface mgmt
+    no shutdown
+    ip dhcp
+interface 1/1/1
+    description AP-OPEN
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/2
+    description AP-H113
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/3
+    description AP-H120
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/4
+    description AP-H138
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/5
+    description AP-H109
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/6
+    description AP-OPEN
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/7
+    description AP-H146
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/8
+    description CAM..H-Ext-Park-SE
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/9
+    description PH-H120
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/10
+    description PH-H109
+    no shutdown
+    no routing
+    vlan trunk native 789
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 304,789
+interface 1/1/11
+    description PH-OPEN
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/12
+    description PH-OPEN
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/13
+    description PH-OPEN
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/14
+    description PH-OPEN
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/15
+    description PH-H106
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/16
+    description PH-H107
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/17
+    description PH-H108
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/18
+    description PH-H116
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/19
+    description PH-H124
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/20
+    description PH-H145
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/21
+    description AP-H136
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/22
+    description PH-H102
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/23
+    description CAM..H-Ext-120
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/24
+    description PH-H103
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/25
+    description PH-H104
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/26
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description TC-Hallway
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/27
+    description CAM..H-Ext-Park-SE-Mid-2
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/28
+    description CAM..H-Ext-120
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/29
+    description CAM..Ext-Park-SE-Mid
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 1/1/30
+    description CAM..H-Ext-148
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/31
+    description CAM..H-Ext-Park-SE-NE
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/32
+    description CAM..H-Ext-Park-SE-Mid
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/33
+    description PH-H144
+    no shutdown
+    no routing
+    vlan trunk native 789
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan trunk allowed 304,789
+    power-over-ethernet allocate-by class
+    power-over-ethernet assigned-class 3
+interface 1/1/34
+    description PH-H148
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/35
+    description PH-H138
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/36
+    description PH-H113
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/37
+    description PH-H112
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/38
+    description PH-H126 green room
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/39
+    description CAM..SA-Ext-102
+    no shutdown
+    no routing
+    vlan access 353
+    spanning-tree port-type admin-edge
+interface 1/1/40
+    description PH-H_hall_phone
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/41
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description OPEN
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/42
+    description PH-H121
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/43
+    description PH-H111
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+interface 1/1/44
+    description OPEN
+    no shutdown
+    no routing
+    vlan trunk native 789
+    vlan trunk allowed 304,789
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 1/1/45
+    no shutdown
+    no routing
+    vlan access 304
+    spanning-tree port-type admin-edge
+interface 1/1/46
+    description AP-H102
+    no shutdown
+    no routing
+    vlan trunk native 791
+    vlan trunk allowed 200-204,375,733,791
+interface 1/1/47
+    description OPEN
+    no shutdown
+    no routing
+    vlan trunk native 820
+    vlan trunk allowed 304,820
+interface 1/1/48
+    description SIPGW-H128
+    no shutdown
+    no routing
+    vlan access 304
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 1/1/49
+    no shutdown
+    no routing
+    vlan trunk native 790
+    vlan trunk allowed all
+interface 1/1/50
+    no shutdown
+interface 1/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 1/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/1
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/3
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/4
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/5
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/6
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/7
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/8
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/9
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 2/1/10
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/11
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/12
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/13
+    description COMP-H109
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/14
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/15
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/16
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/17
+    description COMP-H109
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/18
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/19
+    description COMP-H109
+    no shutdown
+    no routing
+    vlan access 788
+    spanning-tree port-type admin-edge
+interface 2/1/20
+    description DAC
+    no shutdown
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 2/1/21
+    description DAC
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 375
+    spanning-tree port-type admin-edge
+interface 2/1/22
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/23
+    description FaxGW-H116
+    no shutdown
+    no routing
+    vlan access 304
+    spanning-tree port-type admin-edge
+interface 2/1/24
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/25
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/26
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/27
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/28
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface 2/1/29
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/30
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/31
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/32
+    description COMP-OPEN
+    no shutdown
+    no routing
+    vlan access 789
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   spanning-tree port-type admin-edge
+interface 2/1/33
+    description PROJ-H111-C8
+    no shutdown
+    no routing
+    vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/34
+    description PROJ-H112-C7
+    no shutdown
+    no routing
+    vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/35
+    description PROJ-OPEN
+    no shutdown
+    no routing
+    vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/36
+    description PROJ-OPEN
+    no shutdown
+    no routing
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/37
+    description PROJ-OPEN
+    no shutdown
+    no routing
+    vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/38
+    description PROJ-OPEN
+    no shutdown
+    no routing
+    vlan access 564
+    spanning-tree port-type admin-edge
+interface 2/1/39
+    description PRNT - H1444 HP BW
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/40
+    description PRNT-H116-Color
+    no shutdown
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/41
+    description PRNT-H116-BW
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/42
+    description PRNT-H146
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/43
+    description PRNT-OPEN
+    no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/44
+    description MFP-H166-Sharp
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 402
+    spanning-tree port-type admin-edge
+interface 2/1/45
+    description OPEN
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/46
+    description HVAC-H128-JACE
+    no shutdown
+    no routing
+    vlan access 817
+    spanning-tree port-type admin-edge
+interface 2/1/47
+    description SW-Theater Sound
+    no shutdown
+    no routing
+    vlan access 820
+    spanning-tree port-type admin-edge
+interface 2/1/48
+    description UPS-H128
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   no shutdown
+    no routing
+    vlan access 789
+    spanning-tree port-type admin-edge
+interface 2/1/49
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/50
+    no shutdown
+interface 2/1/51
+    no shutdown
+    no routing
+    vlan access 1
+interface 2/1/52
+    no shutdown
+    no routing
+    vlan access 1
+interface vlan 1
+    shutdown
+    no ip dhcp
+    ip helper-address 10.40.1.40
+interface vlan 613
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                   description OSPF-H128-CiscoA48
+    ip address 172.20.2.6/30
+    ip ospf 10 area 0.0.0.0
+interface vlan 788
+    ip address 10.70.88.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 789
+    description All of Humanities staff/faculty offices.
+    ip address 10.70.89.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+interface vlan 790
+    description HumanitesTest
+    ip address 10.70.90.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip helper-address 10.40.3.15
+    ip pim-sparse enable
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               interface vlan 791
+    description Aruba AP in H Humanities building
+    ip address 10.70.91.1/24
+    ip helper-address 10.40.1.40
+    ip helper-address 10.40.1.70
+    ip pim-sparse enable
+ip route 0.0.0.0/0 192.168.2.5
+ip route 0.0.0.0/0 172.20.2.5
+ip dns server-address 10.40.1.77
+ip dns server-address 10.40.1.68
+!
+!
+!
+!
+!
+router ospf 10
+    redistribute connected
+    redistribute static
+    area 0.0.0.0
+router pim
+    enable
+https-server vrf default
+https-server vrf mgmt
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               swa-h128#            s           h           o                       v           e           r           
+-----------------------------------------------------------------------------
+ArubaOS-CX
+(c) Copyright 2017-2023 Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : FL.10.10.1071                                                 
+Build Date   : 2023-07-18 20:07:21 UTC                                       
+Build ID     : ArubaOS-CX:FL.10.10.1071:a06f690a9a57:202307181953            
+Build SHA    : a06f690a9a575a0511058335b1fd95f90005c18c                      
+Hot Patches  :                                                               
+Active Image : primary                       
+
+Service OS Version : FL.01.11.0001                 
+BIOS Version       : FL.01.0002                    
+swa-h128# sho ip in bri
+Interface         IP Address             Interface Status
+                                           link/admin
+vlan1            No Address                down/down
+
+vlan613          172.20.2.6/30             up/up
+
+vlan788          10.70.88.1/24             up/up
+
+vlan789          10.70.89.1/24             up/up
+
+vlan790          10.70.90.1/24             up/up
+
+vlan791          10.70.91.1/24             up/up
+
+
+swa-h128# sho cdp neighbor-info 
+
+CDP Neighbor Information 
+=========================
+
+Port        Device ID                Platform                 Capability  
+--------------------------------------------------------------------------------
+2/1/27      SEP001B2ABC4039          Cisco IP Phone 7906      HPM         
+1/1/37      SEP001B0C96A1A1          Cisco IP Phone 7906      HPM         
+1/1/25      SEPC444A0747AA4          Cisco IP Phone 7821      HPM         
+1/1/15      SEP001FCAE8BF89          Cisco IP Phone 7941      HPM         
+1/1/41      SEP007278267F80          Cisco IP Phone 7821      HPM         
+1/1/43      SEP001FCAE8502E          Cisco IP Phone 7906      HPM         
+1/1/22      SEP007E9578A484          Cisco IP Phone 7821      HPM         
+1/1/18      SEP001C58414D33          Cisco IP Phone 7961      HPM         
+2/1/23      ATADCEB941C6EAA          Cisco ATA 190            HP          
+1/1/49      sw-aa144-A48.sccc.edu(...N9K-C93180YC-EX-24       CIRS        
+1/1/38      SEP001B2A89687B          Cisco IP Phone 7941      HPM         
+1/1/40      SEP001B2ABC3D68          Cisco IP Phone 7906      HPM         
+1/1/19      SEPC444A07479ED          Cisco IP Phone 7821      HPM         
+1/1/34      SEP001B2ABC3B6C          Cisco IP Phone 7906      HPM         
+1/1/33      SEP007E9578A35E          Cisco IP Phone 7821      HPM         
+1/1/35      SEP001B2ABC3BAA          Cisco IP Phone 7906      HPM         
+2/1/47      Theater-MikroTik         MikroTik                 R           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/42      SEP001B2AB8276D          Cisco IP Phone 7906      HPM         
+1/1/10      SEP001B2ABC40A7          Cisco IP Phone 7906      HPM         
+1/1/36      SEP001B0C96CA8C          Cisco IP Phone 7906      HPM         
+1/1/17      SEPC444A07478CB          Cisco IP Phone 7821      HPM         
+1/1/16      SEP706BB949B4D6          Cisco IP Phone 7841      HPM         
+1/1/24      SEP007278268E89          Cisco IP Phone 7821      HPM         
+1/1/20      SEP007E9578A43F          Cisco IP Phone 7821      HPM         
+swa-h128#       sho cdp neighbor-info de
+Invalid input: de
+swa-h128# sho cdp neighbor-info de
+% There is no matched command.
+swa-h128# sho cdp neighbor-info de                        sho lldp neighbor-info 
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 46
+Total Neighbor Entries Deleted  : 853
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 853
+
+LOCAL-PORT  CHASSIS-ID         PORT-ID                      PORT-DESC                    TTL      SYS-NAME    
+-----------------------------------------------------------------------------------------------------------
+1/1/1       70:3a:0e:c4:eb:16  70:3a:0e:c4:eb:16            bond0                        120      AP-H138                            
+1/1/2       94:b4:0f:cd:f8:50  94:b4:0f:cd:f8:50            bond0                        120      AP-H113                            
+1/1/3       f0:5c:19:c7:1c:22  f0:5c:19:c7:1c:22            bond0                        120      AP-H120                            
+1/1/4       94:b4:0f:cb:da:48  94:b4:0f:cb:da:48            bond0                        120      AP-H102                            
+1/1/5       94:b4:0f:cb:dc:6a  94:b4:0f:cb:dc:6a            bond0                        120      AP-H109                            
+1/1/7       94:b4:0f:cb:db:7c  94:b4:0f:cb:db:7c            bond0                        120      AP-H146                            
+1/1/10      10.30.4.237        001B2ABC40A7:P1              SW PORT                      180      SEP001B2ABC40A7.sccc.edu           
+1/1/15      10.30.4.232        001FCAE8BF89:P1              SW PORT                      180      SEP001FCAE8BF89.sccc.edu           
+1/1/16      10.30.4.243        706BB949B4D6:P1              SW PORT                      180      SEP706BB949B4D6.sccc.edu           
+1/1/17      10.30.4.244        C444A07478CB:P1              SW PORT                      180      SEPC444A07478CB.sccc.edu           
+1/1/18      10.30.4.250        001C58414D33:P1              SW PORT                      180      SEP001C58414D33.sccc.edu           
+1/1/19      10.30.4.215        C444A07479ED:P1              SW PORT                      180      SEPC444A07479ED.sccc.edu           
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               1/1/20      10.30.4.222        007E9578A43F:P1              SW PORT                      180      SEP007E9578A43F.sccc.edu           
+1/1/21      84:d4:7e:c9:96:ce  84:d4:7e:c9:96:ce            bond0                        120      AP-H136                            
+1/1/22      10.30.4.214        007E9578A484:P1              SW PORT                      180      SEP007E9578A484.sccc.edu           
+1/1/24      10.30.4.249        007278268E89:P1              SW PORT                      180      SEP007278268E89.sccc.edu           
+1/1/25      10.30.4.231        C444A0747AA4:P1              SW PORT                      180      SEPC444A0747AA4.sccc.edu           
+1/1/26      18:66:da:01:fa:aa  18:66:da:01:fa:aa                                         3601                                        
+1/1/33      10.30.4.223        007E9578A35E:P1              SW PORT                      180      SEP007E9578A35E.sccc.edu           
+1/1/34      10.30.4.247        001B2ABC3B6C:P1              SW PORT                      180      SEP001B2ABC3B6C.sccc.edu           
+1/1/35      10.30.4.219        001B2ABC3BAA:P1              SW PORT                      180      SEP001B2ABC3BAA.sccc.edu           
+1/1/36      10.30.4.213        001B0C96CA8C:P1              SW PORT                      180      SEP001B0C96CA8C.sccc.edu           
+1/1/37      10.30.4.233        001B0C96A1A1:P1              SW PORT                      180      SEP001B0C96A1A1.sccc.edu           
+1/1/38      10.30.4.225        001B2A89687B:P1              SW PORT                      180      SEP001B2A89687B.sccc.edu           
+1/1/40      10.30.4.236        001B2ABC3D68:P1              SW PORT                      180      SEP001B2ABC3D68.sccc.edu           
+1/1/41      10.30.4.228        007278267F80:P1              SW PORT                      180      SEP007278267F80.sccc.edu           
+1/1/42      10.30.4.224        001B2AB8276D:P1              SW PORT                      180      SEP001B2AB8276D.sccc.edu           
+1/1/43      10.30.4.246        001FCAE8502E:P1              SW PORT                      180      SEP001FCAE8502E.sccc.edu           
+1/1/49      3c:51:0e:39:cc:f4  Ethernet1/13                 SW-H128-PRIM                 120      sw-aa144-A48.sccc.edu              
+2/1/1       LA-H109-01         00:be:43:d7:15:5e                                         3601                                        
+2/1/2       LA-H109-02         00:be:43:da:ec:48                                         3601                                        
+2/1/3       LA-H109-03         00:be:43:da:ec:0b                                         3601                                        
+2/1/4       LA-H109-04         c0:25:a5:b5:09:da                                         3601                                        
+2/1/5       LA-H109-05         00:be:43:da:ee:2a                                         3601                                        
+2/1/6       LA-H109-06         c0:25:a5:b4:dc:8e                                         3601                                        
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               2/1/7       LA-H109-09         00:be:43:da:e8:54                                         3601                                        
+2/1/9       LA-H109-10         00:be:43:d6:c9:8c                                         3601                                        
+2/1/11      LA-H109-07         00:be:43:da:69:43                                         3601                                        
+2/1/12      LA-H109-08         c0:25:a5:b5:09:4c                                         3601                                        
+2/1/13      LA-H109-11         00:be:43:d6:c7:80                                         3601                                        
+2/1/18      LA-H109-12         00:be:43:da:ec:ba                                         3601                                        
+2/1/27      10.70.89.87        001B2ABC4039:P1              SW PORT                      180      SEP001B2ABC4039.sccc.edu           
+2/1/29      30:9c:23:08:94:1e  30:9c:23:08:94:1e                                         3601                                        
+2/1/30      IN-H113-01         00:be:43:d7:16:f9                                         3601                                        
+2/1/32      IN-H112-01A        a8:a1:59:dc:57:48                                         3601                                        
+2/1/42      00:23:24:ef:da:7a  00:23:24:ef:da:7a                                         3601                                        
+swa-h128#     sho lldo p swa-h128# sho lldp neighbor-info de
+
+LLDP Neighbor Information 
+=========================
+
+Total Neighbor Entries          : 46
+Total Neighbor Entries Deleted  : 853
+Total Neighbor Entries Dropped  : 0
+Total Neighbor Entries Aged-Out : 853
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/1
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 23
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 23
+Neighbor System-Name           : AP-H138
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 70:3a:0e:c4:eb:16
+Neighbor Management-Address    : 10.70.91.23
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 70:3a:0e:c4:eb:16
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/2
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 23
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 23
+Neighbor System-Name           : AP-H113
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 94:b4:0f:cd:f8:50
+Neighbor Management-Address    : 10.70.91.28
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 94:b4:0f:cd:f8:50
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/3
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 20
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 20
+Neighbor System-Name           : AP-H120
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : f0:5c:19:c7:1c:22
+Neighbor Management-Address    : 10.70.91.26
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : f0:5c:19:c7:1c:22
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/4
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 25
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 25
+Neighbor System-Name           : AP-H102
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 94:b4:0f:cb:da:48
+Neighbor Management-Address    : 10.70.91.21
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 94:b4:0f:cb:da:48
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/5
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 16
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 16
+Neighbor System-Name           : AP-H109
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 94:b4:0f:cb:dc:6a
+Neighbor Management-Address    : 10.70.91.22
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 94:b4:0f:cb:dc:6a
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/7
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 16
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 16
+Neighbor System-Name           : AP-H146
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 94:b4:0f:cb:db:7c
+Neighbor Management-Address    : 10.70.91.24
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 94:b4:0f:cb:db:7c
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/10
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : SEP001B2ABC40A7.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.237
+Neighbor Management-Address    : 10.30.4.237
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B2ABC40A7:P1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port                           : 1/1/15
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : SEP001FCAE8BF89.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7941G,V2, SCCP41.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.232
+Neighbor Management-Address    : 10.30.4.232
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 001FCAE8BF89:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 6.30 W
+PSE Allocated Power Value      : 6.30 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/16
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 8
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 8
+Neighbor System-Name           : SEP706BB949B4D6.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7841, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.243
+Neighbor Management-Address    : 10.30.4.243
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 706BB949B4D6:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.60 W
+PSE Allocated Power Value      : 3.60 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor TX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor RX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Fallback time         : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor TX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/17
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : SEPC444A07478CB.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.244
+Neighbor Management-Address    : 10.30.4.244
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : C444A07478CB:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/18
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 30
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 30
+Neighbor System-Name           : SEP001C58414D33.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7961G,V1, SCCP41.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.250
+Neighbor Management-Address    : 10.30.4.250
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 001C58414D33:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 6.30 W
+PSE Allocated Power Value      : 6.30 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/19
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 6
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 6
+Neighbor System-Name           : SEPC444A07479ED.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.215
+Neighbor Management-Address    : 10.30.4.215
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : C444A07479ED:P1
+Neighbor Port-Desc             : SW PORT
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/20
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 6
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 6
+Neighbor System-Name           : SEP007E9578A43F.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.222
+Neighbor Management-Address    : 10.30.4.222
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 007E9578A43F:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/21
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 17
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 17
+Neighbor System-Name           : AP-H136
+Neighbor System-Description    : ArubaOS (MODEL: 205), Version Aruba AP
+Neighbor Chassis-ID            : 84:d4:7e:c9:96:ce
+Neighbor Management-Address    : 10.70.91.25
+Chassis Capabilities Available : Bridge, WLAN
+Chassis Capabilities Enabled   : WLAN
+Neighbor Port-ID               : 84:d4:7e:c9:96:ce
+Neighbor Port-Desc             : bond0
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 12.50 W
+PSE Allocated Power Value      : 12.50 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Class           : Class4
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD, 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 1000 BASETFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/22
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 11
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 11
+Neighbor System-Name           : SEP007E9578A484.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.214
+Neighbor Management-Address    : 10.30.4.214
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 007E9578A484:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/24
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : SEP007278268E89.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Chassis-ID            : 10.30.4.249
+Neighbor Management-Address    : 10.30.4.249
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 007278268E89:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/25
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 6
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 6
+Neighbor System-Name           : SEPC444A0747AA4.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.231
+Neighbor Management-Address    : 10.30.4.231
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : C444A0747AA4:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/26
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 9
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 9
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : 18:66:da:01:fa:aa
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 18:66:da:01:fa:aa
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/33
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 9
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 9
+Neighbor System-Name           : SEP007E9578A35E.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.223
+Neighbor Management-Address    : 10.30.4.223
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 007E9578A35E:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/34
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 1
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 1
+Neighbor System-Name           : SEP001B2ABC3B6C.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.247
+Neighbor Management-Address    : 10.30.4.247
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-ID               : 001B2ABC3B6C:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Port                           : 1/1/35
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : SEP001B2ABC3BAA.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.219
+Neighbor Management-Address    : 10.30.4.219
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B2ABC3BAA:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/36
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 6
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 6
+Neighbor System-Name           : SEP001B0C96CA8C.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.213
+Neighbor Management-Address    : 10.30.4.213
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B0C96CA8C:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/37
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 9
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 9
+Neighbor System-Name           : SEP001B0C96A1A1.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.233
+Neighbor Management-Address    : 10.30.4.233
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B0C96A1A1:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/38
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+Neighbor System-Name           : SEP001B2A89687B.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7941G,V1, SCCP41.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.225
+Neighbor Management-Address    : 10.30.4.225
+Chassis Capabilities Available : Bridge, Telephone
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 001B2A89687B:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 6.30 W
+PSE Allocated Power Value      : 6.30 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               --------------------------------------------------------------------------------
+
+Port                           : 1/1/40
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : SEP001B2ABC3D68.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.236
+Neighbor Management-Address    : 10.30.4.236
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B2ABC3D68:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/41
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 5
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 5
+Neighbor System-Name           : SEP007278267F80.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7821, V1, sip78xx.12-5-1SR3-74.loads
+Neighbor Chassis-ID            : 10.30.4.228
+Neighbor Management-Address    : 10.30.4.228
+Chassis Capabilities Available : Bridge, Telephone
+Chassis Capabilities Enabled   : Bridge, Telephone
+Neighbor Port-ID               : 007278267F80:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : DOT3
+Neighbor Power Type            : Type 2 PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : PSE
+PD Requested Power Value       : 3.30 W
+PSE Allocated Power Value      : 3.30 W
+Neighbor Power Supported       : No
+Neighbor Power Enabled         : No
+Neighbor Power Class           : Class1
+Neighbor Power Paircontrol     : No
+PSE Power Pairs                : SIGNAL
+Neighbor Power Down Request    : 
+PD Associated TLV              : dot3
+PD Requested TLV types         : dot3, med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 100 BASE_TXFD, 100 BASE_TX, 10 BASET_FD, 10 BASE_T
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/42
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : SEP001B2AB8276D.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.224
+Neighbor Management-Address    : 10.30.4.224
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B2AB8276D:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/43
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+Neighbor System-Name           : SEP001FCAE8502E.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V6, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.30.4.246
+Neighbor Management-Address    : 10.30.4.246
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001FCAE8502E:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 304
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : true
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                                Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 1/1/49
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : sw-aa144-A48.sccc.edu
+Neighbor System-Description    : Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Neighbor Chassis-ID            : 3c:51:0e:39:cc:f4
+Neighbor Management-Address    : 3c:51:0e:39:cc:f4
+Chassis Capabilities Available : Bridge, Router
+Chassis Capabilities Enabled   : Bridge, Router
+Neighbor Port-ID               : Ethernet1/13
+Neighbor Port-Desc             : SW-H128-PRIM
+Neighbor Port VLAN ID          : 1
+TTL                            : 120
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/1
+Neighbor Entries               : 1
+  Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-01
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-ID               : 00:be:43:d7:15:5e
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/2
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 4
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 4
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-02
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:ec:48
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/3
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 17
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 17
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-03
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:ec:0b
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/4
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 22
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 22
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-04
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : c0:25:a5:b5:09:da
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/5
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 54
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 54
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-05
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:ee:2a
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/6
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 46
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 46
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-06
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : c0:25:a5:b4:dc:8e
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/7
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 18
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 18
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-09
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:e8:54
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/9
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 22
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 22
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-10
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:d6:c9:8c
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/11
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-07
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:69:43
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/12
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 35
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 35
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-08
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : c0:25:a5:b5:09:4c
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/13
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-11
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:d6:c7:80
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/18
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 2
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 2
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : LA-H109-12
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:da:ec:ba
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+    
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/27
+Neighbor Entries               : 1
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries Deleted       : 3
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 3
+Neighbor System-Name           : SEP001B2ABC4039.sccc.edu
+Neighbor System-Description    : Cisco IP Phone 7906G,V2, SCCP11.9-4-2SR3-1S
+Neighbor Chassis-ID            : 10.70.89.87
+Neighbor Management-Address    : 10.70.89.87
+Chassis Capabilities Available : Telephone
+Chassis Capabilities Enabled   : Telephone
+Neighbor Port-ID               : 001B2ABC4039:P1
+Neighbor Port-Desc             : SW PORT
+Neighbor Port VLAN ID          : 
+TTL                            : 180
+
+Neighbor PoE information       : MED
+Neighbor Power Type            : PD
+Neighbor Power Priority        : Unknown
+Neighbor Power Source          : UNKNOWN
+PD Requested Power Value       : 5.00 W
+PSE Allocated Power Value      : 5.00 W
+PD Associated TLV              : med
+PD Requested TLV types         : med
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_III
+MED capabilities enabled       : Capabilities, Network Policy, PD, Inventory
+MED capabilities supported     : Capabilities, Network Policy, PD, Inventory
+
+Neighbor Med Network Policy
+Neighbor Med Application type  : voice
+Neighbor Med Policy VLAN ID    : 4095
+Neighbor Med Policy Priority   : 5
+Neighbor Med Policy DSCP       : 46
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : false
+Neighbor Med Application type  : voice-signaling
+Neighbor Med Policy VLAN ID    : 4095
+Neighbor Med Policy Priority   : 4
+Neighbor Med Policy DSCP       : 32
+Neighbor Med Policy Unknown    : false
+Neighbor Med Policy Tagged     : false
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_T, 1000 BASE_XFD, FDX_BPAUSE, FDX_SPAUSE
+Neighbor MAU type              : 100 BASETXFD
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/29
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 5
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 5
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : 30:9c:23:08:94:1e
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 30:9c:23:08:94:1e
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/30
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Entries               : 1
+Neighbor Entries Deleted       : 32
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 32
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : IN-H113-01
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:be:43:d7:16:f9
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/32
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 49
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 49
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : IN-H112-01A
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : a8:a1:59:dc:57:48
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+--------------------------------------------------------------------------------
+
+Port                           : 2/1/42
+Neighbor Entries               : 1
+Neighbor Entries Deleted       : 71
+Neighbor Entries Dropped       : 0
+Neighbor Entries Aged-Out      : 71
+Neighbor System-Name           : 
+Neighbor System-Description    : 
+Neighbor Chassis-ID            : 00:23:24:ef:da:7a
+Neighbor Management-Address    : 
+Chassis Capabilities Available :  
+Chassis Capabilities Enabled   :  
+Neighbor Port-ID               : 00:23:24:ef:da:7a
+Neighbor Port-Desc             : 
+Neighbor Port VLAN ID          : 
+TTL                            : 3601
+
+Neighbor MED Capabilities
+Neighbor Device class          : CLASS_I
+MED capabilities enabled       : Capabilities
+MED capabilities supported     : Capabilities
+
+Neighbor Mac-Phy details
+Neighbor Auto-neg Supported    : true
+ -- MORE --, next page: Space, next line: Enter, quit: q                                                               Neighbor Auto-Neg Enabled      : true
+Neighbor Auto-Neg Advertised   : 1000 BASE_TFD
+Neighbor MAU type              :  
+
+Neighbor EEE information       : DOT3
+Neighbor TX Wake time          : 0 us
+Neighbor RX Wake time          : 0 us
+Neighbor Fallback time         : 0 us
+Neighbor TX Echo time          : 0 us
+Neighbor RX Echo time          : 0 us
+
+swa-h128#                             swa-h128# e                            swa-h128# ex                            swa-h128# exi                            swa-h128# exit                            swa-h128# exit

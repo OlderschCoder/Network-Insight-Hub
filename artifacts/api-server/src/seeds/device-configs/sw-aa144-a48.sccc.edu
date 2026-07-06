@@ -1,0 +1,1590 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.05.13 03:10:37 =~=~=~=~=~=~=~=~=~=~=~=
+sho ip int sho runn
+sw-aa144-A48# sho running-config 
+
+
+!Command: show running-config
+!Running configuration last done at: Fri May  9 17:20:46 2025
+!Time: Tue May 13 07:32:40 2025
+
+version 10.2(6) Bios:version 07.69 
+hostname sw-aa144-A48
+vdc sw-aa144-A48 id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+feature telnet
+cfs eth distribute
+feature ospf
+feature pim
+feature interface-vlan
+feature lacp
+feature dhcp
+feature vpc
+feature lldp
+--More--
+feature vtp
+
+no password strength-check
+username 
+/  role network-admin
+ip domain-lookup
+ip domain-name sccc.edu
+ip name-server 10.40.1.68 192.168.1.111
+copp profile strict
+vtp domain blob
+snmp-server user admin 
+ localizedkey
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+
+ip route 0.0.0.0/0 192.168.2.5
+ip pim ssm range 232.0.0.0/8
+vlan 1-3,17,41,51,150-151,200-204,301-314,316-322,332,348-353,372-373,375,377,40
+1-405,408,412-416,502,506,508,564,568,601,610-628,660,670,680,701-703,706-708,71
+4,722-723,726,728-731,733-737,740,749-750,764-766,772-775,780,788-791,801-804,80
+--More--
+6,809,816-821,824,826,832-833,835,840-842,845,848,999
+vlan 2
+  name SAN00
+vlan 17
+  name keepaliveSvpc
+vlan 51
+  name DMZ2
+vlan 150
+  name ASA-LAN-FO
+vlan 151
+  name ASA-STFUL-FO
+vlan 200
+  name SLC_students
+vlan 201
+  name SLC-Students-Aruba
+vlan 202
+  name SLC-Staff-Aruba
+vlan 203
+  name SLC-Appliance-Aruba
+vlan 204
+  name SLC-Guest-Aruba
+vlan 301
+  name VOIP-A
+--More--
+vlan 302
+  name VOIP-AA
+vlan 303
+  name VOIP-S
+vlan 304
+  name VOIP-H
+vlan 305
+  name VOIP-COS
+vlan 306
+  name VOIP-V
+vlan 307
+  name VOIP-SLC
+vlan 308
+  name VOIP-SLCCDE
+vlan 309
+  name VOIP-SLCAB
+vlan 310
+  name VOIP-B
+vlan 311
+  name VOIP-M
+vlan 312
+  name VOIP-C
+vlan 313
+--More--
+  name VOIP-E
+vlan 314
+  name VOIP-EA
+vlan 316
+  name VOIP-T
+vlan 317
+  name VOIP-TA
+vlan 318
+  name VOIP-TB
+vlan 319
+  name VOIP-TD
+vlan 320
+  name VOIP-TT
+vlan 321
+  name VOIP-SLCT
+vlan 322
+  name VOIP-CAH
+vlan 332
+  name TestingAndGI
+vlan 348
+  name PSEC-Servers
+vlan 349
+  name PSEC-A-AA
+--More--
+vlan 350
+  name PSEC-S-B-H-Cos-V-M
+vlan 351
+  name PSEC-SLC
+vlan 352
+  name PSEC-T-TA-TB-TD-TT
+vlan 353
+  name PSEC-C-E-EAnnex-CAH
+vlan 372
+  name DAC-Servers
+vlan 373
+  name DAC-A-AA
+vlan 375
+  name DAC-SLC
+vlan 377
+  name DAC-C-E-Eannex-CAH
+vlan 401
+  name Servers
+vlan 402
+  name Printers
+vlan 403
+  name Citrix
+vlan 404
+--More--
+  name 3CXPBX-Phone
+vlan 405
+  name DigitalSignage
+vlan 408
+  name DR-site-equipment
+vlan 412
+  name Stor2
+vlan 413
+  name Stor413
+vlan 414
+  name Nutan-IPMI
+vlan 415
+  name Nutan-VMWareVmotion
+vlan 416
+  name Nutan-VMMgmtCVMClst
+vlan 502
+  name WLAN-APs-WCS
+vlan 506
+  name WLAN-IPads
+vlan 508
+  name WLAN-Public
+vlan 564
+  name Projectors
+--More--
+vlan 568
+  name HDMI
+vlan 601
+  name LAN2
+vlan 610
+  name IT-Staff
+vlan 611
+  name OSPF100-A144Core-A48
+vlan 612
+  name OSPF2
+vlan 613
+  name OSPF10-Humanities
+vlan 614
+  name OSPF10-AA144-A48
+vlan 615
+  name OSPF10-T48-A48
+vlan 616
+  name OSPF10-Epworth
+vlan 617
+  name OSPF10-TechSchool
+vlan 618
+  name OSPF10-SLC151
+vlan 619
+--More--
+  name OSPF10-V201
+vlan 620
+  name OSPF10-B101
+vlan 621
+  name OSPF10-TA107
+vlan 622
+  name OSPF10-A144-1
+vlan 623
+  name OSPF10-A144-2
+vlan 624
+  name OSPF10-SharpCC
+vlan 625
+  name OSPF10-AA105
+vlan 626
+  name OSPF10-SU121
+vlan 627
+  name OSFP-COS109
+vlan 628
+  name OSPF-HealthCenter
+vlan 660
+  name VDI-Desktops
+vlan 670
+  name P2P-AA109-AA144
+--More--
+vlan 680
+  name A001
+vlan 701
+  name A144-Staff
+vlan 702
+  name A103
+vlan 703
+  name A136
+vlan 706
+  name A149
+vlan 707
+  name A166A
+vlan 708
+  name A166
+vlan 714
+  name A192
+vlan 722
+  name ArubaAP-A
+vlan 723
+  name ArubaAP-Outdoor
+vlan 726
+  name AA131
+vlan 728
+--More--
+  name AA137
+vlan 729
+  name AA155
+vlan 730
+  name AA159
+vlan 731
+  name AA163
+vlan 733
+  name AA105-Staff
+vlan 734
+  name AA101
+vlan 735
+  name AA109
+vlan 736
+  name AA112
+vlan 737
+  name AA113
+vlan 740
+  name test-vlan
+vlan 749
+  name CosmoBuilding
+vlan 750
+  name ArubaAP-COS
+--More--
+vlan 764
+  name V103-AgLab
+vlan 765
+  name AgBuilding
+vlan 766
+  name ArubaAP-V
+vlan 772
+  name E117-E213-EpworthLabs
+vlan 773
+  name EpworthBuilding
+vlan 774
+  name MM-Equipment-in-E
+vlan 775
+  name ArubaAP-E
+vlan 780
+  name HealthCenter
+vlan 788
+  name H109-HumLab
+vlan 789
+  name HumanitiesBuilding
+vlan 790
+  name HumanitiesTest
+vlan 791
+--More--
+  name ArubaAP-H
+vlan 801
+  name SWKTS-Data
+vlan 802
+  name TechSchoolLabs
+vlan 803
+  name TechLectureCapture
+vlan 804
+  name TechHVAC
+vlan 806
+  name ArubaAP-T
+vlan 809
+  name TA-WorkForceCenter
+vlan 816
+  name MaintenanceBuilding
+vlan 817
+  name HVAC-Maintenance
+vlan 818
+  name Fire-Alarm-System
+vlan 819
+  name HVAC-maintenance
+vlan 820
+  name Gym-Pressbox
+--More--
+vlan 821
+  name SA-building
+vlan 824
+  name SLC-Buildings
+vlan 826
+  name ArubaAP-SLC
+vlan 832
+  name SU108-Bookstore
+vlan 833
+  name StudentBuilding
+vlan 835
+  name ArubaAP-S
+vlan 840
+  name CAH-General
+vlan 841
+  name CAH-Labs
+vlan 842
+  name CAH-Sim-Record
+vlan 845
+  name ArubaAP-CAH
+vlan 848
+  name SmartCCWired
+vlan 999
+--More--
+  name Gym-Video
+
+spanning-tree port type edge bpduguard default
+route-map Test permit 10
+service dhcp
+ip dhcp relay
+ip dhcp relay information option trust
+ip dhcp relay information trust-all
+ipv6 dhcp relay
+vrf context management
+vpc domain 10
+  role priority 10
+  peer-keepalive destination 172.20.11.2 source 172.20.11.1 vrf default
+
+
+interface Vlan1
+  no shutdown
+  ip address 192.168.2.70/16
+  ip pim sparse-mode
+  ip dhcp relay address 10.40.1.40 
+
+interface Vlan2
+  description SAN00
+--More--
+  no shutdown
+  ip address 172.16.13.1/26
+
+interface Vlan3
+  no shutdown
+  ip address 172.16.13.65/28
+
+interface Vlan17
+  no shutdown
+  ip address 172.20.11.1/30
+
+interface Vlan301
+  description VOIP in A144
+  ip address 10.30.1.1/24
+  ip pim sparse-mode
+  ip dhcp relay address 10.40.1.40 
+  ip dhcp relay address 10.40.1.70 
+
+interface Vlan302
+  description VOIP in AA105 & AA144
+  ip address 10.30.2.1/24
+  ip pim sparse-mode
+  ip dhcp relay address 10.40.1.40 
+--More--
+  ip dhcp relay address 10.40.1.70 
+
+interface Vlan303
+  description VOIP in SU121 & SA208
+  ip address 10.30.3.1/24
+  ip pim sparse-mode
+  ip dhcp relay address 10.40.1.40 
+  ip dhcp relay address 10.40.1.70 
+
+interface Vlan611
+  description OSPF-TO-6509-CORESWITCH
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.1/30
+  no ip ospf passive-interface
+  ip router ospf 100 area 0.0.0.0
+
+interface Vlan612
+  description OSPF-TO-9300NEXUS-BuilingT
+  no shutdown
+  no ip redirects
+  ip address 172.20.3.1/30
+  ip ospf network point-to-point
+--More--
+  no ip ospf passive-interface
+  ip router ospf 100 area 0.0.0.0
+
+interface Vlan613
+  description OSPF-H128-CiscoA48
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.5/30
+  ip ospf network broadcast
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan614
+  description OSPF10-AA144-A48Cisco9k
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.9/30
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan615
+  description OSPF10-A48Cisco9k-TO-T48Cisco9k
+  no shutdown
+--More--
+  no ip redirects
+  ip address 172.20.2.13/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan616
+  description OSPF10-Epworth-To-Cisco9k-A48
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.17/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan617
+  description OSFP10-TechSchool-To-A48Cisco9k
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.21/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+--More--
+
+
+interface Vlan618
+  description OSFP10-SLC151-Dorms-To-A48Cisco9k
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.25/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan619
+  description OSPF10-V201
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.29/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan620
+  description OSPF10-B101
+  no shutdown
+  no ip redirects
+--More--
+  ip address 172.20.2.33/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan621
+  description OSPF10-TA107
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.37/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan622
+  description OSPF10-A144-1
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.41/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+--More--
+interface Vlan623
+  description OSPF10-A144-2
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.45/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan624
+  description OSPF10-SharpCC
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.49/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan625
+  description OSPF10-AA105
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.53/30
+--More--
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan626
+  description OSPF-SU121
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.57/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan627
+  description OSPF-COS109
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.61/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface Vlan628
+--More--
+  description OSPF-Healthcenter
+  no shutdown
+  no ip redirects
+  ip address 172.20.2.65/30
+  ip ospf network point-to-point
+  no ip ospf passive-interface
+  ip router ospf 10 area 0.0.0.0
+
+interface port-channel15
+  description ***vpc peer link***
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1-16,18-4094
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/1
+  description Nutanix Node 1 port 1
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+--More--
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/2
+  description Nutanix Node 2 port 1
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/3
+  description Nutanix Node 3 port 1
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 416
+  switchport trunk allowed vlan 1,51,302,313,372,401,403-404,412,414-416,610-612
+,660
+  spanning-tree port type edge trunk
+--More--
+  vpc orphan-port suspend
+  no shutdown
+
+interface Ethernet1/4
+
+interface Ethernet1/5
+  switchport
+  spanning-tree port type edge
+
+interface Ethernet1/6
+  switchport
+
+interface Ethernet1/7
+  description **Connectivity to the switch SW-AA144Core-USD480
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/8
+  description 1/8 Synology NAS
+  switchport
+  switchport access vlan 610
+  no shutdown
+--More--
+
+
+interface Ethernet1/9
+  description Conetrix Toolbox scanning tool
+  switchport
+  no shutdown
+
+interface Ethernet1/10
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/11
+  description SW-H128-TEST
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,200-204,304,351-353,375,402,404-405,564,613,73
+3,788-791,817,820
+  spanning-tree port type edge trunk
+  no shutdown
+
+interface Ethernet1/12
+  switchport
+
+--More--
+interface Ethernet1/13
+  description SW-H128-PRIM
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,200-204,304,351-353,375,402,404-405,564,613,73
+3,788-791,817,820
+  no shutdown
+
+interface Ethernet1/14
+  description SW-CAH144
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,200-204,322,350-353,375,377,402,502,564,610-61
+2,733,817,840-842,845
+  no shutdown
+
+interface Ethernet1/15
+  description AA109-PaloAlto-Link
+  switchport
+  switchport access vlan 601
+  no shutdown
+
+interface Ethernet1/16
+--More--
+  description Heartbeat to SW-AA144-A24 port 16
+  switchport
+  switchport access vlan 17
+  no shutdown
+
+interface Ethernet1/17
+  switchport
+  switchport access vlan 412
+  switchport trunk native vlan 412
+  no shutdown
+
+interface Ethernet1/18
+  switchport
+
+interface Ethernet1/19
+  description UPS-Controller
+  switchport
+  no shutdown
+
+interface Ethernet1/20
+  switchport
+  switchport mode trunk
+  switchport trunk native vlan 722
+--More--
+  switchport trunk allowed vlan 1,200-204,375,722,733,820,999
+  no shutdown
+
+interface Ethernet1/21
+  description AA148 Aruba 6100 uplink
+  switchport
+  switchport mode trunk
+  fec off
+  no shutdown
+
+interface Ethernet1/22
+  description OPEN
+  switchport
+  switchport mode trunk
+
+interface Ethernet1/23
+  description OPEN
+  switchport
+  switchport mode trunk
+
+interface Ethernet1/24
+  description OPEN
+  switchport
+--More--
+  switchport mode trunk
+
+interface Ethernet1/25
+  description A144 Aruba switch stack 1
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1-2,10,200-204,301,348,375,401-402,405,564,568,6
+10,622,701-703,706-708,714,722-723,726,728-731,733,817
+  no shutdown
+
+interface Ethernet1/26
+  description A144 Aruba switch stack 2
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface Ethernet1/27
+  description **Connectivity to the switch SWA-AA144.Access
+  switchport
+  switchport mode trunk
+
+interface Ethernet1/28
+  description SharpCC to AA144
+--More--
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,201-204,303,375,402,404,624,723,733,820,835,84
+8,999
+  flowcontrol receive on
+  speed 25000
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/29
+  switchport
+
+interface Ethernet1/30
+  switchport
+  switchport access vlan 401
+  no shutdown
+
+interface Ethernet1/31
+  switchport
+  switchport access vlan 412
+  spanning-tree port type edge
+  no shutdown
+
+--More--
+interface Ethernet1/32
+  switchport
+  switchport access vlan 412
+  spanning-tree port type edge
+  no shutdown
+
+interface Ethernet1/33
+  switchport
+  switchport access vlan 412
+  spanning-tree port type edge
+  no shutdown
+
+interface Ethernet1/34
+  switchport
+  switchport access vlan 412
+  spanning-tree port type edge
+  no shutdown
+
+interface Ethernet1/35
+  description FortiGate1-Port35-IDEATEK-Internet
+  switchport
+  flowcontrol receive on
+  speed 10000
+--More--
+
+
+interface Ethernet1/36
+  description FortiGate2-Port35-IDEATEK-Internet
+  no shutdown
+
+interface Ethernet1/37
+  description IDEATEK-ISP(internet-connection)
+  switchport
+
+interface Ethernet1/38
+  switchport
+
+interface Ethernet1/39
+  switchport
+
+interface Ethernet1/40
+  description B101 to AA144 port 1/40
+  switchport
+  switchport mode trunk
+  fec fc-fec
+  no shutdown
+
+interface Ethernet1/41
+--More--
+  switchport
+
+interface Ethernet1/42
+  switchport
+
+interface Ethernet1/43
+  description Aruba-7205-Controller-1
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,201-204,401
+  no shutdown
+
+interface Ethernet1/44
+  description Aruba-7205-Controller-2
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1,201-204,401
+  no shutdown
+
+interface Ethernet1/45
+  switchport
+
+interface Ethernet1/46
+--More--
+  description fortigate 1
+  switchport
+  switchport access vlan 401
+
+interface Ethernet1/47
+  switchport
+  switchport access vlan 401
+  no shutdown
+
+interface Ethernet1/48
+  switchport
+
+interface Ethernet1/49
+  description peerlink to 24port nexus
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 1-16,18-4094
+  channel-group 15 mode active
+  no shutdown
+
+interface Ethernet1/50
+  switchport
+
+--More--
+interface Ethernet1/51
+  switchport
+
+interface Ethernet1/52
+  switchport
+
+interface Ethernet1/53
+  description HP Bladeserver in Rack 4 (from North)
+  switchport
+
+interface Ethernet1/54
+  description Link between AA144 A48 and T122 T48
+  switchport
+  switchport mode trunk
+  no shutdown
+
+interface mgmt0
+  shutdown force
+  vrf member management
+line console
+line vty
+boot nxos bootflash:/nxos64-cs.10.2.6.M.bin 
+router ospf 10
+--More--
+  redistribute direct route-map Test
+  passive-interface default
+router ospf 100
+  passive-interface default
+
+
+
+
+sw-aa144-A48#     sho ip int bri
+
+
+IP Interface Status for VRF "default"(1)
+Interface            IP Address      Interface Status
+Vlan1                192.168.2.70    protocol-up/link-up/admin-up       
+Vlan2                172.16.13.1     protocol-up/link-up/admin-up       
+Vlan3                172.16.13.65    protocol-up/link-up/admin-up       
+Vlan17               172.20.11.1     protocol-up/link-up/admin-up       
+Vlan301              10.30.1.1       protocol-down/link-down/admin-down 
+Vlan302              10.30.2.1       protocol-down/link-down/admin-down 
+Vlan303              10.30.3.1       protocol-down/link-down/admin-down 
+Vlan611              172.20.2.1      protocol-up/link-up/admin-up       
+Vlan612              172.20.3.1      protocol-up/link-up/admin-up       
+Vlan613              172.20.2.5      protocol-up/link-up/admin-up       
+Vlan614              172.20.2.9      protocol-up/link-up/admin-up       
+Vlan615              172.20.2.13     protocol-up/link-up/admin-up       
+Vlan616              172.20.2.17     protocol-up/link-up/admin-up       
+Vlan617              172.20.2.21     protocol-up/link-up/admin-up       
+Vlan618              172.20.2.25     protocol-up/link-up/admin-up       
+Vlan619              172.20.2.29     protocol-up/link-up/admin-up       
+Vlan620              172.20.2.33     protocol-up/link-up/admin-up       
+Vlan621              172.20.2.37     protocol-up/link-up/admin-up       
+Vlan622              172.20.2.41     protocol-up/link-up/admin-up       
+Vlan623              172.20.2.45     protocol-up/link-up/admin-up       
+--More--
+Vlan624              172.20.2.49     protocol-up/link-up/admin-up       
+Vlan625              172.20.2.53     protocol-up/link-up/admin-up       
+Vlan626              172.20.2.57     protocol-up/link-up/admin-up       
+Vlan627              172.20.2.61     protocol-up/link-up/admin-up       
+Vlan628              172.20.2.65     protocol-up/link-up/admin-up       
+
+sw-aa144-A48#     sho int stta
+sw-aa144-A48# sho int sttaatus
+
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+mgmt0         --                 disabled  routed    auto    auto    --         
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Eth1/1        Nutanix Node 1 por connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/2        Nutanix Node 2 por connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/3        Nutanix Node 3 por connected trunk     full    10G     SFP-H10GB-C
+U1M
+Eth1/4        --                 xcvrAbsen routed    auto    auto    --         
+Eth1/5        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/6        --                 xcvrAbsen 1         auto    auto    --         
+Eth1/7        **Connectivity to  connected trunk     full    10G     10Gbase-LR 
+Eth1/8        1/8 Synology NAS   connected 610       full    1000    1000base-T 
+Eth1/9        Conetrix Toolbox s xcvrAbsen 1         auto    auto    --         
+Eth1/10       --                 xcvrAbsen trunk     auto    auto    --         
+Eth1/11       SW-H128-TEST       xcvrAbsen trunk     auto    auto    --         
+--More--
+Eth1/12       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/13       SW-H128-PRIM       connected trunk     full    1000    1000base-SX
+Eth1/14       SW-CAH144          connected trunk     full    10G     10Gbase-LR 
+Eth1/15       AA109-PaloAlto-Lin connected 601       full    1000    1000base-LH
+Eth1/16       Heartbeat to SW-AA connected 17        full    1000    1000base-SX
+Eth1/17       --                 xcvrAbsen 412       auto    auto    --         
+Eth1/18       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/19       UPS-Controller     connected 1         full    100     1000base-T 
+Eth1/20       --                 xcvrAbsen trunk     auto    auto    --         
+Eth1/21       AA148 Aruba 6100 u incompati trunk     auto    auto    10Gbase-SR 
+Eth1/22       OPEN               xcvrAbsen trunk     auto    auto    --         
+Eth1/23       OPEN               xcvrAbsen trunk     auto    auto    --         
+Eth1/24       OPEN               xcvrAbsen trunk     auto    auto    --         
+Eth1/25       A144 Aruba switch  connected trunk     full    10G     10Gbase-SR 
+Eth1/26       A144 Aruba switch  connected trunk     full    10G     10Gbase-SR 
+Eth1/27       **Connectivity to  xcvrAbsen trunk     auto    auto    --         
+Eth1/28       SharpCC to AA144   connected trunk     full    25G     SFP-H25GB-L
+R
+Eth1/29       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/30       --                 xcvrAbsen 401       auto    auto    --         
+Eth1/31       --                 connected 412       full    10G     10Gbase-SR 
+Eth1/32       --                 connected 412       full    10G     10Gbase-LR 
+Eth1/33       --                 connected 412       full    10G     10Gbase-SR 
+--More--
+Eth1/34       --                 connected 412       full    10G     10Gbase-SR 
+Eth1/35       FortiGate1-Port35- disabled  1         auto    10G     SFP-H25GB-L
+R
+Eth1/36       FortiGate2-Port35- notconnec routed    auto    auto    SFP-H25GB-L
+R
+Eth1/37       IDEATEK-ISP(intern xcvrAbsen 1         auto    auto    --         
+Eth1/38       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/39       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/40       B101 to AA144 port connected trunk     full    25G     SFP-H25GB-L
+R
+Eth1/41       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/42       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/43       Aruba-7205-Control connected trunk     full    10G     10Gbase-SR 
+Eth1/44       Aruba-7205-Control connected trunk     full    10G     10Gbase-SR 
+Eth1/45       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/46       fortigate 1        xcvrAbsen 401       auto    auto    --         
+Eth1/47       --                 connected 401       full    1000    1000base-T 
+Eth1/48       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/49       peerlink to 24port connected trunk     full    100G    QSFP-100G-C
+R4
+Eth1/50       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/51       --                 xcvrAbsen 1         auto    auto    --         
+Eth1/52       --                 xcvrAbsen 1         auto    auto    --         
+--More--
+Eth1/53       HP Bladeserver in  xcvrAbsen 1         auto    auto    --         
+Eth1/54       Link between AA144 connected trunk     full    100G    QSFP-100G-C
+WDM4
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Po15          ***vpc peer link** connected trunk     full    100G    --         
+
+--------------------------------------------------------------------------------
+Port          Name               Status    Vlan      Duplex  Speed   Type
+--------------------------------------------------------------------------------
+Vlan1         --                 connected routed    auto    auto    --
+Vlan2         SAN00              connected routed    auto    auto    --
+Vlan3         --                 connected routed    auto    auto    --
+Vlan17        --                 connected routed    auto    auto    --
+Vlan301       VOIP in A144       down      routed    auto    auto    --
+Vlan302       VOIP in AA105 & AA down      routed    auto    auto    --
+Vlan303       VOIP in SU121 & SA down      routed    auto    auto    --
+Vlan611       OSPF-TO-6509-CORES connected routed    auto    auto    --
+Vlan612       OSPF-TO-9300NEXUS- connected routed    auto    auto    --
+Vlan613       OSPF-H128-CiscoA48 connected routed    auto    auto    --
+Vlan614       OSPF10-AA144-A48Ci connected routed    auto    auto    --
+--More--
+Vlan615       OSPF10-A48Cisco9k- connected routed    auto    auto    --
+Vlan616       OSPF10-Epworth-To- connected routed    auto    auto    --
+Vlan617       OSFP10-TechSchool- connected routed    auto    auto    --
+Vlan618       OSFP10-SLC151-Dorm connected routed    auto    auto    --
+Vlan619       OSPF10-V201        connected routed    auto    auto    --
+Vlan620       OSPF10-B101        connected routed    auto    auto    --
+Vlan621       OSPF10-TA107       connected routed    auto    auto    --
+Vlan622       OSPF10-A144-1      connected routed    auto    auto    --
+Vlan623       OSPF10-A144-2      connected routed    auto    auto    --
+Vlan624       OSPF10-SharpCC     connected routed    auto    auto    --
+Vlan625       OSPF10-AA105       connected routed    auto    auto    --
+Vlan626       OSPF-SU121         connected routed    auto    auto    --
+Vlan627       OSPF-COS109        connected routed    auto    auto    --
+Vlan628       OSPF-Healthcenter  connected routed    auto    auto    --
+
+sw-aa144-A48#   sho clock
+sw-aa144-A48# sho clock 
+
+Warning: No NTP peer/server configured. Time may be out of sync.
+07:33:08.318 UTC Tue May 13 2025
+Time source is NTP
+
+sw-aa144-A48# sho log
+
+                    ^
+% Invalid command at '^' marker.
+
+sw-aa144-A48#  sho log
+
+                    ^
+% Invalid command at '^' marker.
+
+sw-aa144-A48# sho lo
+sw-aa144-A48# sho lo
+
+locator-led   logging       login         
+
+
+sw-aa144-A48# sho losho vers
+sw-aa144-A48# sho version 
+
+Cisco Nexus Operating System (NX-OS) Software
+TAC support: http://www.cisco.com/tac
+Copyright (C) 2002-2023, Cisco and/or its affiliates.
+All rights reserved.
+The copyrights to certain works contained in this software are
+owned by other third parties and used and distributed under their own
+licenses, such as open source.  This software is provided "as is," and unless
+otherwise stated, there is no warranty, express or implied, including but not
+limited to warranties of merchantability and fitness for a particular purpose.
+Certain components of this software are licensed under
+the GNU General Public License (GPL) version 2.0 or 
+GNU General Public License (GPL) version 3.0  or the GNU
+Lesser General Public License (LGPL) Version 2.1 or 
+Lesser General Public License (LGPL) Version 2.0. 
+A copy of each such license is available at
+http://www.opensource.org/licenses/gpl-2.0.php and
+http://opensource.org/licenses/gpl-3.0.html and
+http://www.opensource.org/licenses/lgpl-2.1.php and
+http://www.gnu.org/licenses/old-licenses/library.txt.
+
+Software
+  BIOS: version 07.69
+  NXOS: version 10.2(6) [Maintenance Release]
+--More--
+  BIOS compile time:  04/07/2021
+  NXOS image file is: bootflash:///nxos64-cs.10.2.6.M.bin
+  NXOS compile time:  8/31/2023 12:00:00 [08/29/2023 21:07:36]
+
+Hardware
+  cisco Nexus9000 C93180YC-EX chassis 
+  Intel(R) Xeon(R) CPU  @ 1.80GHz with 24617888 kB of memory.
+  Processor Board ID FDO23440YYP
+  Device name: sw-aa144-A48
+  bootflash:   53298520 kB
+
+Kernel uptime is 469 day(s), 17 hour(s), 19 minute(s), 1 second(s)
+
+Last reset at 531582 usecs after Mon Jan 29 14:13:41 2024
+  Reason: Reset due to upgrade
+  System version: 9.3(9)
+  Service: 
+
+plugin
+  Core Plugin, Ethernet Plugin
+
+Active Package(s):
+        
+
+sw-aa144-A48# sho cdp neh
+sw-aa144-A48# sho cdp neh
+
+                        ^
+% Invalid command at '^' marker.
+
+sw-aa144-A48# 
+sw-aa144-A48# sho cdp nehigh
+sw-aa144-A48# sho cdp neighbors 
+
+Capability Codes: R - Router, T - Trans-Bridge, B - Source-Route-Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater,
+                  V - VoIP-Phone, D - Remotely-Managed-Device,
+                  s - Supports-STP-Dispute
+
+Device-ID          Local Intrfce  Hldtme Capability  Platform      Port ID
+IMP01.sccc.edu.sccc.edu
+                    Eth1/2         166    H         VMware           eth0       
+   
+CUCM01.sccc.edu.sccc.edu
+                    Eth1/2         175    H         VMware           eth0       
+   
+SW-AA144-Core-USD480.sccc.edu
+                    Eth1/7         178    R S I     WS-C4510R+E      Ten5/2     
+   
+sw-ah144            Eth1/14        167    R         N2048P           Te1/0/1    
+   
+sw-aa144-A24.sccc.edu(FDO23440YY6)
+                    Eth1/16        168    R S I s   N9K-C93180YC-EX- Eth1/16    
+   
+sw-aa144-A24.sccc.edu(FDO23440YY6)
+                    Eth1/49        168    R S I s   N9K-C93180YC-EX- Eth1/49    
+   
+--More--
+sw-t122-T48.sccc.edu(FDO23440YY1)
+                    Eth1/54        176    R S I s   N9K-C93180YC-EX- Eth1/54    
+   
+
+Total entries displayed: 7
+
+sw-aa144-A48# sho cdp neghigh det
+sw-aa144-A48# sho cdp neigh detail 
+
+----------------------------------------
+Device ID:IMP01.sccc.edu.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.13.7
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth0
+Holdtime: 156 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-22.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:cc:e9
+Remote Interface MAC: 00:50:56:9e:8a:8b
+DC_UUID:  
+----------------------------------------
+Device ID:CUCM01.sccc.edu.sccc.edu
+
+Interface address(es): 1
+    IPv4 Address: 10.30.13.5
+--More--
+Platform: VMware, Capabilities: Host
+Interface: Ethernet1/2, Port ID (outgoing port): eth0
+Holdtime: 164 sec
+
+Version:
+Linux 3.10.0-862.11.6.2.el7.x86_64 #1 SMP Wed Sep 26 16:44:19 IST 2018 CCM:12.5.
+1.10000-22.i386
+
+Advertisement Version: 2
+Duplex: full
+Local Interface MAC: 3c:51:0e:39:cc:e9
+Remote Interface MAC: 00:50:56:9e:8a:8b
+DC_UUID:  
+----------------------------------------
+Device ID:SW-AA144-Core-USD480.sccc.edu
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.5
+Platform: cisco WS-C4510R+E, Capabilities: Router Switch IGMP Filtering 
+Interface: Ethernet1/7, Port ID (outgoing port): TenGigabitEthernet5/2
+Holdtime: 168 sec
+
+--More--
+Version:
+Cisco IOS Software, IOS-XE Software, Catalyst 4500 L3 Switch  Software (cat4500e
+s8-UNIVERSAL-M), Version 03.07.03.E RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 14-Jan-16 08:32 by prod_rel_team
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+Mgmt address(es):
+    IPv4 Address: 192.168.2.5
+Local Interface MAC: 3c:51:0e:39:cc:ee
+Remote Interface MAC: 00:78:88:e7:5f:01
+DC_UUID:  
+----------------------------------------
+Device ID:sw-ah144
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.44
+Platform: N2048P, Capabilities: Router 
+Interface: Ethernet1/14, Port ID (outgoing port): Te1/0/1
+--More--
+Holdtime: 157 sec
+
+Version:
+6.3.3.9
+
+Advertisement Version: 2
+Local Interface MAC: 3c:51:0e:39:cc:f5
+Remote Interface MAC: 88:6f:d4:a4:e5:24
+DC_UUID:  
+----------------------------------------
+Device ID:sw-aa144-A24.sccc.edu(FDO23440YY6)
+System Name: sw-aa144-A24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.2
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+s-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 158 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+--More--
+
+
+Advertisement Version: 2
+
+Native VLAN: 17
+Duplex: full
+
+MTU: 1500
+Mgmt address(es):
+    IPv4 Address: 192.168.2.71
+Local Interface MAC: 3c:51:0e:39:cc:f7
+Remote Interface MAC: 3c:51:0e:39:d0:67
+DC_UUID: FDO23440YY6
+----------------------------------------
+Device ID:sw-aa144-A24.sccc.edu(FDO23440YY6)
+System Name: sw-aa144-A24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.71
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+s-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 158 sec
+--More--
+
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Mgmt address(es):
+    IPv4 Address: 192.168.2.71
+Local Interface MAC: 3c:51:0e:39:cd:18
+Remote Interface MAC: 3c:51:0e:39:d0:57
+DC_UUID: FDO23440YY6
+----------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.73
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Support
+--More--
+s-STP-Dispute
+Interface: Ethernet1/54, Port ID (outgoing port): Ethernet1/54
+Holdtime: 166 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Local Interface MAC: 3c:51:0e:39:cd:2c
+Remote Interface MAC: 3c:51:0e:39:cc:8c
+DC_UUID: FDO23440YY1
+
+sw-aa144-A48# sho lldp nei
+sw-aa144-A48# sho lldp neighbors 
+
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+SW-AA144-Core-USD480.sccc.edu
+                     Eth1/7          120        BR          Te5/2         
+swa-h128             Eth1/13         120        BR          1/1/49        
+sw-ah144             Eth1/14         120                    Te1/0/1       
+sw-aa144-A24.sccc.edu
+                     Eth1/16         120        BR          Ethernet1/16  
+SW-A144-1-aruba      Eth1/25         120        BR          1/1/51        
+SW-A144-2-Aruba      Eth1/26         120        BR          1/1/51        
+swa-scc              Eth1/28         120        BR          1/1/49        
+NMBL-LIVE1-B         Eth1/31         120        S           00e0.ed7d.1c0f
+NMBL-LIVE1-B         Eth1/32         120        S           00e0.ed7d.1c10
+NMBL-LIVE1-A         Eth1/33         120        S           00e0.ed7d.20e7
+NMBL-LIVE1-A         Eth1/34         120        S           00e0.ed7d.20e8
+SW-B101-Aruba        Eth1/40         120        BR          1/1/25        
+sw-aa144-A24.sccc.edu
+                     Eth1/49         120        BR          Ethernet1/49  
+sw-t122-T48.sccc.edu 
+                     Eth1/54         120        BR          Ethernet1/54  
+Total entries displayed: 14
+
+sw-aa144-A48# sho lldp neigh dert
+sw-aa144-A48# sho lldp neigh detail 
+
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: 0078.88e7.5f00
+Port id: Te5/2
+Local Port id: Eth1/7
+Port Description: OPEN Test to 9k1
+System Name: SW-AA144-Core-USD480.sccc.edu
+System Description: Cisco IOS Software, IOS-XE Software, Catalyst 4500 L3 Switch
+  Software (cat4500es8-UNIVERSAL-M), Version 03.07.03.E RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2016 by Cisco Systems, Inc.
+Compiled Thu 14-J
+Time remaining: 116 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.5
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+--More--
+Chassis id: 0c97.5faf.6bc0
+Port id: 1/1/49
+Local Port id: Eth1/13
+Port Description: 1/1/49
+System Name: swa-h128
+System Description: Aruba JL659A  FL.10.10.1071
+Time remaining: 114 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 172.20.2.6
+Management Address IPV6: not advertised
+Vlan ID: 790
+
+
+Chassis id: 886f.d4a4.e522
+Port id: Te1/0/1
+Local Port id: Eth1/14
+Port Description: Te1/0/1
+System Name: sw-ah144
+System Description: null
+Time remaining: 90 seconds
+System Capabilities: not advertised
+Enabled Capabilities: not advertised
+--More--
+Management Address: not advertised
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 3c51.0e39.d067
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: Heartbeat to SW-AA144-A48 port 16
+System Name: sw-aa144-A24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 105 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.d067
+Management Address IPV6: not advertised
+Vlan ID: 17
+System UUID: FDO23440YY6
+
+
+Chassis id: e4de.40c7.6400
+--More--
+Port id: 1/1/51
+Local Port id: Eth1/25
+Port Description: SW-AA144 connection
+System Name: SW-A144-1-aruba
+System Description: Aruba JL659A  FL.10.10.1070
+Time remaining: 105 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.201
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: e4de.40c7.8680
+Port id: 1/1/51
+Local Port id: Eth1/26
+Port Description: SW-AA144 connection
+System Name: SW-A144-2-Aruba
+System Description: Aruba JL659A  FL.10.10.1070
+Time remaining: 98 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.202
+--More--
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: e4de.40c4.9080
+Port id: 1/1/49
+Local Port id: Eth1/28
+Port Description: 1/1/49
+System Name: swa-scc
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 95 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.203
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 00e0.ed7d.1c0f
+Port id: 00e0.ed7d.1c0f
+Local Port id: Eth1/31
+Port Description: Interface   3 as tg1
+System Name: NMBL-LIVE1-B
+--More--
+System Description: Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 
+13 20:23:17 UTC 2024 x86_64
+Time remaining: 113 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.1c0f
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 00e0.ed7d.1c10
+Port id: 00e0.ed7d.1c10
+Local Port id: Eth1/32
+Port Description: Interface   4 as tg2
+System Name: NMBL-LIVE1-B
+System Description: Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 
+13 20:23:17 UTC 2024 x86_64
+Time remaining: 113 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.1c10
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+--More--
+
+
+
+Chassis id: 00e0.ed7d.20e7
+Port id: 00e0.ed7d.20e7
+Local Port id: Eth1/33
+Port Description: Interface   3 as tg1
+System Name: NMBL-LIVE1-A
+System Description: Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 
+13 20:23:17 UTC 2024 x86_64
+Time remaining: 96 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.20e7
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 00e0.ed7d.20e8
+Port id: 00e0.ed7d.20e8
+Local Port id: Eth1/34
+Port Description: Interface   4 as tg2
+System Name: NMBL-LIVE1-A
+System Description: Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 
+--More--
+13 20:23:17 UTC 2024 x86_64
+Time remaining: 96 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.20e8
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 0c97.5fb5.de40
+Port id: 1/1/25
+Local Port id: Eth1/40
+Port Description: B101 to AA144 uplink
+System Name: SW-B101-Aruba
+System Description: Aruba JL660A  FL.10.13.0005
+Time remaining: 101 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.196
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+--More--
+Chassis id: 3c51.0e39.d088
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: SW-AA144-A24 CONNECTION TO  SW-AA144-A48
+System Name: sw-aa144-A24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 105 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.d088
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY6
+
+
+Chassis id: 3c51.0e39.cc8c
+Port id: Ethernet1/54
+Local Port id: Eth1/54
+Port Description: Link between AA144 A48 and T122 T48
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+--More--
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 105 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc8c
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY1
+
+Total entries displayed: 14
+
+sw-aa144-A48#   exit
+

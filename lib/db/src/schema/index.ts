@@ -19,3 +19,4 @@ export * from "./projects";
 export * from "./strategic_objectives";
 export * from "./ai_knowledge";
 export * from "./cio_shadow_notes";
+export * from "./device_configs";

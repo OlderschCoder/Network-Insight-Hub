@@ -263,3 +263,96 @@ export async function isAzureReachable(cfg: AzureConfig): Promise<boolean> {
     return false;
   }
 }
+
+// ─── Security / Defender for Cloud ───────────────────────────────────────────
+
+export type AzureSecurityAlert = {
+  id: string;
+  name: string;
+  alertDisplayName: string;
+  severity: string;
+  status: string;
+  description: string;
+  resourceIdentifiers: string[];
+  timeGeneratedUtc: string | null;
+  remediationSteps: string[];
+};
+
+export async function fetchSecurityAlerts(cfg: AzureConfig): Promise<AzureSecurityAlert[]> {
+  const token = await getToken(cfg);
+  const sub = cfg.subscriptionId;
+  const raw = await armGetAll<any>(
+    token,
+    `/subscriptions/${sub}/providers/Microsoft.Security/alerts?api-version=2022-01-01`,
+  );
+  return raw.map((a: any) => ({
+    id: a.id,
+    name: a.name,
+    alertDisplayName: a.properties?.alertDisplayName ?? a.name,
+    severity: a.properties?.severity ?? "Unknown",
+    status: a.properties?.status ?? "Unknown",
+    description: a.properties?.description ?? "",
+    resourceIdentifiers: (a.properties?.resourceIdentifiers ?? []).map((r: any) => r.azureResourceId ?? r.workspaceId ?? "").filter(Boolean),
+    timeGeneratedUtc: a.properties?.timeGeneratedUtc ?? null,
+    remediationSteps: a.properties?.remediationSteps ?? [],
+  }));
+}
+
+// ─── Resource Health ──────────────────────────────────────────────────────────
+
+export type AzureResourceHealth = {
+  resourceId: string;
+  name: string;
+  availabilityState: string;
+  summary: string;
+  reasonType: string | null;
+  occurredTime: string | null;
+};
+
+export async function fetchResourceHealth(cfg: AzureConfig, resourceId?: string): Promise<AzureResourceHealth[]> {
+  const token = await getToken(cfg);
+  const sub = cfg.subscriptionId;
+  const path = resourceId
+    ? `${resourceId}/providers/Microsoft.ResourceHealth/availabilityStatuses?api-version=2022-10-01`
+    : `/subscriptions/${sub}/providers/Microsoft.ResourceHealth/availabilityStatuses?api-version=2022-10-01`;
+  const raw = await armGetAll<any>(token, path.startsWith("/") ? path : `/${path}`);
+  return raw.map((h: any) => ({
+    resourceId: h.id ?? "",
+    name: h.name ?? "",
+    availabilityState: h.properties?.availabilityState ?? "Unknown",
+    summary: h.properties?.summary ?? "",
+    reasonType: h.properties?.reasonType ?? null,
+    occurredTime: h.properties?.occurredTime ?? null,
+  }));
+}
+
+// ─── Policy Compliance ────────────────────────────────────────────────────────
+
+export type AzurePolicyState = {
+  resourceId: string;
+  policyAssignmentName: string;
+  policyDefinitionName: string;
+  complianceState: string;
+  resourceType: string;
+  resourceGroup: string | null;
+  timestamp: string | null;
+};
+
+export async function fetchPolicyStates(cfg: AzureConfig, nonCompliantOnly = true): Promise<AzurePolicyState[]> {
+  const token = await getToken(cfg);
+  const sub = cfg.subscriptionId;
+  const filter = nonCompliantOnly ? "&$filter=complianceState eq 'NonCompliant'" : "";
+  const raw = await armGetAll<any>(
+    token,
+    `/subscriptions/${sub}/providers/Microsoft.PolicyInsights/policyStates/latest/queryResults?api-version=2019-10-01${filter}`,
+  );
+  return raw.map((p: any) => ({
+    resourceId: p.resourceId ?? "",
+    policyAssignmentName: p.policyAssignmentName ?? "",
+    policyDefinitionName: p.policyDefinitionName ?? "",
+    complianceState: p.complianceState ?? "Unknown",
+    resourceType: p.resourceType ?? "",
+    resourceGroup: parseResourceGroup(p.resourceId ?? ""),
+    timestamp: p.timestamp ?? null,
+  }));
+}
