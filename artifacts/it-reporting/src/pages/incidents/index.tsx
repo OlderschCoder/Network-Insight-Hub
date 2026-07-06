@@ -48,6 +48,11 @@ export default function IncidentsPage() {
 
   const { data: rooms = [], isLoading } = useQuery<IncidentRoom[]>({
     queryKey: ["/api/incidents"],
+    queryFn: async () => {
+      const res = await authFetch("/api/incidents");
+      if (!res.ok) throw new Error("Failed to load rooms");
+      return res.json();
+    },
     refetchInterval: 15000,
   });
 

@@ -83,6 +83,11 @@ export default function IncidentRoomPage() {
 
   const { data: room, isLoading } = useQuery<RoomDetail>({
     queryKey: [`/api/incidents/${roomId}`],
+    queryFn: async () => {
+      const res = await authFetch(`/api/incidents/${roomId}`);
+      if (!res.ok) throw new Error("Failed to load room");
+      return res.json();
+    },
     refetchOnWindowFocus: false,
   });
 
@@ -339,6 +344,11 @@ function AddMemberDialog({
   const qc = useQueryClient();
   const { data: allUsers = [] } = useQuery<{ id: number; name: string; email: string }[]>({
     queryKey: ["/api/users"],
+    queryFn: async () => {
+      const res = await authFetch("/api/users");
+      if (!res.ok) throw new Error("Failed to load users");
+      return res.json();
+    },
     enabled: open,
   });
 
