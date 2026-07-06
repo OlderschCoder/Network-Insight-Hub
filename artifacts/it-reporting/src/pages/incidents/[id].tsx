@@ -22,8 +22,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Send, UserPlus, CheckCircle2, Bot, User } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/context/AuthContext";
+
+async function apiRequest(method: string, url: string, body?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
+  return res;
+}
 import ReactMarkdown from "react-markdown";
 
 type Message = {
