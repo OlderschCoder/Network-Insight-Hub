@@ -22,6 +22,7 @@ import analyticsRouter from "./analytics";
 import aiKnowledgeRouter from "./ai_knowledge";
 import cioShadowNotesRouter from "./cio_shadow_notes";
 import deviceConfigsRouter from "./device_configs";
+import incidentsRouter from "./incidents";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use("/analytics", analyticsRouter);
 router.use("/ai-knowledge", aiKnowledgeRouter);
 router.use("/cio-shadow-notes", cioShadowNotesRouter);
 router.use("/network/configs", deviceConfigsRouter);
+router.use("/incidents", incidentsRouter);
 
 export default router;

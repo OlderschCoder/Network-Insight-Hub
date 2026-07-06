@@ -29,6 +29,8 @@ import NetworkTools from "@/pages/network/tools";
 import AfterAction from "@/pages/after-action/index";
 import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
+import Incidents from "@/pages/incidents/index";
+import IncidentRoom from "@/pages/incidents/[id]";
 import Admin from "@/pages/admin/index";
 import AIReport from "@/pages/ai-report/index";
 import UserGuide from "@/pages/user-guide/index";
@@ -121,6 +123,8 @@ function Router() {
       <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />
       <Route path="/it-apps" component={() => <ProtectedRoute component={ITApps} />} />
       
+      <Route path="/incidents" component={() => <ProtectedRoute component={Incidents} />} />
+      <Route path="/incidents/:id" component={() => <ProtectedRoute component={IncidentRoom} />} />
       <Route path="/after-action" component={() => <ProtectedRoute component={AfterAction} />} />
       <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />
       <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />

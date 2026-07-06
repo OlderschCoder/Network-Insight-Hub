@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   BarChart3,
   LayoutGrid,
+  Siren,
 } from "lucide-react";
 
 export type NavItem = {
@@ -49,6 +50,7 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     label: "Operations",
     separator: [3], // separator index before CIO-only items
     items: [
+      { href: "/incidents", label: "Incident Rooms", desc: "Live group chat for outage response", icon: Siren, match: (l) => l === "/incidents" || l.startsWith("/incidents/") },
       { href: "/risks", label: "Risks & Issues", desc: "Open risks, issues, and design notes", icon: ShieldAlert },
       { href: "/after-action", label: "Post-Incident Reviews", desc: "Document incidents and lessons", icon: Activity },
       { href: "/reports", label: "Weekly Reports", desc: "Department weekly reports", icon: Files },
