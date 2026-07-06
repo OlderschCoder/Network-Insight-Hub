@@ -23,13 +23,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Send, UserPlus, CheckCircle2, Bot, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/authFetch";
 
 async function apiRequest(method: string, url: string, body?: unknown) {
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
-    credentials: "include",
   });
   if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
   return res;
@@ -93,7 +93,8 @@ export default function IncidentRoomPage() {
 
   // SSE — real-time messages
   useEffect(() => {
-    const es = new EventSource(`/api/incidents/${roomId}/stream`, { withCredentials: true });
+    const token = localStorage.getItem("auth_token") ?? "";
+    const es = new EventSource(`/api/incidents/${roomId}/stream?token=${encodeURIComponent(token)}`);
 
     es.addEventListener("message", (e) => {
       const msg: Message = JSON.parse(e.data);

@@ -20,14 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Siren, Plus, CheckCircle2, Clock } from "lucide-react";
+import { authFetch } from "@/lib/authFetch";
 import type { IncidentRoom } from "@workspace/db";
 
 async function apiRequest(method: string, url: string, body?: unknown) {
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
-    credentials: "include",
   });
   if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
   return res;

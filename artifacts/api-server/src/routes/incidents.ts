@@ -13,7 +13,7 @@
 import { Router, Response } from "express";
 import { db, incidentRoomsTable, incidentMessagesTable, incidentMembersTable, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { requireAuth, getUserIdFromToken } from "./auth";
 import { logger } from "../lib/logger";
 import { getKnowledgeContext, runChatWithMemory } from "../lib/ai_knowledge";
 import { getOpenAI } from "../lib/openai";
@@ -195,7 +195,12 @@ router.post("/:id/messages", requireAuth, async (req: any, res) => {
 });
 
 // ── SSE stream ────────────────────────────────────────────────────────────────
-router.get("/:id/stream", requireAuth, (req: any, res) => {
+// EventSource can't set headers so auth token comes via ?token= query param
+router.get("/:id/stream", async (req: any, res) => {
+  const token = (req.query.token as string) ?? "";
+  const userId = await getUserIdFromToken(token);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   const roomId = parseInt(req.params.id);
 
   res.setHeader("Content-Type", "text/event-stream");
