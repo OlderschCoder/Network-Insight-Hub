@@ -99,6 +99,10 @@ interface LayoutEvent {
   createdAt: string;
 }
 
+// Stable empty graph — returned by nmGraph when no nodes are visible.
+// Using a module-level constant avoids new [] references each render.
+const NM_EMPTY_GRAPH = { nodes: [] as Node[], edges: [] as Edge[] };
+
 export default function NetworkVisualize() {
   const confirm = useConfirm();
   const { data: switches = [] } = useListSwitches({});
@@ -119,12 +123,15 @@ export default function NetworkVisualize() {
   const [nmSearch, setNmSearch] = useState("");
   const [nmExpandedBuildings, setNmExpandedBuildings] = useState<Set<string>>(new Set());
 
-  const { data: nmNodes = [] } = useQuery<NMNode[]>({
+  // Stable fallbacks so disabled queries don't create new [] refs every render
+  const nmNodesDefault = useRef<NMNode[]>([]).current;
+  const nmLinksDefault = useRef<NMLink[]>([]).current;
+  const { data: nmNodes = nmNodesDefault } = useQuery<NMNode[]>({
     queryKey: ["/api/network-map/nodes"],
     queryFn: () => authFetch("/api/network-map/nodes").then(r => r.json()),
     enabled: dataSource === "netmap",
   });
-  const { data: nmLinks = [] } = useQuery<NMLink[]>({
+  const { data: nmLinks = nmLinksDefault } = useQuery<NMLink[]>({
     queryKey: ["/api/network-map/links"],
     queryFn: () => authFetch("/api/network-map/links").then(r => r.json()),
     enabled: dataSource === "netmap",
@@ -172,7 +179,7 @@ export default function NetworkVisualize() {
     const visibleNodes = nmVisibleNodeIds.size > 0
       ? nmNodes.filter(n => nmVisibleNodeIds.has(n.id))
       : [];
-    if (!visibleNodes.length) return { nodes: [] as Node[], edges: [] as Edge[] };
+    if (!visibleNodes.length) return NM_EMPTY_GRAPH;
 
     const ROLE_COLOR: Record<string,string> = {
       core:         "#ef4444",
@@ -283,10 +290,11 @@ export default function NetworkVisualize() {
     return { nodes: rfNodes, edges: rfEdges };
   }, [nmNodes, nmLinks, nmNodeById, nmVisibleNodeIds]);
 
-  const [nmFlowNodes, setNmFlowNodes, onNmNodesChange] = useNodesState(nmGraph.nodes);
-  const [nmFlowEdges, setNmFlowEdges, onNmEdgesChange] = useEdgesState(nmGraph.edges);
-  useEffect(() => { setNmFlowNodes(nmGraph.nodes); }, [nmGraph.nodes, setNmFlowNodes]);
-  useEffect(() => { setNmFlowEdges(nmGraph.edges); }, [nmGraph.edges, setNmFlowEdges]);
+  // NM graph is read-only (no dragging), so pass computed values directly
+  // instead of syncing through useNodesState — avoids the infinite-render loop
+  // caused by new [] references on every render when queries are disabled.
+  const nmFlowNodes = nmGraph.nodes;
+  const nmFlowEdges = nmGraph.edges;
 
   const filteredSwitches = useMemo(() => {
     const q = search.toLowerCase();
@@ -1771,8 +1779,8 @@ export default function NetworkVisualize() {
                     <ReactFlow
                       nodes={nmFlowNodes}
                       edges={nmFlowEdges}
-                      onNodesChange={onNmNodesChange}
-                      onEdgesChange={onNmEdgesChange}
+                      onNodesChange={() => {}}
+                      onEdgesChange={() => {}}
                       onNodeClick={(_evt, node) => {
                         const nmNode = (node.data as any)?.nmNode as NMNode | undefined;
                         if (nmNode) { setNmSelectedNode(nmNode); void handleNmUpstreamPath(nmNode); }
