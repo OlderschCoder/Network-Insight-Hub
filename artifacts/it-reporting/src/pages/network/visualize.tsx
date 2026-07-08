@@ -114,6 +114,9 @@ export default function NetworkVisualize() {
   const [nmSelectedNode, setNmSelectedNode] = useState<NMNode|null>(null);
   const [nmUpstream, setNmUpstream] = useState<UpstreamResult|null>(null);
   const [nmUpstreamLoading, setNmUpstreamLoading] = useState(false);
+  // Nodes the user has chosen to show — empty = blank canvas
+  const [nmVisibleNodeIds, setNmVisibleNodeIds] = useState<Set<string>>(new Set());
+  const [nmSearch, setNmSearch] = useState("");
 
   const { data: nmNodes = [] } = useQuery<NMNode[]>({
     queryKey: ["/api/network-map/nodes"],
@@ -137,9 +140,38 @@ export default function NetworkVisualize() {
     } catch { /* ignore */ } finally { setNmUpstreamLoading(false); }
   }, []);
 
-  // Build ReactFlow graph from net_nodes + net_links
+  // Add a node + all its direct link neighbours to the visible set
+  const addNodeToView = useCallback((nodeId: string) => {
+    const toAdd = new Set([nodeId]);
+    for (const link of nmLinks) {
+      if (link.aNodeId === nodeId) toAdd.add(link.bNodeId);
+      if (link.bNodeId === nodeId) toAdd.add(link.aNodeId);
+    }
+    setNmVisibleNodeIds(prev => new Set([...prev, ...toAdd]));
+  }, [nmLinks]);
+
+  const removeNodeFromView = useCallback((nodeId: string) => {
+    setNmVisibleNodeIds(prev => { const n = new Set(prev); n.delete(nodeId); return n; });
+  }, []);
+
+  // Building-grouped list of nmNodes for the left panel
+  const nmByBuilding = useMemo(() => {
+    const q = nmSearch.toLowerCase();
+    const map = new Map<string, NMNode[]>();
+    for (const n of nmNodes) {
+      if (q && !n.hostname.toLowerCase().includes(q) && !n.building.toLowerCase().includes(q)) continue;
+      if (!map.has(n.building)) map.set(n.building, []);
+      map.get(n.building)!.push(n);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [nmNodes, nmSearch]);
+
+  // Build ReactFlow graph — only from nodes the user has selected
   const nmGraph = useMemo(() => {
-    if (!nmNodes.length) return { nodes: [] as Node[], edges: [] as Edge[] };
+    const visibleNodes = nmVisibleNodeIds.size > 0
+      ? nmNodes.filter(n => nmVisibleNodeIds.has(n.id))
+      : [];
+    if (!visibleNodes.length) return { nodes: [] as Node[], edges: [] as Edge[] };
 
     const ROLE_COLOR: Record<string,string> = {
       core:         "#ef4444",
@@ -152,7 +184,7 @@ export default function NetworkVisualize() {
 
     // Group by building
     const buildings = new Map<string, NMNode[]>();
-    for (const n of nmNodes) {
+    for (const n of visibleNodes) {
       if (!buildings.has(n.building)) buildings.set(n.building, []);
       buildings.get(n.building)!.push(n);
     }
@@ -248,7 +280,7 @@ export default function NetworkVisualize() {
     }
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [nmNodes, nmLinks, nmNodeById]);
+  }, [nmNodes, nmLinks, nmNodeById, nmVisibleNodeIds]);
 
   const [nmFlowNodes, setNmFlowNodes, onNmNodesChange] = useNodesState(nmGraph.nodes);
   const [nmFlowEdges, setNmFlowEdges, onNmEdgesChange] = useEdgesState(nmGraph.edges);
@@ -1655,11 +1687,69 @@ export default function NetworkVisualize() {
           <CardContent className="p-0">
             {dataSource === "netmap" ? (
               <div className="flex" style={{ height: "70vh" }}>
-                {/* NM ReactFlow canvas */}
-                <div ref={flowWrapperRef} className="flex-1 bg-slate-950 rounded-bl-lg" style={{ minWidth: 0 }}>
-                  {nmNodes.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                      Loading network map nodes…
+
+                {/* ── Left panel: building/switch picker ── */}
+                <div className="w-56 shrink-0 border-r border-border bg-card flex flex-col rounded-bl-lg overflow-hidden">
+                  <div className="p-2 border-b border-border space-y-1.5">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                      <input
+                        placeholder="Filter…"
+                        value={nmSearch}
+                        onChange={e => setNmSearch(e.target.value)}
+                        className="w-full pl-6 pr-2 py-1 text-xs bg-muted rounded border-0 outline-none"
+                      />
+                    </div>
+                    {nmVisibleNodeIds.size > 0 && (
+                      <button
+                        className="w-full text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 px-1"
+                        onClick={() => { setNmVisibleNodeIds(new Set()); setNmSelectedNode(null); }}
+                      >
+                        <X className="h-3 w-3" /> Clear diagram ({nmVisibleNodeIds.size})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto text-xs">
+                    {nmByBuilding.map(([building, nodes]) => (
+                      <div key={building}>
+                        <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 sticky top-0">
+                          {building}
+                        </div>
+                        {nodes.map(n => {
+                          const visible = nmVisibleNodeIds.has(n.id);
+                          const ROLE_DOT: Record<string,string> = {
+                            core: "#ef4444", distribution: "#f97316",
+                            access: "#3b82f6", firewall: "#f59e0b",
+                            edge: "#8b5cf6", controller: "#10b981",
+                          };
+                          const dot = ROLE_DOT[n.role] ?? "#64748b";
+                          return (
+                            <button
+                              key={n.id}
+                              onClick={() => visible ? removeNodeFromView(n.id) : addNodeToView(n.id)}
+                              className={`w-full text-left px-2 py-1.5 hover:bg-muted/50 flex items-center gap-1.5 ${visible ? "bg-emerald-950/40" : ""}`}
+                            >
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, display: "inline-block", flexShrink: 0 }} />
+                              <span className={`font-mono truncate flex-1 ${visible ? "text-emerald-300" : ""}`}>{n.hostname}</span>
+                              {visible && <span className="text-emerald-500 text-[9px]">●</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    {nmByBuilding.length === 0 && (
+                      <p className="p-3 text-center text-muted-foreground">No matches</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── ReactFlow canvas ── */}
+                <div ref={flowWrapperRef} className="flex-1 bg-slate-950" style={{ minWidth: 0 }}>
+                  {nmFlowNodes.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+                      <NetIcon className="h-8 w-8 opacity-20" />
+                      <span>Click a switch in the list to add it to the map</span>
+                      <span className="text-xs opacity-60">Each switch shows its direct neighbours</span>
                     </div>
                   ) : (
                     <ReactFlow
