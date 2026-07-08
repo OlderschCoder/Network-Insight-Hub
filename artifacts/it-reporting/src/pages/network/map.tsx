@@ -271,6 +271,7 @@ export default function NetworkMapPage() {
         <TabsList>
           <TabsTrigger value="nodes">Nodes</TabsTrigger>
           <TabsTrigger value="links">Links</TabsTrigger>
+          <TabsTrigger value="portmap">Port Map</TabsTrigger>
         </TabsList>
 
         {/* ── Nodes tab ─────────────────────────────────────── */}
@@ -487,6 +488,11 @@ export default function NetworkMapPage() {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        {/* ── Port Map tab ──────────────────────────────────── */}
+        <TabsContent value="portmap" className="mt-3">
+          <SwitchPortMap nodes={nodes} links={links} nodeById={nodeById} />
         </TabsContent>
       </Tabs>
 
@@ -1104,5 +1110,317 @@ function LldpImportDialog({ onClose, onImported }: { onClose: () => void; onImpo
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Switch Port Map
+// Shows a visual faceplate for any switch, colored by LLDP confidence.
+// Hover a port for full details; click to pin the detail panel.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type PortEntry = {
+  link: NetLink;
+  neighbor: NetNode | undefined;
+  localPort: string;
+  remotePort: string;
+};
+
+const CONFIDENCE_PORT_COLOR: Record<string, string> = {
+  confirmed_lldp:   "bg-emerald-500 text-white border-emerald-600",
+  confirmed_cdp:    "bg-emerald-500 text-white border-emerald-600",
+  confirmed_manual: "bg-blue-500   text-white border-blue-600",
+  inferred:         "bg-amber-400  text-white border-amber-500",
+  stale:            "bg-slate-300  text-slate-600 border-slate-400",
+};
+
+const PORT_MODE_COLOR: Record<string, string> = {
+  peerlink:  "ring-2 ring-purple-500",
+  heartbeat: "ring-2 ring-indigo-400",
+  routed:    "ring-2 ring-cyan-400",
+};
+
+const CRIT_BADGE: Record<string, string> = {
+  critical: "bg-red-100 text-red-700",
+  high:     "bg-orange-100 text-orange-700",
+  medium:   "bg-blue-100 text-blue-700",
+  low:      "bg-slate-100 text-slate-600",
+};
+
+function fmtSpeed(mbps: number | null): string {
+  if (!mbps) return "";
+  if (mbps >= 100000) return "100G";
+  if (mbps >= 40000)  return "40G";
+  if (mbps >= 25000)  return "25G";
+  if (mbps >= 10000)  return "10G";
+  if (mbps >= 1000)   return "1G";
+  return `${mbps}M`;
+}
+
+function parsePortNum(port: string): number {
+  // "Eth1/14" → 14, "Eth1/49" → 49, "1/1/49" → 49, "Gi1/0/1" → 1
+  const parts = port.split("/");
+  const last = parseInt(parts[parts.length - 1], 10);
+  return isNaN(last) ? 999 : last;
+}
+
+function SwitchPortMap({
+  nodes,
+  links,
+  nodeById,
+}: {
+  nodes: NetNode[];
+  links: NetLink[];
+  nodeById: Map<string, NetNode>;
+}) {
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [pinnedPort, setPinnedPort] = useState<PortEntry | null>(null);
+  const [hoveredPort, setHoveredPort] = useState<PortEntry | null>(null);
+
+  // Default to first core switch when data loads
+  const switches = useMemo(
+    () => nodes.filter((n) => n.nodeKind === "switch" || n.nodeKind === "router")
+               .sort((a, b) => a.hostname.localeCompare(b.hostname)),
+    [nodes],
+  );
+
+  // Auto-select first core switch
+  useState(() => {
+    if (!selectedId && switches.length) {
+      const core = switches.find((s) => s.role === "core") ?? switches[0];
+      setSelectedId(core.id);
+    }
+  });
+
+  const selectedSwitch = nodeById.get(selectedId) ?? switches.find((s) => s.role === "core") ?? switches[0];
+
+  const effectiveId = selectedSwitch?.id ?? selectedId;
+
+  // Build port → entry map
+  const portMap = useMemo(() => {
+    const m = new Map<string, PortEntry>();
+    if (!effectiveId) return m;
+    for (const link of links) {
+      if (link.aNodeId === effectiveId) {
+        m.set(link.aPort, { link, neighbor: nodeById.get(link.bNodeId), localPort: link.aPort, remotePort: link.bPort });
+      } else if (link.bNodeId === effectiveId) {
+        m.set(link.bPort, { link, neighbor: nodeById.get(link.aNodeId), localPort: link.bPort, remotePort: link.aPort });
+      }
+    }
+    return m;
+  }, [links, effectiveId, nodeById]);
+
+  // Build sorted port list: all known ports + gaps up to 54 for Nexus
+  const portSlots = useMemo(() => {
+    const knownNums = [...portMap.keys()].map(parsePortNum).filter((n) => n < 900);
+    const maxPort = knownNums.length ? Math.max(...knownNums) : 24;
+    const slots: string[] = [];
+    for (let i = 1; i <= Math.max(maxPort, 24); i++) {
+      slots.push(`${i}`);
+    }
+    return slots;
+  }, [portMap]);
+
+  // Map slot number → PortEntry (match by port number suffix)
+  const slotEntries = useMemo(() => {
+    const m = new Map<number, PortEntry>();
+    for (const [portStr, entry] of portMap.entries()) {
+      const num = parsePortNum(portStr);
+      if (num < 900) m.set(num, entry);
+    }
+    return m;
+  }, [portMap]);
+
+  const detail = hoveredPort ?? pinnedPort;
+
+  if (!switches.length) {
+    return (
+      <div className="py-16 text-center text-muted-foreground">
+        No switches in the Network Map yet. Seed nodes first.
+      </div>
+    );
+  }
+
+  // Split into downlink rows (1‥48) and uplink row (49+)
+  const allNums = portSlots.map(Number);
+  const downlinks = allNums.filter((n) => n <= 48);
+  const uplinks   = allNums.filter((n) => n > 48);
+
+  function PortSlot({ num }: { num: number }) {
+    const entry = slotEntries.get(num);
+    const baseColor = entry
+      ? (CONFIDENCE_PORT_COLOR[entry.link.confidence] ?? "bg-slate-400 text-white")
+      : "bg-slate-100 text-slate-400 border-slate-200";
+    const modeRing = entry ? (PORT_MODE_COLOR[entry.link.portMode ?? ""] ?? "") : "";
+    const isPinned = pinnedPort?.localPort === entry?.localPort;
+
+    return (
+      <div
+        key={num}
+        className={`
+          relative flex flex-col items-center justify-center
+          rounded border cursor-pointer select-none transition-all
+          ${uplinks.includes(num) ? "w-12 h-14" : "w-10 h-12"}
+          ${baseColor} ${modeRing}
+          ${isPinned ? "ring-2 ring-yellow-400" : ""}
+          hover:opacity-80 hover:scale-105
+        `}
+        onMouseEnter={() => entry && setHoveredPort(entry)}
+        onMouseLeave={() => setHoveredPort(null)}
+        onClick={() => {
+          if (!entry) return;
+          setPinnedPort(isPinned ? null : entry);
+        }}
+      >
+        <span className="text-[9px] font-bold leading-tight">{num}</span>
+        {entry && (
+          <span className="text-[7px] leading-tight text-center px-0.5 truncate max-w-full">
+            {entry.neighbor?.hostname
+              ? entry.neighbor.hostname.replace(/^(sw[a-z]?-|SW-|swa-)/i, "").substring(0, 7)
+              : "?"}
+          </span>
+        )}
+        {entry && fmtSpeed(entry.link.speedMbps) && (
+          <span className="text-[6px] opacity-80">{fmtSpeed(entry.link.speedMbps)}</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Switch selector */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select
+          value={effectiveId}
+          onValueChange={(v) => { setSelectedId(v); setPinnedPort(null); setHoveredPort(null); }}
+        >
+          <SelectTrigger className="w-72">
+            <SelectValue placeholder="Select switch…" />
+          </SelectTrigger>
+          <SelectContent>
+            {switches.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.hostname} — {s.building}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedSwitch && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-mono">{selectedSwitch.mgmtIp ?? "no IP"}</span>
+            <Badge variant="outline" className={ROLE_COLOR[selectedSwitch.role] ?? ""}>
+              {selectedSwitch.role}
+            </Badge>
+            <span>{selectedSwitch.model ?? ""}</span>
+            <span className="text-xs">
+              {portMap.size} / {portSlots.length} ports connected
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Faceplate panel */}
+      <div className="border rounded-xl bg-slate-50 p-4 space-y-3">
+        {/* Downlink ports: rows of 12 */}
+        {downlinks.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5 font-medium">Downlink ports (1–{Math.max(...downlinks)})</p>
+            <div className="flex flex-wrap gap-1">
+              {downlinks.map((n) => <PortSlot key={n} num={n} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Uplink ports */}
+        {uplinks.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5 font-medium">Uplink ports ({Math.min(...uplinks)}–{Math.max(...uplinks)})</p>
+            <div className="flex gap-1.5">
+              {uplinks.map((n) => <PortSlot key={n} num={n} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 pt-1 border-t text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> Confirmed LLDP/CDP</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block" /> Manual</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-400 inline-block" /> Inferred</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-300 inline-block" /> Stale</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Empty</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded ring-2 ring-purple-500 inline-block" /> Peer-link</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded ring-2 ring-indigo-400 inline-block" /> Heartbeat</span>
+        </div>
+      </div>
+
+      {/* Detail panel — hover or click */}
+      {detail ? (
+        <div className="border rounded-lg p-4 bg-white shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Local port</p>
+            <p className="font-mono font-bold text-base">{detail.localPort}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {detail.link.portMode ?? "unknown mode"}
+              {detail.link.portMode === "peerlink" && <span className="ml-1 text-purple-600 font-medium">vPC peer-link</span>}
+              {detail.link.portMode === "heartbeat" && <span className="ml-1 text-indigo-600 font-medium">vPC heartbeat</span>}
+            </p>
+            {detail.link.nativeVlan && (
+              <p className="text-xs text-muted-foreground">Native VLAN {detail.link.nativeVlan}</p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Neighbor</p>
+            <p className="font-bold">{detail.neighbor?.hostname ?? detail.link.lldpPeerHostname ?? "Unknown"}</p>
+            <p className="text-xs text-muted-foreground">{detail.neighbor?.model ?? detail.neighbor?.vendor ?? ""}</p>
+            <p className="font-mono text-xs text-muted-foreground">{detail.neighbor?.mgmtIp ?? ""}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Remote port: <span className="font-mono">{detail.remotePort}</span></p>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Link</p>
+            <p className="font-bold">{fmtSpeed(detail.link.speedMbps) || "?"}</p>
+            <p className="text-xs text-muted-foreground">{detail.link.linkKind}</p>
+            <p className={`text-xs font-medium mt-1 ${CONFIDENCE_STYLE[detail.link.confidence] ?? ""}`}>
+              {detail.link.confidence?.replace(/_/g, " ")}
+            </p>
+            {detail.link.lastVerifiedAt && (
+              <p className="text-xs text-muted-foreground">
+                Verified {new Date(detail.link.lastVerifiedAt).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Impact</p>
+            {detail.neighbor ? (
+              <>
+                <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${CRIT_BADGE[detail.neighbor.criticality] ?? ""}`}>
+                  {detail.neighbor.criticality}
+                </span>
+                <p className="text-xs text-muted-foreground mt-1">{detail.neighbor.building}</p>
+                <p className="text-xs text-muted-foreground">{detail.neighbor.function ?? detail.neighbor.role}</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">No node record</p>
+            )}
+            {detail.link.notes && (
+              <p className="text-xs text-muted-foreground mt-1 italic">{detail.link.notes}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          Hover or click a port for details
+        </p>
+      )}
+
+      {/* Missing data callout */}
+      <div className="border border-amber-200 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 space-y-1">
+        <p className="font-semibold">Data not yet collected (needed for full spec):</p>
+        <p>Admin/oper status, port descriptions, vPC IDs, allowed VLAN lists, optics/DOM levels, error counters, utilization — paste <span className="font-mono">show interface</span>, <span className="font-mono">show interface trunk</span>, <span className="font-mono">show vpc</span>, <span className="font-mono">show interface transceiver</span> output to expand port detail.</p>
+      </div>
+    </div>
   );
 }
