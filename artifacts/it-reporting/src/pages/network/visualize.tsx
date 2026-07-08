@@ -117,6 +117,7 @@ export default function NetworkVisualize() {
   // Nodes the user has chosen to show — empty = blank canvas
   const [nmVisibleNodeIds, setNmVisibleNodeIds] = useState<Set<string>>(new Set());
   const [nmSearch, setNmSearch] = useState("");
+  const [nmExpandedBuildings, setNmExpandedBuildings] = useState<Set<string>>(new Set());
 
   const { data: nmNodes = [] } = useQuery<NMNode[]>({
     queryKey: ["/api/network-map/nodes"],
@@ -1329,13 +1330,83 @@ export default function NetworkVisualize() {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Pick switches and VLANs from the lists below — they'll appear in the diagram, grouped by
-        building. Drag nodes to reposition. The diagram shows what's selected; it doesn't pull live
-        link data, so use it to compose a quick logical view.
+        {dataSource === "netmap"
+          ? "Click a building to expand it, then click a switch to add it and its neighbours to the map. Click again to remove."
+          : "Pick switches and VLANs from the lists below — they'll appear in the diagram, grouped by building."}
       </p>
 
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <div className="space-y-3">
+          {/* ── Network Map picker (replaces inventory tabs) ── */}
+          {dataSource === "netmap" ? (<>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filter buildings / switches…"
+                value={nmSearch}
+                onChange={(e) => setNmSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {nmVisibleNodeIds.size > 0 && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{nmVisibleNodeIds.size} node{nmVisibleNodeIds.size === 1 ? "" : "s"} on map</span>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs"
+                  onClick={() => { setNmVisibleNodeIds(new Set()); setNmSelectedNode(null); }}>
+                  <X className="h-3 w-3 mr-1" /> Clear map
+                </Button>
+              </div>
+            )}
+            <Card>
+              <CardContent className="p-2 max-h-[65vh] overflow-y-auto space-y-0.5">
+                {nmByBuilding.map(([building, bNodes]) => {
+                  const expanded = nmExpandedBuildings.has(building);
+                  const visCount = bNodes.filter(n => nmVisibleNodeIds.has(n.id)).length;
+                  const ROLE_DOT: Record<string,string> = { core:"#ef4444", distribution:"#f97316", access:"#3b82f6", firewall:"#f59e0b", edge:"#8b5cf6", controller:"#10b981" };
+                  return (
+                    <div key={building}>
+                      <button
+                        onClick={() => {
+                          const next = new Set(nmExpandedBuildings);
+                          if (next.has(building)) next.delete(building); else next.add(building);
+                          setNmExpandedBuildings(next);
+                        }}
+                        className="w-full text-left px-2 py-1.5 rounded hover:bg-muted/50 flex items-center gap-2 text-xs font-semibold"
+                      >
+                        <span className="text-muted-foreground">{expanded ? "▾" : "▸"}</span>
+                        <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="flex-1 truncate">{building}</span>
+                        <span className="text-muted-foreground font-normal">{bNodes.length}</span>
+                        {visCount > 0 && <Badge className="text-[9px] px-1 py-0 h-4 bg-emerald-800 text-emerald-200">{visCount}</Badge>}
+                      </button>
+                      {expanded && bNodes.map(n => {
+                        const visible = nmVisibleNodeIds.has(n.id);
+                        const dot = ROLE_DOT[n.role] ?? "#64748b";
+                        return (
+                          <button key={n.id}
+                            onClick={() => visible ? removeNodeFromView(n.id) : addNodeToView(n.id)}
+                            className={`w-full text-left pl-7 pr-2 py-1 rounded text-xs flex items-center gap-2 hover:bg-muted/50 ${visible ? "bg-emerald-950/50" : ""}`}
+                          >
+                            <span style={{ width:6, height:6, borderRadius:"50%", background:dot, display:"inline-block", flexShrink:0 }} />
+                            <span className={`font-mono flex-1 truncate ${visible ? "text-emerald-300" : ""}`}>{n.hostname}</span>
+                            {visible
+                              ? <span className="text-emerald-500 text-[10px]">●</span>
+                              : <span className="text-muted-foreground text-[10px]">+</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {nmByBuilding.length === 0 && (
+                  <p className="text-xs text-muted-foreground p-4 text-center">
+                    {nmNodes.length === 0 ? "Loading…" : "No matches."}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </>) : (<>
+          {/* ── Manual topology inventory tabs ── */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1571,6 +1642,7 @@ export default function NetworkVisualize() {
               </Card>
             </TabsContent>
           </Tabs>
+          </>)}
         </div>
 
         <Card>
@@ -1687,64 +1759,8 @@ export default function NetworkVisualize() {
           <CardContent className="p-0">
             {dataSource === "netmap" ? (
               <div className="flex" style={{ height: "70vh" }}>
-
-                {/* ── Left panel: building/switch picker ── */}
-                <div className="w-56 shrink-0 border-r border-border bg-card flex flex-col rounded-bl-lg overflow-hidden">
-                  <div className="p-2 border-b border-border space-y-1.5">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                      <input
-                        placeholder="Filter…"
-                        value={nmSearch}
-                        onChange={e => setNmSearch(e.target.value)}
-                        className="w-full pl-6 pr-2 py-1 text-xs bg-muted rounded border-0 outline-none"
-                      />
-                    </div>
-                    {nmVisibleNodeIds.size > 0 && (
-                      <button
-                        className="w-full text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 px-1"
-                        onClick={() => { setNmVisibleNodeIds(new Set()); setNmSelectedNode(null); }}
-                      >
-                        <X className="h-3 w-3" /> Clear diagram ({nmVisibleNodeIds.size})
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex-1 overflow-y-auto text-xs">
-                    {nmByBuilding.map(([building, nodes]) => (
-                      <div key={building}>
-                        <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 sticky top-0">
-                          {building}
-                        </div>
-                        {nodes.map(n => {
-                          const visible = nmVisibleNodeIds.has(n.id);
-                          const ROLE_DOT: Record<string,string> = {
-                            core: "#ef4444", distribution: "#f97316",
-                            access: "#3b82f6", firewall: "#f59e0b",
-                            edge: "#8b5cf6", controller: "#10b981",
-                          };
-                          const dot = ROLE_DOT[n.role] ?? "#64748b";
-                          return (
-                            <button
-                              key={n.id}
-                              onClick={() => visible ? removeNodeFromView(n.id) : addNodeToView(n.id)}
-                              className={`w-full text-left px-2 py-1.5 hover:bg-muted/50 flex items-center gap-1.5 ${visible ? "bg-emerald-950/40" : ""}`}
-                            >
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, display: "inline-block", flexShrink: 0 }} />
-                              <span className={`font-mono truncate flex-1 ${visible ? "text-emerald-300" : ""}`}>{n.hostname}</span>
-                              {visible && <span className="text-emerald-500 text-[9px]">●</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                    {nmByBuilding.length === 0 && (
-                      <p className="p-3 text-center text-muted-foreground">No matches</p>
-                    )}
-                  </div>
-                </div>
-
                 {/* ── ReactFlow canvas ── */}
-                <div ref={flowWrapperRef} className="flex-1 bg-slate-950" style={{ minWidth: 0 }}>
+                <div ref={flowWrapperRef} className="flex-1 bg-slate-950 rounded-bl-lg" style={{ minWidth: 0 }}>
                   {nmFlowNodes.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
                       <NetIcon className="h-8 w-8 opacity-20" />
