@@ -14,7 +14,7 @@
 import { readFileSync, readdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import postgres from "postgres";
+import pg from "pg";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIR = join(__dirname, "device-configs");
@@ -24,7 +24,8 @@ const DRY_RUN = process.argv.includes("--dry-run");
 if (!DB_URL) { console.error("DATABASE_URL not set"); process.exit(1); }
 if (DRY_RUN) console.log("DRY RUN — no writes\n");
 
-const sql = postgres(DB_URL);
+const pool = new pg.Pool({ connectionString: DB_URL });
+const query = (text: string, params?: unknown[]) => pool.query(text, params);
 
 // ── Hostname canonicalisation ──────────────────────────────────────────────
 
@@ -192,53 +193,46 @@ async function upsertLink(
   entry: LLDPEntry,
   evidenceRef: string
 ): Promise<"inserted" | "updated" | "skipped" | "no_node"> {
-  const [aNode] = await sql`SELECT id FROM net_nodes WHERE hostname = ${aHostname} LIMIT 1`;
+  const aRes = await query("SELECT id FROM net_nodes WHERE hostname = $1 LIMIT 1", [aHostname]);
+  const aNode = aRes.rows[0];
   if (!aNode) return "no_node";
 
-  const [bNode] = await sql`SELECT id FROM net_nodes WHERE hostname = ${entry.remoteHostname} LIMIT 1`;
+  const bRes = await query("SELECT id FROM net_nodes WHERE hostname = $1 LIMIT 1", [entry.remoteHostname]);
+  const bNode = bRes.rows[0];
   if (!bNode) return "no_node";
 
-  // Skip self-loops
   if (aNode.id === bNode.id) return "skipped";
 
-  // Check for existing link in either direction
-  const [existing] = await sql`
+  const exRes = await query(`
     SELECT id FROM net_links
-    WHERE (a_node_id = ${aNode.id} AND b_node_id = ${bNode.id} AND a_port = ${entry.localPort})
-       OR (a_node_id = ${bNode.id} AND b_node_id = ${aNode.id} AND b_port = ${entry.localPort})
+    WHERE (a_node_id = $1 AND b_node_id = $2 AND a_port = $3)
+       OR (a_node_id = $2 AND b_node_id = $1 AND b_port = $3)
     LIMIT 1
-  `;
+  `, [aNode.id, bNode.id, entry.localPort]);
+  const existing = exRes.rows[0];
 
   if (existing) {
     if (!DRY_RUN) {
-      await sql`
+      await query(`
         UPDATE net_links SET
-          confidence       = ${entry.confidence},
+          confidence       = $1,
           last_verified_at = NOW(),
-          evidence_ref     = ${evidenceRef},
-          speed_mbps       = COALESCE(${entry.speed ?? null}, speed_mbps)
-        WHERE id = ${existing.id}
-      `;
+          evidence_ref     = $2,
+          speed_mbps       = COALESCE($3, speed_mbps)
+        WHERE id = $4
+      `, [entry.confidence, evidenceRef, entry.speed ?? null, existing.id]);
     }
     return "updated";
   }
 
   if (!DRY_RUN) {
-    await sql`
+    await query(`
       INSERT INTO net_links
         (id, a_node_id, a_port, b_node_id, b_port, link_kind, speed_mbps,
          confidence, last_verified_at, evidence_ref)
-      VALUES (
-        gen_random_uuid(),
-        ${aNode.id}, ${entry.localPort},
-        ${bNode.id}, ${entry.remotePort},
-        'fiber',
-        ${entry.speed ?? null},
-        ${entry.confidence},
-        NOW(),
-        ${evidenceRef}
-      )
-    `;
+      VALUES (gen_random_uuid(), $1, $2, $3, $4, 'fiber', $5, $6, NOW(), $7)
+    `, [aNode.id, entry.localPort, bNode.id, entry.remotePort,
+        entry.speed ?? null, entry.confidence, evidenceRef]);
   }
   return "inserted";
 }
@@ -283,4 +277,4 @@ console.log(`Links updated : ${stats.updated}`);
 console.log(`Skipped       : ${stats.skipped}`);
 console.log(`No node match : ${stats.no_node}  ← add missing nodes to net_nodes`);
 
-await sql.end();
+await pool.end();
