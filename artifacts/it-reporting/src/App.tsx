@@ -26,6 +26,7 @@ import RiskDetail from "@/pages/risks/[id]";
 import Network from "@/pages/network/index";
 import NetworkVisualize from "@/pages/network/visualize";
 import NetworkTools from "@/pages/network/tools";
+import NetworkMap from "@/pages/network/map";
 import AfterAction from "@/pages/after-action/index";
 import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
       <Route path="/network/tools" component={() => <ProtectedRoute component={NetworkTools} />} />
+      <Route path="/network/map" component={() => <ProtectedRoute component={NetworkMap} />} />
       <Route path="/azure-vms" component={() => <ProtectedRoute component={AzureVms} />} />
       <Route path="/azure-inventory" component={() => <ProtectedRoute component={AzureInventory} />} />
       <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />

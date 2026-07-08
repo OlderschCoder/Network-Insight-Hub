@@ -23,6 +23,7 @@ import aiKnowledgeRouter from "./ai_knowledge";
 import cioShadowNotesRouter from "./cio_shadow_notes";
 import deviceConfigsRouter from "./device_configs";
 import incidentsRouter from "./incidents";
+import networkMapRouter from "./network_map";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use("/ai-knowledge", aiKnowledgeRouter);
 router.use("/cio-shadow-notes", cioShadowNotesRouter);
 router.use("/network/configs", deviceConfigsRouter);
 router.use("/incidents", incidentsRouter);
+router.use("/network-map", networkMapRouter);
 
 export default router;

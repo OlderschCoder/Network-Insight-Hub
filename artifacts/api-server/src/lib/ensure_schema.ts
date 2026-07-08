@@ -165,6 +165,98 @@ export async function ensureSchema(): Promise<void> {
     logger.error({ err }, "Failed to ensure azure_sync_runs table");
   }
 
+  // 8) Network Map — nodes, links, OSPF adjacencies.
+  //    UUID-keyed tables for physical topology documentation.
+  //    Uses ensure-table pattern so self-hosted installs self-heal on boot.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "net_nodes" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "hostname" varchar(80) NOT NULL,
+        "display_name" varchar(120) NOT NULL,
+        "node_kind" varchar(20) NOT NULL,
+        "vendor" varchar(20),
+        "model" varchar(80),
+        "mgmt_ip" varchar(45),
+        "building" varchar(80) NOT NULL,
+        "location" varchar(120),
+        "role" varchar(20) NOT NULL,
+        "function" varchar(30),
+        "criticality" varchar(10) NOT NULL DEFAULT 'medium',
+        "tags" text[],
+        "status" varchar(10),
+        "notes" text,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_nodes_mgmt_ip_idx" ON "net_nodes" ("mgmt_ip")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_nodes_building_idx" ON "net_nodes" ("building")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_nodes_hostname_uq" ON "net_nodes" ("hostname")`);
+    logger.info("Ensured net_nodes table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure net_nodes table");
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "net_links" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "a_node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,
+        "a_port" varchar(40) NOT NULL,
+        "b_node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,
+        "b_port" varchar(40) NOT NULL,
+        "link_kind" varchar(12) NOT NULL,
+        "speed_mbps" integer,
+        "port_mode" varchar(12),
+        "native_vlan" integer,
+        "allowed_vlans" integer[],
+        "portchannel" varchar(20),
+        "lldp_peer_hostname" varchar(80),
+        "lldp_peer_mgmt_ip" varchar(45),
+        "confidence" varchar(20) NOT NULL,
+        "last_verified_at" timestamptz NOT NULL,
+        "evidence_ref" varchar(200),
+        "notes" text,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_a_node_idx" ON "net_links" ("a_node_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_b_node_idx" ON "net_links" ("b_node_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_last_verified_idx" ON "net_links" ("last_verified_at")`);
+    logger.info("Ensured net_links table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure net_links table");
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "net_routing_adjacencies" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "device_node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,
+        "protocol" varchar(10) NOT NULL,
+        "process" varchar(20),
+        "area" varchar(16),
+        "local_interface" varchar(40) NOT NULL,
+        "local_ip" varchar(45),
+        "peer_router_id" varchar(45),
+        "peer_ip" varchar(45),
+        "state" varchar(10) NOT NULL,
+        "last_seen_at" timestamptz NOT NULL,
+        "evidence_ref" varchar(200),
+        "notes" text,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_device_idx" ON "net_routing_adjacencies" ("device_node_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_state_idx" ON "net_routing_adjacencies" ("state")`);
+    logger.info("Ensured net_routing_adjacencies table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure net_routing_adjacencies table");
+  }
+
   // 7) reports.include_cloud_inventory: opt-in flag to attach the Azure cloud
   //    inventory snapshot to a weekly report. New column added after initial
   //    setup; ADD COLUMN IF NOT EXISTS is a no-op when already present.

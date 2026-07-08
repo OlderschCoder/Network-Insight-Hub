@@ -1633,6 +1633,11 @@ export default function Network() {
               <Workflow className="h-4 w-4 mr-2" /> Visualizer
             </Button>
           </Link>
+          <Link href="/network/map">
+            <Button variant="outline" size="sm">
+              <NetworkIcon className="h-4 w-4 mr-2" /> Network Map
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"
