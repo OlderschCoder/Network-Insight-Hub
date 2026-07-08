@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, netNodesTable, netLinksTable, netRoutingAdjacenciesTable, networkSwitchesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { requireAuth, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
 
@@ -260,6 +260,16 @@ interface LldpNeighbor {
  * Parse NX-OS "show lldp neighbors detail" output into structured neighbors.
  * Handles the block-per-neighbor format used on Nexus 9000 series.
  */
+/** Strip trailing prompt chars, domain suffix, and whitespace from any hostname */
+function canonHostname(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\.sccc\.edu$/i, "")   // drop domain
+    .replace(/[#>()\s]+$/, "")      // strip trailing prompt junk: # > ( ) spaces
+    .trim();
+}
+
 function parseNxosLldp(raw: string): LldpNeighbor[] {
   const neighbors: LldpNeighbor[] = [];
 
@@ -269,19 +279,20 @@ function parseNxosLldp(raw: string): LldpNeighbor[] {
   for (const block of blocks) {
     if (!block.trim()) continue;
 
-    const localPortMatch = block.match(/Local Port id:\s*(\S+)/i);
+    const localPortMatch  = block.match(/Local Port id:\s*(\S+)/i);
     const systemNameMatch = block.match(/System Name:\s*(\S+)/i);
-    const mgmtAddrMatch = block.match(/Management Address[^:]*:\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i);
-    const remotePortMatch = block.match(/Port id:\s*(\S+)/i);
-    const sysDescMatch = block.match(/System Description:\s*(.+)/i);
+    const mgmtAddrMatch   = block.match(/Management Address[^:]*:\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i);
+    // BUG FIX: match "Port id:" only at start of a line, NOT as part of "Local Port id:"
+    const remotePortMatch = block.match(/^[\t ]*Port id:\s*(\S+)/im);
+    const sysDescMatch    = block.match(/System Description:\s*(.+)/i);
 
     if (!localPortMatch || !systemNameMatch || !remotePortMatch) continue;
 
     neighbors.push({
-      localPort: localPortMatch[1].trim(),
-      systemName: systemNameMatch[1].trim().toLowerCase().replace(/\.sccc\.edu$/i, ""),
-      mgmtAddress: mgmtAddrMatch ? mgmtAddrMatch[1].trim() : null,
-      remotePort: remotePortMatch[1].trim(),
+      localPort:         localPortMatch[1].trim(),
+      systemName:        canonHostname(systemNameMatch[1]),
+      mgmtAddress:       mgmtAddrMatch ? mgmtAddrMatch[1].trim() : null,
+      remotePort:        remotePortMatch[1].trim(),
       systemDescription: sysDescMatch ? sysDescMatch[1].trim().slice(0, 200) : null,
     });
   }
@@ -304,7 +315,7 @@ function parseNxosLldp(raw: string): LldpNeighbor[] {
         }
         current = { localPort: localM[1].trim(), mgmtAddress: null, systemDescription: null };
       }
-      if (sysNameM) current.systemName = sysNameM[1].trim().toLowerCase().replace(/\.sccc\.edu$/i, "");
+      if (sysNameM) current.systemName = canonHostname(sysNameM[1]);
       if (portIdM && !current.remotePort) current.remotePort = portIdM[1].trim();
       if (mgmtM) current.mgmtAddress = mgmtM[1].trim();
     }
@@ -322,7 +333,7 @@ router.post("/import/lldp", requireAuth, requireNetworkAdmin, async (req: any, r
 
   const { sourceDeviceHostname, capturedAt, evidenceRef, rawText } = parsed.data;
   const capturedDate = new Date(capturedAt);
-  const srcHostname = sourceDeviceHostname.toLowerCase().trim().replace(/\.sccc\.edu$/i, "");
+  const srcHostname = canonHostname(sourceDeviceHostname);
 
   // Resolve or create the source device node
   let [srcNode] = await db
@@ -388,7 +399,7 @@ router.post("/import/lldp", requireAuth, requireNetworkAdmin, async (req: any, r
         results.nodesUpserted++;
       }
 
-      // Canonical ordering for dedup
+      // Canonical ordering for new inserts (ensures consistent a<b UUID order)
       let aId = srcNode.id;
       let aPort = nbr.localPort;
       let bId = nbrNode.id;
@@ -398,18 +409,23 @@ router.post("/import/lldp", requireAuth, requireNetworkAdmin, async (req: any, r
         [aPort, bPort] = [bPort, aPort];
       }
 
-      // Check for existing link between these two nodes+ports
+      // Dedup: search BOTH directions — seed data may not have used canonical order
       const existingLinks = await db
         .select()
         .from(netLinksTable)
         .where(
-          and(
-            eq(netLinksTable.aNodeId, aId),
-            eq(netLinksTable.bNodeId, bId),
+          or(
+            and(eq(netLinksTable.aNodeId, aId), eq(netLinksTable.bNodeId, bId)),
+            and(eq(netLinksTable.aNodeId, bId), eq(netLinksTable.bNodeId, aId)),
           ),
         );
 
-      const existing = existingLinks.find((l) => l.aPort === aPort && l.bPort === bPort);
+      // Match on ports regardless of which side they're stored on
+      const existing = existingLinks.find(
+        (l) =>
+          (l.aPort === aPort && l.bPort === bPort) ||
+          (l.aPort === bPort && l.bPort === aPort),
+      );
 
       if (existing) {
         // Update confidence and timestamp; don't overwrite manual notes

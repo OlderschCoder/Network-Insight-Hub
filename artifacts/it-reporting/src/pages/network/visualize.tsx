@@ -50,6 +50,22 @@ import {
   Undo2,
 } from "lucide-react";
 import { Link } from "wouter";
+import { authFetch } from "@/lib/authFetch";
+
+// ── Network Map types (net_nodes / net_links) ──────────────────
+type NMNode = {
+  id: string; hostname: string; displayName: string; nodeKind: string;
+  vendor: string|null; model: string|null; mgmtIp: string|null;
+  building: string; location: string|null; role: string; function: string|null;
+  criticality: string; tags: string[]|null; status: string|null; notes: string|null;
+};
+type NMLink = {
+  id: string; aNodeId: string; aPort: string; bNodeId: string; bPort: string;
+  linkKind: string; speedMbps: number|null; portMode: string|null;
+  confidence: string; lastVerifiedAt: string; notes: string|null; isStale?: boolean;
+};
+type UpstreamSeg = { fromHostname: string; toHostname: string; fromPort: string; toPort: string; linkKind: string; speedMbps: number|null; };
+type UpstreamResult = { path: UpstreamSeg[]; reachedCore: boolean; };
 
 const statusFill: Record<string, string> = {
   online: "#10b981",
@@ -92,6 +108,152 @@ export default function NetworkVisualize() {
   const [selectedSwitchIds, setSelectedSwitchIds] = useState<Set<number>>(new Set());
   const [selectedVlanIds, setSelectedVlanIds] = useState<Set<number>>(new Set());
   const [selectedVmIds, setSelectedVmIds] = useState<Set<number>>(new Set());
+
+  // ── Network Map topology source ────────────────────────────────
+  const [dataSource, setDataSource] = useState<"inventory"|"netmap">("inventory");
+  const [nmSelectedNode, setNmSelectedNode] = useState<NMNode|null>(null);
+  const [nmUpstream, setNmUpstream] = useState<UpstreamResult|null>(null);
+  const [nmUpstreamLoading, setNmUpstreamLoading] = useState(false);
+
+  const { data: nmNodes = [] } = useQuery<NMNode[]>({
+    queryKey: ["/api/network-map/nodes"],
+    queryFn: () => authFetch("/api/network-map/nodes").then(r => r.json()),
+    enabled: dataSource === "netmap",
+  });
+  const { data: nmLinks = [] } = useQuery<NMLink[]>({
+    queryKey: ["/api/network-map/links"],
+    queryFn: () => authFetch("/api/network-map/links").then(r => r.json()),
+    enabled: dataSource === "netmap",
+  });
+
+  const nmNodeById = useMemo(() => new Map(nmNodes.map(n => [n.id, n])), [nmNodes]);
+
+  const handleNmUpstreamPath = useCallback(async (node: NMNode) => {
+    setNmUpstreamLoading(true);
+    setNmUpstream(null);
+    try {
+      const r = await authFetch(`/api/network-map/nodes/${node.id}/upstream-path`);
+      setNmUpstream(await r.json());
+    } catch { /* ignore */ } finally { setNmUpstreamLoading(false); }
+  }, []);
+
+  // Build ReactFlow graph from net_nodes + net_links
+  const nmGraph = useMemo(() => {
+    if (!nmNodes.length) return { nodes: [] as Node[], edges: [] as Edge[] };
+
+    const ROLE_COLOR: Record<string,string> = {
+      core:         "#ef4444",
+      distribution: "#f97316",
+      access:       "#3b82f6",
+      firewall:     "#f59e0b",
+      edge:         "#8b5cf6",
+      controller:   "#10b981",
+    };
+
+    // Group by building
+    const buildings = new Map<string, NMNode[]>();
+    for (const n of nmNodes) {
+      if (!buildings.has(n.building)) buildings.set(n.building, []);
+      buildings.get(n.building)!.push(n);
+    }
+
+    const rfNodes: Node[] = [];
+    const rfEdges: Edge[] = [];
+
+    let bx = 0;
+    for (const [building, bNodes] of buildings) {
+      const bId = `nmb-${building}`;
+      const cols = 3;
+      const W = 180, H = 70, PAD = 16, GAP = 12;
+      const rows = Math.ceil(bNodes.length / cols);
+      const bw = cols * W + (cols - 1) * GAP + PAD * 2;
+      const bh = rows * H + (rows - 1) * GAP + PAD * 2 + 28;
+
+      // Building container
+      rfNodes.push({
+        id: bId,
+        type: "group",
+        position: { x: bx, y: 0 },
+        style: {
+          width: bw, height: bh,
+          background: "rgba(51,65,85,0.4)",
+          border: "1px solid #475569",
+          borderRadius: 8,
+        },
+        data: { label: building },
+      });
+
+      // Building label node
+      rfNodes.push({
+        id: `${bId}-label`,
+        parentNode: bId,
+        extent: "parent",
+        position: { x: PAD, y: 6 },
+        style: { fontSize: 11, color: "#94a3b8", fontWeight: 600, pointerEvents: "none", background: "transparent", border: "none" },
+        data: { label: building },
+      });
+
+      bNodes.forEach((n, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const color = ROLE_COLOR[n.role] ?? "#64748b";
+        rfNodes.push({
+          id: `nm-${n.id}`,
+          parentNode: bId,
+          extent: "parent",
+          position: { x: PAD + col * (W + GAP), y: PAD + 24 + row * (H + GAP) },
+          style: { width: W, height: H, background: "#1e293b", border: `2px solid ${color}`, borderRadius: 6, cursor: "pointer", fontSize: 11 },
+          data: {
+            label: (
+              <div style={{ padding: "4px 6px", lineHeight: 1.4 }}>
+                <div style={{ color, fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n.hostname}</div>
+                <div style={{ color: "#94a3b8", fontSize: 10 }}>{n.role} · {n.nodeKind}</div>
+                {n.mgmtIp && <div style={{ color: "#64748b", fontSize: 9, fontFamily: "monospace" }}>{n.mgmtIp}</div>}
+                {n.status && <div style={{ color: n.status === "online" ? "#10b981" : "#ef4444", fontSize: 9 }}>● {n.status}</div>}
+              </div>
+            ),
+            nmNode: n,
+          },
+        });
+      });
+
+      bx += bw + 40;
+    }
+
+    for (const link of nmLinks) {
+      const aNode = nmNodeById.get(link.aNodeId);
+      const bNode = nmNodeById.get(link.bNodeId);
+      if (!aNode || !bNode) continue;
+
+      const isStale = link.isStale || link.confidence === "stale";
+      const confirmed = link.confidence === "confirmed_lldp" || link.confidence === "confirmed_cdp" || link.confidence === "confirmed_manual";
+      const strokeColor = isStale ? "#64748b" : confirmed ? "#10b981" : "#f59e0b";
+      const fmtSpeed = (m: number|null) => !m ? "" : m >= 100000 ? "100G" : m >= 25000 ? "25G" : m >= 10000 ? "10G" : m >= 1000 ? "1G" : `${m}M`;
+      const label = `${link.aPort}↔${link.bPort}${link.speedMbps ? " " + fmtSpeed(link.speedMbps) : ""}`;
+
+      rfEdges.push({
+        id: `nme-${link.id}`,
+        source: `nm-${link.aNodeId}`,
+        target: `nm-${link.bNodeId}`,
+        label,
+        labelStyle: { fontSize: 9, fill: "#94a3b8" },
+        labelBgStyle: { fill: "#0f172a", fillOpacity: 0.8 },
+        style: {
+          stroke: strokeColor,
+          strokeWidth: confirmed ? 2 : 1,
+          strokeDasharray: isStale ? "4 3" : link.confidence === "inferred" ? "6 3" : undefined,
+        },
+        data: { link, aNode, bNode },
+      });
+    }
+
+    return { nodes: rfNodes, edges: rfEdges };
+  }, [nmNodes, nmLinks, nmNodeById]);
+
+  const [nmFlowNodes, setNmFlowNodes, onNmNodesChange] = useNodesState(nmGraph.nodes);
+  const [nmFlowEdges, setNmFlowEdges, onNmEdgesChange] = useEdgesState(nmGraph.edges);
+  useEffect(() => { setNmFlowNodes(nmGraph.nodes); }, [nmGraph.nodes, setNmFlowNodes]);
+  useEffect(() => { setNmFlowEdges(nmGraph.edges); }, [nmGraph.edges, setNmFlowEdges]);
 
   const filteredSwitches = useMemo(() => {
     const q = search.toLowerCase();
@@ -1383,13 +1545,29 @@ export default function NetworkVisualize() {
           <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm flex items-center gap-2">
               Diagram
-              {savedById.size > 0 && (
+              {dataSource === "inventory" && savedById.size > 0 && (
                 <Badge variant="outline" className="text-[10px] font-normal">
                   Custom layout · {savedById.size} saved
                 </Badge>
               )}
+              {dataSource === "netmap" && (
+                <Badge className="text-[10px] font-normal bg-emerald-900 text-emerald-200 border-emerald-700">
+                  Network Map source · {nmNodes.length} nodes · {nmLinks.length} links
+                </Badge>
+              )}
             </CardTitle>
             <div className="flex items-center gap-2">
+              {/* Source toggle */}
+              <div className="flex rounded-md border border-border text-xs overflow-hidden">
+                <button
+                  className={`px-2 py-1 transition-colors ${dataSource === "inventory" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  onClick={() => setDataSource("inventory")}
+                >Manual Topology</button>
+                <button
+                  className={`px-2 py-1 transition-colors ${dataSource === "netmap" ? "bg-emerald-700 text-white" : "hover:bg-muted"}`}
+                  onClick={() => { setDataSource("netmap"); setNmSelectedNode(null); }}
+                >Network Map</button>
+              </div>
               {lockedByOther && (
                 <Badge variant="destructive" className="text-[10px] font-normal gap-1">
                   <Lock className="h-3 w-3" />
@@ -1475,6 +1653,123 @@ export default function NetworkVisualize() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
+            {dataSource === "netmap" ? (
+              <div className="flex" style={{ height: "70vh" }}>
+                {/* NM ReactFlow canvas */}
+                <div ref={flowWrapperRef} className="flex-1 bg-slate-950 rounded-bl-lg" style={{ minWidth: 0 }}>
+                  {nmNodes.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                      Loading network map nodes…
+                    </div>
+                  ) : (
+                    <ReactFlow
+                      nodes={nmFlowNodes}
+                      edges={nmFlowEdges}
+                      onNodesChange={onNmNodesChange}
+                      onEdgesChange={onNmEdgesChange}
+                      onNodeClick={(_evt, node) => {
+                        const nmNode = (node.data as any)?.nmNode as NMNode | undefined;
+                        if (nmNode) { setNmSelectedNode(nmNode); void handleNmUpstreamPath(nmNode); }
+                      }}
+                      fitView
+                      fitViewOptions={{ padding: 0.15 }}
+                      minZoom={0.1}
+                      maxZoom={2}
+                      nodesDraggable={false}
+                    >
+                      <Background color="#334155" gap={20} />
+                      <Controls />
+                      <MiniMap
+                        nodeColor={(n) => n.id.startsWith("nm-") ? "#3b82f6" : "transparent"}
+                        maskColor="rgba(15,23,42,0.7)"
+                      />
+                    </ReactFlow>
+                  )}
+                </div>
+
+                {/* NM Node detail sidebar */}
+                {nmSelectedNode && (
+                  <div className="w-72 border-l border-border bg-card overflow-y-auto p-4 rounded-br-lg text-sm space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-bold text-base break-all">{nmSelectedNode.hostname}</div>
+                      <button className="text-muted-foreground hover:text-foreground mt-0.5" onClick={() => setNmSelectedNode(null)}>✕</button>
+                    </div>
+
+                    {nmSelectedNode.displayName && nmSelectedNode.displayName !== nmSelectedNode.hostname && (
+                      <div className="text-muted-foreground text-xs">{nmSelectedNode.displayName}</div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                      <span className="text-muted-foreground">Role</span>
+                      <span className="capitalize font-medium">{nmSelectedNode.role}</span>
+                      <span className="text-muted-foreground">Kind</span>
+                      <span>{nmSelectedNode.nodeKind}</span>
+                      {nmSelectedNode.vendor && <><span className="text-muted-foreground">Vendor</span><span>{nmSelectedNode.vendor}</span></>}
+                      {nmSelectedNode.model && <><span className="text-muted-foreground">Model</span><span>{nmSelectedNode.model}</span></>}
+                      <span className="text-muted-foreground">Building</span>
+                      <span>{nmSelectedNode.building}</span>
+                      {nmSelectedNode.location && <><span className="text-muted-foreground">Location</span><span>{nmSelectedNode.location}</span></>}
+                      {nmSelectedNode.mgmtIp && <><span className="text-muted-foreground">Mgmt IP</span><span className="font-mono">{nmSelectedNode.mgmtIp}</span></>}
+                      {nmSelectedNode.criticality && <><span className="text-muted-foreground">Criticality</span><span className="capitalize">{nmSelectedNode.criticality}</span></>}
+                      {nmSelectedNode.status && <><span className="text-muted-foreground">Status</span><span className={nmSelectedNode.status === "online" ? "text-emerald-400" : "text-red-400"}>{nmSelectedNode.status}</span></>}
+                    </div>
+
+                    {nmSelectedNode.notes && (
+                      <div className="text-xs text-muted-foreground border rounded p-2">{nmSelectedNode.notes}</div>
+                    )}
+
+                    <div className="border-t pt-2">
+                      <div className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Upstream Path</div>
+                      {nmUpstreamLoading && <div className="text-xs text-muted-foreground">Computing…</div>}
+                      {!nmUpstreamLoading && nmUpstream && (
+                        nmUpstream.path.length === 0
+                          ? <div className="text-xs text-muted-foreground">No upstream path found (may be core)</div>
+                          : <div className="space-y-1">
+                              {nmUpstream.path.map((seg, i) => (
+                                <div key={i} className="text-xs">
+                                  <span className="font-mono text-blue-400">{seg.fromHostname}</span>
+                                  <span className="text-muted-foreground"> {seg.fromPort}→{seg.toPort} </span>
+                                  <span className="font-mono text-emerald-400">{seg.toHostname}</span>
+                                  {seg.speedMbps && <span className="text-muted-foreground ml-1 text-[10px]">{seg.speedMbps >= 10000 ? (seg.speedMbps / 1000) + "G" : seg.speedMbps + "M"}</span>}
+                                </div>
+                              ))}
+                              {nmUpstream.reachedCore && (
+                                <Badge className="text-[10px] bg-emerald-900 text-emerald-200 mt-1">Reached core</Badge>
+                              )}
+                            </div>
+                      )}
+                    </div>
+
+                    {/* Links for this node */}
+                    <div className="border-t pt-2">
+                      <div className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Connected Links</div>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {nmLinks
+                          .filter(l => l.aNodeId === nmSelectedNode.id || l.bNodeId === nmSelectedNode.id)
+                          .map(l => {
+                            const isA = l.aNodeId === nmSelectedNode.id;
+                            const peerNode = nmNodeById.get(isA ? l.bNodeId : l.aNodeId);
+                            const myPort = isA ? l.aPort : l.bPort;
+                            const peerPort = isA ? l.bPort : l.aPort;
+                            return (
+                              <div key={l.id} className="text-xs flex items-start gap-1">
+                                <span className="font-mono text-slate-400 shrink-0">{myPort}</span>
+                                <span className="text-muted-foreground">→</span>
+                                <span className="font-mono text-blue-400">{peerNode?.hostname ?? l.bNodeId}</span>
+                                <span className="font-mono text-slate-400">:{peerPort}</span>
+                                <span className={`ml-auto text-[10px] shrink-0 ${l.confidence === "confirmed_lldp" || l.confidence === "confirmed_manual" ? "text-emerald-400" : l.confidence === "inferred" ? "text-amber-400" : "text-slate-500"}`}>
+                                  {l.confidence.replace("confirmed_", "")}
+                                </span>
+                              </div>
+                            );
+                          })
+                        }
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
             <div ref={flowWrapperRef} style={{ height: "70vh" }} className="bg-slate-950 rounded-b-lg">
               {totalSelected === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -1511,6 +1806,7 @@ export default function NetworkVisualize() {
                 </ReactFlow>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>
