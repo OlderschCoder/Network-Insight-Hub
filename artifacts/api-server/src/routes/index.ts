@@ -24,6 +24,7 @@ import cioShadowNotesRouter from "./cio_shadow_notes";
 import deviceConfigsRouter from "./device_configs";
 import incidentsRouter from "./incidents";
 import networkMapRouter from "./network_map";
+import networkNodesRouter from "./network_nodes";
 
 const router: IRouter = Router();
 
@@ -50,6 +51,7 @@ router.use("/analytics", analyticsRouter);
 router.use("/ai-knowledge", aiKnowledgeRouter);
 router.use("/cio-shadow-notes", cioShadowNotesRouter);
 router.use("/network/configs", deviceConfigsRouter);
+router.use("/network", networkNodesRouter);
 router.use("/incidents", incidentsRouter);
 router.use("/network-map", networkMapRouter);
 

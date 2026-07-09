@@ -27,6 +27,8 @@ import Network from "@/pages/network/index";
 import NetworkVisualize from "@/pages/network/visualize";
 import NetworkTools from "@/pages/network/tools";
 import NetworkMap from "@/pages/network/map";
+import NodeDetail from "@/pages/network/node-detail";
+import Buildings from "@/pages/network/buildings";
 import AfterAction from "@/pages/after-action/index";
 import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
@@ -116,6 +118,9 @@ function Router() {
       <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />
       <Route path="/risks/:id" component={() => <ProtectedRoute component={RiskDetail} />} />
       
+      <Route path="/network/nodes/:id" component={() => <ProtectedRoute component={NodeDetail} />} />
+      <Route path="/network/buildings/:name" component={() => <ProtectedRoute component={Buildings} />} />
+      <Route path="/network/buildings" component={() => <ProtectedRoute component={Buildings} />} />
       <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
       <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
       <Route path="/network/tools" component={() => <ProtectedRoute component={NetworkTools} />} />
