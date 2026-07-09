@@ -1894,7 +1894,7 @@ export async function runChatWithMemory(
     UPSERT_SWITCH_TOOL,
     UPSERT_VLAN_TOOL,
     SAVE_SHADOW_NOTE_TOOL,
-    PING_TOO    PING_TOOL,
+    PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
     SCAN_NETWORK_TOOL,
     QUERY_AZURE_VM_TOOL,
@@ -2146,20 +2146,6 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "zendesk_update_ticket tool failed");
           resultText = "Error: Zendesk ticket update failed";
-        }
-      }
-
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: resultText,
-      });
-    }
-  }
-
-  return done("I've completed the requested operations.");
-}
-t = "Error: failed to update Zendesk ticket";
         }
       }
 
