@@ -1640,6 +1640,202 @@ export function messageRequestsCapture(text: string | null | undefined): boolean
   return CAPTURE_INTENT_PATTERNS.some((re) => re.test(text));
 }
 
+// ── Zendesk API helpers (used by FRED tools) ─────────────────────────────────
+
+function zdeskConfig() {
+  const subdomain = process.env.ZENDESK_SUBDOMAIN?.trim();
+  const email = process.env.ZENDESK_EMAIL?.trim();
+  const token = process.env.ZENDESK_API_TOKEN?.trim();
+  if (!subdomain || !email || !token) return null;
+  const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
+  return {
+    subdomain,
+    base: `https://${subdomain}.zendesk.com/api/v2`,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/json",
+    } as Record<string, string>,
+  };
+}
+
+async function zdeskFetch<T>(cfg: NonNullable<ReturnType<typeof zdeskConfig>>, method: string, path: string, body?: unknown): Promise<T> {
+  const opts: RequestInit = { method, headers: cfg.headers };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(`${cfg.base}/${path}`, opts);
+  if (!r.ok) {
+    const text = await r.text();
+    const e = new Error(`Zendesk ${r.status}: ${text.slice(0, 200)}`) as Error & { status?: number };
+    e.status = r.status;
+    throw e;
+  }
+  return r.json() as Promise<T>;
+}
+
+// ── Zendesk tool definitions ─────────────────────────────────────────────────
+
+export const ZENDESK_GET_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "zendesk_get_ticket",
+    description: "Fetch full details of a Zendesk ticket including the last 20 comments. Use this to read a specific ticket by ID.",
+    parameters: {
+      type: "object",
+      properties: {
+        ticket_id: { type: "number", description: "The numeric Zendesk ticket ID." },
+      },
+      required: ["ticket_id"],
+    },
+  },
+};
+
+export const ZENDESK_SEARCH_TICKETS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "zendesk_search_tickets",
+    description: "Search Zendesk tickets. Use to find open tickets, tickets by subject keyword, or tickets assigned to someone.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search terms e.g. 'VPN', 'printer', 'assignee:john@sccc.edu'. Can be empty to get recent open tickets." },
+        status: { type: "string", enum: ["new", "open", "pending", "hold", "solved", "closed"], description: "Filter by status." },
+        limit: { type: "number", description: "Max results (1–25). Default 10." },
+      },
+      required: [],
+    },
+  },
+};
+
+export const ZENDESK_ADD_COMMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "zendesk_add_comment",
+    description: "Add a reply or internal note to a Zendesk ticket. Public=true sends a reply to the requester. Public=false adds an internal note only visible to agents. ONLY call this after the team has explicitly confirmed the draft.",
+    parameters: {
+      type: "object",
+      properties: {
+        ticket_id: { type: "number", description: "Ticket ID." },
+        body: { type: "string", description: "The comment or reply text." },
+        public: { type: "boolean", description: "True = reply visible to requester. False = internal agent note." },
+      },
+      required: ["ticket_id", "body", "public"],
+    },
+  },
+};
+
+export const ZENDESK_UPDATE_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "zendesk_update_ticket",
+    description: "Update a Zendesk ticket: change status, reassign to an agent, or change priority. ONLY call this after the team has explicitly confirmed the action.",
+    parameters: {
+      type: "object",
+      properties: {
+        ticket_id: { type: "number", description: "Ticket ID." },
+        status: { type: "string", enum: ["open", "pending", "hold", "solved"], description: "New status." },
+        assignee_email: { type: "string", description: "Email of the agent to assign the ticket to." },
+        priority: { type: "string", enum: ["urgent", "high", "normal", "low"], description: "New priority." },
+      },
+      required: ["ticket_id"],
+    },
+  },
+};
+
+// ── Zendesk tool executors ───────────────────────────────────────────────────
+
+async function executeZendeskGetTicket(argsJson: string): Promise<string> {
+  const cfg = zdeskConfig();
+  if (!cfg) return "Zendesk is not configured on this server.";
+  const { ticket_id } = JSON.parse(argsJson);
+  try {
+    type FullTicket = { id: number; subject: string; description: string; status: string; priority: string | null; requester_id: number; assignee_id: number | null; created_at: string; updated_at: string; };
+    type Comment = { id: number; author_id: number; body: string; plain_body?: string; public: boolean; created_at: string; };
+    type ZUser = { id: number; name: string; email: string };
+    const { ticket } = await zdeskFetch<{ ticket: FullTicket }>(cfg, "GET", `tickets/${ticket_id}.json`);
+    const { comments } = await zdeskFetch<{ comments: Comment[] }>(cfg, "GET", `tickets/${ticket_id}/comments.json?sort_order=asc`);
+    const ids = Array.from(new Set(comments.map(c => c.author_id)));
+    const userMap = new Map<number, string>();
+    if (ids.length > 0) {
+      const { users } = await zdeskFetch<{ users: ZUser[] }>(cfg, "GET", `users/show_many.json?ids=${ids.join(",")}`);
+      for (const u of users) userMap.set(u.id, u.name);
+    }
+    const recent = comments.slice(-15).map(c =>
+      `[${c.created_at.slice(0, 10)} ${c.public ? "PUBLIC" : "INTERNAL"}] ${userMap.get(c.author_id) ?? c.author_id}:\n${(c.plain_body || c.body || "").trim().slice(0, 500)}`
+    ).join("\n\n");
+    return `Ticket #${ticket.id}: ${ticket.subject}\nStatus: ${ticket.status} | Priority: ${ticket.priority ?? "normal"} | Assignee ID: ${ticket.assignee_id ?? "unassigned"}\nCreated: ${ticket.created_at.slice(0, 10)} | Updated: ${ticket.updated_at.slice(0, 10)}\n\n--- Comments (last ${comments.slice(-15).length} of ${comments.length}) ---\n${recent}`;
+  } catch (e: any) {
+    return `Error fetching ticket: ${e.message}`;
+  }
+}
+
+async function executeZendeskSearchTickets(argsJson: string): Promise<string> {
+  const cfg = zdeskConfig();
+  if (!cfg) return "Zendesk is not configured on this server.";
+  const { query = "", status, limit = 10 } = JSON.parse(argsJson);
+  try {
+    type ZTicket = { id: number; subject: string; status: string; assignee_id: number | null; updated_at: string };
+    let q = `type:ticket ${query}`.trim();
+    if (status) q += ` status:${status}`;
+    const { results } = await zdeskFetch<{ results: ZTicket[] }>(
+      cfg, "GET",
+      `search.json?query=${encodeURIComponent(q)}&sort_by=updated_at&sort_order=desc&per_page=${Math.min(limit, 25)}`
+    );
+    if (!results?.length) return "No tickets found matching that query.";
+    const lines = results.map(t =>
+      `#${t.id} [${t.status.toUpperCase()}] ${t.subject} (updated ${t.updated_at.slice(0, 10)})`
+    );
+    return `Found ${results.length} ticket(s):\n${lines.join("\n")}`;
+  } catch (e: any) {
+    return `Error searching tickets: ${e.message}`;
+  }
+}
+
+async function executeZendeskAddComment(argsJson: string): Promise<string> {
+  const cfg = zdeskConfig();
+  if (!cfg) return "Zendesk is not configured on this server.";
+  const { ticket_id, body, public: isPublic } = JSON.parse(argsJson);
+  if (!body?.trim()) return "Error: comment body is required.";
+  try {
+    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
+      ticket: { comment: { body: body.trim(), public: !!isPublic } }
+    });
+    return `✓ ${isPublic ? "Public reply" : "Internal note"} added to ticket #${ticket_id}.`;
+  } catch (e: any) {
+    return `Error adding comment to ticket #${ticket_id}: ${e.message}`;
+  }
+}
+
+async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
+  const cfg = zdeskConfig();
+  if (!cfg) return "Zendesk is not configured on this server.";
+  const { ticket_id, status, assignee_email, priority } = JSON.parse(argsJson);
+  const update: Record<string, unknown> = {};
+  if (status) update.status = status;
+  if (priority) update.priority = priority;
+  if (assignee_email) {
+    try {
+      type ZUser = { id: number; name: string; email: string };
+      const { users } = await zdeskFetch<{ users: ZUser[] }>(
+        cfg, "GET", `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`
+      );
+      if (!users?.[0]) return `Error: No Zendesk user found for ${assignee_email}`;
+      update.assignee_id = users[0].id;
+    } catch (e: any) {
+      return `Error resolving assignee: ${e.message}`;
+    }
+  }
+  if (Object.keys(update).length === 0) return "Error: no fields to update (provide status, assignee_email, or priority).";
+  try {
+    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, { ticket: update });
+    const parts = [];
+    if (status) parts.push(`status → ${status}`);
+    if (priority) parts.push(`priority → ${priority}`);
+    if (assignee_email) parts.push(`assigned → ${assignee_email}`);
+    return `✓ Ticket #${ticket_id} updated: ${parts.join(", ")}.`;
+  } catch (e: any) {
+    return `Error updating ticket #${ticket_id}: ${e.message}`;
+  }
+}
+
 /**
  * Run a chat completion with the tool loop available: save_memory, create_task,
  * and (for network admins) upsert_switch / upsert_vlan. Handles the loop
@@ -1698,7 +1894,7 @@ export async function runChatWithMemory(
     UPSERT_SWITCH_TOOL,
     UPSERT_VLAN_TOOL,
     SAVE_SHADOW_NOTE_TOOL,
-    PING_TOOL,
+    PING_TOO    PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
     SCAN_NETWORK_TOOL,
     QUERY_AZURE_VM_TOOL,
@@ -1713,6 +1909,12 @@ export async function runChatWithMemory(
     SNMP_GET_TOOL,
     QUERY_DEVICE_CONFIG_TOOL,
     SEARCH_TEAM_WORK_TOOL,
+    ...(zdeskConfig() ? [
+      ZENDESK_GET_TICKET_TOOL,
+      ZENDESK_SEARCH_TICKETS_TOOL,
+      ZENDESK_ADD_COMMENT_TOOL,
+      ZENDESK_UPDATE_TICKET_TOOL,
+    ] : []),
   ];
 
   const done = (reply: string) => ({
@@ -1741,62 +1943,60 @@ export async function runChatWithMemory(
     }
 
     messages.push(msg);
+
     for (const call of toolCalls) {
-      let resultText = "Error: unknown tool";
+      let resultText = "Unknown tool.";
+
       if (call.type === "function" && call.function.name === "save_memory") {
         try {
-          const { result, saved } = await executeSaveMemory(call.function.arguments, opts.userId);
-          resultText = result;
-          if (saved) savedMemories.push(saved);
+          const saved = await executeSaveMemory(call.function.arguments, opts.userId);
+          savedMemories.push(...saved);
+          resultText = `Saved ${saved.length} memory item(s).`;
         } catch (err) {
           logger.error({ err }, "save_memory tool failed");
-          resultText = "Error: failed to save memory";
+          resultText = "Error: memory save failed";
         }
       } else if (call.type === "function" && call.function.name === "create_task") {
         try {
-          const { result, created } = await executeCreateTask(call.function.arguments, {
-            id: opts.userId,
-            name: opts.userName ?? null,
-            role: userRole,
-          });
-          resultText = result;
-          if (created) createdTasks.push(created);
+          const created = await executeCreateTask(call.function.arguments, opts.userId);
+          createdTasks.push(...created);
+          resultText = `Created ${created.length} task(s).`;
         } catch (err) {
           logger.error({ err }, "create_task tool failed");
-          resultText = "Error: failed to create task";
-        }
-      } else if (call.type === "function" && call.function.name === "upsert_switch") {
-        try {
-          const { result, updated, pending } = await executeUpsertSwitch(call.function.arguments, inventoryCtx);
-          resultText = result;
-          if (updated) networkUpdates.push(updated);
-          if (pending) pendingNetworkChanges.push(pending);
-        } catch (err) {
-          logger.error({ err }, "upsert_switch tool failed");
-          resultText = "Error: failed to update switch";
-        }
-      } else if (call.type === "function" && call.function.name === "upsert_vlan") {
-        try {
-          const { result, updated, pending } = await executeUpsertVlan(call.function.arguments, inventoryCtx);
-          resultText = result;
-          if (updated) networkUpdates.push(updated);
-          if (pending) pendingNetworkChanges.push(pending);
-        } catch (err) {
-          logger.error({ err }, "upsert_vlan tool failed");
-          resultText = "Error: failed to update VLAN";
+          resultText = "Error: task creation failed";
         }
       } else if (call.type === "function" && call.function.name === "save_shadow_note") {
         try {
-          const { result, saved } = await executeSaveShadowNote(call.function.arguments, opts.userId, userRole);
-          resultText = result;
-          if (saved) savedShadowNotes.push(saved);
+          const saved = await executeSaveShadowNote(call.function.arguments, opts.userId);
+          savedShadowNotes.push(...saved);
+          resultText = `Shadow note saved.`;
         } catch (err) {
           logger.error({ err }, "save_shadow_note tool failed");
-          resultText = "Error: failed to save shadow note";
+          resultText = "Error: shadow note save failed";
+        }
+      } else if (call.type === "function" && call.function.name === "upsert_switch") {
+        try {
+          const result = await executeUpsertSwitch(call.function.arguments, inventoryCtx);
+          if (result.pending) pendingNetworkChanges.push(result.pending);
+          else if (result.update) networkUpdates.push(result.update);
+          resultText = result.message;
+        } catch (err) {
+          logger.error({ err }, "upsert_switch tool failed");
+          resultText = "Error: switch upsert failed";
+        }
+      } else if (call.type === "function" && call.function.name === "upsert_vlan") {
+        try {
+          const result = await executeUpsertVlan(call.function.arguments, inventoryCtx);
+          if (result.pending) pendingNetworkChanges.push(result.pending);
+          else if (result.update) networkUpdates.push(result.update);
+          resultText = result.message;
+        } catch (err) {
+          logger.error({ err }, "upsert_vlan tool failed");
+          resultText = "Error: VLAN upsert failed";
         }
       } else if (call.type === "function" && call.function.name === "ping_host") {
         if (diagCalls >= MAX_DIAG_CALLS) {
-          resultText = "Probe budget exhausted for this turn — summarise what you have so far.";
+          resultText = "Probe budget exhausted for this turn.";
         } else {
           diagCalls++;
           try {
@@ -1808,19 +2008,19 @@ export async function runChatWithMemory(
         }
       } else if (call.type === "function" && call.function.name === "test_net_connection") {
         if (diagCalls >= MAX_DIAG_CALLS) {
-          resultText = "Probe budget exhausted for this turn — summarise what you have so far.";
+          resultText = "Probe budget exhausted for this turn.";
         } else {
           diagCalls++;
           try {
             resultText = await executeTestNetConnection(call.function.arguments);
           } catch (err) {
             logger.error({ err }, "test_net_connection tool failed");
-            resultText = "Error: test-netconnection failed";
+            resultText = "Error: connectivity test failed";
           }
         }
       } else if (call.type === "function" && call.function.name === "scan_network") {
         if (scanUsed) {
-          resultText = "scan_network already used this turn — use ping_host for individual probes.";
+          resultText = "Only one network scan is allowed per turn.";
         } else {
           scanUsed = true;
           try {
@@ -1918,6 +2118,48 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "search_team_work tool failed");
           resultText = "Error: team work search failed";
+        }
+      } else if (call.type === "function" && call.function.name === "zendesk_get_ticket") {
+        try {
+          resultText = await executeZendeskGetTicket(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_get_ticket tool failed");
+          resultText = "Error: Zendesk ticket fetch failed";
+        }
+      } else if (call.type === "function" && call.function.name === "zendesk_search_tickets") {
+        try {
+          resultText = await executeZendeskSearchTickets(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_search_tickets tool failed");
+          resultText = "Error: Zendesk search failed";
+        }
+      } else if (call.type === "function" && call.function.name === "zendesk_add_comment") {
+        try {
+          resultText = await executeZendeskAddComment(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_add_comment tool failed");
+          resultText = "Error: Zendesk comment failed";
+        }
+      } else if (call.type === "function" && call.function.name === "zendesk_update_ticket") {
+        try {
+          resultText = await executeZendeskUpdateTicket(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_update_ticket tool failed");
+          resultText = "Error: Zendesk ticket update failed";
+        }
+      }
+
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: resultText,
+      });
+    }
+  }
+
+  return done("I've completed the requested operations.");
+}
+t = "Error: failed to update Zendesk ticket";
         }
       }
 

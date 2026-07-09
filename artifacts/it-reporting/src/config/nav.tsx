@@ -16,6 +16,7 @@ import {
   BarChart3,
   LayoutGrid,
   Siren,
+  Building2,
 } from "lucide-react";
 
 export type NavItem = {
@@ -67,7 +68,8 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
   const infrastructure: NavGroup = {
     label: "Infrastructure",
     items: [
-      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") },
+      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") || l.startsWith("/network/nodes") },
+      { href: "/network/buildings", label: "Buildings", desc: "Campus building health and device map", icon: Building2, match: (l) => l === "/network/buildings" || l.startsWith("/network/buildings/") },
       { href: "/azure-vms", label: "Azure", desc: "VMs and cloud resource inventory", icon: Cloud },
       { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
       { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
