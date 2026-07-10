@@ -1,0 +1,11 @@
+=== swa-tt103  ip=192.168.2.188  vendor=Aruba ===
+
+--- no page ---
+no page
+
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+swa-tt103# no page
+swa-tt103# show lldp neighbors detail
+Invalid input: neighbors
+swa-tt103# 

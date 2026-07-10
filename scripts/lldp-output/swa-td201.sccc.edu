@@ -1,0 +1,9 @@
+=== swa-td201  ip=192.168.2.187  vendor=Aruba ===
+
+--- no page ---
+no page
+swa-td201# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+swa-td201# 

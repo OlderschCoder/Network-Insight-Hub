@@ -1,0 +1,9 @@
+=== swa-aa105  ip=192.168.2.199  vendor=Aruba ===
+
+--- no page ---
+no page
+SWA-AA105# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+SWA-AA105# 

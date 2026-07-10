@@ -1,0 +1,367 @@
+=== sw-aa144-a48  ip=192.168.2.70  vendor=Cisco ===
+
+--- terminal length 0 ---
+terminal length 0
+sw-aa144-A48# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: 0c97.5f9e.4180
+Port id: 1/1/49
+Local Port id: Eth1/5
+Port Description: 1/1/49
+System Name: swa-a161
+System Description: Aruba JL659A  FL.10.10.1071
+Time remaining: 115 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.197
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3810.f05c.9480
+Port id: 1/1/51
+Local Port id: Eth1/7
+Port Description: SWA-AA144-Access -> SW-AA144-A24 1/24
+System Name: SWA-AA144-Access
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 106 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.1
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5faf.6bc0
+Port id: 1/1/49
+Local Port id: Eth1/13
+Port Description: 1/1/49
+System Name: swa-h128
+System Description: Aruba JL659A  FL.10.10.1071
+Time remaining: 92 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 172.20.2.6
+Management Address IPV6: not advertised
+Vlan ID: 790
+
+
+Chassis id: 34c5.1596.2a80
+Port id: 1/1/51
+Local Port id: Eth1/14
+Port Description: 1/1/51
+System Name: CAH
+System Description: Aruba JL659A  FL.10.10.1070
+Time remaining: 97 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.216
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.d067
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: Heartbeat to SW-AA144-A48 port 16
+System Name: sw-aa144-A24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 104 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.d067
+Management Address IPV6: not advertised
+Vlan ID: 17
+System UUID: FDO23440YY6
+
+
+Chassis id: e4de.40c7.6400
+Port id: 1/1/51
+Local Port id: Eth1/25
+Port Description: SW-AA144 connection
+System Name: SW-A144-1-aruba
+System Description: Aruba JL659A  FL.10.10.1070
+Time remaining: 92 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.201
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: e4de.40c7.8680
+Port id: 1/1/51
+Local Port id: Eth1/26
+Port Description: SW-AA144 connection
+System Name: SW-A144-2-Aruba
+System Description: Aruba JL659A  FL.10.10.1070
+Time remaining: 119 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.202
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: e4de.40c4.9080
+Port id: 1/1/49
+Local Port id: Eth1/28
+Port Description: 1/1/49
+System Name: swa-scc
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 119 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.203
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 00e0.ed7d.1c0f
+Port id: 00e0.ed7d.1c0f
+Local Port id: Eth1/31
+Port Description: Interface   3 as tg1
+System Name: NMBL-LIVE1-B
+System Description: Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+Time remaining: 94 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.1c0f
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 00e0.ed7d.1c10
+Port id: 00e0.ed7d.1c10
+Local Port id: Eth1/32
+Port Description: Interface   4 as tg2
+System Name: NMBL-LIVE1-B
+System Description: Linux NMBL-LIVE1-B 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+Time remaining: 98 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.1c10
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 00e0.ed7d.20e7
+Port id: 00e0.ed7d.20e7
+Local Port id: Eth1/33
+Port Description: Interface   3 as tg1
+System Name: NMBL-LIVE1-A
+System Description: Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+Time remaining: 114 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.20e7
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 00e0.ed7d.20e8
+Port id: 00e0.ed7d.20e8
+Local Port id: Eth1/34
+Port Description: Interface   4 as tg2
+System Name: NMBL-LIVE1-A
+System Description: Linux NMBL-LIVE1-A 4.4.36-c3dec11b87f268-opt #1 SMP Tue Feb 13 20:23:17 UTC 2024 x86_64
+Time remaining: 116 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Address: 00e0.ed7d.20e8
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+
+
+Chassis id: 0c97.5fac.9340
+Port id: 1/1/51
+Local Port id: Eth1/37
+Port Description: SWA-AA105 -> SW-AA144-A24 1/28
+System Name: SWA-AA105
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 118 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.199
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0c97.5fb5.de40
+Port id: 1/1/25
+Local Port id: Eth1/41
+Port Description: B101 to AA144 uplink
+System Name: SW-AA148-Aruba
+System Description: Aruba JL660A  FL.10.13.0005
+Time remaining: 108 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.41
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 0012.012c.4b00
+Port id: Gi1/0/1
+Local Port id: Eth1/45
+Port Description: GigabitEthernet1/0/1
+System Name: SW-E208.sccc.edu
+System Description: Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+Time remaining: 103 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.24
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.d088
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: SW-AA144-A24 CONNECTION TO  SW-AA144-A48
+System Name: sw-aa144-A24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 104 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.d088
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY6
+
+
+Chassis id: 3c51.0e39.cc8c
+Port id: Ethernet1/54
+Local Port id: Eth1/54
+Port Description: Link between AA144 A48 and T122 T48
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 118 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc8c
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY1
+
+Total entries displayed: 17
+sw-aa144-A48# 
+--- show cdp neighbors detail ---
+show cdp neighbors detail
+----------------------------------------
+Device ID:sw-aa144-A24.sccc.edu(FDO23440YY6)
+System Name: sw-aa144-A24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.2
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 172 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 17
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Mgmt address(es):
+    IPv4 Address: 192.168.2.71
+Local Interface MAC: 3c:51:0e:39:cc:f7
+Remote Interface MAC: 3c:51:0e:39:d0:67
+DC_UUID: FDO23440YY6
+----------------------------------------
+Device ID:SW-E208.sccc.edu
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.24
+Platform: cisco WS-C3750-48TS, Capabilities: Router Switch IGMP Filtering 
+Interface: Ethernet1/45, Port ID (outgoing port): GigabitEthernet1/0/1
+Holdtime: 169 sec
+
+Version:
+Cisco IOS Software, C3750 Software (C3750-IPSERVICESK9-M), Version 12.2(55)SE9, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Mon 03-Mar-14 22:45 by prod_rel_team
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+Mgmt address(es):
+    IPv4 Address: 192.168.2.24
+Local Interface MAC: 3c:51:0e:39:cd:14
+Remote Interface MAC: 00:12:01:2c:4b:01
+DC_UUID:  
+----------------------------------------
+Device ID:sw-aa144-A24.sccc.edu(FDO23440YY6)
+System Name: sw-aa144-A24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.71
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 172 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Mgmt address(es):
+    IPv4 Address: 192.168.2.71
+Local Interface MAC: 3c:51:0e:39:cd:18
+Remote Interface MAC: 3c:51:0e:39:d0:57
+DC_UUID: FDO23440YY6
+----------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.73
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/54, Port ID (outgoing port): Ethernet1/54
+Holdtime: 172 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 3c:51:0e:39:cd:2c
+Remote Interface MAC: 3c:51:0e:39:cc:8c
+DC_UUID: FDO23440YY1
+sw-aa144-A48# 

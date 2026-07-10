@@ -1,0 +1,9 @@
+=== sw-healthcenter  ip=192.168.2.212  vendor=Aruba ===
+
+--- no page ---
+no page
+sw-healthcenter# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+sw-healthcenter# 

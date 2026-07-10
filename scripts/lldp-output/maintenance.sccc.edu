@@ -1,0 +1,9 @@
+=== maintenance  ip=192.168.2.205  vendor=Aruba ===
+
+--- no page ---
+no page
+SW-M201-1# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+SW-M201-1# 

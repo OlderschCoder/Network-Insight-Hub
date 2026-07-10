@@ -1,0 +1,9 @@
+=== swa-scc  ip=192.168.2.203  vendor=Aruba ===
+
+--- no page ---
+no page
+swa-scc# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+swa-scc# 

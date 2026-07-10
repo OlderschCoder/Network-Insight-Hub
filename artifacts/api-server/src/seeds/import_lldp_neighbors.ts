@@ -4,7 +4,7 @@
  * and upserts net_links rows.
  *
  * Run:
- *   DATABASE_URL="postgres://sccc:a-strong-password@localhost:5432/sccc_it" \
+ *   export $(grep -v '^#' /opt/sccc-it/.env.production | xargs)
  *   npx tsx artifacts/api-server/src/seeds/import_lldp_neighbors.ts
  *
  * Safe to re-run — uses ON CONFLICT DO UPDATE so existing links are refreshed.
@@ -34,6 +34,7 @@ function canonHostname(raw: string): string {
     .toLowerCase()
     .replace(/\.sccc\.edu$/i, "")
     .replace(/\.local$/i, "")
+    .replace(/[#>()\s]+$/, "")
     .trim();
 }
 
@@ -203,12 +204,13 @@ async function upsertLink(
 
   if (aNode.id === bNode.id) return "skipped";
 
+  // Check both port orderings in both directions
   const exRes = await query(`
     SELECT id FROM net_links
-    WHERE (a_node_id = $1 AND b_node_id = $2 AND a_port = $3)
-       OR (a_node_id = $2 AND b_node_id = $1 AND b_port = $3)
+    WHERE (a_node_id = $1 AND b_node_id = $2 AND a_port = $3 AND b_port = $4)
+       OR (a_node_id = $2 AND b_node_id = $1 AND a_port = $4 AND b_port = $3)
     LIMIT 1
-  `, [aNode.id, bNode.id, entry.localPort]);
+  `, [aNode.id, bNode.id, entry.localPort, entry.remotePort]);
   const existing = exRes.rows[0];
 
   if (existing) {
@@ -226,13 +228,16 @@ async function upsertLink(
   }
 
   if (!DRY_RUN) {
+    // Canonical ordering: ensure a_node_id < b_node_id (lexicographic) to prevent inverse-link dupes
+    const [aId, aPort, bId, bPort] = aNode.id <= bNode.id
+      ? [aNode.id, entry.localPort, bNode.id, entry.remotePort]
+      : [bNode.id, entry.remotePort, aNode.id, entry.localPort];
     await query(`
       INSERT INTO net_links
         (id, a_node_id, a_port, b_node_id, b_port, link_kind, speed_mbps,
          confidence, last_verified_at, evidence_ref)
       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'fiber', $5, $6, NOW(), $7)
-    `, [aNode.id, entry.localPort, bNode.id, entry.remotePort,
-        entry.speed ?? null, entry.confidence, evidenceRef]);
+    `, [aId, aPort, bId, bPort, entry.speed ?? null, entry.confidence, evidenceRef]);
   }
   return "inserted";
 }

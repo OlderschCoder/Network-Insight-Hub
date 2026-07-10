@@ -1,0 +1,13 @@
+=== baseball-pressbox  ip=192.168.2.27  vendor=Aruba ===
+
+--- no page ---
+no page
+
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Last login: 2026-06-22 19:59:47 from 172.18.1.2
+User "admin" has logged in 4 times in the past 30 days
+SW-BB# no page
+SW-BB# show lldp neighbors detail
+Invalid input: neighbors
+SW-BB# 

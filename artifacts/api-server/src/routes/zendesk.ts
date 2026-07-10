@@ -49,6 +49,32 @@ async function zget<T>(cfg: ReturnType<typeof zendeskConfig>, path: string): Pro
   return (await r.json()) as T;
 }
 
+async function zput<T>(cfg: ReturnType<typeof zendeskConfig>, path: string, body: unknown): Promise<T> {
+  if (!cfg) throw new Error("Zendesk not configured");
+  const url = `https://${cfg.subdomain}.zendesk.com/api/v2/${path}`;
+  const r = await fetch(url, { method: "PUT", headers: cfg.headers, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const text = await r.text();
+    const err = new Error(`Zendesk ${r.status}: ${text.slice(0, 300)}`) as Error & { status?: number };
+    err.status = r.status;
+    throw err;
+  }
+  return (await r.json()) as T;
+}
+
+async function zpost_write<T>(cfg: ReturnType<typeof zendeskConfig>, path: string, body: unknown): Promise<T> {
+  if (!cfg) throw new Error("Zendesk not configured");
+  const url = `https://${cfg.subdomain}.zendesk.com/api/v2/${path}`;
+  const r = await fetch(url, { method: "POST", headers: cfg.headers, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const text = await r.text();
+    const err = new Error(`Zendesk ${r.status}: ${text.slice(0, 300)}`) as Error & { status?: number };
+    err.status = r.status;
+    throw err;
+  }
+  return (await r.json()) as T;
+}
+
 router.get("/my-open-count", requireAuth, async (req: any, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {
@@ -551,6 +577,144 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
       })),
     });
   } catch (e: any) {
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// ── Full ticket detail (for FRED / AI) ───────────────────────────────────────
+// GET /zendesk/ticket/:id  — returns ticket + last 20 public comments
+router.get("/ticket/:id", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const ticketId = parseInt(req.params.id, 10);
+  if (!isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+  try {
+    type FullTicket = {
+      id: number; subject: string; description: string;
+      status: string; priority: string | null;
+      requester_id: number; assignee_id: number | null;
+      created_at: string; updated_at: string;
+    };
+    const { ticket } = await zget<{ ticket: FullTicket }>(cfg, `tickets/${ticketId}.json`);
+    const { comments } = await zget<{ comments: ZendeskComment[] }>(
+      cfg, `tickets/${ticketId}/comments.json?sort_order=asc`
+    );
+    // Resolve author names
+    const ids = Array.from(new Set(comments.map(c => c.author_id)));
+    const userMap = new Map<number, ZendeskUser>();
+    if (ids.length > 0) {
+      const { users } = await zget<{ users: ZendeskUser[] }>(cfg, `users/show_many.json?ids=${ids.join(",")}`);
+      for (const u of users) userMap.set(u.id, u);
+    }
+    const enriched = comments.slice(-20).map(c => ({
+      id: c.id,
+      author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
+      public: c.public,
+      body: truncate((c.plain_body || c.body || "").trim(), 600),
+      createdAt: c.created_at,
+    }));
+    return res.json({
+      id: ticket.id, subject: ticket.subject, description: ticket.description,
+      status: ticket.status, priority: ticket.priority,
+      requesterId: ticket.requester_id,
+      assigneeId: ticket.assignee_id,
+      assigneeName: ticket.assignee_id ? (userMap.get(ticket.assignee_id)?.name ?? null) : null,
+      createdAt: ticket.created_at, updatedAt: ticket.updated_at,
+      url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticket.id}`,
+      comments: enriched,
+    });
+  } catch (e: any) {
+    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// ── Ticket search (for FRED / AI) ─────────────────────────────────────────────
+// GET /zendesk/search?q=...&status=open&limit=10
+router.get("/search", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const q = (req.query.q as string || "").trim();
+  const status = (req.query.status as string || "").trim();
+  const limit = Math.min(parseInt(req.query.limit as string || "10", 10) || 10, 25);
+  let query = `type:ticket ${q}`;
+  if (status) query += ` status:${status}`;
+  try {
+    const { results } = await zget<{ results: ZendeskTicket[] }>(
+      cfg,
+      `search.json?query=${encodeURIComponent(query)}&sort_by=updated_at&sort_order=desc&per_page=${limit}`
+    );
+    return res.json({
+      tickets: (results || []).map(t => ({
+        id: t.id, subject: t.subject, status: t.status,
+        assigneeId: t.assignee_id,
+        createdAt: t.created_at, updatedAt: t.updated_at,
+        url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
+      })),
+    });
+  } catch (e: any) {
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// ── Add comment / reply (for FRED / AI) ──────────────────────────────────────
+// POST /zendesk/ticket/:id/comment
+// body: { body: string, public: boolean, author_email?: string }
+router.post("/ticket/:id/comment", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const ticketId = parseInt(req.params.id, 10);
+  if (!isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+  const { body, public: isPublic = true } = req.body ?? {};
+  if (!body?.trim()) return res.status(400).json({ error: "body required" });
+  try {
+    await zput(cfg, `tickets/${ticketId}.json`, {
+      ticket: { comment: { body: body.trim(), public: !!isPublic } }
+    });
+    return res.json({ ok: true, ticketId, public: !!isPublic });
+  } catch (e: any) {
+    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// ── Update ticket status / assignee / priority (for FRED / AI) ───────────────
+// PATCH /zendesk/ticket/:id
+// body: { status?: string, assignee_email?: string, priority?: string }
+router.patch("/ticket/:id", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const ticketId = parseInt(req.params.id, 10);
+  if (!isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+
+  const { status, assignee_email, priority } = req.body ?? {};
+  const VALID_STATUSES = ["new", "open", "pending", "hold", "solved", "closed"];
+  const VALID_PRIORITIES = ["urgent", "high", "normal", "low"];
+
+  const update: Record<string, unknown> = {};
+  if (status) {
+    if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    update.status = status;
+  }
+  if (priority) {
+    if (!VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` });
+    update.priority = priority;
+  }
+  if (assignee_email) {
+    // Resolve email to Zendesk user id
+    const { users } = await zget<{ users: ZendeskUser[] }>(
+      cfg, `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`
+    ).catch(() => ({ users: [] }));
+    if (!users?.[0]) return res.status(404).json({ error: `No Zendesk user found for ${assignee_email}` });
+    update.assignee_id = users[0].id;
+  }
+  if (Object.keys(update).length === 0) return res.status(400).json({ error: "Nothing to update" });
+
+  try {
+    await zput(cfg, `tickets/${ticketId}.json`, { ticket: update });
+    return res.json({ ok: true, ticketId, updated: update });
+  } catch (e: any) {
+    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
     return res.status(502).json({ error: "Zendesk API error", message: e.message });
   }
 });

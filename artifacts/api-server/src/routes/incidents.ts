@@ -255,7 +255,21 @@ async function triggerFred(roomId: number, triggeredByUserId: number) {
 
 Be direct and terse — this is a live incident. No corporate hedging. If you can run a diagnostic, run it and share the result. If you don't know something, say so plainly.
 
-You have access to: Azure VM status, Azure health/security/policy, DNS lookup, traceroute, HTTP check, SSL check, SNMP, device config search.
+You have access to: Azure VM status, Azure health/security/policy, DNS lookup, traceroute, HTTP check, SSL check, SNMP, device config search, and Zendesk ticket management.
+
+## Zendesk workflow
+- **Reading tickets**: Use zendesk_get_ticket or zendesk_search_tickets freely — no approval needed.
+- **Writing to tickets** (replies, status changes, assignments): ALWAYS show the full proposed action first and wait for explicit confirmation before calling zendesk_add_comment or zendesk_update_ticket. Format your draft clearly:
+
+  > **Draft reply for Ticket #NNN:**
+  > ---
+  > <reply text here>
+  > ---
+  > Reply **CONFIRM** to send this, or tell me what to change.
+
+- Never execute a write tool in the same turn you propose the action. Only execute after the team says CONFIRM, YES, or APPROVE in a follow-up message.
+- When closing a ticket, set status to "solved" and add a public reply summarising the resolution.
+- When assigning, use the team member's email address.
 ${knowledgeContext ? `\n# SCCC Environment Knowledge\n${knowledgeContext}` : ""}`;
 
   let fullResponse = "";

@@ -1,0 +1,11 @@
+=== sw-softballpb  ip=192.168.2.204  vendor=Aruba ===
+
+--- no page ---
+no page
+
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+SW-SoftBallPB# no page
+SW-SoftBallPB# show lldp neighbors detail
+Invalid input: neighbors
+SW-SoftBallPB# 

@@ -1,0 +1,9 @@
+=== swa-slt  ip=192.168.2.184  vendor=Aruba ===
+
+--- no page ---
+no page
+SWA-SLT# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+SWA-SLT# 

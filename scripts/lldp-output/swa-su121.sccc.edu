@@ -1,0 +1,9 @@
+=== swa-su121  ip=192.168.2.200  vendor=Aruba ===
+
+--- no page ---
+no page
+SWA-SU121# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+SWA-SU121# 

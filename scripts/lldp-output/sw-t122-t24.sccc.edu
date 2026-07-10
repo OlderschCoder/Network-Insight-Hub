@@ -1,0 +1,137 @@
+=== sw-t122-t24  ip=192.168.2.73  vendor=Cisco ===
+
+--- terminal length 0 ---
+terminal length 0
+sw-t122-T48# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: 6c31.0e9b.0e67
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: ***keepalivefor VPC**
+System Name: sw-t122-T24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 90 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 6c31.0e9b.0e67
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+System UUID: FDO23440YY0
+
+
+Chassis id: 6c31.0e9b.0e88
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: ** SW-T122-T24 CONNECTION TO  SW-T122-T48 *
+System Name: sw-t122-T24.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 90 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 6c31.0e9b.0e88
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY0
+
+
+Chassis id: 3c51.0e39.cd2c
+Port id: Ethernet1/54
+Local Port id: Eth1/54
+Port Description: Link between AA144 A48 and T122 T48
+System Name: sw-aa144-A48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 92 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cd2c
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YYP
+
+Total entries displayed: 3
+sw-t122-T48# 
+--- show cdp neighbors detail ---
+show cdp neighbors detail
+----------------------------------------
+Device ID:sw-t122-T24.sccc.edu(FDO23440YY0)
+System Name: sw-t122-T24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.6
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch Supports-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 176 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 3c:51:0e:39:cc:57
+Remote Interface MAC: 6c:31:0e:9b:0e:57
+DC_UUID: FDO23440YY0
+----------------------------------------
+Device ID:sw-t122-T24.sccc.edu(FDO23440YY0)
+System Name: sw-t122-T24
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.72
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 176 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 3c:51:0e:39:cc:78
+Remote Interface MAC: 6c:31:0e:9b:0e:57
+DC_UUID: FDO23440YY0
+----------------------------------------
+Device ID:sw-aa144-A48.sccc.edu(FDO23440YYP)
+System Name: sw-aa144-A48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.70
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/54, Port ID (outgoing port): Ethernet1/54
+Holdtime: 176 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 3c:51:0e:39:cc:8c
+Remote Interface MAC: 3c:51:0e:39:cd:2c
+DC_UUID: FDO23440YYP
+sw-t122-T48# 

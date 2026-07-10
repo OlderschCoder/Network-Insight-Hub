@@ -1,0 +1,9 @@
+=== sw-cos109  ip=192.168.2.171  vendor=Aruba ===
+
+--- no page ---
+no page
+SW-COS109-Aruba# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+SW-COS109-Aruba# 

@@ -1,0 +1,9 @@
+=== swa-h128  ip=10.70.89.1  vendor=Aruba ===
+
+--- no page ---
+no page
+swa-h128# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+swa-h128# 

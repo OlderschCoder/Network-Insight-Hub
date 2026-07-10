@@ -1,0 +1,9 @@
+=== sw-sa208  ip=192.168.2.194  vendor=Aruba ===
+
+--- no page ---
+no page
+sw-sa208# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Invalid input: neighbors
+sw-sa208# 

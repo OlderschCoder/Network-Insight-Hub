@@ -1,0 +1,124 @@
+=== sw-t122-t48  ip=192.168.2.72  vendor=Cisco ===
+
+--- terminal length 0 ---
+terminal length 0
+sw-t122-T24# 
+--- show lldp neighbors detail ---
+show lldp neighbors detail
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+  (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+Device ID            Local Intf      Hold-time  Capability  Port ID  
+
+Chassis id: 0c97.5faf.d840
+Port id: 1/1/49
+Local Port id: Eth1/6
+Port Description: SW-AA144-PRIM
+System Name: swa-t122
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 90 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.190
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.cc57
+Port id: Ethernet1/16
+Local Port id: Eth1/16
+Port Description: **keepalive for vpc***
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 112 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc57
+Management Address IPV6: not advertised
+Vlan ID: not advertised
+System UUID: FDO23440YY1
+
+
+Chassis id: 0c97.5faf.d640
+Port id: 1/1/49
+Local Port id: Eth1/22
+Port Description: 1/1/49 SW-T122-PRIM
+System Name: SW-COS109-Aruba
+System Description: Aruba JL659A  FL.10.13.0005
+Time remaining: 117 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 192.168.2.171
+Management Address IPV6: not advertised
+Vlan ID: 1
+
+
+Chassis id: 3c51.0e39.cc78
+Port id: Ethernet1/49
+Local Port id: Eth1/49
+Port Description: SW-T122-T48 CONNECTION TO  SW-T122-T24
+System Name: sw-t122-T48.sccc.edu
+System Description: Cisco Nexus Operating System (NX-OS) Software 10.2(6)
+TAC support: http://www.cisco.com/tac
+Copyright (c) 2002-2023, Cisco Systems, Inc. All rights reserved.
+Time remaining: 114 seconds
+System Capabilities: B, R
+Enabled Capabilities: B, R
+Management Address: 3c51.0e39.cc78
+Management Address IPV6: not advertised
+Vlan ID: 1
+System UUID: FDO23440YY1
+
+Total entries displayed: 4
+sw-t122-T24# 
+--- show cdp neighbors detail ---
+show cdp neighbors detail
+----------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 172.20.11.5
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch Supports-STP-Dispute
+Interface: Ethernet1/16, Port ID (outgoing port): Ethernet1/16
+Holdtime: 168 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 6c:31:0e:9b:0e:67
+Remote Interface MAC: 3c:51:0e:39:cc:47
+DC_UUID: FDO23440YY1
+----------------------------------------
+Device ID:sw-t122-T48.sccc.edu(FDO23440YY1)
+System Name: sw-t122-T48
+VTP Management Domain Name: blob
+
+Interface address(es): 1
+    IPv4 Address: 192.168.2.73
+Platform: N9K-C93180YC-EX-24, Capabilities: Router Switch IGMP Filtering Supports-STP-Dispute
+Interface: Ethernet1/49, Port ID (outgoing port): Ethernet1/49
+Holdtime: 168 sec
+
+Version:
+Cisco Nexus Operating System (NX-OS) Software, Version 10.2(6)
+
+Advertisement Version: 2
+
+Native VLAN: 1
+Duplex: full
+
+MTU: 1500
+Physical Location: `
+Local Interface MAC: 6c:31:0e:9b:0e:88
+Remote Interface MAC: 3c:51:0e:39:cc:47
+DC_UUID: FDO23440YY1
+sw-t122-T24# 
