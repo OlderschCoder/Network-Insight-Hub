@@ -327,6 +327,20 @@ router.get("/buildings", requireAuth, async (_req, res) => {
   return res.json(buildings);
 });
 
+/** PATCH /network/buildings/:name – authoritative rename across devices and VLANs */
+router.patch("/buildings/:name", requireAuth, requireNetworkAdmin, async (req, res) => {
+  const currentName = decodeURIComponent(req.params.name).trim();
+  const parsed = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  const newName = parsed.data.name;
+
+  await db.transaction(async (tx) => {
+    await tx.update(netNodesTable).set({ building: newName, updatedAt: new Date() }).where(ilike(netNodesTable.building, currentName));
+    await tx.update(vlansTable).set({ building: newName, updatedAt: new Date() }).where(ilike(vlansTable.building, currentName));
+  });
+
+  return res.json({ oldName: currentName, name: newName });
+});
 /** GET /network/buildings/:name – all nodes, vlans, and live status for a building */
 router.get("/buildings/:name", requireAuth, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
@@ -356,11 +370,18 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     liveStatus: liveStatuses[n.mgmtIp ?? ""] ?? liveStatuses[n.hostname] ?? "unknown",
   }));
 
+  const statuses = nodesWithStatus.map((node) => node.liveStatus);
+  const allUp = statuses.length > 0 && statuses.every((status) => status === "up");
+  const hasIssue = statuses.some((status) => status === "down" || status === "degraded");
+  const healthColor = allUp ? "green" : hasIssue ? "amber" : "unknown";
+
   return res.json({
+    name,
     building: name,
     nodes: nodesWithStatus,
     vlans,
     links,
+    healthColor,
     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
   });
 });

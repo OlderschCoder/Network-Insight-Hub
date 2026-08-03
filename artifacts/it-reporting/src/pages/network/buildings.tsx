@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/authFetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Server, Wifi, WifiOff, AlertTriangle, Activity,
-  ArrowLeft, ChevronRight, Loader2, RefreshCw, Search,
+  ArrowLeft, ChevronRight, Loader2, RefreshCw, Search, Pencil, Save, X,
 } from "lucide-react";
 
 const API = "/api";
@@ -46,6 +48,7 @@ interface VlanSummary {
   vlanId: number;
   name: string | null;
   description: string | null;
+  building: string;
   ipRange: string | null;
   vlanPurpose: string | null;
 }
@@ -120,7 +123,7 @@ function BuildingsGrid() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/network/buildings`, { credentials: "include" });
+      const r = await authFetch(`${API}/network/buildings`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       setBuildings(await r.json());
     } catch (e: any) {
@@ -144,6 +147,7 @@ function BuildingsGrid() {
     return a.name.localeCompare(b.name);
   });
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -162,7 +166,8 @@ function BuildingsGrid() {
           <Badge variant="outline">{buildings.length} buildings</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1">
+  
+        <Button variant="outline" size="sm" onClick={load} className="gap-1">
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
         </div>
@@ -235,11 +240,15 @@ function BuildingDetailView({ name }: { name: string }) {
   const [detail, setDetail] = useState<BuildingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { isCIO } = useAuth();
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState(name);
+  const [savingName, setSavingName] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/network/buildings/${encodeURIComponent(name)}`, { credentials: "include" });
+      const r = await authFetch(`${API}/network/buildings/${encodeURIComponent(name)}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       setDetail(await r.json());
     } catch (e: any) {
@@ -251,6 +260,39 @@ function BuildingDetailView({ name }: { name: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const saveBuildingName = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === name) { setEditingName(false); return; }
+    setSavingName(true);
+    try {
+      const r = await authFetch(`${API}/network/buildings/${encodeURIComponent(name)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "Building override saved", description: `${name} renamed to ${trimmed}.` });
+      window.location.assign(`/network/buildings/${encodeURIComponent(trimmed)}`);
+    } catch (e: any) {
+      toast({ title: "Building update failed", description: e.message, variant: "destructive" });
+    } finally { setSavingName(false); }
+  };
+
+
+  const editVlanBuilding = async (vlan: VlanSummary) => {
+    const building = window.prompt(`Move VLAN ${vlan.vlanId} to which building?`, vlan.building || name)?.trim();
+    if (!building || building === vlan.building) return;
+    try {
+      const r = await authFetch(`${API}/network/vlans/${vlan.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ building }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "VLAN moved", description: `VLAN ${vlan.vlanId} is now assigned to ${building}.` });
+      await load();
+    } catch (e: any) {
+      toast({ title: "VLAN update failed", description: e.message, variant: "destructive" });
+    }
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -293,13 +335,22 @@ function BuildingDetailView({ name }: { name: string }) {
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
         <div className="flex items-center gap-2 flex-1">
           {style.icon}
-          <h1 className="text-2xl font-bold">{detail.name}</h1>
+                    {editingName ? (
+            <div className="flex items-center gap-2">
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="h-9 w-64" aria-label="Building name" />
+              <Button size="sm" onClick={saveBuildingName} disabled={savingName}><Save className="h-4 w-4 mr-1" />Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setEditingName(false); setNewName(name); }}><X className="h-4 w-4" /></Button>
+            </div>
+          ) : <h1 className="text-2xl font-bold">{detail.name}</h1>}
           <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
             detail.healthColor === "green" ? "bg-green-100 text-green-700 border-green-300"
             : detail.healthColor === "amber" ? "bg-amber-100 text-amber-700 border-amber-300"
             : "bg-gray-100 text-gray-600 border-gray-300"
           }`}>{style.label}</span>
         </div>
+        {isCIO && !editingName && (
+          <Button variant="outline" size="sm" onClick={() => setEditingName(true)} className="gap-1"><Pencil className="h-4 w-4" /> Edit Building</Button>
+        )}
         <Button variant="outline" size="sm" onClick={load} className="gap-1">
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
@@ -405,6 +456,7 @@ function BuildingDetailView({ name }: { name: string }) {
                     <TableHead>Description</TableHead>
                     <TableHead>IP Range</TableHead>
                     <TableHead>Purpose</TableHead>
+                    {isCIO && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -419,6 +471,7 @@ function BuildingDetailView({ name }: { name: string }) {
                         <TableCell className="text-xs text-muted-foreground">{vlan.description ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{vlan.ipRange ?? "—"}</TableCell>
                         <TableCell className="text-xs">{vlan.vlanPurpose ?? "—"}</TableCell>
+                        {isCIO && <TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => editVlanBuilding(vlan)}><Pencil className="h-4 w-4 mr-1" /> Edit</Button></TableCell>}
                       </TableRow>
                     ))}
                 </TableBody>

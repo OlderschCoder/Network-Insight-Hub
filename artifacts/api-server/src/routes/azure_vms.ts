@@ -127,7 +127,7 @@ router.patch("/:id", requireAuth, requireCIO, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [row] = await db
     .update(azureVmsTable)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...parsed.data, source: "manual", updatedAt: new Date() })
     .where(eq(azureVmsTable.id, id))
     .returning();
   if (!row) return res.status(404).json({ error: "Not found" });
@@ -236,22 +236,24 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
       })
       .onConflictDoUpdate({
         target: azureVmsTable.azureResourceId,
-        set: {
-          name: vm.name,
-          resourceGroup: vm.resourceGroup,
-          subscription: vm.subscription,
-          location: vm.location,
-          size: vm.size,
-          os: vm.os,
-          privateIp: vm.privateIp,
-          publicIp: vm.publicIp,
-          vnet: vm.vnet,
-          subnet: vm.subnet,
-          status: vm.status,
-          source: "azure",
-          lastSyncedAt: now,
-          updatedAt: now,
-        },
+        set: prior?.source === "manual"
+          ? { lastSyncedAt: now, updatedAt: now }
+          : {
+              name: vm.name,
+              resourceGroup: vm.resourceGroup,
+              subscription: vm.subscription,
+              location: vm.location,
+              size: vm.size,
+              os: vm.os,
+              privateIp: vm.privateIp,
+              publicIp: vm.publicIp,
+              vnet: vm.vnet,
+              subnet: vm.subnet,
+              status: vm.status,
+              source: "azure",
+              lastSyncedAt: now,
+              updatedAt: now,
+            },
       });
   }
 

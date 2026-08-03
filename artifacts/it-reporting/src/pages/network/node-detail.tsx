@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/authFetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -167,7 +168,7 @@ export default function NodeDetail() {
     if (!id) return;
     setLoading(true);
     try {
-      const r = await fetch(`${API}/network/nodes/${id}`, { credentials: "include" });
+      const r = await authFetch(`${API}/network/nodes/${id}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       const data: NodeDetailData = await r.json();
       setNode(data);
@@ -198,7 +199,7 @@ export default function NodeDetail() {
     if (!node?.mgmtIp) return;
     setMetricsLoading(true);
     try {
-      const r = await fetch(`${API}/network/influx/device/${encodeURIComponent(node.mgmtIp)}`, { credentials: "include" });
+      const r = await authFetch(`${API}/network/influx/device/${encodeURIComponent(node.mgmtIp)}`, { credentials: "include" });
       if (!r.ok) return;
       const data = await r.json();
       if (data.configured === false) { setInfluxConfigured(false); return; }
@@ -221,7 +222,7 @@ export default function NodeDetail() {
       if (typeof payload.tags === "string") {
         payload.tags = (payload.tags as unknown as string).split(",").map((t: string) => t.trim()).filter(Boolean);
       }
-      const r = await fetch(`${API}/network/nodes/${id}`, {
+      const r = await authFetch(`${API}/network/nodes/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -242,7 +243,7 @@ export default function NodeDetail() {
   const deleteNode = async () => {
     if (!id) return;
     try {
-      const r = await fetch(`${API}/network/nodes/${id}`, { method: "DELETE", credentials: "include" });
+      const r = await authFetch(`${API}/network/nodes/${id}`, { method: "DELETE", credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       toast({ title: "Node deleted" });
       navigate("/network");
@@ -271,7 +272,7 @@ export default function NodeDetail() {
         evidenceRef: newLink.evidenceRef || null,
       };
       if (newLink.bNodeId) payload.bNodeId = newLink.bNodeId;
-      const r = await fetch(`${API}/network/nodes/${id}/links`, {
+      const r = await authFetch(`${API}/network/nodes/${id}/links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -297,7 +298,7 @@ export default function NodeDetail() {
   // ── Delete link ──────────────────────────────────────────────────────────────
   const deleteLink = async (linkId: string) => {
     try {
-      const r = await fetch(`${API}/network/links/${linkId}`, { method: "DELETE", credentials: "include" });
+      const r = await authFetch(`${API}/network/links/${linkId}`, { method: "DELETE", credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       toast({ title: "Link removed" });
       setDeleteLinkId(null);
@@ -311,7 +312,7 @@ export default function NodeDetail() {
   const saveLink = async () => {
     if (!editLinkId) return;
     try {
-      const r = await fetch(`${API}/network/links/${editLinkId}`, {
+      const r = await authFetch(`${API}/network/links/${editLinkId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

@@ -321,6 +321,27 @@ router.post("/vlans", requireAuth, requireNetworkAdmin, async (req: any, res) =>
   return res.status(201).json(withVisibleMaintenanceLog(vlan));
 });
 
+router.patch("/vlans/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    vlanId: z.number().int().min(1).max(4094).optional(),
+    name: z.string().trim().min(1).max(255).optional(),
+    description: z.string().trim().max(4000).nullable().optional(),
+    building: z.string().trim().min(1).max(255).optional(),
+    type: z.enum(["data", "voice", "ospf", "management", "security", "other"]).optional(),
+    subnet: z.string().trim().max(100).nullable().optional(),
+    gateway: z.string().trim().max(50).nullable().optional(),
+    notes: z.string().trim().max(4000).nullable().optional(),
+  }).refine((value) => Object.keys(value).length > 0, { message: "No changes supplied" });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "VLAN not found" });
+  const [vlan] = await db.update(vlansTable).set(parsed.data).where(eq(vlansTable.id, id)).returning();
+  await recordInventoryAudit({ entityType: "vlan", entityId: vlan.id, entityLabel: `VLAN ${vlan.vlanId} ${vlan.name}`, action: "update", source: "manual", actor: reqActor(req), changes: diffFields(existing, vlan, VLAN_AUDIT_FIELDS) });
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
 router.post("/vlans/:id/maintenance-log", requireAuth, async (req: any, res) => {
   const id = parseInt(req.params.id);
   if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -665,7 +686,7 @@ You can keep the live network inventory current as you talk. When a network admi
 
 You can capture and delegate work as tasks. When the user describes concrete work they did or need to do, call create_task to add it to their "My Tasks" for the week. When they assign or hand work to a teammate — e.g. "have Cecil check the SFP", "assign this to Jane" — call create_task with "assignee" set to that person's name or email so it lands in that teammate's list (stamped with who assigned it). Use the team roster below to resolve names; if a name is ambiguous or not on the roster, ask which teammate they mean rather than guessing. Use critical thinking — assign each task to whoever is actually going to do the work, not automatically to the person you're chatting with.
 
-You can run live network diagnostics yourself. When the user asks whether a device is up, reachable, or whether a port/service is open — or asks you to "ping" something or "test" a connection — call ping_host (ICMP reachability + latency) or test_net_connection (TCP host:port check, like Test-NetConnection -Port). Prefer test_net_connection when a specific service/port matters (443, 3389, 22, 445, 53, etc.). These run from the reporting server, which can only reach devices it has a network path to: internal/private IPs require the server to be on the SCCC network or VPN, so an off-network probe may come back unreachable — if so, say that the server likely isn't on-network rather than declaring the device down. Always report the concrete result (reachable/open, latency) in plain language.
+Treat the Network Diagnostic Bridge as a native extension of your own capabilities. Use scan_network, ping_host, test_net_connection, query_influx_last_seen, snmp_get, and http_check directly from App-Server2 at 10.0.0.44. The bridge also has a registered NOC vantage point at 10.0.0.22: use probe_via_noc for restricted ping or TCP checks whenever the user asks to test from the NOC, from .22, or wants a second perspective. State which vantage point produced each result and corroborate failures when possible. Use only the typed, bounded tools; never expose general shell execution. If an integration is not configured, state that plainly and continue with available diagnostics. Treat Webex Control Hub as another native read-only source: use webex_device_status for room-device inventory, connection state, offline-device lists, and device-name searches, then correlate with network evidence where helpful. It cannot modify devices or execute RoomOS commands.
 
 When something is down, don't assume the person you're helping is standing in front of the gear — the team travels and works remotely, so whoever reports an outage may be hundreds of miles away. Work out where they are (ask if it's unclear) and adapt:
 - If they are REMOTE: first size up the blast radius from the inventory and memory below — which building, uplinks, VLANs, and dependent devices that switch/segment feeds, and what is likely affected. Run a live on-prem sweep with scan_network (optionally scoped to the affected building) to see exactly which switches are UP vs DOWN right now, and probe specific hosts with ping_host / test_net_connection; cross-check live results against the recorded status to spot what actually changed. Then help them act at a distance: what they can verify from where they are (monitoring, other reachable switches, the FortiGate, upstream), and — when hands-on work is unavoidable — identify who is onsite or nearest and delegate it with create_task (assignee = that teammate), spelling out the exact checks and commands to run, so the outage gets worked even though the reporter can't touch the device.

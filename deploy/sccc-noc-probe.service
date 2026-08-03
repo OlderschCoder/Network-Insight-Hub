@@ -1,0 +1,27 @@
+[Unit]
+Description=SCCC restricted NOC probe for Fred
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+EnvironmentFile=/etc/sccc-noc-probe.env
+ExecStart=/usr/bin/python3 /opt/sccc-noc-probe/noc_probe_agent.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

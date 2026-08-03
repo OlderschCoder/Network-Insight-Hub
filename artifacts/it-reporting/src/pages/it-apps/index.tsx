@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 
 const EMBED_URL = "https://unified-project-view.replit.app/organizations";
 
+const ACR_APPS = [
+  { name: "Continuity LMS", description: "Courses, rosters, student records, and outage continuity", href: "/acr/continuity/" },
+  { name: "ACR Analytics Dashboard", description: "Continuity dashboard, enrollment, retention, and GPA analytics", href: "/acr/analytics/" },
+  { name: "Board Docs", description: "Governance documents and meeting records", href: "/acr/board-docs/" },
+  { name: "ACR Data Overview", description: "Academic master-data and integration overview", href: "/acr/overview/" },
+];
+
 export default function ITApps() {
   return (
     <div className="space-y-4">
@@ -22,6 +29,34 @@ export default function ITApps() {
             Open in new tab
           </a>
         </Button>
+      </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold">SCCC Academic Continuity Repository</h2>
+          <p className="text-sm text-muted-foreground">Direct links to each ACR application on App-Server2.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {ACR_APPS.map((app) => (
+            <a
+              key={app.name}
+              href={app.href}
+              className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold">{app.name}</h3>
+                <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">{app.description}</p>
+              <p className="mt-3 text-xs font-medium text-primary">Open {app.name}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <div>
+        <h2 className="text-xl font-semibold">Unified Project View</h2>
+        <p className="text-sm text-muted-foreground">External catalog of additional IT applications and projects.</p>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">

@@ -1841,6 +1841,107 @@ async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
  * and (for network admins) upsert_switch / upsert_vlan. Handles the loop
  * (max 3 rounds) and returns the final reply plus everything persisted.
  */
+export const PROBE_VIA_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "probe_via_noc",
+    description: "Run a restricted ping or TCP-connect check from the NOC probe at 10.0.0.22. Use this as a second network vantage point or when the user explicitly asks to test from 10.0.0.22. This is not general shell access.",
+    parameters: { type: "object", properties: {
+      operation: { type: "string", enum: ["ping", "tcp"] },
+      target: { type: "string", description: "Hostname or IP address to test." },
+      port: { type: "integer", minimum: 1, maximum: 65535, description: "Required only for a TCP check." },
+    }, required: ["operation", "target"] },
+  },
+};
+async function executeProbeViaNoc(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const operation = args.operation === "tcp" ? "tcp" : args.operation === "ping" ? "ping" : "";
+  const target = String(args.target || "").trim(); const port = Number(args.port);
+  if (!operation) return "Error: operation must be ping or tcp.";
+  if (!target || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/.test(target)) return "Error: a valid target is required.";
+  if (operation === "tcp" && (!Number.isInteger(port) || port < 1 || port > 65535)) return "Error: TCP port must be 1-65535.";
+  const base = process.env.NOC_PROBE_URL?.replace(/\/$/, ""); const token = process.env.NOC_PROBE_TOKEN;
+  if (!base || !token) return "The NOC probe is not configured on App-Server2.";
+  const response = await fetch(`${base}/v1/probe`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ operation, target, ...(operation === "tcp" ? { port } : {}) }), signal: AbortSignal.timeout(10000) });
+  if (!response.ok) return `NOC probe request failed (${response.status}).`;
+  const result = await response.json() as Record<string, unknown>;
+  if (operation === "ping") return `NOC probe 10.0.0.22 → ${target}: ${result.reachable ? "REACHABLE" : "NO ICMP REPLY"} (${result.elapsedMs ?? "?"} ms).\n${String(result.summary ?? "").slice(0, 1500)}`;
+  return `NOC probe 10.0.0.22 → TCP ${target}:${port}: ${result.open ? "OPEN" : "CLOSED OR UNREACHABLE"} (${result.elapsedMs ?? "?"} ms)${result.error ? ` — ${result.error}` : ""}.`;
+}
+export const WEBEX_DEVICE_STATUS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "webex_device_status",
+    description: "Read Webex Control Hub device inventory and connection status. Use for Webex room-device outages, offline devices, and device-name lookups. Read-only; never changes a device.",
+    parameters: { type: "object", properties: {
+      query: { type: "string", description: "Optional device or room name filter." },
+      status: { type: "string", enum: ["all", "online", "offline"], description: "Connection-status filter; defaults to all." },
+    } },
+  },
+};
+let webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+async function refreshWebexAccessToken(): Promise<boolean> {
+  const refreshToken = process.env.WEBEX_REFRESH_TOKEN; const clientId = process.env.WEBEX_CLIENT_ID; const clientSecret = process.env.WEBEX_CLIENT_SECRET;
+  if (!refreshToken || !clientId || !clientSecret) return false;
+  const body = new URLSearchParams({ grant_type: "refresh_token", client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken });
+  const response = await fetch("https://webexapis.com/v1/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body, signal: AbortSignal.timeout(10000) });
+  if (!response.ok) return false;
+  const tokens = await response.json() as { access_token?: string; refresh_token?: string };
+  if (!tokens.access_token) return false;
+  webexAccessToken = tokens.access_token;
+  if (tokens.refresh_token) process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
+  return true;
+}
+async function webexFetch(path: string, retry = true): Promise<Response> {
+  if (!webexAccessToken) webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+  if (!webexAccessToken && !(await refreshWebexAccessToken())) throw new Error("Webex is not configured");
+  const response = await fetch(`https://webexapis.com/v1${path}`, { headers: { Authorization: `Bearer ${webexAccessToken}`, Accept: "application/json" }, signal: AbortSignal.timeout(12000) });
+  if (response.status === 401 && retry && await refreshWebexAccessToken()) return webexFetch(path, false);
+  return response;
+}
+async function executeWebexDeviceStatus(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}"); const query = String(args.query || "").trim().toLowerCase(); const wanted = ["online", "offline"].includes(args.status) ? args.status : "all";
+  let response: Response;
+  try { response = await webexFetch("/devices?max=1000"); } catch { return "Webex device monitoring is not configured yet."; }
+  if (!response.ok) return `Webex device query failed (${response.status}).`;
+  const data = await response.json() as { items?: Array<Record<string, unknown>> };
+  const devices = (data.items || []).map((device) => {
+    const rawStatus = String(device.connectionStatus || device.status || "unknown").toLowerCase();
+    const status = rawStatus === "connected" ? "online" : rawStatus === "disconnected" ? "offline" : rawStatus;
+    return {
+      name: String(device.displayName || device.name || "Unnamed device"),
+      product: String(device.product || device.type || "Unknown"),
+      status,
+    };
+  }).filter((device) => (!query || `${device.name} ${device.product}`.toLowerCase().includes(query)) && (wanted === "all" || device.status === wanted));
+  if (!devices.length) return query ? `No Webex devices match "${String(args.query)}".` : `No Webex devices match status ${wanted}.`;
+  const online = devices.filter((device) => device.status === "online").length; const offline = devices.filter((device) => device.status === "offline").length;
+  const lines = [`Webex Control Hub: ${devices.length} device(s) — ${online} online, ${offline} offline.`];
+  for (const device of devices.slice(0, 100)) lines.push(`- ${device.name} — ${device.product} — ${device.status.toUpperCase()}`);
+  if (devices.length > 100) lines.push(`- … ${devices.length - 100} more`);
+  return lines.join("\n").slice(0, 7000);
+}
+export const QUERY_INFLUX_LAST_SEEN_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function", function: { name: "query_influx_last_seen", description: "Read monitoring data to report when a host was last seen and its latest ping loss/latency. Read-only.", parameters: { type: "object", properties: { host: { type: "string" }, minutes: { type: "number", minimum: 5, maximum: 10080 } }, required: ["host"] } }
+};
+async function executeQueryInfluxLastSeen(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}"); const host = String(args.host || "").trim();
+  if (!host || !/^[A-Za-z0-9._:-]+$/.test(host)) return "Error: a valid hostname or IP is required.";
+  const base = process.env.INFLUXDB_URL?.replace(/\/$/, ""); const token = process.env.INFLUXDB_TOKEN; const org = process.env.INFLUXDB_ORG || "SCCC"; const bucket = process.env.INFLUXDB_BUCKET || "telegraf";
+  if (!base || !token) return "InfluxDB is not configured; set INFLUXDB_URL and a read-only INFLUXDB_TOKEN.";
+  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60));
+  const flux = `from(bucket: "${bucket}") |> range(start: -${minutes}m) |> filter(fn: (r) => r.source == "${host}" or r.agent_host == "${host}" or r.host == "${host}") |> filter(fn: (r) => r._field == "percent_packet_loss" or r._field == "average_response_ms" or r._field == "rtt" or r._field == "uptime") |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "agent_host", "host"])`;
+  const res = await fetch(`${base}/api/v2/query?org=${encodeURIComponent(org)}`, { method: "POST", headers: { Authorization: `Token ${token}`, "Content-Type": "application/vnd.flux", Accept: "application/csv" }, body: flux, signal: AbortSignal.timeout(10000) });
+  if (!res.ok) return `InfluxDB query failed (${res.status}).`; const csv = await res.text(); return csv.trim() ? `Latest telemetry for ${host}:\n${csv.slice(0, 6000)}` : `No telemetry found for ${host} in the last ${minutes} minutes.`;
+}
+export const GRAFANA_PANEL_LINK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function", function: { name: "grafana_panel_link", description: "Create a read-only Grafana dashboard or panel link for an exact recent time window.", parameters: { type: "object", properties: { dashboardUid: { type: "string" }, panelId: { type: "number" }, minutes: { type: "number", minimum: 5, maximum: 10080 }, host: { type: "string" } } } }
+};
+async function executeGrafanaPanelLink(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}"); const base = process.env.GRAFANA_URL?.replace(/\/$/, ""); if (!base) return "Grafana linking is not configured; set GRAFANA_URL.";
+  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60)); const uid = String(args.dashboardUid || "").trim(); const path = uid ? `/d/${encodeURIComponent(uid)}` : "/dashboards"; const q = new URLSearchParams({ from: `now-${minutes}m`, to: "now" });
+  if (Number.isFinite(Number(args.panelId))) q.set("viewPanel", String(Number(args.panelId))); if (args.host) q.set("var-host", String(args.host)); return `Grafana read-only view (${minutes} minute window): ${base}${path}?${q.toString()}`;
+}
 export async function runChatWithMemory(
   openai: OpenAI,
   opts: {
@@ -1897,6 +1998,10 @@ export async function runChatWithMemory(
     PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
     SCAN_NETWORK_TOOL,
+    PROBE_VIA_NOC_TOOL,
+    WEBEX_DEVICE_STATUS_TOOL,
+    QUERY_INFLUX_LAST_SEEN_TOOL,
+    GRAFANA_PANEL_LINK_TOOL,
     QUERY_AZURE_VM_TOOL,
     QUERY_AZURE_SECURITY_TOOL,
     QUERY_AZURE_HEALTH_TOOL,
@@ -1949,27 +2054,31 @@ export async function runChatWithMemory(
 
       if (call.type === "function" && call.function.name === "save_memory") {
         try {
-          const saved = await executeSaveMemory(call.function.arguments, opts.userId);
-          savedMemories.push(...saved);
-          resultText = `Saved ${saved.length} memory item(s).`;
+          const outcome = await executeSaveMemory(call.function.arguments, opts.userId);
+          if (outcome.saved) savedMemories.push(outcome.saved);
+          resultText = outcome.result;
         } catch (err) {
           logger.error({ err }, "save_memory tool failed");
           resultText = "Error: memory save failed";
         }
       } else if (call.type === "function" && call.function.name === "create_task") {
         try {
-          const created = await executeCreateTask(call.function.arguments, opts.userId);
-          createdTasks.push(...created);
-          resultText = `Created ${created.length} task(s).`;
+          const outcome = await executeCreateTask(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName ?? null,
+            role: userRole,
+          });
+          if (outcome.created) createdTasks.push(outcome.created);
+          resultText = outcome.result;
         } catch (err) {
           logger.error({ err }, "create_task tool failed");
           resultText = "Error: task creation failed";
         }
       } else if (call.type === "function" && call.function.name === "save_shadow_note") {
         try {
-          const saved = await executeSaveShadowNote(call.function.arguments, opts.userId);
-          savedShadowNotes.push(...saved);
-          resultText = `Shadow note saved.`;
+          const outcome = await executeSaveShadowNote(call.function.arguments, opts.userId, userRole);
+          if (outcome.saved) savedShadowNotes.push(outcome.saved);
+          resultText = outcome.result;
         } catch (err) {
           logger.error({ err }, "save_shadow_note tool failed");
           resultText = "Error: shadow note save failed";
@@ -1978,8 +2087,8 @@ export async function runChatWithMemory(
         try {
           const result = await executeUpsertSwitch(call.function.arguments, inventoryCtx);
           if (result.pending) pendingNetworkChanges.push(result.pending);
-          else if (result.update) networkUpdates.push(result.update);
-          resultText = result.message;
+          else if (result.updated) networkUpdates.push(result.updated);
+          resultText = result.result;
         } catch (err) {
           logger.error({ err }, "upsert_switch tool failed");
           resultText = "Error: switch upsert failed";
@@ -1988,8 +2097,8 @@ export async function runChatWithMemory(
         try {
           const result = await executeUpsertVlan(call.function.arguments, inventoryCtx);
           if (result.pending) pendingNetworkChanges.push(result.pending);
-          else if (result.update) networkUpdates.push(result.update);
-          resultText = result.message;
+          else if (result.updated) networkUpdates.push(result.updated);
+          resultText = result.result;
         } catch (err) {
           logger.error({ err }, "upsert_vlan tool failed");
           resultText = "Error: VLAN upsert failed";
@@ -2030,7 +2139,15 @@ export async function runChatWithMemory(
             resultText = "Error: network scan failed";
           }
         }
-      } else if (call.type === "function" && call.function.name === "query_azure_vm") {
+      } else if (call.type === "function" && call.function.name === "probe_via_noc") {
+        if (diagCalls >= MAX_DIAG_CALLS) resultText = "Probe budget exhausted for this turn.";
+        else { diagCalls++; try { resultText = await executeProbeViaNoc(call.function.arguments); } catch (err) { logger.error({ err }, "probe_via_noc tool failed"); resultText = "Error: NOC probe failed"; } }
+      } else if (call.type === "function" && call.function.name === "webex_device_status") {
+        try { resultText = await executeWebexDeviceStatus(call.function.arguments); } catch (err) { logger.error({ err }, "webex_device_status tool failed"); resultText = "Error: Webex device query failed"; }
+      } else if (call.type === "function" && call.function.name === "query_influx_last_seen") {
+        try { resultText = await executeQueryInfluxLastSeen(call.function.arguments); } catch (err) { logger.error({ err }, "query_influx_last_seen failed"); resultText = "Error: InfluxDB query failed"; }
+      } else if (call.type === "function" && call.function.name === "grafana_panel_link") {
+        try { resultText = await executeGrafanaPanelLink(call.function.arguments); } catch (err) { logger.error({ err }, "grafana_panel_link failed"); resultText = "Error: Grafana link generation failed"; }      } else if (call.type === "function" && call.function.name === "query_azure_vm") {
         try {
           resultText = await executeQueryAzureVm(call.function.arguments);
         } catch (err) {
