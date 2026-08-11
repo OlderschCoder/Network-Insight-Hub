@@ -50,6 +50,7 @@ import Monitoring from "@/pages/monitoring/index";
 import ITApps from "@/pages/it-apps/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import DesignSystem from "@/pages/design-system/index";
+import Banner from "@/pages/banner/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -129,6 +130,7 @@ function Router() {
       <Route path="/azure-inventory" component={() => <ProtectedRoute component={AzureInventory} />} />
       <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />
       <Route path="/it-apps" component={() => <ProtectedRoute component={ITApps} />} />
+      <Route path="/banner" component={() => <ProtectedRoute component={Banner} />} />
       
       <Route path="/incidents" component={() => <ProtectedRoute component={Incidents} />} />
       <Route path="/incidents/:id" component={() => <ProtectedRoute component={IncidentRoom} />} />

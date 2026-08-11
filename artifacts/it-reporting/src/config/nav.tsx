@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Siren,
   Building2,
+  GraduationCap,
 } from "lucide-react";
 
 export type NavItem = {
@@ -79,7 +80,19 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     ],
   };
 
-  return [myWork, operations, infrastructure];
+  const enterpriseSystems: NavGroup = {
+    label: "Enterprise Systems",
+    items: [
+      {
+        href: "/banner",
+        label: "Banner",
+        desc: "EUP provisioning report, operating procedure, and change log",
+        icon: GraduationCap,
+      },
+    ],
+  };
+
+  return [myWork, operations, infrastructure, enterpriseSystems];
 }
 
 export function isNavItemActive(item: NavItem, location: string): boolean {
