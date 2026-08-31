@@ -29,6 +29,7 @@ import {
   diffFields,
   SWITCH_AUDIT_FIELDS,
   VLAN_AUDIT_FIELDS,
+  canonicalBuildingName,
   type InventoryActor,
 } from "../lib/inventory";
 import { buildInventoryHealth } from "../lib/inventory_health";
@@ -40,6 +41,8 @@ import {
   listLayoutEvents,
   restoreLayout,
 } from "../lib/layout_governance";
+import { getBuildingSummaries, getCanonicalBuildingName } from "./network_nodes";
+import { findSwitchByIdentity, saveSwitchByIdentity } from "../lib/network_identity";
 import fs from "fs";
 import path from "path";
 
@@ -58,6 +61,13 @@ function visibleMaintenanceLog(log: unknown): MaintenanceLogEntry[] {
 
 function withVisibleMaintenanceLog<T extends { maintenanceLog?: unknown }>(row: T): T {
   return { ...row, maintenanceLog: visibleMaintenanceLog(row.maintenanceLog) };
+}
+
+function withCanonicalSwitchBuilding<T extends { building?: string | null }>(row: T): T {
+  return {
+    ...row,
+    building: getCanonicalBuildingName(row.building || "Unknown Building"),
+  };
 }
 
 function canEditMaintenanceEntry(user: any, entry: MaintenanceLogEntry): boolean {
@@ -85,6 +95,430 @@ function getCampusMapDataUrl(): string | null {
   return null;
 }
 
+const WEBEX_CONTROL_HUB_OVERVIEW_URL = "https://admin.webex.com/overview";
+const WEBEX_DEVELOPER_DEVICES_URL = "https://developer.webex.com/docs/api/v1/devices";
+const WEBEX_DEVELOPER_SERVICE_APPS_URL = "https://developer.webex.com/create/docs/service-apps";
+const WEBEX_DEVELOPER_AUDIT_EVENTS_URL = "https://developer.webex.com/admin/docs/api/v1/admin-audit-events";
+const WEBEX_EMERGENCY_CALLING_GUIDE_URL = "https://help.webex.com/en-us/article/av6oo3/Enhanced-Emergency-Calling-for-Webex-Calling";
+const WEBEX_E911_VLAN_MIN = 301;
+const WEBEX_E911_VLAN_MAX = 323;
+
+let webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+
+async function refreshWebexSupportAccessToken(): Promise<boolean> {
+  const refreshToken = process.env.WEBEX_REFRESH_TOKEN;
+  const clientId = process.env.WEBEX_CLIENT_ID;
+  const clientSecret = process.env.WEBEX_CLIENT_SECRET;
+  if (!refreshToken || !clientId || !clientSecret) return false;
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  });
+  const response = await fetch("https://webexapis.com/v1/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) return false;
+  const tokens = await response.json() as { access_token?: string; refresh_token?: string };
+  if (!tokens.access_token) return false;
+  webexSupportAccessToken = tokens.access_token;
+  if (tokens.refresh_token) process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
+  return true;
+}
+
+async function webexSupportFetch(pathname: string, retry = true): Promise<Response> {
+  if (!webexSupportAccessToken) webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+  if (!webexSupportAccessToken && !(await refreshWebexSupportAccessToken())) {
+    throw new Error("Webex is not configured");
+  }
+  const requestUrl = pathname.startsWith("https://webexapis.com/v1/")
+    ? pathname
+    : `https://webexapis.com/v1${pathname}`;
+  const response = await fetch(requestUrl, {
+    headers: {
+      Authorization: `Bearer ${webexSupportAccessToken}`,
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (response.status === 401 && retry && await refreshWebexSupportAccessToken()) {
+    return webexSupportFetch(pathname, false);
+  }
+  return response;
+}
+
+type CallingPerson = {
+  id: string;
+  name: string;
+  ownerType: "PEOPLE" | "PLACE";
+  phoneNumber: string | null;
+  extension: string | null;
+  webexLocation: string | null;
+  building: string | null;
+  buildingAssigned: boolean;
+};
+
+type CallingPersonBase = Omit<CallingPerson, "building" | "buildingAssigned">;
+
+let cachedCallingPeople: { expiresAt: number; people: CallingPersonBase[] } | null = null;
+
+function nextWebexPage(response: Response): string | null {
+  const link = response.headers.get("link");
+  if (!link) return null;
+  const nextPart = link.split(",").find((part) => /rel="?next"?/i.test(part));
+  const candidate = nextPart?.match(/<([^>]+)>/)?.[1];
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    return url.origin === "https://webexapis.com" && url.pathname.startsWith("/v1/")
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function resultRows<T>(result: any): T[] {
+  if (Array.isArray(result)) return result as T[];
+  return (result?.rows ?? []) as T[];
+}
+
+async function getPhoneBuildingAssignments(): Promise<Map<string, string>> {
+  const result = await db.execute(sql`
+    SELECT "webex_person_id", "building"
+      FROM "phone_building_assignments"
+  `);
+  return new Map(
+    resultRows<{ webex_person_id: string; building: string }>(result)
+      .map((row) => [row.webex_person_id, row.building]),
+  );
+}
+
+async function getWebexCallingPeople(assignments?: Map<string, string>): Promise<CallingPerson[]> {
+  let basePeople = cachedCallingPeople?.expiresAt && cachedCallingPeople.expiresAt > Date.now()
+    ? cachedCallingPeople.people
+    : null;
+
+  if (!basePeople) {
+    const people = new Map<string, CallingPersonBase>();
+    let nextUrl: string | null = "/telephony/config/numbers?max=1000";
+    let pageCount = 0;
+
+    while (nextUrl && pageCount < 20) {
+      const response = await webexSupportFetch(nextUrl);
+      if (!response.ok) {
+        throw new Error(`Webex phone directory query failed (${response.status}).`);
+      }
+
+      const data = await response.json() as { phoneNumbers?: Array<Record<string, any>> };
+      for (const number of data.phoneNumbers ?? []) {
+        const owner = number.owner as Record<string, unknown> | undefined;
+        const ownerType = String(owner?.type || "").toUpperCase();
+        if (!owner || !["PEOPLE", "PLACE"].includes(ownerType) || !owner.id) continue;
+
+        const id = String(owner.id);
+        const firstName = String(owner.firstName || "").trim();
+        const lastName = String(owner.lastName || "").trim();
+        const ownerName = String(owner.displayName || owner.name || "").trim();
+        const name = `${firstName} ${lastName}`.trim()
+          || ownerName
+          || (ownerType === "PLACE" ? "Unnamed shared phone" : "Unnamed person");
+        const phoneNumber = String(number.phoneNumber || "").trim() || null;
+        const extension = String(number.extension || "").trim() || null;
+        const webexLocation = String(number.location?.name || "").trim() || null;
+        const existing = people.get(id);
+
+        if (!existing) {
+          people.set(id, {
+            id,
+            name,
+            ownerType: ownerType as "PEOPLE" | "PLACE",
+            phoneNumber,
+            extension,
+            webexLocation,
+          });
+          continue;
+        }
+
+        // Prefer a direct number when one record has only an extension, while
+        // preserving the first extension/location returned for the person.
+        if (!existing.phoneNumber && phoneNumber) existing.phoneNumber = phoneNumber;
+        if (!existing.extension && extension) existing.extension = extension;
+        if (!existing.webexLocation && webexLocation) existing.webexLocation = webexLocation;
+      }
+
+      nextUrl = nextWebexPage(response);
+      pageCount += 1;
+    }
+
+    if (nextUrl) throw new Error("Webex phone directory exceeded the 20-page safety limit.");
+    basePeople = Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name));
+    cachedCallingPeople = { people: basePeople, expiresAt: Date.now() + 5 * 60 * 1000 };
+  }
+
+  return basePeople.map((person) => {
+    const building = assignments?.get(person.id) ?? null;
+    return { ...person, building, buildingAssigned: !!building };
+  });
+}
+
+function looksLikeVoiceOrE911Vlan(vlan: {
+  vlanId: number;
+  type?: string | null;
+  name?: string | null;
+  description?: string | null;
+  notes?: string | null;
+}) {
+  if (vlan.vlanId >= WEBEX_E911_VLAN_MIN && vlan.vlanId <= WEBEX_E911_VLAN_MAX) return true;
+  const haystack = `${vlan.type ?? ""} ${vlan.name ?? ""} ${vlan.description ?? ""} ${vlan.notes ?? ""}`.toLowerCase();
+  return haystack.includes("voice") || haystack.includes("voip") || haystack.includes("e911") || haystack.includes("911");
+}
+
+router.get("/calling/support", requireAuth, async (_req: any, res) => {
+  try {
+    res.setHeader("Cache-Control", "no-store");
+    const [buildingSummaries, switches, vlans] = await Promise.all([
+      getBuildingSummaries(),
+      db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building, networkSwitchesTable.hostname),
+      db.select().from(vlansTable).orderBy(vlansTable.vlanId),
+    ]);
+
+    const webexConfigured = !!(
+      process.env.WEBEX_ACCESS_TOKEN ||
+      (process.env.WEBEX_REFRESH_TOKEN && process.env.WEBEX_CLIENT_ID && process.env.WEBEX_CLIENT_SECRET)
+    );
+
+    let webexQueryError: string | null = null;
+    let phoneDirectoryQueryError: string | null = null;
+    let webexDevices: Array<{
+      id: string;
+      name: string;
+      product: string;
+      status: "online" | "offline" | "unknown";
+      personId: string | null;
+      workspaceId: string | null;
+    }> = [];
+    let callingPeople: CallingPerson[] = [];
+
+    if (webexConfigured) {
+      try {
+        const response = await webexSupportFetch("/devices?max=1000");
+        if (!response.ok) {
+          webexQueryError = `Webex device query failed (${response.status}).`;
+        } else {
+          const data = await response.json() as { items?: Array<Record<string, unknown>> };
+          webexDevices = (data.items ?? [])
+            .map((device) => {
+              const rawStatus = String(device.connectionStatus || device.status || "unknown").toLowerCase();
+              const status: "online" | "offline" | "unknown" =
+                rawStatus === "connected"
+                  ? "online"
+                  : rawStatus === "disconnected"
+                    ? "offline"
+                    : "unknown";
+              return {
+                id: String(device.id || ""),
+                name: String(device.displayName || device.name || "Unnamed device"),
+                product: String(device.product || device.type || "Unknown"),
+                status,
+                personId: String(device.personId || "").trim() || null,
+                workspaceId: String(device.workspaceId || "").trim() || null,
+              };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+      } catch (err: any) {
+        webexQueryError = err?.message === "Webex is not configured" ? null : (err?.message || "Webex device query failed.");
+      }
+
+      try {
+        const assignments = await getPhoneBuildingAssignments();
+        callingPeople = await getWebexCallingPeople(assignments);
+      } catch (err: any) {
+        phoneDirectoryQueryError = err?.message === "Webex is not configured"
+          ? null
+          : (err?.message || "Webex phone directory query failed.");
+      }
+    }
+
+    const switchesByBuilding = new Map<string, typeof switches>();
+    for (const sw of switches) {
+      if (/\b(?:SVI|Boiler Room)\b/i.test(sw.location ?? "")) continue;
+      const building = getCanonicalBuildingName(sw.building || "Unknown Building");
+      if (!switchesByBuilding.has(building)) switchesByBuilding.set(building, []);
+      switchesByBuilding.get(building)!.push(sw);
+    }
+
+    const voiceVlans = vlans.filter(looksLikeVoiceOrE911Vlan);
+    const voiceVlansByBuilding = new Map<string, typeof voiceVlans>();
+    for (const vlan of voiceVlans) {
+      const building = getCanonicalBuildingName(vlan.building || "Unknown Building");
+      if (!voiceVlansByBuilding.has(building)) voiceVlansByBuilding.set(building, []);
+      voiceVlansByBuilding.get(building)!.push(vlan);
+    }
+
+    const presentE911VlanIds = Array.from(
+      new Set(
+        voiceVlans
+          .map((vlan) => vlan.vlanId)
+          .filter((vlanId) => vlanId >= WEBEX_E911_VLAN_MIN && vlanId <= WEBEX_E911_VLAN_MAX),
+      ),
+    ).sort((a, b) => a - b);
+
+    const missingE911VlanIds = Array.from(
+      { length: WEBEX_E911_VLAN_MAX - WEBEX_E911_VLAN_MIN + 1 },
+      (_, offset) => WEBEX_E911_VLAN_MIN + offset,
+    ).filter((vlanId) => !presentE911VlanIds.includes(vlanId));
+
+    const buildings = buildingSummaries
+      .map((summary) => {
+        const buildingSwitches = switchesByBuilding.get(summary.name) ?? [];
+        const buildingVoiceVlans = (voiceVlansByBuilding.get(summary.name) ?? []).sort((a, b) => a.vlanId - b.vlanId);
+        return {
+          name: summary.name,
+          healthColor: summary.healthColor,
+          monitoringStrategy: summary.monitoringStrategy,
+          nodeCount: summary.nodeCount,
+          switchCount: buildingSwitches.length,
+          onlineSwitchCount: buildingSwitches.filter((sw) => String(sw.status).toLowerCase() === "online").length,
+          offlineSwitchCount: buildingSwitches.filter((sw) => String(sw.status).toLowerCase() === "offline").length,
+          e911Vlans: buildingVoiceVlans.map((vlan) => ({
+            id: vlan.id,
+            vlanId: vlan.vlanId,
+            name: vlan.name,
+            description: vlan.description,
+            subnet: vlan.subnet,
+            gateway: vlan.gateway,
+          })),
+        };
+      })
+      .filter((building) => building.e911Vlans.length > 0 || building.switchCount > 0);
+
+    const healthyBuildings = buildings.filter((building) => building.healthColor === "green").length;
+    const attentionBuildings = buildings.filter((building) => building.healthColor === "amber" || building.healthColor === "red").length;
+    const unknownBuildings = buildings.filter((building) => building.healthColor === "unknown").length;
+    const onlineDevices = webexDevices.filter((device) => device.status === "online").length;
+    const offlineDevices = webexDevices.filter((device) => device.status === "offline").length;
+    const unknownDevices = webexDevices.filter((device) => device.status === "unknown").length;
+
+    return res.json({
+      configured: webexConfigured,
+      queryError: webexQueryError,
+      phoneDirectoryQueryError,
+      links: {
+        controlHubOverview: WEBEX_CONTROL_HUB_OVERVIEW_URL,
+        devicesReference: WEBEX_DEVELOPER_DEVICES_URL,
+        serviceAppsGuide: WEBEX_DEVELOPER_SERVICE_APPS_URL,
+        auditEventsReference: WEBEX_DEVELOPER_AUDIT_EVENTS_URL,
+        emergencyCallingGuide: WEBEX_EMERGENCY_CALLING_GUIDE_URL,
+      },
+      e911Range: {
+        start: WEBEX_E911_VLAN_MIN,
+        end: WEBEX_E911_VLAN_MAX,
+        present: presentE911VlanIds,
+        missing: missingE911VlanIds,
+      },
+      summary: {
+        totalWebexDevices: webexDevices.length,
+        onlineWebexDevices: onlineDevices,
+        offlineWebexDevices: offlineDevices,
+        unknownWebexDevices: unknownDevices,
+        totalCallingPeople: callingPeople.length,
+        assignedCallingPeople: callingPeople.filter((person) => person.buildingAssigned).length,
+        unassignedCallingPeople: callingPeople.filter((person) => !person.buildingAssigned).length,
+        totalCallingBuildings: buildings.length,
+        healthyCallingBuildings: healthyBuildings,
+        attentionCallingBuildings: attentionBuildings,
+        unknownCallingBuildings: unknownBuildings,
+      },
+      buildingOptions: buildingSummaries
+        .map((summary) => summary.name)
+        .filter((name) => name && name !== "Unknown Building")
+        .sort((a, b) => a.localeCompare(b)),
+      buildings,
+      people: callingPeople,
+      devices: webexDevices,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || "Failed to build Cisco Calling support view" });
+  }
+});
+
+router.patch("/calling/people/:personId/building", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const personId = String(req.params.personId || "").trim();
+  if (!personId || personId.length > 500) return res.status(400).json({ error: "Invalid person identifier" });
+
+  const parsed = z.object({
+    building: z.string().trim().max(120).nullable(),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  try {
+    const summaries = await getBuildingSummaries();
+    const requested = parsed.data.building?.trim() || null;
+    const selectedBuilding = requested
+      ? summaries.find((summary) => summary.name.toLowerCase() === requested.toLowerCase())?.name ?? null
+      : null;
+    if (requested && !selectedBuilding) {
+      return res.status(400).json({ error: "Select a recognized campus building" });
+    }
+
+    // Re-read the authoritative directory so a browser cannot create a local
+    // assignment for an arbitrary or stale Webex identifier.
+    const callingPeople = await getWebexCallingPeople();
+    const person = callingPeople.find((candidate) => candidate.id === personId);
+    if (!person) return res.status(404).json({ error: "Calling person not found" });
+
+    const beforeResult = await db.execute(sql`
+      SELECT "building"
+        FROM "phone_building_assignments"
+       WHERE "webex_person_id" = ${personId}
+    `);
+    const previousBuilding = resultRows<{ building: string }>(beforeResult)[0]?.building ?? null;
+
+    if (selectedBuilding) {
+      await db.execute(sql`
+        INSERT INTO "phone_building_assignments"
+          ("webex_person_id", "building", "updated_by_id", "updated_by_name")
+        VALUES
+          (${personId}, ${selectedBuilding}, ${req.user?.id ?? null}, ${req.user?.name ?? req.user?.email ?? "Unknown"})
+        ON CONFLICT ("webex_person_id") DO UPDATE
+          SET "building" = EXCLUDED."building",
+              "updated_by_id" = EXCLUDED."updated_by_id",
+              "updated_by_name" = EXCLUDED."updated_by_name",
+              "updated_at" = now()
+      `);
+    } else {
+      await db.execute(sql`
+        DELETE FROM "phone_building_assignments"
+         WHERE "webex_person_id" = ${personId}
+      `);
+    }
+
+    if (previousBuilding !== selectedBuilding) {
+      await db.execute(sql`
+        INSERT INTO "phone_building_assignment_events"
+          ("webex_person_id", "person_name", "phone_number", "previous_building", "new_building", "actor_id", "actor_name")
+        VALUES
+          (${personId}, ${person.name}, ${person.phoneNumber ?? person.extension}, ${previousBuilding}, ${selectedBuilding},
+           ${req.user?.id ?? null}, ${req.user?.name ?? req.user?.email ?? "Unknown"})
+      `);
+    }
+
+    return res.json({
+      personId,
+      building: selectedBuilding,
+      buildingAssigned: !!selectedBuilding,
+    });
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || "Could not update the phone building assignment" });
+  }
+});
+
 router.get("/switches", requireAuth, async (req: any, res) => {
   const { q, building, status } = req.query;
   let switches;
@@ -105,7 +539,7 @@ router.get("/switches", requireAuth, async (req: any, res) => {
       ? await db.select().from(networkSwitchesTable).where(and(...conditions)).orderBy(networkSwitchesTable.building)
       : await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
   }
-  return res.json(switches.map(withVisibleMaintenanceLog));
+  return res.json(switches.map(withVisibleMaintenanceLog).map(withCanonicalSwitchBuilding));
 });
 
 router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res) => {
@@ -121,24 +555,26 @@ router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-  const [sw] = await db.insert(networkSwitchesTable).values(parsed.data).returning();
+  const before = await findSwitchByIdentity({ hostname: parsed.data.hostname, ipAddress: parsed.data.ipAddress });
+  const result = await saveSwitchByIdentity(parsed.data);
+  const sw = result.row;
   await recordInventoryAudit({
     entityType: "switch",
     entityId: sw.id,
     entityLabel: sw.hostname,
-    action: "create",
+    action: result.action === "created" ? "create" : "update",
     source: "manual",
     actor: reqActor(req),
-    changes: diffFields(null, sw, SWITCH_AUDIT_FIELDS),
+    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
   });
-  return res.status(201).json(sw);
+  return res.status(result.action === "created" ? 201 : 200).json(withCanonicalSwitchBuilding(sw));
 });
 
 router.get("/switches/:id", requireAuth, async (req, res) => {
   const id = parseInt(req.params.id);
   const [sw] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
   if (!sw) return res.status(404).json({ error: "Not found" });
-  return res.json(withVisibleMaintenanceLog(sw));
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
 });
 
 router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
@@ -157,9 +593,17 @@ router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any,
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [before] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
   if (!before) return res.status(404).json({ error: "Not found" });
-  const [sw] = await db.update(networkSwitchesTable).set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(networkSwitchesTable.id, id)).returning();
-  if (!sw) return res.status(404).json({ error: "Not found" });
+  const result = await saveSwitchByIdentity({
+    hostname: parsed.data.hostname ?? before.hostname,
+    building: parsed.data.building ?? before.building,
+    ipAddress: parsed.data.ipAddress ?? before.ipAddress,
+    model: parsed.data.model ?? before.model,
+    status: parsed.data.status ?? before.status,
+    configFile: parsed.data.configFile ?? before.configFile,
+    notes: parsed.data.notes ?? before.notes,
+    location: parsed.data.location ?? before.location,
+  }, id);
+  const sw = result.row;
   await recordInventoryAudit({
     entityType: "switch",
     entityId: sw.id,
@@ -169,7 +613,7 @@ router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any,
     actor: reqActor(req),
     changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
   });
-  return res.json(sw);
+  return res.json(withCanonicalSwitchBuilding(sw));
 });
 
 router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) => {
@@ -203,7 +647,7 @@ router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) 
     .set({ maintenanceLog: nextLog, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id))
     .returning();
-  return res.json(withVisibleMaintenanceLog(sw));
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
 });
 
 router.patch("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
@@ -243,7 +687,7 @@ router.patch("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: 
     .set({ maintenanceLog: nextLog, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id))
     .returning();
-  return res.json(withVisibleMaintenanceLog(sw));
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
 });
 
 router.delete("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
@@ -269,7 +713,7 @@ router.delete("/switches/:id/maintenance-log/:entryId", requireAuth, async (req:
     .set({ maintenanceLog: nextLog, updatedAt: new Date() })
     .where(eq(networkSwitchesTable.id, id))
     .returning();
-  return res.json(withVisibleMaintenanceLog(sw));
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
 });
 
 router.get("/vlans", requireAuth, async (req: any, res) => {
@@ -308,7 +752,11 @@ router.post("/vlans", requireAuth, requireNetworkAdmin, async (req: any, res) =>
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-  const [vlan] = await db.insert(vlansTable).values(parsed.data).returning();
+  const values = {
+    ...parsed.data,
+    building: canonicalBuildingName(parsed.data.building),
+  };
+  const [vlan] = await db.insert(vlansTable).values(values).returning();
   await recordInventoryAudit({
     entityType: "vlan",
     entityId: vlan.id,
@@ -338,7 +786,13 @@ router.patch("/vlans/:id", requireAuth, requireNetworkAdmin, async (req: any, re
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
   const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
   if (!existing) return res.status(404).json({ error: "VLAN not found" });
-  const [vlan] = await db.update(vlansTable).set(parsed.data).where(eq(vlansTable.id, id)).returning();
+  const values = {
+    ...parsed.data,
+    ...(parsed.data.building
+      ? { building: canonicalBuildingName(parsed.data.building) }
+      : {}),
+  };
+  const [vlan] = await db.update(vlansTable).set(values).where(eq(vlansTable.id, id)).returning();
   await recordInventoryAudit({ entityType: "vlan", entityId: vlan.id, entityLabel: `VLAN ${vlan.vlanId} ${vlan.name}`, action: "update", source: "manual", actor: reqActor(req), changes: diffFields(existing, vlan, VLAN_AUDIT_FIELDS) });
   return res.json(withVisibleMaintenanceLog(vlan));
 });
@@ -585,24 +1039,31 @@ router.post("/ai-chat", requireAuth, async (req: any, res) => {
   }
 
   try {
-    const switches = await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
-    const vlans = await db.select().from(vlansTable).orderBy(vlansTable.vlanId);
+    const [switches, vlans, buildingSummaries] = await Promise.all([
+      db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
+      db.select().from(vlansTable).orderBy(vlansTable.vlanId),
+      getBuildingSummaries(),
+    ]);
 
-    const buildingsMap = new Map<string, { switches: any[]; vlans: any[] }>();
+    const switchesByBuilding = new Map<string, typeof switches>();
     for (const s of switches) {
-      const b = s.building || "Unassigned";
-      if (!buildingsMap.has(b)) buildingsMap.set(b, { switches: [], vlans: [] });
-      buildingsMap.get(b)!.switches.push(s);
+      const b = getCanonicalBuildingName(s.building || "Unassigned");
+      if (!switchesByBuilding.has(b)) switchesByBuilding.set(b, []);
+      switchesByBuilding.get(b)!.push(s);
     }
+    const vlansByBuilding = new Map<string, typeof vlans>();
     for (const v of vlans) {
-      const b = v.building || "Unassigned";
-      if (!buildingsMap.has(b)) buildingsMap.set(b, { switches: [], vlans: [] });
-      buildingsMap.get(b)!.vlans.push(v);
+      const b = getCanonicalBuildingName(v.building || "Unassigned");
+      if (!vlansByBuilding.has(b)) vlansByBuilding.set(b, []);
+      vlansByBuilding.get(b)!.push(v);
     }
 
     let inventoryText = "";
-    const buildings = Array.from(buildingsMap.entries()).sort(([a], [b]) => a.localeCompare(b));
-    for (const [name, { switches: sws, vlans: vls }] of buildings) {
+    for (const summary of buildingSummaries) {
+      const name = summary.name;
+      const sws = switchesByBuilding.get(name) ?? [];
+      const vls = vlansByBuilding.get(name) ?? [];
+      if (!sws.length && !vls.length) continue;
       inventoryText += `\n## ${name}\n`;
       if (sws.length) {
         inventoryText += "Switches:\n";

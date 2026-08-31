@@ -7,12 +7,13 @@ import {
 import type { AuditFieldChange } from "@workspace/db";
 import { eq, ilike, desc, and } from "drizzle-orm";
 import { logger } from "./logger";
+import { findSwitchByIdentity, saveSwitchByIdentity } from "./network_identity";
 
 export type { AuditFieldChange };
 
 export type InventorySource = "manual" | "chat_ai";
 export type InventoryEntityType = "switch" | "vlan";
-export type InventoryAction = "create" | "update" | "rollback";
+export type InventoryAction = "create" | "update" | "delete" | "rollback";
 
 export interface InventoryActor {
   id: number | null;
@@ -23,7 +24,7 @@ export interface NetworkUpdate {
   kind: InventoryEntityType;
   id: number;
   label: string;
-  action: "created" | "updated";
+  action: "created" | "updated" | "deleted";
 }
 
 export interface PendingNetworkChange {
@@ -126,7 +127,7 @@ export function vlanLabel(vlanId: number, name?: string | null): string {
   return name ? `VLAN ${vlanId} ${name}` : `VLAN ${vlanId}`;
 }
 
-// ---- Switch upsert (match by hostname) ------------------------------------
+// ---- Switch upsert (management IP authoritative, hostname fallback) -------
 
 export interface SwitchUpsertInput {
   hostname: string;
@@ -162,67 +163,50 @@ export async function upsertSwitchByHostname(
 ): Promise<UpsertResult> {
   const hostname = input.hostname?.trim();
   if (!hostname) return { ok: false, error: "hostname is required" };
-
-  const [existing] = await db
-    .select()
-    .from(networkSwitchesTable)
-    .where(ilike(networkSwitchesTable.hostname, hostname));
-
-  if (existing) {
-    const updates: any = {};
-    applySwitchInput(updates, input);
-    if (Object.keys(updates).length === 0) {
-      return { ok: false, error: `No changes provided for switch "${hostname}".` };
+  const existing = await findSwitchByIdentity({ hostname, ipAddress: input.ipAddress ?? null });
+  const before = existing ? { ...existing } : null;
+  if (!existing) {
+    const building = input.building?.trim() || undefined;
+    const ipAddress = input.ipAddress?.trim() || undefined;
+    if (!building || !ipAddress) {
+      return {
+        ok: false,
+        error: `Switch "${hostname}" does not exist yet; creating it requires both building and ipAddress.`,
+      };
     }
-    const [row] = await db
-      .update(networkSwitchesTable)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(networkSwitchesTable.id, existing.id))
-      .returning();
-    const changes = diffFields(existing, row, SWITCH_AUDIT_FIELDS);
-    await recordInventoryAudit({
-      entityType: "switch",
-      entityId: row.id,
-      entityLabel: row.hostname,
-      action: "update",
-      source: ctx.source,
-      actor: ctx.actor,
-      changes,
-    });
-    logger.info({ id: row.id, hostname: row.hostname, source: ctx.source }, "Switch updated");
-    return {
-      ok: true,
-      result: `Updated switch "${row.hostname}" (id ${row.id}).`,
-      update: { kind: "switch", id: row.id, label: row.hostname, action: "updated" },
-    };
   }
 
-  const building = input.building?.trim() || undefined;
-  const ipAddress = input.ipAddress?.trim() || undefined;
-  if (!building || !ipAddress) {
-    return {
-      ok: false,
-      error: `Switch "${hostname}" does not exist yet; creating it requires both building and ipAddress.`,
-    };
+  const result = await saveSwitchByIdentity({
+    hostname,
+    building: input.building ?? undefined,
+    ipAddress: input.ipAddress ?? undefined,
+    model: input.model ?? undefined,
+    status: input.status ?? undefined,
+    configFile: input.configFile ?? undefined,
+    notes: input.notes ?? undefined,
+    location: input.location ?? undefined,
+  });
+  const row = result.row;
+  const changes = diffFields(before, row, SWITCH_AUDIT_FIELDS);
+  if (changes.length === 0) {
+    return { ok: false, error: `No changes provided for switch "${hostname}".` };
   }
-  const values: any = { hostname, building, ipAddress, status: "unknown" };
-  applySwitchInput(values, input);
-  const [row] = await db.insert(networkSwitchesTable).values(values).returning();
-  const changes = diffFields(null, row, SWITCH_AUDIT_FIELDS);
   await recordInventoryAudit({
     entityType: "switch",
     entityId: row.id,
     entityLabel: row.hostname,
-    action: "create",
+    action: result.action === "created" ? "create" : "update",
     source: ctx.source,
     actor: ctx.actor,
     changes,
   });
-  logger.info({ id: row.id, hostname: row.hostname, source: ctx.source }, "Switch created");
+  logger.info({ id: row.id, hostname: row.hostname, source: ctx.source, action: result.action }, "Switch upserted");
   return {
     ok: true,
-    result: `Added switch "${row.hostname}" in ${row.building} (id ${row.id}).`,
-    update: { kind: "switch", id: row.id, label: row.hostname, action: "created" },
+    result: result.action === "created"
+      ? `Added switch "${row.hostname}" in ${row.building} (id ${row.id}).`
+      : `Updated switch "${row.hostname}" (id ${row.id}).`,
+    update: { kind: "switch", id: row.id, label: row.hostname, action: result.action === "created" ? "created" : "updated" },
   };
 }
 
@@ -231,11 +215,7 @@ export async function previewSwitchByHostname(
 ): Promise<{ ok: true; pending: PendingNetworkChange } | { ok: false; error: string }> {
   const hostname = input.hostname?.trim();
   if (!hostname) return { ok: false, error: "hostname is required" };
-
-  const [existing] = await db
-    .select()
-    .from(networkSwitchesTable)
-    .where(ilike(networkSwitchesTable.hostname, hostname));
+  const existing = await findSwitchByIdentity({ hostname, ipAddress: input.ipAddress ?? null });
 
   if (existing) {
     const after: any = { ...existing };
@@ -294,9 +274,27 @@ export interface VlanUpsertInput {
   notes?: string | null;
 }
 
+const CAMPUS_WIDE_BUILDING_ALIASES = new Set([
+  "campus wide",
+  "campuswide",
+  "canoys wide",
+]);
+
+/** Keep campus-wide VLANs in one inventory group despite legacy typos. */
+export function canonicalBuildingName(value: string): string {
+  const trimmed = value.trim();
+  const key = trimmed
+    .toLowerCase()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+  return CAMPUS_WIDE_BUILDING_ALIASES.has(key) ? "Campus Wide" : trimmed;
+}
+
 function applyVlanInput(target: any, input: VlanUpsertInput): void {
   if (input.name !== undefined) target.name = input.name;
-  if (input.building !== undefined) target.building = input.building;
+  if (input.building !== undefined && input.building !== null) {
+    target.building = canonicalBuildingName(input.building);
+  }
   if (input.description !== undefined) target.description = input.description;
   if (input.subnet !== undefined) target.subnet = input.subnet;
   if (input.gateway !== undefined) target.gateway = input.gateway;
@@ -346,7 +344,7 @@ export async function upsertVlanByVlanId(
   }
 
   const name = input.name?.trim() || undefined;
-  const building = input.building?.trim() || undefined;
+  const building = input.building ? canonicalBuildingName(input.building) : undefined;
   const type = input.type ? String(input.type).toLowerCase() : undefined;
   if (!name || !building || !type || !VLAN_TYPES.has(type)) {
     return {
@@ -404,7 +402,7 @@ export async function previewVlanByVlanId(
   }
 
   const name = input.name?.trim() || undefined;
-  const building = input.building?.trim() || undefined;
+  const building = input.building ? canonicalBuildingName(input.building) : undefined;
   const type = input.type ? String(input.type).toLowerCase() : undefined;
   if (!name || !building || !type || !VLAN_TYPES.has(type)) {
     return {

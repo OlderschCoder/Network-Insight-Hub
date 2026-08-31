@@ -14,3 +14,6 @@ export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
+// Keep this explicit so workspace consumers resolve the new table even when
+// their TypeScript project caches the schema barrel during an incremental build.
+export * from "./schema/net_ports";

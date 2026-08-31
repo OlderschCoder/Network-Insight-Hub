@@ -19,6 +19,21 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+// Production must have exactly one API owner: the systemd service. A manually
+// launched copy can otherwise outlive its SSH session, keep port 8080 open, and
+// force the managed service into an endless EADDRINUSE restart loop. systemd
+// always supplies INVOCATION_ID; the explicit override is reserved for a
+// deliberate recovery test and should never be placed in production env files.
+if (
+  process.env["NODE_ENV"] === "production" &&
+  !process.env["INVOCATION_ID"] &&
+  process.env["SCCC_ALLOW_STANDALONE_API"] !== "true"
+) {
+  throw new Error(
+    "Refusing to start the production API outside systemd. Use: systemctl restart sccc-api",
+  );
+}
+
 async function main(): Promise<void> {
   // Reconcile known schema drift on self-hosted databases (sessions table,
   // nullable users.password_hash) BEFORE accepting traffic or seeding. Both the

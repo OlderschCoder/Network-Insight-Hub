@@ -25,6 +25,7 @@ import deviceConfigsRouter from "./device_configs";
 import incidentsRouter from "./incidents";
 import networkMapRouter from "./network_map";
 import networkNodesRouter from "./network_nodes";
+import internalReportsRouter from "./internal_reports";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use("/network/configs", deviceConfigsRouter);
 router.use("/network", networkNodesRouter);
 router.use("/incidents", incidentsRouter);
 router.use("/network-map", networkMapRouter);
+router.use("/internal", internalReportsRouter);
 
 export default router;

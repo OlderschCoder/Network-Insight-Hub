@@ -232,6 +232,56 @@ export async function ensureSchema(): Promise<void> {
 
   try {
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "net_ports" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,
+        "interface_name" varchar(80) NOT NULL,
+        "if_index" integer,
+        "is_physical" boolean NOT NULL DEFAULT true,
+        "description" text,
+        "if_type" integer,
+        "mtu" integer,
+        "mac_address" varchar(32),
+        "admin_status" varchar(12),
+        "oper_status" varchar(12),
+        "speed_mbps" integer,
+        "duplex" varchar(12),
+        "port_mode" varchar(12),
+        "native_vlan" integer,
+        "allowed_vlans" integer[],
+        "portchannel" varchar(40),
+        "vpc_id" integer,
+        "in_errors" bigint,
+        "out_errors" bigint,
+        "in_discards" bigint,
+        "out_discards" bigint,
+        "in_octets" numeric(30,0),
+        "out_octets" numeric(30,0),
+        "in_bps" bigint,
+        "out_bps" bigint,
+        "utilization_pct" real,
+        "rx_power_dbm" real,
+        "tx_power_dbm" real,
+        "temperature_c" real,
+        "optics_status" varchar(20),
+        "config_evidence" varchar(300),
+        "telemetry_evidence" varchar(300),
+        "config_updated_at" timestamptz,
+        "telemetry_updated_at" timestamptz,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_ports_node_interface_uq" ON "net_ports" ("node_id", "interface_name")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_node_idx" ON "net_ports" ("node_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_telemetry_updated_idx" ON "net_ports" ("telemetry_updated_at")`);
+    logger.info("Ensured net_ports table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure net_ports table");
+  }
+
+  try {
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "net_routing_adjacencies" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
         "device_node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,

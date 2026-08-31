@@ -347,11 +347,15 @@ export default function NetworkVisualize() {
     const normalizeBuilding = (raw?: string | null) => {
       if (!raw) return "Unknown";
       // Strip a trailing parenthetical room/code like " (AA-158)" or " (A Building)".
-      return raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+      const cleaned = raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+      const key = cleaned.toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
+      return ["campus wide", "campuswide", "canoys wide"].includes(key)
+        ? "Campus Wide"
+        : cleaned;
     };
 
     // Campus-level buckets float above buildings (e.g. VLAN 1 Mgmt, Camera VLAN).
-    const CAMPUS_KEYS = new Set(["Campus-wide", "Core"]);
+    const CAMPUS_KEYS = new Set(["Campus Wide", "Core"]);
 
     // Group selected items by normalized building (excluding campus-level VLANs).
     const switchesByBuilding: Record<string, typeof selSwitches> = {};
@@ -1190,7 +1194,11 @@ export default function NetworkVisualize() {
   const buildingOptions = useMemo(() => {
     const normalize = (raw?: string | null) => {
       if (!raw) return "Unknown";
-      return raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+      const cleaned = raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
+      const key = cleaned.toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
+      return ["campus wide", "campuswide", "canoys wide"].includes(key)
+        ? "Campus Wide"
+        : cleaned;
     };
     const map = new Map<
       string,

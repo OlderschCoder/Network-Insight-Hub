@@ -4,9 +4,11 @@
  */
 import { Router } from "express";
 import { db, netNodesTable, netLinksTable, netRoutingAdjacenciesTable, networkSwitchesTable } from "@workspace/db";
+import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, and, or } from "drizzle-orm";
 import { requireAuth, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
+import { collectLldpIntoNetworkMap } from "../lib/lldp_map_collector";
 
 const router = Router();
 
@@ -207,6 +209,29 @@ router.delete("/links/:id", requireAuth, requireNetworkAdmin, async (req: any, r
     .returning();
   if (!link) return res.status(404).json({ error: "Not found" });
   return res.json({ ok: true });
+});
+
+router.get("/ports", requireAuth, async (req: any, res) => {
+  const nodeId = String(req.query.nodeId ?? "").trim();
+  if (!z.string().uuid().safeParse(nodeId).success) {
+    return res.status(400).json({ error: "A valid nodeId is required" });
+  }
+  const ports = await db.select().from(netPortsTable).where(eq(netPortsTable.nodeId, nodeId));
+  ports.sort((a, b) => {
+    if (a.ifIndex != null && b.ifIndex != null && a.ifIndex !== b.ifIndex) return a.ifIndex - b.ifIndex;
+    return a.interfaceName.localeCompare(b.interfaceName, undefined, { numeric: true });
+  });
+  return res.json(ports);
+});
+
+router.post("/collect/lldp", requireAuth, requireNetworkAdmin, async (_req: any, res) => {
+  try {
+    return res.json(await collectLldpIntoNetworkMap());
+  } catch (err) {
+    return res.status(502).json({
+      error: err instanceof Error ? err.message : "LLDP collection failed",
+    });
+  }
 });
 
 // ──────────────────────────────────────────────────────────────
