@@ -3,9 +3,11 @@ flowchart LR
   UI --> S[(Durable per-user session)]
   UI --> API[Fred API]
   API --> R{Workload profile}
-  R -->|routine| T[GPT-5.6 Terra]
-  R -->|deep| C[GPT-5.6 Sol; Claude when ZDR-qualified]
-  R -->|verify| V[GPT-5.6 Terra]
+  R -->|routine: direct OpenAI| T[GPT-5.6 Terra]
+  R -->|deep: direct OpenAI| C[GPT-5.6 Sol]
+  R -->|verify: direct OpenAI| V[GPT-5.6 Terra]
+  R -->|non-OpenAI model| OR[OpenRouter ZDR gateway]
+  OR --> X[Claude or Gemini when ZDR-qualified]
   T --> TOOLS[Typed live evidence tools]
   C --> SNAP[Timestamped architecture evidence snapshot]
   SNAP --> C

@@ -2845,6 +2845,7 @@ export async function runChatWithMemory(
     const completion = await openai.chat.completions.create({
       model: opts.model,
       max_completion_tokens: opts.maxCompletionTokens,
+      ...(opts.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
       messages,
       tools: mustGatherEvidence ? evidenceOnlyTools : tools,
       ...(mustGatherEvidence ? { tool_choice: "required" as const } : {}),
@@ -3119,6 +3120,7 @@ export async function runChatWithMemory(
   const final = await openai.chat.completions.create({
     model: opts.model,
     max_completion_tokens: opts.maxCompletionTokens,
+    ...(opts.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
     messages: [...messages, { role: "system", content: "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools." }],
   });
   return done(final.choices[0]?.message?.content ?? "I could not complete the evidence synthesis.");

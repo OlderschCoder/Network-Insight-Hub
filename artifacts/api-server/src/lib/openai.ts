@@ -2,8 +2,9 @@ import OpenAI from "openai";
 
 export function isAIConfigured(): boolean {
   return Boolean(
-    process.env.AI_INTEGRATIONS_OPENAI_API_KEY &&
-      process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    process.env.OPENAI_API_KEY ||
+      (process.env.AI_INTEGRATIONS_OPENAI_API_KEY &&
+        process.env.AI_INTEGRATIONS_OPENAI_BASE_URL),
   );
 }
 
@@ -13,12 +14,12 @@ let cachedOpenRouter: OpenAI | null = null;
 export type FredModelProfile = "routine" | "deep" | "verify";
 
 const FRED_MODELS: Record<FredModelProfile, string> = {
-  routine: process.env.FRED_ROUTINE_MODEL || "openai/gpt-5.6-terra",
+  routine: process.env.FRED_ROUTINE_MODEL || "gpt-5.6-terra",
   // Claude Opus 5 is the preferred cross-provider deep model, but OpenRouter
   // currently exposes no ZDR-compatible endpoint for this account. Keep SCCC
   // data private by default; operators can switch once a ZDR endpoint exists.
-  deep: process.env.FRED_DEEP_MODEL || "openai/gpt-5.6-sol",
-  verify: process.env.FRED_VERIFY_MODEL || "openai/gpt-5.6-terra",
+  deep: process.env.FRED_DEEP_MODEL || "gpt-5.6-sol",
+  verify: process.env.FRED_VERIFY_MODEL || "gpt-5.6-terra",
 };
 
 export function isOpenRouterConfigured(): boolean {
@@ -30,6 +31,15 @@ export function isOpenRouterConfigured(): boolean {
  * The existing direct OpenAI integration remains the safe fallback.
  */
 export function getFredAI(profile: FredModelProfile = "routine"): { client: OpenAI; model: string; provider: "openrouter" | "direct" } {
+  const configuredModel = FRED_MODELS[profile];
+  const isOpenAIModel = !configuredModel.includes("/") || configuredModel.startsWith("openai/");
+  if (isOpenAIModel) {
+    return {
+      client: getOpenAI(),
+      model: configuredModel.replace(/^openai\//, ""),
+      provider: "direct",
+    };
+  }
   if (isOpenRouterConfigured()) {
     if (!cachedOpenRouter) {
       cachedOpenRouter = new OpenAI({
@@ -60,7 +70,7 @@ export function getFredAI(profile: FredModelProfile = "routine"): { client: Open
         },
       });
     }
-    return { client: cachedOpenRouter, model: FRED_MODELS[profile], provider: "openrouter" };
+    return { client: cachedOpenRouter, model: configuredModel, provider: "openrouter" };
   }
   return {
     client: getOpenAI(),
@@ -75,8 +85,11 @@ export function getOpenAI(): OpenAI {
   }
   if (!cached) {
     cached = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL:
+        process.env.OPENAI_BASE_URL ||
+        process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ||
+        "https://api.openai.com/v1",
     });
   }
   return cached;
