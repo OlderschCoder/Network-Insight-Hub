@@ -1,7 +1,9 @@
 flowchart LR
   U[Authenticated IT user] --> UI[Fixed-height Fred chat]
   UI --> S[(Durable per-user session)]
+  UI --> A[Protected active incident state]
   UI --> API[Fred API]
+  A --> API
   API --> R{Workload profile}
   R -->|routine: direct OpenAI| T[GPT-5.6 Terra]
   R -->|deep: direct OpenAI| C[GPT-5.6 Sol]

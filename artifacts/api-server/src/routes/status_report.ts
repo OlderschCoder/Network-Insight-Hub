@@ -28,6 +28,7 @@ import { getFredAI, getOpenAI, isAIConfigured } from "../lib/openai";
 import { buildFredFileReviewContext } from "../lib/fred_files";
 import { boundFredMessages, FRED_MAX_CHECKPOINT_CHARS } from "../lib/fred_context";
 import { evidencePolicyFor, latestUserText } from "../lib/fred_evidence_policy";
+import { extractActiveIncidentState } from "../lib/fred_active_state";
 
 const router = Router();
 
@@ -614,6 +615,7 @@ router.post(
 
       const boundedChatMessages = boundFredMessages(chatMessages);
       const evidencePolicy = evidencePolicyFor(latestUserText(chatMessages));
+      const activeIncidentState = extractActiveIncidentState(chatMessages, conversationCheckpoint);
       const lookbackDays = Math.max(1, Math.min(365, Number(rawLookback) || 90));
       const since = new Date();
       since.setDate(since.getDate() - lookbackDays);
@@ -768,6 +770,8 @@ Do not seize the first plausible explanation and present it as fact. Before asse
 
 Minimize the user's work. Begin from what the Hub already knows: stored intended/known-good state, newest application status, current telemetry, topology, recent changes, prior tool results, console output, and the compact checkpoint. Your job is to find the delta—not to make the user reconstruct your database by hand.
 
+Temporary operating state is first-class evidence. A user statement that a path is bypassed, an uplink is disconnected, a device is connected directly, or a temporary configuration is active describes the current incident topology. It overrides stored intended configuration for diagnosis until a newer user statement explicitly restores, removes, or replaces it. Do not save temporary state as durable known-good memory. Before proposing a command, silently reconstruct the current physical path and reject any recommendation that assumes a disconnected or bypassed component is still in path. Never repeat a command that the supplied console has already rejected as invalid; adapt it to the observed platform and mode.
+
 For operational questions, determine and report:
 1. what is expected or was last known good;
 2. what the newest observation shows, with timestamp/source;
@@ -915,6 +919,7 @@ Either way: save immediately, don't wait to be asked. Keep entries tight (1-3 se
 ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
 ${fredFileContext ? `\n# Fred File Library Context\n${fredFileContext}\n` : ""}
 ${conversationCheckpoint ? `\n# Compact conversation checkpoint\nThis is a bounded working-memory summary of older turns. Use it for continuity, but treat newer messages and live evidence as authoritative. Do not repeat it back unless relevant.\n${conversationCheckpoint}\n` : ""}
+${activeIncidentState ? `\n# Protected active incident state\nThese are user-reported temporary operating changes extracted from the conversation, in chronological order. Treat the newest applicable statement as authoritative over stored topology until the user reports restoration or replacement. Do not turn these temporary facts into permanent memory.\n${activeIncidentState}\n` : ""}
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 

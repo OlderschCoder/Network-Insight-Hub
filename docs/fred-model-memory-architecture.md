@@ -39,6 +39,13 @@ Routine answers lead with the answer, delta, and action. Fred does not repeat th
 question, narrate hidden reasoning, dump tool output, or append generic offers.
 Long-form output is reserved for explicitly requested deliverables.
 
+Temporary incident topology is maintained separately from durable memory. Fred
+extracts user-reported bypasses, disconnected paths, direct connections, and
+restorations into a protected active-state block. The newest applicable change
+overrides stored known-good topology during diagnosis until the user reports
+that it has been restored or replaced; temporary state is never promoted to
+permanent memory automatically.
+
 ## Enterprise architecture acceptance workflow
 
 The CIO-only Architecture tab captures a timestamped evidence snapshot from the
