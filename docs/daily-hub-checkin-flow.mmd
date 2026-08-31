@@ -1,0 +1,10 @@
+flowchart LR
+  U[Authenticated user] --> Q[Three daily questions]
+  Q --> A[(learning_gate_answers)]
+  U --> P[Authenticated page views]
+  P --> E[(product_usage_events)]
+  A --> S[Learning status]
+  E --> S
+  S -->|complete or CIO| F[Normal Fred answers]
+  S -->|incomplete routine question| H[Guided hint and exact Hub section]
+  S -->|incident outage security urgent| F

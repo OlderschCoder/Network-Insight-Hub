@@ -1,0 +1,11 @@
+flowchart LR
+  C[Fresh console output] --> X[Evidence reconciliation]
+  G[Stored known-good configuration] --> X
+  T[Current telemetry and topology] --> X
+  X --> L[Local access port and VLAN]
+  L --> U[Local uplink and LAG]
+  U --> R[Reciprocal upstream port]
+  R --> D[Downstream dependencies]
+  D --> I[Independent service signal]
+  I --> O[Fault domain and confidence]
+  O --> A[Test, fix, validation, rollback]

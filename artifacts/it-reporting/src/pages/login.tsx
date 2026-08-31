@@ -99,87 +99,89 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">SCCC IT Hub</CardTitle>
-          <CardDescription>Sign in with your SCCC Microsoft account</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            type="button"
-            className="w-full"
-            onClick={() => {
-              window.location.href = ENTRA_LOGIN_URL;
-            }}
-            disabled={ssoConfigured === false && !!entraStatus}
-          >
-            <MicrosoftLogo />
-            <span className="ml-2">Sign in with Microsoft</span>
-          </Button>
-          {entraStatus && !ssoConfigured && (
-            <p className="text-center text-xs text-muted-foreground">
-              Microsoft sign-in isn't configured yet. Use the emergency login below.
-            </p>
-          )}
-
-          {!showBreakGlass ? (
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setShowBreakGlass(true)}
-                className="text-xs text-muted-foreground hover:text-primary hover:underline"
-              >
-                Use emergency (break-glass) login
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4 border-t pt-4">
-              <p className="text-xs text-muted-foreground">
-                Emergency access for administrators when Microsoft sign-in is unavailable.
+      <div className="w-full max-w-3xl space-y-4">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">SCCC IT Hub</CardTitle>
+            <CardDescription>Sign in with your SCCC Microsoft account</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => {
+                window.location.href = ENTRA_LOGIN_URL;
+              }}
+              disabled={ssoConfigured === false && !!entraStatus}
+            >
+              <MicrosoftLogo />
+              <span className="ml-2">Sign in with Microsoft</span>
+            </Button>
+            {entraStatus && !ssoConfigured && (
+              <p className="text-center text-xs text-muted-foreground">
+                Microsoft sign-in isn't configured yet. Use the emergency login below.
               </p>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="name@sccc.edu" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" variant="secondary" className="w-full" disabled={loginMutation.isPending}>
-                    {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign in
-                  </Button>
-                  <div className="text-center text-sm">
-                    <Link href="/forgot-password" className="text-muted-foreground hover:text-primary hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                </form>
-              </Form>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+
+            {!showBreakGlass ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowBreakGlass(true)}
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Use emergency (break-glass) login
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 border-t pt-4">
+                <p className="text-xs text-muted-foreground">
+                  Emergency access for administrators when Microsoft sign-in is unavailable.
+                </p>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="name@sccc.edu" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" variant="secondary" className="w-full" disabled={loginMutation.isPending}>
+                      {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Sign in
+                    </Button>
+                    <div className="text-center text-sm">
+                      <Link href="/forgot-password" className="text-muted-foreground hover:text-primary hover:underline">
+                        Forgot password?
+                      </Link>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

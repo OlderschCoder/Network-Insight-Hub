@@ -8,7 +8,9 @@ import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, and, or } from "drizzle-orm";
 import { requireAuth, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
-import { collectLldpIntoNetworkMap } from "../lib/lldp_map_collector";
+import { isIP } from "node:net";
+import crypto from "node:crypto";
+import { normalizeNetworkIdentityData, saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 
 const router = Router();
 
@@ -112,36 +114,32 @@ router.get("/nodes", requireAuth, async (req: any, res) => {
 router.post("/nodes", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = nodeCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
-
-  // Normalise hostname: lowercase, trim, strip .sccc.edu suffix
-  const data = {
-    ...parsed.data,
-    hostname: parsed.data.hostname.toLowerCase().trim().replace(/\.sccc\.edu$/i, ""),
-  };
-
-  try {
-    const [node] = await db.insert(netNodesTable).values(data).returning();
-    return res.status(201).json(node);
-  } catch (err: any) {
-    if (err?.code === "23505") return res.status(409).json({ error: "A node with that hostname already exists." });
-    throw err;
-  }
+  const result = await saveNetNodeByIdentity(parsed.data);
+  return res.status(result.action === "created" ? 201 : 200).json(result.row);
 });
 
 router.patch("/nodes/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = nodeUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-
-  const data: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
-  if (data.hostname) data.hostname = (data.hostname as string).toLowerCase().trim().replace(/\.sccc\.edu$/i, "");
-
-  const [node] = await db
-    .update(netNodesTable)
-    .set(data)
-    .where(eq(netNodesTable.id, req.params.id))
-    .returning();
-  if (!node) return res.status(404).json({ error: "Not found" });
-  return res.json(node);
+  const [existing] = await db.select().from(netNodesTable).where(eq(netNodesTable.id, req.params.id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const result = await saveNetNodeByIdentity({
+    hostname: parsed.data.hostname ?? existing.hostname,
+    displayName: parsed.data.displayName ?? existing.displayName,
+    nodeKind: parsed.data.nodeKind ?? existing.nodeKind,
+    vendor: parsed.data.vendor ?? existing.vendor,
+    model: parsed.data.model ?? existing.model,
+    mgmtIp: parsed.data.mgmtIp ?? existing.mgmtIp,
+    building: parsed.data.building ?? existing.building,
+    location: parsed.data.location ?? existing.location,
+    role: parsed.data.role ?? existing.role,
+    function: parsed.data.function ?? existing.function,
+    criticality: parsed.data.criticality ?? existing.criticality,
+    tags: parsed.data.tags ?? existing.tags,
+    status: parsed.data.status ?? existing.status,
+    notes: parsed.data.notes ?? existing.notes,
+  }, existing.id);
+  return res.json(result.row);
 });
 
 router.delete("/nodes/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
@@ -175,31 +173,34 @@ router.get("/links", requireAuth, async (req: any, res) => {
 router.post("/links", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = linkCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
-
-  // Canonical ordering to avoid A-B / B-A duplicates: sort node ids lexicographically
-  let data = { ...parsed.data, lastVerifiedAt: new Date(parsed.data.lastVerifiedAt) };
-  if (data.aNodeId > data.bNodeId) {
-    [data.aNodeId, data.bNodeId] = [data.bNodeId, data.aNodeId];
-    [data.aPort, data.bPort] = [data.bPort, data.aPort];
-  }
-
-  const [link] = await db.insert(netLinksTable).values(data).returning();
-  return res.status(201).json(link);
+  const result = await saveNetLinkByIdentity(parsed.data);
+  return res.status(result.action === "created" ? 201 : 200).json(result.row);
 });
 
 router.patch("/links/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = linkUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-  const data: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
-  if (data.lastVerifiedAt) data.lastVerifiedAt = new Date(data.lastVerifiedAt as string);
-
-  const [link] = await db
-    .update(netLinksTable)
-    .set(data)
-    .where(eq(netLinksTable.id, req.params.id))
-    .returning();
-  if (!link) return res.status(404).json({ error: "Not found" });
-  return res.json(link);
+  const [existing] = await db.select().from(netLinksTable).where(eq(netLinksTable.id, req.params.id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+  const result = await saveNetLinkByIdentity({
+    aNodeId: parsed.data.aNodeId ?? existing.aNodeId,
+    aPort: parsed.data.aPort ?? existing.aPort,
+    bNodeId: parsed.data.bNodeId ?? existing.bNodeId,
+    bPort: parsed.data.bPort ?? existing.bPort,
+    linkKind: parsed.data.linkKind ?? existing.linkKind,
+    speedMbps: parsed.data.speedMbps ?? existing.speedMbps,
+    portMode: parsed.data.portMode ?? existing.portMode,
+    nativeVlan: parsed.data.nativeVlan ?? existing.nativeVlan,
+    allowedVlans: parsed.data.allowedVlans ?? existing.allowedVlans,
+    portchannel: parsed.data.portchannel ?? existing.portchannel,
+    lldpPeerHostname: parsed.data.lldpPeerHostname ?? existing.lldpPeerHostname,
+    lldpPeerMgmtIp: parsed.data.lldpPeerMgmtIp ?? existing.lldpPeerMgmtIp,
+    confidence: parsed.data.confidence ?? existing.confidence,
+    lastVerifiedAt: parsed.data.lastVerifiedAt ?? existing.lastVerifiedAt,
+    evidenceRef: parsed.data.evidenceRef ?? existing.evidenceRef,
+    notes: parsed.data.notes ?? existing.notes,
+  }, existing.id);
+  return res.json(result.row);
 });
 
 router.delete("/links/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
@@ -210,6 +211,10 @@ router.delete("/links/:id", requireAuth, requireNetworkAdmin, async (req: any, r
   if (!link) return res.status(404).json({ error: "Not found" });
   return res.json({ ok: true });
 });
+
+// ──────────────────────────────────────────────────────────────
+// Port inventory — merged configuration + live SNMP telemetry
+// ──────────────────────────────────────────────────────────────
 
 router.get("/ports", requireAuth, async (req: any, res) => {
   const nodeId = String(req.query.nodeId ?? "").trim();
@@ -224,14 +229,408 @@ router.get("/ports", requireAuth, async (req: any, res) => {
   return res.json(ports);
 });
 
-router.post("/collect/lldp", requireAuth, requireNetworkAdmin, async (_req: any, res) => {
-  try {
-    return res.json(await collectLldpIntoNetworkMap());
-  } catch (err) {
-    return res.status(502).json({
-      error: err instanceof Error ? err.message : "LLDP collection failed",
+// ──────────────────────────────────────────────────────────────
+// SSH collector telemetry import — one compact switch per request
+// ──────────────────────────────────────────────────────────────
+
+function telemetryServiceAuthorized(req: any): boolean {
+  const expected = process.env.NOC_PROBE_TOKEN?.trim();
+  const supplied = String(req.headers.authorization ?? "");
+  const remoteAddress = String(req.socket?.remoteAddress ?? "").replace(/^::ffff:/, "");
+  if (!expected || remoteAddress !== "10.0.0.22") return false;
+  const expectedHeader = Buffer.from(`Bearer ${expected}`);
+  const suppliedHeader = Buffer.from(supplied);
+  return expectedHeader.length === suppliedHeader.length
+    && crypto.timingSafeEqual(expectedHeader, suppliedHeader);
+}
+
+async function requireTelemetryImporter(req: any, res: any, next: any) {
+  if (telemetryServiceAuthorized(req)) {
+    req.telemetryService = "10.0.0.22";
+    return next();
+  }
+  return requireAuth(req, res, () => requireNetworkAdmin(req, res, next));
+}
+
+const telemetryInterfaceSchema = z.object({
+  port: z.string().min(1).max(80),
+  description: z.string().max(255).optional().nullable(),
+  name: z.string().max(255).optional().nullable(),
+  admin_status: z.string().max(20).optional().nullable(),
+  oper_status: z.string().max(20).optional().nullable(),
+  status: z.string().max(30).optional().nullable(),
+  reason: z.string().max(120).optional().nullable(),
+  mode: z.string().max(20).optional().nullable(),
+  native_vlan: z.number().int().optional().nullable(),
+  vlan: z.union([z.string(), z.number()]).optional().nullable(),
+  duplex: z.string().max(20).optional().nullable(),
+  speed_mbps: z.number().int().nonnegative().optional().nullable(),
+  speed: z.string().max(30).optional().nullable(),
+  media_type: z.string().max(80).optional().nullable(),
+  type: z.string().max(80).optional().nullable(),
+  is_physical: z.boolean().optional(),
+});
+
+const telemetryNeighborSchema = z.object({
+  local_port: z.string().max(80).optional().nullable(),
+  system_name: z.string().max(160).optional().nullable(),
+  management_addresses: z.array(z.string().max(80)).optional().default([]),
+  port_id: z.string().max(80).optional().nullable(),
+  chassis_id: z.string().max(160).optional().nullable(),
+});
+
+const telemetryImportSchema = z.object({
+  schema: z.literal("sccc.network.switchport_telemetry.v1"),
+  runId: z.string().min(1).max(100),
+  generatedAt: z.string().datetime({ offset: true }),
+  dryRun: z.boolean().optional().default(true),
+  switch: z.object({
+    switch_name: z.string().min(1).max(160),
+    switch_ip: z.string().min(1).max(45),
+    building: z.string().min(1).max(80).optional().nullable(),
+    device_type: z.string().max(40).optional().nullable(),
+    device: z.object({
+      hostname: z.string().max(160).optional().nullable(),
+      vendor: z.string().max(40).optional().nullable(),
+      model: z.string().max(255).optional().nullable(),
+      models: z.array(z.string().max(120)).optional().default([]),
+      serial_numbers: z.array(z.string().max(120)).optional().default([]),
+      os_version: z.string().max(120).optional().nullable(),
+    }).optional().nullable(),
+    polled_at: z.string().datetime({ offset: true }),
+    interfaces: z.array(telemetryInterfaceSchema).max(2000),
+    lldp_neighbors: z.array(telemetryNeighborSchema).max(5000).optional().default([]),
+    mac_counts: z.array(z.object({
+      port: z.string().min(1).max(80),
+      count: z.number().int().nonnegative(),
+    })).max(2000).optional().default([]),
+  }),
+});
+
+function telemetryHostname(raw: string | null | undefined): string {
+  return String(raw ?? "").trim().toLowerCase().replace(/\.sccc\.edu$/i, "");
+}
+
+function telemetryPort(raw: string | null | undefined): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^gigabitethernet/, "gi")
+    .replace(/^fastethernet/, "fa")
+    .replace(/^tengigabitethernet/, "te")
+    .replace(/^ethernet/, "eth");
+}
+
+function looksPhysicalTelemetryPort(raw: string): boolean {
+  return /^(?:\d+(?:\/\d+){2,3}(?::\d+)?|\d+|(?:eth(?:ernet)?|fa(?:stethernet)?|gi(?:gabitethernet)?|te(?:ngigabitethernet)?|twe(?:ntyfivegige)?|fo(?:rtygigabitethernet)?|hu(?:ndredgige)?|twogigabitethernet)\d+(?:\/\d+){1,3}(?::\d+)?)$/i.test(raw.trim());
+}
+
+function telemetryInteger(value: string | number | null | undefined): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  const text = String(value ?? "").trim();
+  return /^\d+$/.test(text) ? Number(text) : null;
+}
+
+function telemetrySpeed(value: string | null | undefined): number | null {
+  const text = String(value ?? "").trim().toLowerCase().replace(/^a-/, "");
+  const match = text.match(/^(\d+(?:\.\d+)?)([kmgt]?)/);
+  if (!match || ["auto", "--", "unknown"].includes(text)) return null;
+  const unit = match[2].trim();
+  const scale = unit === "t" ? 1_000_000 : unit === "g" ? 1000 : unit === "k" ? 0.001 : 1;
+  return Math.round(Number(match[1]) * scale);
+}
+
+function telemetryOperStatus(value: string | null | undefined): string | null {
+  const status = String(value ?? "").trim().toLowerCase();
+  if (!status) return null;
+  return status === "up" || status === "connected" ? "up" : "down";
+}
+
+function telemetryVendor(deviceType: string | null | undefined): string | null {
+  const value = String(deviceType ?? "").toLowerCase();
+  if (value.includes("aruba")) return "Aruba";
+  if (value.includes("cisco")) return "Cisco";
+  return null;
+}
+
+function telemetryLinkKind(mediaType: string | null | undefined): "fiber" | "dac" | "copper" | "unknown" {
+  const value = String(mediaType ?? "").toLowerCase();
+  if (/cu|dac|twinax/.test(value)) return "dac";
+  if (/sfp|qsfp|lr|sr|sx|lx|fiber|optical/.test(value)) return "fiber";
+  if (/base-?t|smart.?rate|rj-?45|copper/.test(value)) return "copper";
+  return "unknown";
+}
+
+router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: any, res) => {
+  const parsed = telemetryImportSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  }
+
+  const { dryRun, runId, switch: telemetry } = parsed.data;
+  const sourceHostname = telemetryHostname(telemetry.switch_name);
+  const collectedModel = telemetry.device?.model?.slice(0, 80) ?? null;
+  const polledAt = new Date(telemetry.polled_at);
+  const allNodes = await db.select().from(netNodesTable);
+  const allInventory = await db.select().from(networkSwitchesTable);
+
+  const nodeByIp = allNodes.find((node) => node.mgmtIp === telemetry.switch_ip);
+  const nodeByName = allNodes.find((node) => telemetryHostname(node.hostname) === sourceHostname);
+  const inventoryByIp = allInventory.find((sw) => sw.ipAddress === telemetry.switch_ip);
+  const inventoryByName = allInventory.find((sw) => telemetryHostname(sw.hostname) === sourceHostname);
+  const preliminaryInventory = inventoryByIp ?? inventoryByName ?? null;
+  const inventoryNode = preliminaryInventory
+    ? allNodes.find((node) => telemetryHostname(node.hostname) === telemetryHostname(preliminaryInventory.hostname))
+    : null;
+
+  if (nodeByIp && nodeByName && nodeByIp.id !== nodeByName.id) {
+    return res.status(409).json({
+      error: "IDENTITY_CONFLICT",
+      message: `${telemetry.switch_ip} resolves to ${nodeByIp.hostname}, while ${sourceHostname} resolves to a different node.`,
+      sourceHostname,
+      switchIp: telemetry.switch_ip,
     });
   }
+
+  let sourceNode = nodeByIp ?? nodeByName ?? inventoryNode ?? null;
+  // Once a node is known, its current management IP is authoritative over an
+  // alternate/SVI collector target or a duplicate inventory row.
+  const inventory = (
+    sourceNode?.mgmtIp
+      ? allInventory.find((sw) => sw.ipAddress === sourceNode!.mgmtIp)
+      : null
+  ) ?? preliminaryInventory;
+  if (/svi/i.test(sourceHostname) || sourceNode?.nodeKind === "svi" || sourceNode?.role === "svi") {
+    const aliasPreview = {
+      dryRun,
+      skipped: !sourceNode,
+      metadataOnly: Boolean(sourceNode),
+      reason: sourceNode ? "SVI_METADATA_ONLY" : "SVI_ALIAS_UNMATCHED",
+      sourceHostname,
+      switchIp: telemetry.switch_ip,
+      matchedNodeId: sourceNode?.id ?? null,
+      matchedNodeHostname: sourceNode?.hostname ?? inventory?.hostname ?? null,
+      matchedNodeMgmtIp: sourceNode?.mgmtIp ?? inventory?.ipAddress ?? null,
+      building: telemetry.building ?? sourceNode?.building ?? inventory?.building ?? null,
+      nodeWillBeCreated: false,
+      physicalInterfaces: 0,
+      logicalInterfacesIgnored: telemetry.interfaces.length,
+      lldpNeighborsSeen: telemetry.lldp_neighbors.length,
+      infrastructureNeighborsResolved: 0,
+      endpointNeighborsIgnored: telemetry.lldp_neighbors.length,
+      linksUpserted: 0,
+    };
+    if (dryRun || !sourceNode) return res.json(aliasPreview);
+
+    await db.update(netNodesTable).set({
+      status: "online",
+      building: telemetry.building ?? sourceNode.building,
+      updatedAt: new Date(),
+    }).where(eq(netNodesTable.id, sourceNode.id));
+    if (inventory) {
+      await db.update(networkSwitchesTable).set({
+        status: "online",
+        building: telemetry.building ?? inventory.building,
+        lastSeen: polledAt,
+        updatedAt: new Date(),
+      }).where(eq(networkSwitchesTable.id, inventory.id));
+    }
+    return res.json({ ...aliasPreview, dryRun: false });
+  }
+
+  if (!sourceNode && !inventory) {
+    return res.status(422).json({
+      error: "UNMATCHED_SWITCH",
+      message: "No Network Map node or switch-inventory row matches this hostname or management IP.",
+      sourceHostname,
+      switchIp: telemetry.switch_ip,
+    });
+  }
+
+  const physicalInterfaces = telemetry.interfaces.filter(
+    (iface) => iface.is_physical === true || (iface.is_physical !== false && looksPhysicalTelemetryPort(iface.port)),
+  );
+  if (physicalInterfaces.length === 0) {
+    return res.status(422).json({
+      error: "NO_PHYSICAL_INTERFACES",
+      message: "The collector record contains no physical interfaces; existing port data was not changed.",
+      sourceHostname,
+      switchIp: telemetry.switch_ip,
+    });
+  }
+
+  const macCounts = new Map(telemetry.mac_counts.map((entry) => [telemetryPort(entry.port), entry.count]));
+  const lldpCounts = new Map<string, number>();
+  for (const neighbor of telemetry.lldp_neighbors) {
+    const localPort = telemetryPort(neighbor.local_port);
+    if (localPort) lldpCounts.set(localPort, (lldpCounts.get(localPort) ?? 0) + 1);
+  }
+
+  const nodeCandidates = [...allNodes];
+  const resolveNeighbor = (neighbor: z.infer<typeof telemetryNeighborSchema>) => {
+    for (const address of neighbor.management_addresses) {
+      if (isIP(address)) {
+        const byIp = nodeCandidates.find((node) => node.mgmtIp === address);
+        if (byIp) return byIp;
+      }
+    }
+    if (neighbor.system_name) {
+      const hostname = telemetryHostname(neighbor.system_name);
+      return nodeCandidates.find((node) => telemetryHostname(node.hostname) === hostname) ?? null;
+    }
+    return null;
+  };
+  const resolvedNeighbors = telemetry.lldp_neighbors.filter(
+    (neighbor) => neighbor.local_port && neighbor.port_id && resolveNeighbor(neighbor),
+  );
+
+  const preview = {
+    dryRun,
+    skipped: false,
+    metadataOnly: false,
+    sourceHostname,
+    switchIp: telemetry.switch_ip,
+    matchedNodeId: sourceNode?.id ?? null,
+    matchedNodeHostname: sourceNode?.hostname ?? inventory?.hostname ?? null,
+    matchedNodeMgmtIp: sourceNode?.mgmtIp ?? inventory?.ipAddress ?? null,
+    building: telemetry.building ?? sourceNode?.building ?? inventory?.building ?? null,
+    nodeWillBeCreated: !sourceNode,
+    physicalInterfaces: physicalInterfaces.length,
+    logicalInterfacesIgnored: telemetry.interfaces.length - physicalInterfaces.length,
+    lldpNeighborsSeen: telemetry.lldp_neighbors.length,
+    infrastructureNeighborsResolved: resolvedNeighbors.length,
+    endpointNeighborsIgnored: telemetry.lldp_neighbors.length - resolvedNeighbors.length,
+    linksUpserted: 0,
+  };
+  if (dryRun) return res.json(preview);
+
+  if (!sourceNode) {
+    const result = await saveNetNodeByIdentity({
+      hostname: inventory!.hostname,
+      displayName: inventory!.hostname,
+      nodeKind: "switch",
+      vendor: telemetry.device?.vendor ?? telemetryVendor(telemetry.device_type),
+      model: collectedModel ?? inventory!.model?.slice(0, 80) ?? null,
+      mgmtIp: inventory!.ipAddress,
+      building: telemetry.building ?? inventory!.building,
+      location: inventory!.location ?? null,
+      role: "access",
+      criticality: "medium",
+      status: "online",
+      notes: inventory!.notes ?? null,
+    });
+    sourceNode = result.row;
+    nodeCandidates.push(sourceNode);
+  }
+
+  const nodeUpdates: Record<string, unknown> = { status: "online", updatedAt: new Date() };
+  if (inventory) {
+    nodeUpdates.displayName = inventory.hostname;
+    nodeUpdates.building = telemetry.building ?? inventory.building;
+    nodeUpdates.model = collectedModel ?? inventory.model?.slice(0, 80) ?? sourceNode.model;
+    nodeUpdates.location = inventory.location ?? sourceNode.location;
+    nodeUpdates.mgmtIp = sourceNode.mgmtIp && sourceNode.mgmtIp !== "0.0.0.0"
+      ? sourceNode.mgmtIp
+      : inventory.ipAddress;
+  } else if (!sourceNode.mgmtIp || sourceNode.mgmtIp === "0.0.0.0") {
+    nodeUpdates.mgmtIp = telemetry.switch_ip;
+  }
+  if (!sourceNode.vendor || telemetry.device?.vendor) {
+    nodeUpdates.vendor = telemetry.device?.vendor ?? telemetryVendor(telemetry.device_type);
+  }
+  if (telemetry.building) nodeUpdates.building = telemetry.building;
+  if (collectedModel) nodeUpdates.model = collectedModel;
+  await db.update(netNodesTable).set(nodeUpdates).where(eq(netNodesTable.id, sourceNode.id));
+
+  if (inventory) {
+    await db.update(networkSwitchesTable).set({
+      status: "online",
+      building: telemetry.building ?? inventory.building,
+      model: telemetry.device?.model ?? inventory.model,
+      lastSeen: polledAt,
+      updatedAt: new Date(),
+    }).where(eq(networkSwitchesTable.id, inventory.id));
+  }
+
+  for (const iface of physicalInterfaces) {
+    const adminStatus = iface.admin_status && iface.admin_status !== "unknown" ? iface.admin_status : null;
+    const operStatus = iface.oper_status ?? telemetryOperStatus(iface.status);
+    const nativeVlan = iface.native_vlan ?? telemetryInteger(iface.vlan);
+    const speedMbps = iface.speed_mbps ?? telemetrySpeed(iface.speed);
+    const mediaType = iface.media_type ?? iface.type ?? null;
+    const description = (iface.description ?? iface.name ?? "").trim() || null;
+    const portMode = iface.mode && ["trunk", "access", "routed", "peerlink", "heartbeat", "unknown"].includes(iface.mode)
+      ? iface.mode
+      : null;
+    const values: any = {
+      nodeId: sourceNode.id,
+      interfaceName: iface.port.trim(),
+      isPhysical: true,
+      description,
+      adminStatus,
+      operStatus,
+      statusReason: iface.reason ?? null,
+      speedMbps,
+      duplex: iface.duplex ?? null,
+      mediaType,
+      portMode,
+      nativeVlan,
+      macCount: macCounts.get(telemetryPort(iface.port)) ?? 0,
+      lldpNeighborCount: lldpCounts.get(telemetryPort(iface.port)) ?? 0,
+      telemetryEvidence: `collector:${runId}:${sourceHostname}`,
+      telemetryUpdatedAt: polledAt,
+      updatedAt: new Date(),
+    };
+    const updates: any = {
+      isPhysical: true,
+      operStatus,
+      statusReason: iface.reason ?? null,
+      speedMbps,
+      duplex: iface.duplex ?? null,
+      mediaType,
+      macCount: values.macCount,
+      lldpNeighborCount: values.lldpNeighborCount,
+      telemetryEvidence: values.telemetryEvidence,
+      telemetryUpdatedAt: polledAt,
+      updatedAt: new Date(),
+    };
+    if (description) updates.description = description;
+    if (adminStatus) updates.adminStatus = adminStatus;
+    if (portMode) updates.portMode = portMode;
+    if (nativeVlan != null) updates.nativeVlan = nativeVlan;
+    await db.insert(netPortsTable).values(values).onConflictDoUpdate({
+      target: [netPortsTable.nodeId, netPortsTable.interfaceName],
+      set: updates,
+    });
+  }
+
+  const interfaceByPort = new Map(physicalInterfaces.map((iface) => [telemetryPort(iface.port), iface]));
+  for (const neighbor of telemetry.lldp_neighbors) {
+    if (!neighbor.local_port || !neighbor.port_id) continue;
+    const neighborNode = resolveNeighbor(neighbor);
+    if (!neighborNode || neighborNode.id === sourceNode.id) continue;
+    const localInterface = interfaceByPort.get(telemetryPort(neighbor.local_port));
+    await saveNetLinkByIdentity({
+      aNodeId: sourceNode.id,
+      aPort: neighbor.local_port,
+      bNodeId: neighborNode.id,
+      bPort: neighbor.port_id,
+      linkKind: telemetryLinkKind(localInterface?.media_type ?? localInterface?.type),
+      speedMbps: localInterface?.speed_mbps ?? telemetrySpeed(localInterface?.speed),
+      portMode: localInterface?.mode && ["trunk", "access", "routed", "peerlink", "heartbeat", "unknown"].includes(localInterface.mode)
+        ? localInterface.mode
+        : null,
+      nativeVlan: localInterface?.native_vlan ?? telemetryInteger(localInterface?.vlan),
+      confidence: "confirmed_lldp",
+      lastVerifiedAt: polledAt,
+      evidenceRef: `collector:${runId}`,
+      lldpPeerHostname: neighbor.system_name ? telemetryHostname(neighbor.system_name) : neighborNode.hostname,
+      lldpPeerMgmtIp: neighbor.management_addresses.find((address) => isIP(address)) ?? neighborNode.mgmtIp,
+    });
+    preview.linksUpserted++;
+  }
+
+  return res.json({ ...preview, dryRun: false, matchedNodeId: sourceNode.id });
 });
 
 // ──────────────────────────────────────────────────────────────
@@ -367,20 +766,16 @@ router.post("/import/lldp", requireAuth, requireNetworkAdmin, async (req: any, r
     .where(eq(netNodesTable.hostname, srcHostname));
 
   if (!srcNode) {
-    // Auto-create a placeholder node for the source device
-    const [created] = await db
-      .insert(netNodesTable)
-      .values({
-        hostname: srcHostname,
-        displayName: srcHostname,
-        nodeKind: "switch",
-        building: "Unknown",
-        role: "access",
-        criticality: "medium",
-        notes: `Auto-created from LLDP import on ${capturedAt}`,
-      })
-      .returning();
-    srcNode = created;
+    const created = await saveNetNodeByIdentity({
+      hostname: srcHostname,
+      displayName: srcHostname,
+      nodeKind: "switch",
+      building: "Unknown",
+      role: "access",
+      criticality: "medium",
+      notes: `Auto-created from LLDP import on ${capturedAt}`,
+    });
+    srcNode = created.row;
   }
 
   const neighbors = parseNxosLldp(rawText);
@@ -397,88 +792,53 @@ router.post("/import/lldp", requireAuth, requireNetworkAdmin, async (req: any, r
       let [nbrNode] = await db
         .select()
         .from(netNodesTable)
-        .where(eq(netNodesTable.hostname, nbr.systemName));
+        .where(or(eq(netNodesTable.hostname, nbr.systemName), eq(netNodesTable.mgmtIp, nbr.mgmtAddress ?? "")));
 
       if (!nbrNode) {
-        const [created] = await db
-          .insert(netNodesTable)
-          .values({
-            hostname: nbr.systemName,
-            displayName: nbr.systemName,
-            nodeKind: "switch",
-            building: "Unknown",
-            role: "access",
-            criticality: "medium",
-            mgmtIp: nbr.mgmtAddress,
-            notes: `Auto-created from LLDP import via ${srcHostname} on ${capturedAt}`,
-          })
-          .returning();
-        nbrNode = created;
+        const created = await saveNetNodeByIdentity({
+          hostname: nbr.systemName,
+          displayName: nbr.systemName,
+          nodeKind: "switch",
+          building: "Unknown",
+          role: "access",
+          criticality: "medium",
+          mgmtIp: nbr.mgmtAddress,
+          notes: `Auto-created from LLDP import via ${srcHostname} on ${capturedAt}`,
+        });
+        nbrNode = created.row;
         results.nodesUpserted++;
       } else if (nbr.mgmtAddress && !nbrNode.mgmtIp) {
-        // Fill in mgmt IP if we learned it from LLDP
-        await db
-          .update(netNodesTable)
-          .set({ mgmtIp: nbr.mgmtAddress, updatedAt: new Date() })
-          .where(eq(netNodesTable.id, nbrNode.id));
+        const updated = await saveNetNodeByIdentity({
+          hostname: nbrNode.hostname,
+          displayName: nbrNode.displayName,
+          nodeKind: nbrNode.nodeKind,
+          vendor: nbrNode.vendor,
+          model: nbrNode.model,
+          mgmtIp: nbr.mgmtAddress,
+          building: nbrNode.building,
+          location: nbrNode.location,
+          role: nbrNode.role,
+          function: nbrNode.function,
+          criticality: nbrNode.criticality,
+          tags: nbrNode.tags,
+          status: nbrNode.status,
+          notes: nbrNode.notes,
+        }, nbrNode.id);
+        nbrNode = updated.row;
         results.nodesUpserted++;
       }
-
-      // Canonical ordering for new inserts (ensures consistent a<b UUID order)
-      let aId = srcNode.id;
-      let aPort = nbr.localPort;
-      let bId = nbrNode.id;
-      let bPort = nbr.remotePort;
-      if (aId > bId) {
-        [aId, bId] = [bId, aId];
-        [aPort, bPort] = [bPort, aPort];
-      }
-
-      // Dedup: search BOTH directions — seed data may not have used canonical order
-      const existingLinks = await db
-        .select()
-        .from(netLinksTable)
-        .where(
-          or(
-            and(eq(netLinksTable.aNodeId, aId), eq(netLinksTable.bNodeId, bId)),
-            and(eq(netLinksTable.aNodeId, bId), eq(netLinksTable.bNodeId, aId)),
-          ),
-        );
-
-      // Match on ports regardless of which side they're stored on
-      const existing = existingLinks.find(
-        (l) =>
-          (l.aPort === aPort && l.bPort === bPort) ||
-          (l.aPort === bPort && l.bPort === aPort),
-      );
-
-      if (existing) {
-        // Update confidence and timestamp; don't overwrite manual notes
-        await db
-          .update(netLinksTable)
-          .set({
-            confidence: "confirmed_lldp",
-            lastVerifiedAt: capturedDate,
-            evidenceRef: evidenceRef ?? existing.evidenceRef,
-            lldpPeerHostname: nbr.systemName,
-            lldpPeerMgmtIp: nbr.mgmtAddress ?? existing.lldpPeerMgmtIp,
-            updatedAt: new Date(),
-          })
-          .where(eq(netLinksTable.id, existing.id));
-      } else {
-        await db.insert(netLinksTable).values({
-          aNodeId: aId,
-          aPort,
-          bNodeId: bId,
-          bPort,
-          linkKind: "fiber",
-          confidence: "confirmed_lldp",
-          lastVerifiedAt: capturedDate,
-          evidenceRef: evidenceRef ?? null,
-          lldpPeerHostname: nbr.systemName,
-          lldpPeerMgmtIp: nbr.mgmtAddress,
-        });
-      }
+      await saveNetLinkByIdentity({
+        aNodeId: srcNode.id,
+        aPort: nbr.localPort,
+        bNodeId: nbrNode.id,
+        bPort: nbr.remotePort,
+        linkKind: "fiber",
+        confidence: "confirmed_lldp",
+        lastVerifiedAt: capturedDate,
+        evidenceRef: evidenceRef ?? null,
+        lldpPeerHostname: nbr.systemName,
+        lldpPeerMgmtIp: nbr.mgmtAddress,
+      });
       results.linksUpserted++;
     } catch (err: any) {
       results.errors.push(`${nbr.systemName}: ${err?.message ?? "unknown error"}`);
@@ -499,12 +859,6 @@ router.post("/seed-from-switches", requireAuth, requireNetworkAdmin, async (req:
 
   for (const sw of switches) {
     const hostname = sw.hostname.toLowerCase().trim().replace(/\.sccc\.edu$/i, "");
-    const [existing] = await db
-      .select()
-      .from(netNodesTable)
-      .where(eq(netNodesTable.hostname, hostname));
-
-    if (existing) { skipped++; continue; }
 
     // Infer role from hostname/model heuristics
     let role: "core" | "distribution" | "access" | "edge" | "firewall" | "controller" | "svi" = "access";
@@ -530,7 +884,7 @@ router.post("/seed-from-switches", requireAuth, requireNetworkAdmin, async (req:
     else if (/fortinet|fortigate/i.test(sw.model ?? "")) vendor = "Fortinet";
     else if (/dell/i.test(sw.model ?? "")) vendor = "Dell";
 
-    await db.insert(netNodesTable).values({
+    const result = await saveNetNodeByIdentity({
       hostname,
       displayName: sw.hostname,
       nodeKind,
@@ -544,10 +898,15 @@ router.post("/seed-from-switches", requireAuth, requireNetworkAdmin, async (req:
       status: (sw.status as "online" | "offline" | "unknown") ?? "unknown",
       notes: sw.notes ?? null,
     });
-    created++;
+    if (result.action === "created") created++;
+    else skipped++;
   }
 
   return res.json({ created, skipped, total: switches.length });
+});
+
+router.post("/normalize", requireAuth, requireNetworkAdmin, async (_req, res) => {
+  return res.json(await normalizeNetworkIdentityData());
 });
 
 // ──────────────────────────────────────────────────────────────

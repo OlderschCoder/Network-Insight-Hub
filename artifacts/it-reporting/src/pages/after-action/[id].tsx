@@ -15,6 +15,7 @@ import { useTimelineRefresh } from "@/hooks/useTimelineRefresh";
 import { format } from "date-fns";
 import { ArrowLeft, Download, ExternalLink, Pencil, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 
 const severityColor: Record<string, string> = {
   low: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -50,19 +51,10 @@ export default function AfterActionDetail() {
 
   const handleExport = async (type: "docx" | "pdf") => {
     try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/export/after-action/${id}/${type}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `after-action-${id}.${type}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadAuthenticatedFile(
+        `${import.meta.env.BASE_URL}api/export/after-action/${id}/${type}`,
+        `after-action-${id}.${type}`,
+      );
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
     }

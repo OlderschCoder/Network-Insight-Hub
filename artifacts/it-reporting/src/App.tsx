@@ -28,14 +28,14 @@ import NetworkVisualize from "@/pages/network/visualize";
 import NetworkTools from "@/pages/network/tools";
 import NetworkMap from "@/pages/network/map";
 import NodeDetail from "@/pages/network/node-detail";
-import Buildings from "@/pages/network/buildings";
+import Buildings, { BuildingsEmbedPage } from "@/pages/network/buildings";
 import AfterAction from "@/pages/after-action/index";
 import NewAfterAction from "@/pages/after-action/new";
 import AfterActionDetail from "@/pages/after-action/[id]";
 import Incidents from "@/pages/incidents/index";
 import IncidentRoom from "@/pages/incidents/[id]";
 import Admin from "@/pages/admin/index";
-import AIReport from "@/pages/ai-report/index";
+import AIReport, { FredMobilePage } from "@/pages/ai-report/index";
 import UserGuide from "@/pages/user-guide/index";
 import ProcessesIndex from "@/pages/processes/index";
 import NewProcess from "@/pages/processes/new";
@@ -47,10 +47,17 @@ import StrategicObjectivesIndex from "@/pages/strategic-objectives/index";
 import AzureVms from "@/pages/azure-vms/index";
 import AzureInventory from "@/pages/azure-inventory/index";
 import Monitoring from "@/pages/monitoring/index";
+import MonitoringEmbedPage from "@/pages/monitoring/embed";
 import ITApps from "@/pages/it-apps/index";
+import WebexCallingReport from "@/pages/it-apps/webex-calling";
+import CiscoCalling from "@/pages/it-apps/cisco-calling";
+import PasswordResetActivity from "@/pages/password-reset-activity/index";
+import MfaTapActivity from "@/pages/mfa-tap-activity/index";
+import StudentAccess from "@/pages/student-access/index";
 import AnalyticsPage from "@/pages/analytics/index";
 import DesignSystem from "@/pages/design-system/index";
 import Banner from "@/pages/banner/index";
+import LearnPage from "@/pages/learn/index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +68,14 @@ const queryClient = new QueryClient({
   },
 });
 
+const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
+
+function rememberPostLoginRedirect() {
+  if (typeof window === "undefined") return;
+  const target = `${window.location.pathname}${window.location.search}${window.location.hash}` || "/";
+  sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, target);
+}
+
 function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
   const { isAuthenticated, isLoading, isCIO } = useAuth();
   const [, setLocation] = useLocation();
@@ -70,6 +85,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
   }
 
   if (!isAuthenticated) {
+    rememberPostLoginRedirect();
     setLocation("/login");
     return null;
   }
@@ -86,6 +102,30 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
       <Component />
     </Layout>
   );
+}
+
+function ProtectedBareRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
+  const { isAuthenticated, isLoading, isCIO } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return <div className="h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
+  if (!isAuthenticated) {
+    rememberPostLoginRedirect();
+    setLocation("/login");
+    return null;
+  }
+
+  if (adminOnly && !isCIO) {
+    return <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
+      <h2 className="text-2xl font-bold">Access Denied</h2>
+      <p className="text-muted-foreground mt-2">You need CIO privileges to view this page.</p>
+    </div>;
+  }
+
+  return <Component />;
 }
 
 function Router() {
@@ -119,6 +159,8 @@ function Router() {
       <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />
       <Route path="/risks/:id" component={() => <ProtectedRoute component={RiskDetail} />} />
       
+      <Route path="/network/buildings/embed" component={BuildingsEmbedPage} />
+      <Route path="/monitoring/embed" component={MonitoringEmbedPage} />
       <Route path="/network/nodes/:id" component={() => <ProtectedRoute component={NodeDetail} />} />
       <Route path="/network/buildings/:name" component={() => <ProtectedRoute component={Buildings} />} />
       <Route path="/network/buildings" component={() => <ProtectedRoute component={Buildings} />} />
@@ -130,7 +172,12 @@ function Router() {
       <Route path="/azure-inventory" component={() => <ProtectedRoute component={AzureInventory} />} />
       <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />
       <Route path="/it-apps" component={() => <ProtectedRoute component={ITApps} />} />
+      <Route path="/it-apps/webex-calling" component={() => <ProtectedRoute component={WebexCallingReport} />} />
+      <Route path="/it-apps/cisco-calling" component={() => <ProtectedRoute component={CiscoCalling} />} />
       <Route path="/banner" component={() => <ProtectedRoute component={Banner} />} />
+      <Route path="/password-reset-activity" component={() => <ProtectedRoute component={PasswordResetActivity} />} />
+      <Route path="/mfa-tap-activity" component={() => <ProtectedRoute component={MfaTapActivity} />} />
+      <Route path="/student-access" component={() => <ProtectedRoute component={StudentAccess} />} />
       
       <Route path="/incidents" component={() => <ProtectedRoute component={Incidents} />} />
       <Route path="/incidents/:id" component={() => <ProtectedRoute component={IncidentRoom} />} />
@@ -138,9 +185,11 @@ function Router() {
       <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />
       <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />
       
+      <Route path="/fred/mobile" component={() => <ProtectedBareRoute component={FredMobilePage} />} />
       <Route path="/ai-report" component={() => <ProtectedRoute component={AIReport} />} />
 
       <Route path="/user-guide" component={() => <ProtectedRoute component={UserGuide} />} />
+      <Route path="/learn" component={() => <ProtectedRoute component={LearnPage} />} />
 
       <Route path="/processes" component={() => <ProtectedRoute component={ProcessesIndex} />} />
       <Route path="/processes/new" component={() => <ProtectedRoute component={NewProcess} />} />

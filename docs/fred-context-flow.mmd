@@ -1,0 +1,14 @@
+flowchart LR
+  U["User message"] --> B["Browser transcript"]
+  B --> R["10 recent messages"]
+  B --> C["8k rolling checkpoint"]
+  R --> A["Fred chat API"]
+  C --> A
+  O["Bounded operational context"] --> A
+  A --> L["Live tools when facts can change"]
+  L --> M["Model response"]
+  A --> M
+  M --> B
+
+  E["Clear visible chat"] --> C
+  E --> V["Empty visible transcript"]

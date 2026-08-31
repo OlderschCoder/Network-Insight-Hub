@@ -40,6 +40,21 @@ function startOfDayUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+router.post("/events", requireAuth, async (req: any, res) => {
+  const eventType = String(req.body?.eventType ?? "");
+  const path = String(req.body?.path ?? "").trim().slice(0, 500);
+  const clientSessionId = String(req.body?.clientSessionId ?? "").trim().slice(0, 64);
+  const durationSeconds = Math.max(0, Math.min(120, Math.floor(Number(req.body?.durationSeconds) || 0)));
+  if (!['page_view', 'heartbeat', 'fred_message'].includes(eventType) || !path || !clientSessionId) {
+    return res.status(400).json({ error: "valid eventType, path, and clientSessionId are required" });
+  }
+  await db.execute(sql`
+    INSERT INTO product_usage_events (user_id, client_session_id, event_type, path, duration_seconds)
+    VALUES (${req.user.id}, ${clientSessionId}, ${eventType}, ${path}, ${durationSeconds})
+  `);
+  return res.status(204).end();
+});
+
 router.get("/usage", requireAuth, requireCIO, async (req, res) => {
   const days = clampDays(req.query.days);
   // "last N days" means N calendar days INCLUDING today.
@@ -164,6 +179,46 @@ router.get("/usage", requireAuth, requireCIO, async (req, res) => {
     objectives: objectivesByUser,
   };
 
+  const engagementResult: any = await db.execute(sql`
+    WITH session_counts AS (
+      SELECT user_id, count(*)::int AS session_starts
+        FROM sessions WHERE created_at >= ${since} GROUP BY user_id
+    ), event_counts AS (
+      SELECT user_id,
+             count(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+             coalesce(sum(duration_seconds) FILTER (WHERE event_type = 'heartbeat'), 0)::int AS active_seconds,
+             count(*) FILTER (WHERE event_type = 'fred_message')::int AS fred_messages,
+             max(created_at) AS last_seen_at
+        FROM product_usage_events WHERE created_at >= ${since} GROUP BY user_id
+    )
+    SELECT u.id AS user_id,
+           coalesce(s.session_starts, 0)::int AS session_starts,
+           coalesce(e.page_views, 0)::int AS page_views,
+           coalesce(e.active_seconds, 0)::int AS active_seconds,
+           coalesce(e.fred_messages, 0)::int AS fred_messages,
+           e.last_seen_at
+      FROM users u
+      LEFT JOIN session_counts s ON s.user_id = u.id
+      LEFT JOIN event_counts e ON e.user_id = u.id
+  `);
+  const engagementRows = Array.isArray(engagementResult?.rows) ? engagementResult.rows : engagementResult;
+  const engagementByUser = new Map<number, any>();
+  for (const row of engagementRows ?? []) engagementByUser.set(Number(row.user_id), row);
+
+  const topPagesResult: any = await db.execute(sql`
+    SELECT path, count(*)::int AS views, count(DISTINCT user_id)::int AS users
+      FROM product_usage_events
+     WHERE event_type = 'page_view' AND created_at >= ${since}
+     GROUP BY path
+     ORDER BY views DESC, path ASC
+     LIMIT 20
+  `);
+  const topPages = (Array.isArray(topPagesResult?.rows) ? topPagesResult.rows : topPagesResult ?? []).map((row: any) => ({
+    path: row.path,
+    views: Number(row.views),
+    users: Number(row.users),
+  }));
+
   const perUser = users.map((u) => {
     const counts: Record<FeatureKey, number> = {
       entries: featureMaps.entries.get(u.id) ?? 0,
@@ -177,6 +232,7 @@ router.get("/usage", requireAuth, requireCIO, async (req, res) => {
       objectives: featureMaps.objectives.get(u.id) ?? 0,
     };
     const total = FEATURE_KEYS.reduce((s, k) => s + counts[k], 0);
+    const engagement = engagementByUser.get(u.id);
     return {
       userId: u.id,
       name: u.name,
@@ -185,6 +241,13 @@ router.get("/usage", requireAuth, requireCIO, async (req, res) => {
       isActive: u.isActive !== false,
       counts,
       total,
+      engagement: {
+        sessionStarts: Number(engagement?.session_starts ?? 0),
+        pageViews: Number(engagement?.page_views ?? 0),
+        activeSeconds: Number(engagement?.active_seconds ?? 0),
+        fredMessages: Number(engagement?.fred_messages ?? 0),
+        lastSeenAt: engagement?.last_seen_at ? new Date(engagement.last_seen_at).toISOString() : null,
+      },
     };
   });
 
@@ -232,6 +295,11 @@ router.get("/usage", requireAuth, requireCIO, async (req, res) => {
 
   const grandTotal = FEATURE_KEYS.reduce((s, k) => s + featureTotals[k], 0);
   const activeContributors = perUser.filter((u) => u.total > 0).length;
+  const engagedUsers = perUser.filter((u) => u.engagement.sessionStarts > 0 || u.engagement.pageViews > 0).length;
+  const sessionStarts = perUser.reduce((sum, u) => sum + u.engagement.sessionStarts, 0);
+  const pageViews = perUser.reduce((sum, u) => sum + u.engagement.pageViews, 0);
+  const activeSeconds = perUser.reduce((sum, u) => sum + u.engagement.activeSeconds, 0);
+  const fredMessages = perUser.reduce((sum, u) => sum + u.engagement.fredMessages, 0);
 
   return res.json({
     range: {
@@ -243,11 +311,18 @@ router.get("/usage", requireAuth, requireCIO, async (req, res) => {
       totalContributions: grandTotal,
       activeContributors,
       totalUsers: perUser.length,
+      engagedUsers,
+      sessionStarts,
+      pageViews,
+      activeMinutes: Math.round(activeSeconds / 60),
+      fredMessages,
     },
     perUser,
     featureTotals,
     roleBreakdown,
     dailyActivity,
+    topPages,
+    measurementNote: "Product engagement comes from authenticated sessions and events. Work-record counts are contributions, not proof that an assignee opened the application.",
   });
 });
 

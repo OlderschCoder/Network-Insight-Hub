@@ -5,6 +5,7 @@ import {
   useListProjects,
   useListRisks,
   useListLogItems,
+  useGetDashboardSummary,
 } from "@workspace/api-client-react";
 import type { Project, Risk } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { isoMondayCentral, todayCentral } from "@/lib/dates";
 import { format } from "date-fns";
+import ItHuntGroupCard from "@/components/ItHuntGroupCard";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -206,6 +208,7 @@ export default function MyWork() {
   const { data: projects } = useListProjects();
   const { data: risks } = useListRisks({});
   const { data: items } = useListLogItems({ weekOf, userId });
+  const { data: summary, isError: isSummaryError } = useGetDashboardSummary();
 
   const myProjects: Project[] = (projects ?? []).filter((p) =>
     (p.assignees ?? []).some((a) => a.userId === userId)
@@ -235,7 +238,7 @@ export default function MyWork() {
         <QuickAddItemDialog />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Projects</CardTitle>
@@ -274,6 +277,8 @@ export default function MyWork() {
         </Card>
 
         <MyZendesk />
+
+        <ItHuntGroupCard summary={summary} isError={isSummaryError} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

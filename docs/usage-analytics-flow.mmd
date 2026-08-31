@@ -1,0 +1,15 @@
+flowchart LR
+  U[Authenticated user] --> S[Session creation]
+  S --> ST[(sessions)]
+  U --> L[Application layout]
+  L -->|route transition| E[Analytics events API]
+  L -->|visible 60-second heartbeat| E
+  U --> F[Fred]
+  F -->|message submitted| E
+  E --> ET[(product_usage_events)]
+  ST --> A[Usage analytics API]
+  ET --> A
+  O[(Operational record tables)] --> A
+  A --> D[Analytics dashboard]
+  D --> G[Product engagement]
+  D --> R[Operational records by owner]

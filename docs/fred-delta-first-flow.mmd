@@ -1,0 +1,13 @@
+flowchart LR
+  Q[User operational question] --> I[Intent policy]
+  I --> E[Required evidence tools]
+  K[Known-good config and memory] --> D[Delta comparison]
+  C[Fresh console and prior results] --> D
+  E --> O[Current observations]
+  O --> D
+  D --> X{Conflict or new abnormality?}
+  X -->|yes| F[Smallest fault domain]
+  X -->|no| B[Next unobserved boundary]
+  F --> R[Recommended fix or test]
+  R --> V[Validation and rollback]
+  B --> V

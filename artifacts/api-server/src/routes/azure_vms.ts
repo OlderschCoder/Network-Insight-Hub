@@ -239,20 +239,10 @@ router.post("/sync", requireAuth, requireCIO, async (req: any, res) => {
         set: prior?.source === "manual"
           ? { lastSyncedAt: now, updatedAt: now }
           : {
-              name: vm.name,
-              resourceGroup: vm.resourceGroup,
-              subscription: vm.subscription,
-              location: vm.location,
-              size: vm.size,
-              os: vm.os,
-              privateIp: vm.privateIp,
-              publicIp: vm.publicIp,
-              vnet: vm.vnet,
-              subnet: vm.subnet,
-              status: vm.status,
-              source: "azure",
-              lastSyncedAt: now,
-              updatedAt: now,
+              name: vm.name, resourceGroup: vm.resourceGroup, subscription: vm.subscription,
+              location: vm.location, size: vm.size, os: vm.os, privateIp: vm.privateIp,
+              publicIp: vm.publicIp, vnet: vm.vnet, subnet: vm.subnet, status: vm.status,
+              source: "azure", lastSyncedAt: now, updatedAt: now,
             },
       });
   }

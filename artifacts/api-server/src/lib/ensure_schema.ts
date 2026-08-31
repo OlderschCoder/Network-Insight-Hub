@@ -10,6 +10,43 @@ import { logger } from "./logger";
 // already correct, and self-heals a fresh or drifted database. Failures are
 // logged, not fatal, so a reconcile problem never prevents the server starting.
 export async function ensureSchema(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_chat_sessions" (
+      "id" bigserial PRIMARY KEY,
+      "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "title" varchar(200) NOT NULL DEFAULT 'Fred conversation',
+      "messages" jsonb NOT NULL DEFAULT '[]'::jsonb,
+      "checkpoint" text NOT NULL DEFAULT '',
+      "is_active" boolean NOT NULL DEFAULT true,
+      "created_at" timestamptz NOT NULL DEFAULT now(),
+      "updated_at" timestamptz NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_chat_sessions_user_updated_idx" ON "fred_chat_sessions" ("user_id", "updated_at" DESC)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "fred_chat_sessions_one_active_idx" ON "fred_chat_sessions" ("user_id") WHERE "is_active" = true`);
+    logger.info("Ensured durable Fred chat sessions table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure durable Fred chat sessions table");
+  }
+
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "learn_scenario_progress" (
+      "id" bigserial PRIMARY KEY,
+      "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "scenario_id" varchar(100) NOT NULL,
+      "current_step" integer DEFAULT 0 NOT NULL,
+      "status" varchar(20) DEFAULT 'not_started' NOT NULL,
+      "attempts" integer DEFAULT 0 NOT NULL,
+      "history" jsonb DEFAULT '[]'::jsonb NOT NULL,
+      "started_at" timestamptz DEFAULT now() NOT NULL,
+      "completed_at" timestamptz,
+      "updated_at" timestamptz DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "scenario_id")
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "learn_progress_user_idx" ON "learn_scenario_progress" ("user_id", "status")`);
+    logger.info("Ensured Learn scenario progress table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure Learn scenario progress table");
+  }
   // 1) Persistent bearer-token session store. When `sessions` is missing, both
   //    Entra SSO and break-glass login fail at the session-insert step with
   //    `relation "sessions" does not exist`, locking everyone out even though
@@ -100,6 +137,35 @@ export async function ensureSchema(): Promise<void> {
     logger.info("Ensured inventory_audit table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure inventory_audit table");
+  }
+
+  // Fred's operational-record audit trail. This is separate from the switch /
+  // VLAN inventory audit because it also covers risks, PIRs, goals, projects,
+  // processes, weekly entries, and building changes.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "fred_record_audit" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "resource" varchar(40) NOT NULL,
+        "action" varchar(20) NOT NULL,
+        "identifier" varchar(255) NOT NULL,
+        "label" varchar(500) NOT NULL,
+        "actor_id" integer,
+        "actor_name" varchar(255),
+        "before" jsonb,
+        "after" jsonb,
+        "created_at" timestamp DEFAULT now() NOT NULL
+      )
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_record_audit_resource_idx" ON "fred_record_audit" ("resource", "identifier")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_record_audit_created_at_idx" ON "fred_record_audit" ("created_at")`,
+    );
+    logger.info("Ensured fred_record_audit table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure fred_record_audit table");
   }
 
   // 5) Network-diagram layout governance: a change log (with position snapshots)
@@ -244,13 +310,17 @@ export async function ensureSchema(): Promise<void> {
         "mac_address" varchar(32),
         "admin_status" varchar(12),
         "oper_status" varchar(12),
+        "status_reason" varchar(120),
         "speed_mbps" integer,
         "duplex" varchar(12),
+        "media_type" varchar(80),
         "port_mode" varchar(12),
         "native_vlan" integer,
         "allowed_vlans" integer[],
         "portchannel" varchar(40),
         "vpc_id" integer,
+        "mac_count" integer NOT NULL DEFAULT 0,
+        "lldp_neighbor_count" integer NOT NULL DEFAULT 0,
         "in_errors" bigint,
         "out_errors" bigint,
         "in_discards" bigint,
@@ -275,6 +345,10 @@ export async function ensureSchema(): Promise<void> {
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_ports_node_interface_uq" ON "net_ports" ("node_id", "interface_name")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_node_idx" ON "net_ports" ("node_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_telemetry_updated_idx" ON "net_ports" ("telemetry_updated_at")`);
+    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "status_reason" varchar(120)`);
+    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "media_type" varchar(80)`);
+    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "mac_count" integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "lldp_neighbor_count" integer NOT NULL DEFAULT 0`);
     logger.info("Ensured net_ports table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure net_ports table");
@@ -307,6 +381,87 @@ export async function ensureSchema(): Promise<void> {
     logger.error({ err }, "Failed to ensure net_routing_adjacencies table");
   }
 
+  // 9) Local campus-building assignments for Webex Calling people. Webex is
+  //    authoritative for the person and number; this table stores only the
+  //    Insight Hub building label so editing it cannot move or reprovision a
+  //    calling user in Control Hub. The event table preserves every change.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "phone_building_assignments" (
+        "webex_person_id" text PRIMARY KEY NOT NULL,
+        "building" varchar(120) NOT NULL,
+        "updated_by_id" integer REFERENCES "users"("id") ON DELETE SET NULL,
+        "updated_by_name" varchar(255),
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "phone_building_assignments_building_idx"
+      ON "phone_building_assignments" ("building")
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "phone_building_assignment_events" (
+        "id" bigserial PRIMARY KEY NOT NULL,
+        "webex_person_id" text NOT NULL,
+        "person_name" varchar(255),
+        "phone_number" varchar(80),
+        "previous_building" varchar(120),
+        "new_building" varchar(120),
+        "actor_id" integer REFERENCES "users"("id") ON DELETE SET NULL,
+        "actor_name" varchar(255),
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "phone_building_assignment_events_person_idx"
+      ON "phone_building_assignment_events" ("webex_person_id", "created_at")
+    `);
+    logger.info("Ensured phone building assignment tables exist");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure phone building assignment tables");
+  }
+
+  // 10) Durable Webex Calling CDR history for the IT 1200 report. Only
+  //     operational call-leg metadata is retained; caller names/numbers are
+  //     deliberately excluded from this reporting store.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "webex_it_call_legs" (
+        "report_id" text PRIMARY KEY NOT NULL,
+        "correlation_id" text NOT NULL,
+        "start_time" timestamptz NOT NULL,
+        "answer_time" timestamptz,
+        "release_time" timestamptz,
+        "answered" boolean DEFAULT false NOT NULL,
+        "ring_duration_seconds" integer DEFAULT 0 NOT NULL,
+        "duration_seconds" integer DEFAULT 0 NOT NULL,
+        "user_id" text,
+        "user_name" varchar(255),
+        "user_type" varchar(40),
+        "called_number" varchar(80),
+        "redirecting_number" varchar(80),
+        "is_hunt_group_leg" boolean DEFAULT false NOT NULL,
+        "ingested_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_start_idx" ON "webex_it_call_legs" ("start_time")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_correlation_idx" ON "webex_it_call_legs" ("correlation_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "webex_it_call_sync_state" (
+        "id" integer PRIMARY KEY NOT NULL,
+        "backfill_cursor" timestamptz,
+        "last_success_at" timestamptz,
+        "last_error" text,
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`INSERT INTO "webex_it_call_sync_state" ("id") VALUES (1) ON CONFLICT ("id") DO NOTHING`);
+    logger.info("Ensured Webex IT call history tables exist");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure Webex IT call history tables");
+  }
+
   // 7) reports.include_cloud_inventory: opt-in flag to attach the Azure cloud
   //    inventory snapshot to a weekly report. New column added after initial
   //    setup; ADD COLUMN IF NOT EXISTS is a no-op when already present.
@@ -317,5 +472,30 @@ export async function ensureSchema(): Promise<void> {
     logger.info("Ensured reports.include_cloud_inventory column exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure reports.include_cloud_inventory column");
+  }
+
+  // Product engagement is distinct from work records. A task assignment or PIR
+  // proves ownership/contribution, not that the assignee signed in or viewed a
+  // page. This event stream captures only authenticated page views, bounded
+  // foreground heartbeats, and explicit Fred messages.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "product_usage_events" (
+        "id" bigserial PRIMARY KEY,
+        "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "client_session_id" varchar(64) NOT NULL,
+        "event_type" varchar(24) NOT NULL,
+        "path" varchar(500) NOT NULL,
+        "duration_seconds" integer DEFAULT 0 NOT NULL,
+        "created_at" timestamptz DEFAULT now() NOT NULL,
+        CONSTRAINT "product_usage_events_type_check" CHECK ("event_type" IN ('page_view', 'heartbeat', 'fred_message')),
+        CONSTRAINT "product_usage_events_duration_check" CHECK ("duration_seconds" BETWEEN 0 AND 120)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "product_usage_events_user_time_idx" ON "product_usage_events" ("user_id", "created_at")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "product_usage_events_path_time_idx" ON "product_usage_events" ("path", "created_at")`);
+    logger.info("Ensured product usage event table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure product usage event table");
   }
 }

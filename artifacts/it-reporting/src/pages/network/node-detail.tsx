@@ -47,6 +47,7 @@ interface NetNode {
   criticality: string | null;
   tags: string[];
   status: string | null;
+  notes: string | null;
 }
 
 interface EnrichedLink {
@@ -110,8 +111,8 @@ function fmtSpeed(mbps: number | null) {
   return `${mbps}M`;
 }
 
-function fmtBytes(bytes: number | null) {
-  if (bytes === null) return "—";
+function fmtBytes(bytes: number | null | undefined) {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes)) return "—";
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
   if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(1)} KB`;
@@ -185,7 +186,8 @@ export default function NodeDetail() {
         function: data.function ?? "",
         criticality: data.criticality ?? "",
         status: data.status ?? "",
-        tags: data.tags,
+        notes: data.notes ?? "",
+        tags: Array.isArray(data.tags) ? data.tags : [],
       });
     } catch (e: any) {
       toast({ title: "Failed to load node", description: e.message, variant: "destructive" });
@@ -204,7 +206,13 @@ export default function NodeDetail() {
       const data = await r.json();
       if (data.configured === false) { setInfluxConfigured(false); return; }
       setInfluxConfigured(true);
-      setLiveMetrics(data);
+      // Older/missing Influx series can omit fields entirely. Normalize the
+      // response so a sparse telemetry sample never crashes the detail page.
+      setLiveMetrics({
+        interfaces: Array.isArray(data.interfaces) ? data.interfaces : [],
+        pingLoss: typeof data.pingLoss === "number" && Number.isFinite(data.pingLoss) ? data.pingLoss : null,
+        rtt: typeof data.rtt === "number" && Number.isFinite(data.rtt) ? data.rtt : null,
+      });
     } finally {
       setMetricsLoading(false);
     }
@@ -219,7 +227,9 @@ export default function NodeDetail() {
     setSaving(true);
     try {
       const payload = { ...editFields };
-      if (typeof payload.tags === "string") {
+      if (payload.tags == null) {
+        payload.tags = [];
+      } else if (typeof payload.tags === "string") {
         payload.tags = (payload.tags as unknown as string).split(",").map((t: string) => t.trim()).filter(Boolean);
       }
       const r = await authFetch(`${API}/network/nodes/${id}`, {
@@ -470,6 +480,9 @@ export default function NodeDetail() {
                 <FieldRow label="Status" editing={editing}
                   view={node.status ?? "—"}
                   edit={<Input value={editFields.status ?? ""} onChange={e => setEditFields(f => ({ ...f, status: e.target.value }))} placeholder="active, decommissioned..." />} />
+                <FieldRow label="Notes" editing={editing}
+                  view={node.notes ?? "—"}
+                  edit={<Textarea rows={5} value={editFields.notes ?? ""} onChange={e => setEditFields(f => ({ ...f, notes: e.target.value }))} placeholder="Purpose, replacement history, dependencies, or other inventory notes" />} />
               </CardContent>
             </Card>
           </div>
@@ -490,19 +503,19 @@ export default function NodeDetail() {
 
           {node.links.length > 0 && (
             <div className="rounded-md border overflow-x-auto">
-              <Table>
+              <Table className="table-fixed min-w-[1100px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Local Port</TableHead>
-                    <TableHead>Remote Port</TableHead>
-                    <TableHead>Peer</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Speed</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead>Native VLAN</TableHead>
-                    <TableHead>Allowed VLANs</TableHead>
-                    <TableHead>Port-Channel</TableHead>
-                    <TableHead>Confidence</TableHead>
+                    <TableHead className="w-[9rem]">Local Port</TableHead>
+                    <TableHead className="w-[9rem]">Remote Port</TableHead>
+                    <TableHead className="w-[16rem]">Peer</TableHead>
+                    <TableHead className="w-[7rem]">Type</TableHead>
+                    <TableHead className="w-[6rem]">Speed</TableHead>
+                    <TableHead className="w-[7rem]">Mode</TableHead>
+                    <TableHead className="w-[7rem]">Native VLAN</TableHead>
+                    <TableHead className="w-[12rem]">Allowed VLANs</TableHead>
+                    <TableHead className="w-[8rem]">Port-Channel</TableHead>
+                    <TableHead className="w-[8rem]">Confidence</TableHead>
                     {canEdit && <TableHead className="w-16">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -514,12 +527,17 @@ export default function NodeDetail() {
                       <TableCell>
                         {link.peerNode ? (
                           <Link href={`/network/nodes/${link.peerNode.id}`}>
-                            <span className="text-primary underline cursor-pointer text-xs">
+                            <span
+                              className="block truncate text-primary underline cursor-pointer text-xs"
+                              title={link.peerNode.displayName || link.peerNode.hostname}
+                            >
                               {link.peerNode.displayName || link.peerNode.hostname}
                             </span>
                           </Link>
                         ) : link.lldpPeerHostname ? (
-                          <span className="text-xs text-muted-foreground">{link.lldpPeerHostname}</span>
+                          <span className="block truncate text-xs text-muted-foreground" title={link.lldpPeerHostname}>
+                            {link.lldpPeerHostname}
+                          </span>
                         ) : "—"}
                       </TableCell>
                       <TableCell><Badge variant="outline" className="text-xs capitalize">{link.linkKind ?? "—"}</Badge></TableCell>
@@ -585,7 +603,7 @@ export default function NodeDetail() {
                 <Card>
                   <CardContent className="py-4 text-center">
                     <p className="text-xs text-muted-foreground mb-1">RTT</p>
-                    <p className="text-2xl font-bold">{liveMetrics.rtt !== null ? `${liveMetrics.rtt.toFixed(1)} ms` : "—"}</p>
+                    <p className="text-2xl font-bold">{typeof liveMetrics.rtt === "number" && Number.isFinite(liveMetrics.rtt) ? `${liveMetrics.rtt.toFixed(1)} ms` : "—"}</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -602,13 +620,13 @@ export default function NodeDetail() {
                   <CardHeader><CardTitle className="text-base flex items-center gap-2"><Cable className="h-4 w-4" /> Interfaces</CardTitle></CardHeader>
                   <CardContent className="p-0">
                     <div className="rounded-md overflow-x-auto">
-                      <Table>
+                      <Table className="table-fixed min-w-[520px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Interface</TableHead>
-                            <TableHead>Oper Status</TableHead>
-                            <TableHead>In</TableHead>
-                            <TableHead>Out</TableHead>
+                            <TableHead className="w-[12rem]">Interface</TableHead>
+                            <TableHead className="w-[8rem]">Oper Status</TableHead>
+                            <TableHead className="w-[8rem]">In</TableHead>
+                            <TableHead className="w-[8rem]">Out</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

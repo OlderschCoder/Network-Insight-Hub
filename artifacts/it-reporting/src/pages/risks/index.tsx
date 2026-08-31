@@ -11,6 +11,7 @@ import { RISK_CATEGORIES } from "@/components/RiskForm";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 
 const severityColor: Record<string, string> = {
   critical: "bg-red-500/10 text-red-700 border-red-200",
@@ -63,20 +64,10 @@ export default function Risks() {
   const { toast } = useToast();
   const handleExport = async (type: "pdf" | "docx") => {
     try {
-      const res = await fetch(
+      await downloadAuthenticatedFile(
         `${import.meta.env.BASE_URL}api/export/risks/${type}?scope=open`,
-        { credentials: "include" }
+        `risk-register-open.${type}`,
       );
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `risk-register-open.${type}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
     }

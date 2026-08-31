@@ -4,6 +4,7 @@ import { ensureSchema } from "./lib/ensure_schema";
 import { seedAppUsageKnowledge } from "./lib/seed_app_usage";
 import { seedBreakGlassAccount, stripNonBreakGlassPasswords } from "./lib/seed_breakglass";
 import { startSessionCleanup } from "./routes/auth";
+import { startWebexCallHistorySync } from "./routes/dashboard";
 
 const rawPort = process.env["PORT"];
 
@@ -66,6 +67,9 @@ async function main(): Promise<void> {
     });
     // Periodically purge expired persistent sessions.
     startSessionCleanup();
+    // Maintain the rolling 90-day IT hunt-group history without waiting for a
+    // user to open the report.
+    startWebexCallHistorySync();
   });
 }
 

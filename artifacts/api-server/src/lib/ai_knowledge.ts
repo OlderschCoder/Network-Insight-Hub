@@ -1,8 +1,31 @@
 import type OpenAI from "openai";
-import { db, aiKnowledgeTable, logItemsTable, cioShadowNotesTable, usersTable, networkSwitchesTable, deviceConfigsTable } from "@workspace/db";
+import {
+  db,
+  aiKnowledgeTable,
+  logItemsTable,
+  cioShadowNotesTable,
+  usersTable,
+  networkSwitchesTable,
+  deviceConfigsTable,
+  netNodesTable,
+  netLinksTable,
+  vlansTable,
+} from "@workspace/db";
+import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, asc, gte, and, or, sql, desc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
 import { pingHost, testNetConnection, pingHosts } from "./net_diag";
+import {
+  getBuildingSummaries,
+  getCanonicalBuildingName,
+  getMonitoringSnapshot,
+} from "../routes/network_nodes";
+import {
+  startSwitchTelemetryViaNoc,
+  getSwitchTelemetryStatusViaNoc,
+  getSwitchTelemetryAuditViaNoc,
+} from "./noc_probe";
+import { getFredFilePreview, listFredFiles } from "./fred_files";
 import {
   upsertSwitchByHostname,
   upsertVlanByVlanId,
@@ -248,7 +271,7 @@ export const CREATE_TASK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   function: {
     name: "create_task",
     description:
-      "Record a piece of work as an item in someone's 'My Tasks' list for the current week. By default the task goes to the signed-in user, and these items roll up into their weekly report automatically. To DELEGATE or ASSIGN the work to a specific teammate instead — e.g. the user says 'have Cecil look at the SFP issue', 'assign this to Jane', or 'add this to Mark's list' — pass that person's name or email in `assignee`; the task is added to THAT person's My Tasks and stamped with who assigned it. Use the team roster in the context to pick the right person; if the name is ambiguous or unknown, ask the user which teammate they mean instead of guessing. Call this whenever the user describes concrete work (an accomplishment, a completed action, a fix, or a to-do), capturing each distinct item as its own task, and prefer capturing over asking. Do NOT use this for durable environment facts (use save_memory instead), for questions, or for hypotheticals.",
+      "Record a piece of work as an item in someone's 'My Tasks' list for the current week. By default the task goes to the signed-in user, and these items roll up into their weekly report automatically. To DELEGATE or ASSIGN the work to a specific active teammate instead — e.g. the user says 'have the network engineer look at the SFP issue', 'assign this to Jane', or 'add this to Mark's list' — pass that person's name or email in `assignee`; the task is added to THAT person's My Tasks and stamped with who assigned it. Use only the active team roster in the context to pick the right person; if the name is ambiguous, retired, inactive, or unknown, ask which active teammate should receive it rather than guessing. Call this whenever the user describes concrete work (an accomplishment, a completed action, a fix, or a to-do), capturing each distinct item as its own task, and prefer capturing over asking. Do NOT use this for durable environment facts (use save_memory instead), for questions, or for hypotheticals.",
     parameters: {
       type: "object",
       properties: {
@@ -788,7 +811,7 @@ async function executeUpsertVlan(rawArgs: string, ctx: InventoryToolCtx): Promis
 // Explicit capture intent — used to let the CIO opt into task capture on a
 // per-message basis (their chat is otherwise non-capturing by default). This
 // also covers delegation: the CIO frequently assigns work to teammates, so
-// delegation phrasing ("assign to Jane", "have Cecil …") must open the
+// delegation phrasing ("assign to Jane", "have the network engineer …") must open the
 // create_task tool even when the message never says the word "task".
 const CAPTURE_INTENT_PATTERNS: RegExp[] = [
   /\b(add|create|save|capture|log|record|track|make)\b[^.]*\b(task|to-?do|item|note this|reminder)\b/i,
@@ -1395,6 +1418,134 @@ async function executeSnmpGet(rawArgs: string): Promise<string> {
   }
 }
 
+// ---- Fred accessible-file catalog ---------------------------------------
+
+export const LIST_ACCESSIBLE_FILES_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "list_accessible_files",
+    description: "List Fred's persistent, app-authorized file catalog: uploaded Fred Files and stored device-configuration backups. Returns metadata and stable record/download links only; it never scans arbitrary server directories.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional filename, device name, MIME type, notes, or uploader search." },
+        source: { type: "string", enum: ["all", "fred_files", "device_configs"], description: "Catalog source; defaults to all." },
+        kind: { type: "string", enum: ["all", "text", "image", "binary", "config"], description: "Optional file-kind filter." },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "Maximum records; defaults to 100." },
+      },
+    },
+  },
+};
+
+export async function executeListAccessibleFiles(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const query = normalizedText(args.query);
+  const source = ["fred_files", "device_configs"].includes(args.source) ? args.source : "all";
+  const kind = ["text", "image", "binary", "config"].includes(args.kind) ? args.kind : "all";
+  const limit = Math.min(200, Math.max(1, Number(args.limit) || 100));
+  const [uploadedFiles, configs] = await Promise.all([
+    source === "device_configs" ? Promise.resolve([]) : listFredFiles(),
+    source === "fred_files"
+      ? Promise.resolve([])
+      : db.select({
+        id: deviceConfigsTable.id,
+        deviceName: deviceConfigsTable.deviceName,
+        deviceType: deviceConfigsTable.deviceType,
+        filename: deviceConfigsTable.filename,
+        notes: deviceConfigsTable.notes,
+        sizeBytes: deviceConfigsTable.sizeBytes,
+        createdAt: deviceConfigsTable.createdAt,
+      }).from(deviceConfigsTable).orderBy(desc(deviceConfigsTable.createdAt)),
+  ]);
+
+  const records = [
+    ...uploadedFiles.map((file) => ({
+      fileId: `fred_file:${file.id}`,
+      source: "fred_files",
+      name: file.originalName,
+      kind: file.reviewKind,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      ownerOrDevice: file.uploadedByName,
+      notes: null,
+      createdAt: file.createdAt,
+      link: `/api/fred-files/${file.id}/download`,
+    })),
+    ...configs.map((config) => ({
+      fileId: `device_config:${config.id}`,
+      source: "device_configs",
+      name: config.filename,
+      kind: "config",
+      mimeType: "text/plain",
+      sizeBytes: config.sizeBytes,
+      ownerOrDevice: config.deviceName,
+      notes: config.notes,
+      createdAt: isoValue(config.createdAt),
+      link: `/network?tab=configs&q=${encodeURIComponent(config.deviceName)}`,
+      deviceType: config.deviceType,
+    })),
+  ].filter((record) => {
+    if (kind !== "all" && record.kind !== kind) return false;
+    if (!query) return true;
+    return Object.values(record).map(normalizedText).join(" ").includes(query);
+  }).sort((a, b) => normalizedText(b.createdAt).localeCompare(normalizedText(a.createdAt)));
+
+  return boundedNetworkResult({
+    source: "Fred File Library + Device Config Backups",
+    generatedAt: new Date().toISOString(),
+    matched: records.length,
+    returned: Math.min(records.length, limit),
+    files: records.slice(0, limit),
+    note: "Use read_accessible_file for fred_file IDs. Use query_device_config for redacted configuration sections; raw config secrets are never returned to chat.",
+  });
+}
+
+export const READ_ACCESSIBLE_FILE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "read_accessible_file",
+    description: "Read a bounded preview of a text file from the authorized Fred File Library by the file ID returned from list_accessible_files. Images and binary files return metadata only. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        file_id: { type: "string", description: "A fred_file:<uuid> ID returned by list_accessible_files." },
+        max_chars: { type: "integer", minimum: 500, maximum: 18000, description: "Maximum text preview size; defaults to 12000." },
+      },
+      required: ["file_id"],
+    },
+  },
+};
+
+export async function executeReadAccessibleFile(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const fileId = String(args.file_id || "").trim();
+  if (fileId.startsWith("device_config:")) {
+    return "Device configuration files must be read with query_device_config so credentials are redacted before content reaches chat.";
+  }
+  if (!fileId.startsWith("fred_file:")) return "Error: use a fred_file:<uuid> ID from list_accessible_files.";
+  const id = fileId.slice("fred_file:".length);
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return "Error: invalid Fred File ID.";
+  const maxChars = Math.min(18_000, Math.max(500, Number(args.max_chars) || 12_000));
+  const preview = await getFredFilePreview(id, maxChars);
+  if (!preview) return "File not found in the authorized Fred File Library.";
+  return boundedNetworkResult({
+    source: `/api/fred-files/${id}`,
+    file: {
+      fileId,
+      name: preview.record.originalName,
+      mimeType: preview.record.mimeType,
+      kind: preview.record.reviewKind,
+      sizeBytes: preview.record.sizeBytes,
+      uploadedBy: preview.record.uploadedByName,
+      createdAt: preview.record.createdAt,
+      downloadLink: `/api/fred-files/${id}/download`,
+    },
+    previewText: preview.previewText,
+    truncated: preview.truncated,
+    note: preview.record.reviewKind === "text" ? null : "This file type has metadata only; automatic text extraction is not available.",
+  });
+}
+
 // ---- query_device_config tool --------------------------------------------
 
 export const QUERY_DEVICE_CONFIG_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
@@ -1841,6 +1992,649 @@ async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
  * and (for network admins) upsert_switch / upsert_vlan. Handles the loop
  * (max 3 rounds) and returns the final reply plus everything persisted.
  */
+const NETWORK_DATA_RESULT_LIMIT = 24_000;
+
+function boundedNetworkResult(value: unknown): string {
+  const text = JSON.stringify(value, null, 2);
+  return text.length <= NETWORK_DATA_RESULT_LIMIT
+    ? text
+    : `${text.slice(0, NETWORK_DATA_RESULT_LIMIT)}\n... result truncated; narrow the query for complete records.`;
+}
+
+function isoValue(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function normalizedText(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+type CallingBuildingEvidence = {
+  configured: boolean;
+  building: string;
+  assignedPhoneOwners: number;
+  matchedPhoneOwners: number;
+  onlinePhoneOwners: number;
+  offlinePhoneOwners: number;
+  unknownPhoneOwners: number;
+  noMatchedDevice: number;
+  devices: Array<{ name: string; product: string; status: "online" | "offline" | "unknown" }>;
+  error?: string;
+};
+
+function looksLikeCallingPhone(name: string, product: string): boolean {
+  const value = `${name} ${product}`.toLowerCase();
+  return /(ip phone|desk phone|phone|mpp|ata|dect|vg3|vg4|cp[- ]?\d|(?:^|\D)(?:68|78|79|88|98)\d{2}(?:\D|$))/.test(value);
+}
+
+async function getCallingBuildingEvidence(
+  buildingName: string,
+  includeDevices = true,
+): Promise<CallingBuildingEvidence> {
+  const canonicalBuilding = getCanonicalBuildingName(buildingName);
+  const empty: CallingBuildingEvidence = {
+    configured: false,
+    building: canonicalBuilding,
+    assignedPhoneOwners: 0,
+    matchedPhoneOwners: 0,
+    onlinePhoneOwners: 0,
+    offlinePhoneOwners: 0,
+    unknownPhoneOwners: 0,
+    noMatchedDevice: 0,
+    devices: [],
+  };
+
+  let response: Response;
+  try {
+    response = await webexFetch("/devices?max=1000");
+  } catch {
+    return { ...empty, error: "Webex Calling device status is not configured." };
+  }
+  if (!response.ok) return { ...empty, configured: true, error: `Webex device query failed (${response.status}).` };
+
+  const assignmentResult = await db.execute(sql`
+    SELECT "webex_person_id", "building"
+      FROM "phone_building_assignments"
+  `);
+  const assignmentRows = (Array.isArray(assignmentResult)
+    ? assignmentResult
+    : ((assignmentResult as any)?.rows ?? [])) as Array<{ webex_person_id: string; building: string }>;
+  const owners = new Set(
+    assignmentRows
+      .filter((row) => normalizedText(getCanonicalBuildingName(row.building)) === normalizedText(canonicalBuilding))
+      .map((row) => String(row.webex_person_id)),
+  );
+
+  const data = await response.json() as { items?: Array<Record<string, unknown>> };
+  const byOwner = new Map<string, Array<{ name: string; product: string; status: "online" | "offline" | "unknown" }>>();
+  for (const device of data.items ?? []) {
+    const ownerId = String(device.personId || device.workspaceId || "").trim();
+    if (!ownerId || !owners.has(ownerId)) continue;
+    const name = String(device.displayName || device.name || "Unnamed device");
+    const product = String(device.product || device.type || "Unknown");
+    if (!looksLikeCallingPhone(name, product)) continue;
+    const rawStatus = normalizedText(device.connectionStatus || device.status || "unknown");
+    const status: "online" | "offline" | "unknown" = rawStatus === "connected"
+      ? "online"
+      : rawStatus === "disconnected"
+        ? "offline"
+        : "unknown";
+    const devices = byOwner.get(ownerId) ?? [];
+    devices.push({ name, product, status });
+    byOwner.set(ownerId, devices);
+  }
+
+  let onlinePhoneOwners = 0;
+  let offlinePhoneOwners = 0;
+  let unknownPhoneOwners = 0;
+  for (const devices of byOwner.values()) {
+    if (devices.some((device) => device.status === "online")) onlinePhoneOwners += 1;
+    else if (devices.some((device) => device.status === "offline")) offlinePhoneOwners += 1;
+    else unknownPhoneOwners += 1;
+  }
+  const devices = Array.from(byOwner.values()).flat();
+  return {
+    configured: true,
+    building: canonicalBuilding,
+    assignedPhoneOwners: owners.size,
+    matchedPhoneOwners: byOwner.size,
+    onlinePhoneOwners,
+    offlinePhoneOwners,
+    unknownPhoneOwners,
+    noMatchedDevice: Math.max(0, owners.size - byOwner.size),
+    devices: includeDevices ? devices.slice(0, 80) : [],
+  };
+}
+
+export const CISCO_CALLING_SUPPORT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "cisco_calling_support",
+    description: "Read the same building assignments and live Webex phone/device states used by the Cisco Calling IT App. Use this to verify whether phones in a building are online and to corroborate building service availability. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        building: { type: "string", description: "Campus building name, such as Allied Health, Hobble, Humanities, or West Campus." },
+        includeDevices: { type: "boolean", description: "Include matched phone device names and models; defaults to true." },
+      },
+      required: ["building"],
+    },
+  },
+};
+
+export async function executeCiscoCallingSupport(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const building = String(args.building || "").trim();
+  if (!building) return "Error: building is required.";
+  const evidence = await getCallingBuildingEvidence(building, args.includeDevices !== false);
+  return boundedNetworkResult({ source: "/it-apps/cisco-calling", generatedAt: new Date().toISOString(), ...evidence });
+}
+
+export const QUERY_NETWORK_MAP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "query_network_map",
+    description: "Read the Network Map's current nodes, switch-to-switch links, and room/building-to-Nexus paths. Use the path view for questions such as which core/distribution port serves a room, building, or access switch; it cross-checks node metadata, Port Map descriptions, and confirmed topology links. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        view: { type: "string", enum: ["overview", "nodes", "links", "path"], description: "Data view; defaults to overview. Use path to trace a room, building, or access switch to its core/Nexus port." },
+        query: { type: "string", description: "Optional hostname, IP, display-name, room label, port description, peer, or port search." },
+        building: { type: "string", description: "Optional building filter." },
+        status: { type: "string", enum: ["all", "online", "offline", "unknown"], description: "Node inventory-status filter." },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "Maximum detailed records; defaults to 50." },
+      },
+    },
+  },
+};
+
+export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const view = ["nodes", "links", "path"].includes(args.view) ? args.view : "overview";
+  const query = normalizedText(args.query);
+  const building = normalizedText(args.building);
+  const status = ["online", "offline", "unknown"].includes(args.status) ? args.status : "all";
+  const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
+  const [nodes, links, ports] = await Promise.all([
+    db.select().from(netNodesTable),
+    db.select().from(netLinksTable),
+    db.select().from(netPortsTable),
+  ]);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const physicalPorts = ports.filter((port) => port.isPhysical !== false);
+  const activePorts = physicalPorts.filter((port) =>
+    normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
+  );
+  const staleCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const staleLinks = links.filter((link) => link.lastVerifiedAt.getTime() < staleCutoff);
+
+  if (view === "overview") {
+    return boundedNetworkResult({
+      source: "/network/map",
+      generatedAt: new Date().toISOString(),
+      counts: {
+        nodes: nodes.length,
+        links: links.length,
+        staleLinks: staleLinks.length,
+        physicalPorts: physicalPorts.length,
+        connectedPorts: activePorts.length,
+        portsWithLearnedMacs: physicalPorts.filter((port) => (port.macCount ?? 0) > 0).length,
+        portsWithLldpNeighbors: physicalPorts.filter((port) => (port.lldpNeighborCount ?? 0) > 0).length,
+        buildings: new Set(nodes.map((node) => getCanonicalBuildingName(node.building))).size,
+      },
+      statusCounts: nodes.reduce<Record<string, number>>((counts, node) => {
+        const key = node.status || "unknown";
+        counts[key] = (counts[key] ?? 0) + 1;
+        return counts;
+      }, {}),
+      note: "A connected port is operationally up or has learned MAC/LLDP evidence; it may connect to a switch, phone, computer, access point, or another endpoint.",
+    });
+  }
+
+  if (view === "path") {
+    if (!query && !building) return "Error: path view requires a room, building, hostname, IP, or port-description query.";
+
+    const isDistributionNode = (node: typeof nodes[number] | undefined) => {
+      if (!node) return false;
+      const role = normalizedText(node.role);
+      const identity = [node.hostname, node.displayName, node.model, node.location].map(normalizedText).join(" ");
+      return role === "core" || role === "distribution" || identity.includes("nexus") || identity.includes("core");
+    };
+    const nodeMatches = (node: typeof nodes[number]) => {
+      const haystack = [node.hostname, node.displayName, node.mgmtIp, node.building, node.location, node.role, node.nodeKind, node.vendor, node.model]
+        .map(normalizedText).join(" ");
+      return (!query || haystack.includes(query))
+        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building));
+    };
+    const matchedNodes = nodes.filter(nodeMatches);
+    const matchedPorts = ports.filter((port) => {
+      const node = nodeById.get(port.nodeId);
+      if (!node) return false;
+      const portHaystack = [port.interfaceName, port.description, node.hostname, node.displayName, node.mgmtIp, node.building, node.location]
+        .map(normalizedText).join(" ");
+      return (!query || portHaystack.includes(query))
+        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building));
+    });
+
+    // A room label often appears only on an access-port description. Expand
+    // links from those access switches, but not from a core port-description
+    // match, since expanding every link on a Nexus obscures the actual path.
+    const targetNodeIds = new Set(matchedNodes.map((node) => node.id));
+    for (const port of matchedPorts) {
+      const node = nodeById.get(port.nodeId);
+      if (!isDistributionNode(node)) targetNodeIds.add(port.nodeId);
+    }
+
+    const candidateLinks = links.filter((link) => {
+      const a = nodeById.get(link.aNodeId);
+      const b = nodeById.get(link.bNodeId);
+      const linkHaystack = [
+        a?.hostname, a?.displayName, a?.building, link.aPort,
+        b?.hostname, b?.displayName, b?.building, link.bPort,
+        link.lldpPeerHostname, link.lldpPeerMgmtIp, link.notes,
+      ].map(normalizedText).join(" ");
+      return targetNodeIds.has(link.aNodeId) || targetNodeIds.has(link.bNodeId) || (!!query && linkHaystack.includes(query));
+    });
+
+    // Collector runs may store equivalent links with Eth/Ethernet spelling.
+    // Keep the freshest observation for each physical endpoint pair.
+    const canonicalInterface = (value: unknown) => normalizedText(value).replace(/^ethernet/, "eth").replace(/,$/, "");
+    const linkByIdentity = new Map<string, typeof candidateLinks[number]>();
+    for (const link of candidateLinks) {
+      const endpoints = [
+        `${link.aNodeId}:${canonicalInterface(link.aPort)}`,
+        `${link.bNodeId}:${canonicalInterface(link.bPort)}`,
+      ].sort();
+      const key = endpoints.join("|");
+      const existing = linkByIdentity.get(key);
+      if (!existing || link.lastVerifiedAt.getTime() > existing.lastVerifiedAt.getTime()) linkByIdentity.set(key, link);
+    }
+    const relatedLinks = [...linkByIdentity.values()].sort((a, b) => b.lastVerifiedAt.getTime() - a.lastVerifiedAt.getTime());
+    const formatLink = (link: typeof relatedLinks[number]) => {
+      const a = nodeById.get(link.aNodeId);
+      const b = nodeById.get(link.bNodeId);
+      return {
+        aNode: a?.hostname ?? link.aNodeId,
+        aRole: a?.role ?? null,
+        aBuilding: a ? getCanonicalBuildingName(a.building) : null,
+        aPort: link.aPort,
+        bNode: b?.hostname ?? link.bNodeId,
+        bRole: b?.role ?? null,
+        bBuilding: b ? getCanonicalBuildingName(b.building) : null,
+        bPort: link.bPort,
+        kind: link.linkKind,
+        confidence: link.confidence,
+        lastVerifiedAt: isoValue(link.lastVerifiedAt),
+        evidenceRef: link.evidenceRef,
+        notes: link.notes,
+      };
+    };
+    const servingDistributionLinks = relatedLinks.filter((link) => {
+      const aIsTarget = targetNodeIds.has(link.aNodeId);
+      const bIsTarget = targetNodeIds.has(link.bNodeId);
+      return (aIsTarget && !bIsTarget && isDistributionNode(nodeById.get(link.bNodeId)))
+        || (bIsTarget && !aIsTarget && isDistributionNode(nodeById.get(link.aNodeId)));
+    });
+    const directPortMatches = matchedPorts
+      .sort((a, b) => Number(isDistributionNode(nodeById.get(b.nodeId))) - Number(isDistributionNode(nodeById.get(a.nodeId))))
+      .slice(0, limit)
+      .map((port) => {
+        const node = nodeById.get(port.nodeId)!;
+        return {
+          switch: node.hostname,
+          switchRole: node.role,
+          managementIp: node.mgmtIp,
+          building: getCanonicalBuildingName(node.building),
+          interface: port.interfaceName,
+          description: port.description,
+          isPhysical: port.isPhysical !== false,
+          adminStatus: port.adminStatus,
+          operStatus: port.operStatus,
+          connected: normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
+          configUpdatedAt: isoValue(port.configUpdatedAt),
+          telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
+        };
+      });
+
+    return boundedNetworkResult({
+      source: "/network/map + Port Map",
+      generatedAt: new Date().toISOString(),
+      query: args.query || null,
+      building: args.building || null,
+      matchedNodes: matchedNodes.slice(0, limit).map((node) => ({
+        hostname: node.hostname,
+        managementIp: node.mgmtIp,
+        building: getCanonicalBuildingName(node.building),
+        location: node.location,
+        role: node.role,
+        updatedAt: isoValue(node.updatedAt),
+      })),
+      directPortMatches,
+      servingDistributionLinks: servingDistributionLinks.slice(0, limit).map(formatLink),
+      relatedTopologyLinks: relatedLinks.slice(0, limit).map(formatLink),
+      interpretation: {
+        confirmedServingPathCount: servingDistributionLinks.filter((link) => normalizedText(link.confidence).startsWith("confirmed")).length,
+        rule: "A port-description match identifies where a room/service is configured. A serving Nexus path is confirmed only when a current topology link connects that access switch to a core/distribution node; report timestamps and confidence separately.",
+      },
+    });
+  }
+
+  if (view === "nodes") {
+    const portCounts = new Map<string, { total: number; connected: number; macs: number; lldp: number }>();
+    for (const port of physicalPorts) {
+      const counts = portCounts.get(port.nodeId) ?? { total: 0, connected: 0, macs: 0, lldp: 0 };
+      counts.total += 1;
+      if (normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0) counts.connected += 1;
+      counts.macs += port.macCount ?? 0;
+      counts.lldp += port.lldpNeighborCount ?? 0;
+      portCounts.set(port.nodeId, counts);
+    }
+    const filtered = nodes.filter((node) => {
+      const haystack = [node.hostname, node.displayName, node.mgmtIp, node.building, node.location, node.role, node.nodeKind, node.vendor, node.model].map(normalizedText).join(" ");
+      return (!query || haystack.includes(query))
+        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building))
+        && (status === "all" || normalizedText(node.status || "unknown") === status);
+    });
+    return boundedNetworkResult({
+      source: "/network/map",
+      matched: filtered.length,
+      returned: Math.min(filtered.length, limit),
+      nodes: filtered.slice(0, limit).map((node) => ({
+        id: node.id,
+        hostname: node.hostname,
+        displayName: node.displayName,
+        managementIp: node.mgmtIp,
+        building: getCanonicalBuildingName(node.building),
+        location: node.location,
+        role: node.role,
+        kind: node.nodeKind,
+        criticality: node.criticality,
+        vendor: node.vendor,
+        model: node.model,
+        inventoryStatus: node.status || "unknown",
+        ports: portCounts.get(node.id) ?? { total: 0, connected: 0, macs: 0, lldp: 0 },
+        updatedAt: isoValue(node.updatedAt),
+      })),
+    });
+  }
+
+  const detailedLinks = links.map((link) => {
+    const a = nodeById.get(link.aNodeId);
+    const b = nodeById.get(link.bNodeId);
+    return {
+      id: link.id,
+      aNode: a?.hostname ?? link.aNodeId,
+      aPort: link.aPort,
+      bNode: b?.hostname ?? link.bNodeId,
+      bPort: link.bPort,
+      aBuilding: a ? getCanonicalBuildingName(a.building) : null,
+      bBuilding: b ? getCanonicalBuildingName(b.building) : null,
+      kind: link.linkKind,
+      mode: link.portMode,
+      speedMbps: link.speedMbps,
+      confidence: link.confidence,
+      lastVerifiedAt: isoValue(link.lastVerifiedAt),
+      stale: link.lastVerifiedAt.getTime() < staleCutoff,
+    };
+  }).filter((link) => {
+    const haystack = Object.values(link).map(normalizedText).join(" ");
+    return (!query || haystack.includes(query))
+      && (!building || normalizedText(link.aBuilding).includes(building) || normalizedText(link.bBuilding).includes(building));
+  });
+  return boundedNetworkResult({
+    source: "/network/map",
+    matched: detailedLinks.length,
+    returned: Math.min(detailedLinks.length, limit),
+    links: detailedLinks.slice(0, limit),
+  });
+}
+
+export const QUERY_SWITCH_PORTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "query_switch_ports",
+    description: "Read current Port Map interface telemetry, including room/device descriptions, up/down state, learned endpoints, LLDP evidence, VLANs, errors, utilization, and optics. It can search across all switches for labels such as AA109. Use this for ports connected to phones/computers as well as switch links. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional free-text search across switch identity, building, port name/description, and known topology peers." },
+        switch: { type: "string", description: "Optional switch hostname, display name, or management IP." },
+        building: { type: "string", description: "Optional building filter." },
+        port: { type: "string", description: "Optional interface-name filter." },
+        connectedOnly: { type: "boolean", description: "Only return ports that are up or have learned MAC/LLDP evidence." },
+        issuesOnly: { type: "boolean", description: "Only return ports with state mismatch, errors, discards, high utilization, or optics alarms." },
+        limit: { type: "integer", minimum: 1, maximum: 250, description: "Maximum records; defaults to 100." },
+      },
+    },
+  },
+};
+
+export async function executeQuerySwitchPorts(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const freeQuery = normalizedText(args.query);
+  const switchQuery = normalizedText(args.switch);
+  const building = normalizedText(args.building);
+  const portQuery = normalizedText(args.port);
+  const connectedOnly = args.connectedOnly === true;
+  const issuesOnly = args.issuesOnly === true;
+  const limit = Math.min(250, Math.max(1, Number(args.limit) || 100));
+  const [nodes, ports, links] = await Promise.all([
+    db.select().from(netNodesTable),
+    db.select().from(netPortsTable),
+    db.select().from(netLinksTable),
+  ]);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const linkByPort = new Map<string, typeof links>();
+  for (const link of links) {
+    for (const [nodeId, interfaceName] of [[link.aNodeId, link.aPort], [link.bNodeId, link.bPort]] as const) {
+      const key = `${nodeId}:${normalizedText(interfaceName)}`;
+      const matches = linkByPort.get(key) ?? [];
+      matches.push(link);
+      linkByPort.set(key, matches);
+    }
+  }
+  const detailed = ports.filter((port) => {
+    if (port.isPhysical === false) return false;
+    const node = nodeById.get(port.nodeId);
+    if (!node) return false;
+    const nodeHaystack = [node.hostname, node.displayName, node.mgmtIp].map(normalizedText).join(" ");
+    const knownLinks = linkByPort.get(`${port.nodeId}:${normalizedText(port.interfaceName)}`) ?? [];
+    const peerHaystack = knownLinks.flatMap((link) => {
+      const peerId = link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
+      const peerPort = link.aNodeId === port.nodeId ? link.bPort : link.aPort;
+      const peer = nodeById.get(peerId);
+      return [peer?.hostname, peer?.displayName, peer?.building, peerPort, link.confidence, link.lldpPeerHostname, link.notes];
+    }).map(normalizedText).join(" ");
+    const allHaystack = [nodeHaystack, node.building, node.location, port.interfaceName, port.description, port.portMode, peerHaystack]
+      .map(normalizedText).join(" ");
+    const connected = normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0;
+    const hasIssue = (normalizedText(port.adminStatus) === "up" && normalizedText(port.operStatus) !== "up")
+      || (port.inErrors ?? 0) > 0 || (port.outErrors ?? 0) > 0
+      || (port.inDiscards ?? 0) > 0 || (port.outDiscards ?? 0) > 0
+      || (port.utilizationPct ?? 0) >= 80
+      || !["", "ok", "normal", "up"].includes(normalizedText(port.opticsStatus));
+    return (!freeQuery || allHaystack.includes(freeQuery))
+      && (!switchQuery || nodeHaystack.includes(switchQuery))
+      && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building))
+      && (!portQuery || normalizedText(port.interfaceName).includes(portQuery))
+      && (!connectedOnly || connected)
+      && (!issuesOnly || hasIssue);
+  }).map((port) => {
+    const node = nodeById.get(port.nodeId)!;
+    const knownLinks = linkByPort.get(`${port.nodeId}:${normalizedText(port.interfaceName)}`) ?? [];
+    const peers = knownLinks.map((link) => {
+      const peerId = link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
+      const peerPort = link.aNodeId === port.nodeId ? link.bPort : link.aPort;
+      return { hostname: nodeById.get(peerId)?.hostname ?? peerId, port: peerPort, confidence: link.confidence };
+    });
+    return {
+      switch: node.hostname,
+      managementIp: node.mgmtIp,
+      building: getCanonicalBuildingName(node.building),
+      interface: port.interfaceName,
+      description: port.description,
+      adminStatus: port.adminStatus,
+      operStatus: port.operStatus,
+      connected: normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
+      learnedMacCount: port.macCount ?? 0,
+      lldpNeighborCount: port.lldpNeighborCount ?? 0,
+      knownTopologyPeers: peers,
+      mode: port.portMode,
+      nativeVlan: port.nativeVlan,
+      allowedVlans: port.allowedVlans,
+      speedMbps: port.speedMbps,
+      duplex: port.duplex,
+      mediaType: port.mediaType,
+      portchannel: port.portchannel,
+      errors: { in: port.inErrors ?? 0, out: port.outErrors ?? 0 },
+      discards: { in: port.inDiscards ?? 0, out: port.outDiscards ?? 0 },
+      utilizationPct: port.utilizationPct,
+      optics: { status: port.opticsStatus, rxPowerDbm: port.rxPowerDbm, txPowerDbm: port.txPowerDbm, temperatureC: port.temperatureC },
+      configUpdatedAt: isoValue(port.configUpdatedAt),
+      telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
+    };
+  }).sort((a, b) => a.switch.localeCompare(b.switch, undefined, { numeric: true }) || a.interface.localeCompare(b.interface, undefined, { numeric: true }));
+  return boundedNetworkResult({
+    source: "/network/map (Port Map)",
+    generatedAt: new Date().toISOString(),
+    matched: detailed.length,
+    returned: Math.min(detailed.length, limit),
+    definition: "connected = operStatus up OR learned MAC count > 0 OR LLDP neighbor count > 0",
+    ports: detailed.slice(0, limit),
+  });
+}
+
+export const QUERY_BUILDING_NETWORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "query_building_network",
+    description: "Read the Buildings page's building list, current health, devices, VLANs, and relevant links. Use for building state and blast-radius questions. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        building: { type: "string", description: "Optional building name or partial name." },
+        includeDevices: { type: "boolean", description: "Include device and link detail; defaults to true for one building." },
+        limit: { type: "integer", minimum: 1, maximum: 100, description: "Maximum detail records per category; defaults to 50." },
+      },
+    },
+  },
+};
+
+export async function executeQueryBuildingNetwork(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const query = normalizedText(args.building);
+  const limit = Math.min(100, Math.max(1, Number(args.limit) || 50));
+  const includeDevices = args.includeDevices === true || (!!query && args.includeDevices !== false);
+  const [summaries, nodes, vlans, links] = await Promise.all([
+    getBuildingSummaries(),
+    db.select().from(netNodesTable),
+    db.select().from(vlansTable),
+    db.select().from(netLinksTable),
+  ]);
+  const selected = summaries.filter((building) => !query || normalizedText(building.name).includes(query));
+  const selectedNames = new Set(selected.map((building) => normalizedText(building.name)));
+  const selectedNodes = nodes.filter((node) => selectedNames.has(normalizedText(getCanonicalBuildingName(node.building))));
+  const selectedNodeIds = new Set(selectedNodes.map((node) => node.id));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const result: Record<string, unknown> = {
+    source: "/network/buildings",
+    generatedAt: new Date().toISOString(),
+    matched: selected.length,
+    buildings: selected,
+  };
+  if (selected.length === 1) {
+    const calling = await getCallingBuildingEvidence(selected[0].name, true);
+    const phonesProveService = calling.onlinePhoneOwners > 0;
+    result.callingEvidence = calling;
+    result.operationalAssessment = phonesProveService
+      ? (selected[0].healthColor === "green" ? "operational" : "operational_with_network_attention")
+      : (selected[0].healthColor === "red" ? "down_or_unverified" : "no_online_phone_evidence");
+    result.assessmentNote = phonesProveService && selected[0].healthColor !== "green"
+      ? "Online assigned phones prove the building service path is operating, while failed switch/heartbeat evidence still requires attention. Report the building as operational but degraded, not fully down."
+      : null;
+  }
+  if (includeDevices) {
+    result.devices = selectedNodes.slice(0, limit).map((node) => ({
+      id: node.id,
+      hostname: node.hostname,
+      managementIp: node.mgmtIp,
+      building: getCanonicalBuildingName(node.building),
+      location: node.location,
+      role: node.role,
+      kind: node.nodeKind,
+      criticality: node.criticality,
+      inventoryStatus: node.status || "unknown",
+    }));
+    result.vlans = vlans.filter((vlan) => selectedNames.has(normalizedText(getCanonicalBuildingName(vlan.building)))).slice(0, limit);
+    result.links = links.filter((link) => selectedNodeIds.has(link.aNodeId) || selectedNodeIds.has(link.bNodeId)).slice(0, limit).map((link) => ({
+      aNode: nodeById.get(link.aNodeId)?.hostname ?? link.aNodeId,
+      aPort: link.aPort,
+      bNode: nodeById.get(link.bNodeId)?.hostname ?? link.bNodeId,
+      bPort: link.bPort,
+      confidence: link.confidence,
+      lastVerifiedAt: isoValue(link.lastVerifiedAt),
+    }));
+  }
+  return boundedNetworkResult(result);
+}
+
+export const QUERY_NETWORK_MONITORING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "query_network_monitoring",
+    description: "Read the Monitoring page's current Influx reachability, device/building health, traffic, alerts, and recent trend. Use for 'right now', live state, outage, and last-seen questions. Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        building: { type: "string", description: "Optional building filter for building state and alerts." },
+        includeTrend: { type: "boolean", description: "Include the recent monitoring trend; defaults to false." },
+      },
+    },
+  },
+};
+
+export async function executeQueryNetworkMonitoring(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const building = normalizedText(args.building);
+  const snapshot = await getMonitoringSnapshot(false) as any;
+  if (building) {
+    snapshot.buildings = (snapshot.buildings ?? []).filter((item: any) => normalizedText(item.name).includes(building));
+    snapshot.alertingDevices = (snapshot.alertingDevices ?? []).filter((item: any) => normalizedText(item.building).includes(building));
+  }
+  if (args.includeTrend !== true) snapshot.trend = [];
+  return boundedNetworkResult({ source: "/monitoring", generatedAt: new Date().toISOString(), ...snapshot });
+}
+
+export const SWITCH_TELEMETRY_FROM_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "switch_telemetry_from_noc",
+    description: "Check, audit, or explicitly start the approved switch-port telemetry collector on NOC host 10.0.0.22. This invokes only the fixed collector service; it cannot run arbitrary Python or shell commands.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["status", "audit", "start"], description: "Read status/audit, or start one collection run." },
+        confirmation: { type: "string", description: "For start only, the user must explicitly provide: COLLECT SWITCH TELEMETRY" },
+      },
+      required: ["action"],
+    },
+  },
+};
+
+async function executeSwitchTelemetryFromNoc(rawArgs: string, userRole: string | null): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  if (args.action === "status") return boundedNetworkResult(await getSwitchTelemetryStatusViaNoc());
+  if (args.action === "audit") return boundedNetworkResult(await getSwitchTelemetryAuditViaNoc());
+  if (args.action !== "start") return "Error: action must be status, audit, or start.";
+  if (!userRole || !NETWORK_ADMIN_ROLES.has(userRole)) return "Error: starting switch telemetry requires a network administrator role.";
+  if (args.confirmation !== "COLLECT SWITCH TELEMETRY") {
+    return "Collection not started. Ask the user to explicitly confirm: COLLECT SWITCH TELEMETRY";
+  }
+  return boundedNetworkResult(await startSwitchTelemetryViaNoc());
+}
+
 export const PROBE_VIA_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
   function: {
@@ -1955,6 +2749,8 @@ export async function runChatWithMemory(
     allowTaskCapture?: boolean;
     /** When true, inventory upserts are staged as pending changes instead of applied. */
     previewInventory?: boolean;
+    /** When present, operational questions must collect this evidence before answering. */
+    evidencePolicy?: { toolNames: string[]; minimumCalls: number; reason: string } | null;
   },
 ): Promise<{
   reply: string;
@@ -1985,6 +2781,10 @@ export async function runChatWithMemory(
   // chat turn can't fan out into a scan.
   const MAX_DIAG_CALLS = 12;
   let diagCalls = 0;
+  const MAX_NETWORK_DATA_CALLS = 8;
+  let networkDataCalls = 0;
+  let evidenceCalls = 0;
+  const evidenceToolNames = new Set(opts.evidencePolicy?.toolNames ?? []);
   // A fan-out sweep is hard-capped at one per chat turn regardless of the
   // per-probe budget, since each sweep can spawn dozens of pings.
   let scanUsed = false;
@@ -1995,11 +2795,17 @@ export async function runChatWithMemory(
     UPSERT_SWITCH_TOOL,
     UPSERT_VLAN_TOOL,
     SAVE_SHADOW_NOTE_TOOL,
+    QUERY_NETWORK_MAP_TOOL,
+    QUERY_SWITCH_PORTS_TOOL,
+    QUERY_BUILDING_NETWORK_TOOL,
+    QUERY_NETWORK_MONITORING_TOOL,
+    SWITCH_TELEMETRY_FROM_NOC_TOOL,
     PING_TOOL,
     TEST_NET_CONNECTION_TOOL,
     SCAN_NETWORK_TOOL,
     PROBE_VIA_NOC_TOOL,
     WEBEX_DEVICE_STATUS_TOOL,
+    CISCO_CALLING_SUPPORT_TOOL,
     QUERY_INFLUX_LAST_SEEN_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
     QUERY_AZURE_VM_TOOL,
@@ -2012,6 +2818,8 @@ export async function runChatWithMemory(
     HTTP_CHECK_TOOL,
     SSL_CHECK_TOOL,
     SNMP_GET_TOOL,
+    LIST_ACCESSIBLE_FILES_TOOL,
+    READ_ACCESSIBLE_FILE_TOOL,
     QUERY_DEVICE_CONFIG_TOOL,
     SEARCH_TEAM_WORK_TOOL,
     ...(zdeskConfig() ? [
@@ -2031,12 +2839,15 @@ export async function runChatWithMemory(
     pendingNetworkChanges,
   });
 
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < 5; round++) {
+    const evidenceOnlyTools = tools.filter((tool) => evidenceToolNames.has(tool.function.name));
+    const mustGatherEvidence = Boolean(opts.evidencePolicy && evidenceCalls < opts.evidencePolicy.minimumCalls && evidenceOnlyTools.length > 0);
     const completion = await openai.chat.completions.create({
       model: opts.model,
       max_completion_tokens: opts.maxCompletionTokens,
       messages,
-      tools,
+      tools: mustGatherEvidence ? evidenceOnlyTools : tools,
+      ...(mustGatherEvidence ? { tool_choice: "required" as const } : {}),
     });
 
     const msg = completion.choices[0]?.message;
@@ -2051,6 +2862,7 @@ export async function runChatWithMemory(
 
     for (const call of toolCalls) {
       let resultText = "Unknown tool.";
+      if (call.type === "function" && evidenceToolNames.has(call.function.name)) evidenceCalls++;
 
       if (call.type === "function" && call.function.name === "save_memory") {
         try {
@@ -2103,6 +2915,20 @@ export async function runChatWithMemory(
           logger.error({ err }, "upsert_vlan tool failed");
           resultText = "Error: VLAN upsert failed";
         }
+      } else if (call.type === "function" && call.function.name === "query_network_map") {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
+        else { networkDataCalls++; try { resultText = await executeQueryNetworkMap(call.function.arguments); } catch (err) { logger.error({ err }, "query_network_map tool failed"); resultText = "Error: network map query failed"; } }
+      } else if (call.type === "function" && call.function.name === "query_switch_ports") {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
+        else { networkDataCalls++; try { resultText = await executeQuerySwitchPorts(call.function.arguments); } catch (err) { logger.error({ err }, "query_switch_ports tool failed"); resultText = "Error: switch port query failed"; } }
+      } else if (call.type === "function" && call.function.name === "query_building_network") {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
+        else { networkDataCalls++; try { resultText = await executeQueryBuildingNetwork(call.function.arguments); } catch (err) { logger.error({ err }, "query_building_network tool failed"); resultText = "Error: building network query failed"; } }
+      } else if (call.type === "function" && call.function.name === "query_network_monitoring") {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
+        else { networkDataCalls++; try { resultText = await executeQueryNetworkMonitoring(call.function.arguments); } catch (err) { logger.error({ err }, "query_network_monitoring tool failed"); resultText = "Error: network monitoring query failed"; } }
+      } else if (call.type === "function" && call.function.name === "switch_telemetry_from_noc") {
+        try { resultText = await executeSwitchTelemetryFromNoc(call.function.arguments, userRole); } catch (err) { logger.error({ err }, "switch_telemetry_from_noc tool failed"); resultText = "Error: switch telemetry request failed"; }
       } else if (call.type === "function" && call.function.name === "ping_host") {
         if (diagCalls >= MAX_DIAG_CALLS) {
           resultText = "Probe budget exhausted for this turn.";
@@ -2144,6 +2970,8 @@ export async function runChatWithMemory(
         else { diagCalls++; try { resultText = await executeProbeViaNoc(call.function.arguments); } catch (err) { logger.error({ err }, "probe_via_noc tool failed"); resultText = "Error: NOC probe failed"; } }
       } else if (call.type === "function" && call.function.name === "webex_device_status") {
         try { resultText = await executeWebexDeviceStatus(call.function.arguments); } catch (err) { logger.error({ err }, "webex_device_status tool failed"); resultText = "Error: Webex device query failed"; }
+      } else if (call.type === "function" && call.function.name === "cisco_calling_support") {
+        try { resultText = await executeCiscoCallingSupport(call.function.arguments); } catch (err) { logger.error({ err }, "cisco_calling_support tool failed"); resultText = "Error: Cisco Calling support query failed"; }
       } else if (call.type === "function" && call.function.name === "query_influx_last_seen") {
         try { resultText = await executeQueryInfluxLastSeen(call.function.arguments); } catch (err) { logger.error({ err }, "query_influx_last_seen failed"); resultText = "Error: InfluxDB query failed"; }
       } else if (call.type === "function" && call.function.name === "grafana_panel_link") {
@@ -2222,6 +3050,20 @@ export async function runChatWithMemory(
           logger.error({ err }, "snmp_get tool failed");
           resultText = "Error: SNMP query failed";
         }
+      } else if (call.type === "function" && call.function.name === "list_accessible_files") {
+        try {
+          resultText = await executeListAccessibleFiles(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "list_accessible_files tool failed");
+          resultText = "Error: accessible file catalog query failed";
+        }
+      } else if (call.type === "function" && call.function.name === "read_accessible_file") {
+        try {
+          resultText = await executeReadAccessibleFile(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "read_accessible_file tool failed");
+          resultText = "Error: authorized file preview failed";
+        }
       } else if (call.type === "function" && call.function.name === "query_device_config") {
         try {
           resultText = await executeQueryDeviceConfig(call.function.arguments);
@@ -2274,5 +3116,10 @@ export async function runChatWithMemory(
     }
   }
 
-  return done("I've completed the requested operations.");
+  const final = await openai.chat.completions.create({
+    model: opts.model,
+    max_completion_tokens: opts.maxCompletionTokens,
+    messages: [...messages, { role: "system", content: "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools." }],
+  });
+  return done(final.choices[0]?.message?.content ?? "I could not complete the evidence synthesis.");
 }

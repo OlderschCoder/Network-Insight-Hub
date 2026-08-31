@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import {
   useListSwitches,
   useListVlans,
+  useUpdateSwitch,
   useAddSwitchMaintenanceLogEntry,
   useUpdateSwitchMaintenanceLogEntry,
   useDeleteSwitchMaintenanceLogEntry,
@@ -14,6 +15,7 @@ import {
 import type { NetworkSwitch, Vlan, MaintenanceLogEntry } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/authFetch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -71,6 +73,19 @@ const vlanTypeColor: Record<string, string> = {
   ospf: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
   other: "bg-muted text-muted-foreground border-border",
 };
+const API = "/api";
+
+interface MasterBuildingSummary {
+  name: string;
+  nodeCount: number;
+  deviceCount?: number;
+  connectivityObjectCount?: number;
+  vlanCount: number;
+  healthColor: "green" | "amber" | "red" | "unknown";
+  influxConfigured: boolean;
+  category?: "campus-building" | "remote-site" | "cloud" | "connectivity";
+  monitoringStrategy?: "switch-probe" | "control-plane" | "none";
+}
 
 const matchSwitch = (s: NetworkSwitch, q: string) =>
   !q ||
@@ -86,6 +101,101 @@ const matchVlan = (v: Vlan, q: string) =>
   (v.description ?? "").toLowerCase().includes(q) ||
   v.building?.toLowerCase().includes(q) ||
   (v.subnet ?? "").toLowerCase().includes(q);
+
+function normalizeBuildingName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
+  const original = rawBuilding?.trim();
+  if (!original) return "Unknown Building";
+
+  const key = normalizeBuildingName(original);
+  const exactMatches: Record<string, string> = {
+    "academic arts": "Hobble",
+    "academic arts 144": "Hobble",
+    "academic arts 161": "Hobble",
+    "agriculture v201": "Agriculture",
+    "allied health": "Allied Health",
+    "baseball field pressbox": "Baseball Field",
+    "campus wide": "Campus-wide",
+    "cio office aa151": "Hobble",
+    "cosmetology cos109": "Cosmetology",
+    "epworth alc building": "Epworth ALC",
+    "main campus": "Hobble",
+    "sharp center": "Sharp Champion Center",
+    softball: "Softball Field",
+    "student union": "Student Union / Student Activities",
+    "student union gym 208 sugymcam": "Student Union / Student Activities",
+    "student life ab": "Student Union / Student Activities",
+    "student life de": "Student Union / Student Activities",
+    "student living center slc151": "Student Living Center",
+    "student living slg": "Student Living Center",
+    "student living slh": "Student Living Center",
+    "student living slj": "Student Living Center",
+    "student living slr": "Student Living Center",
+    "student living sls": "Student Living Center",
+    "student living slt": "Student Living Center",
+    "tech ta107": "Industrial Technology Campus",
+    "tech tt103": "Industrial Technology Campus",
+    "tech t122 mgmt": "Industrial Technology Campus",
+    "tech t122 svi": "Industrial Technology Campus",
+    "tech b141": "Industrial Technology Campus",
+    "tech d201": "Industrial Technology Campus",
+    "tech core 3": "Industrial Technology Campus",
+    "tech core 4": "Industrial Technology Campus",
+    "tech building": "Industrial Technology Campus",
+    "tech building b": "Tech Building B",
+    "tech building d": "Tech Building D",
+    "tech building f": "Industrial Technology Campus",
+    "tech building t": "Tech Building T",
+    "west campus": "West Campus",
+  };
+  if (exactMatches[key]) return exactMatches[key];
+
+  if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
+  if (key.includes("azure")) return "Azure (Hybrid-VNet)";
+  if (key.includes("student health")) return "Student Health Center";
+  if (key.includes("student living") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) return "Student Living Center";
+  if (key.includes("student union") || key.includes("student activities") || key.includes("student life")) return "Student Union / Student Activities";
+  if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) return "Sharp Champion Center";
+  if (key.includes("allied health") || key.includes("colvin family center")) return "Allied Health";
+  if (key.includes("agriculture")) return "Agriculture";
+  if (key.includes("cosmetology")) return "Cosmetology";
+  if (key.includes("humanities")) return "Humanities";
+  if (key.includes("maintenance")) return "Maintenance Building";
+  if (key.includes("baseball")) return "Baseball Field";
+  if (key.includes("softball")) return "Softball Field";
+  if (key.includes("epworth")) return "Epworth ALC";
+  if (key.includes("hobble")) return "Hobble";
+  if (
+    key.includes("aa105") ||
+    key.includes("aa151") ||
+    key.includes("a161") ||
+    key.includes("aa 105") ||
+    key.includes("aa 151") ||
+    key.includes("a 144") ||
+    key.includes("aa 144") ||
+    key.includes("fortigate firewall") ||
+    key.includes("nexus core 1") ||
+    key.includes("nexus core 2")
+  ) {
+    return "Hobble";
+  }
+  if (key.includes("industrial tech") || key.includes("industrial technology campus") || key.startsWith("tech ")) {
+    return "Industrial Technology Campus";
+  }
+
+  return original;
+}
+
+function matchesBuildingSearch(summary: MasterBuildingSummary, q: string, switches: NetworkSwitch[], vlans: Vlan[]): boolean {
+  if (!q) return true;
+  if (summary.name.toLowerCase().includes(q)) return true;
+
+  return switches.some((sw) => getCanonicalBuildingName(sw.building) === summary.name && matchSwitch(sw, q)) ||
+    vlans.some((vlan) => getCanonicalBuildingName(vlan.building) === summary.name && matchVlan(vlan, q));
+}
 
 function switchPostIncidentHref(sw: NetworkSwitch): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -485,7 +595,7 @@ function collectCombinedEntries(
       rows.push({
         kind: "switch",
         name: sw.hostname,
-        building: sw.building ?? "",
+        building: getCanonicalBuildingName(sw.building ?? ""),
         address: sw.ipAddress ?? "",
         entry,
       });
@@ -496,7 +606,7 @@ function collectCombinedEntries(
       rows.push({
         kind: "vlan",
         name: `VLAN ${vlan.vlanId} — ${vlan.name}`,
-        building: vlan.building ?? "",
+        building: getCanonicalBuildingName(vlan.building ?? ""),
         address: vlan.subnet ?? "",
         entry,
       });
@@ -593,11 +703,13 @@ function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
 function ExportAllMaintenanceDialog({
   switches,
   vlans,
+  buildingSummaries,
   open,
   onOpenChange,
 }: {
   switches: NetworkSwitch[];
   vlans: Vlan[];
+  buildingSummaries: MasterBuildingSummary[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -616,14 +728,13 @@ function ExportAllMaintenanceDialog({
     return Array.from(seen).sort((a, b) => a.localeCompare(b));
   }, [allRows]);
 
-  const buildings = useMemo(() => {
-    const seen = new Set<string>();
-    for (const r of allRows) {
-      const b = r.building || "Unassigned";
-      seen.add(b);
-    }
-    return Array.from(seen).sort((a, b) => a.localeCompare(b));
-  }, [allRows]);
+  const buildings = useMemo(
+    () =>
+      buildingSummaries
+        .map((summary) => summary.name)
+        .filter((name) => allRows.some((row) => row.building === name)),
+    [allRows, buildingSummaries],
+  );
 
   const filtered = useMemo(() => {
     const fromTs = from ? new Date(from).getTime() : null;
@@ -634,8 +745,7 @@ function ExportAllMaintenanceDialog({
       if (kind !== "__all__" && r.kind !== kind) return false;
       if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
       if (building !== "__all__") {
-        const b = r.building || "Unassigned";
-        if (b !== building) return false;
+        if (r.building !== building) return false;
       }
       const created = e.createdAt ? new Date(e.createdAt).getTime() : null;
       if (fromTs != null && (created == null || created < fromTs)) return false;
@@ -1134,6 +1244,27 @@ function MaintenanceNotesEditor({
 function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: string) => void }) {
   const owner = switchOwner(sw);
   const log = sw.maintenanceLog ?? [];
+  const { user } = useAuth();
+  const canEdit = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const [editOpen, setEditOpen] = useState(false);
+  const [fields, setFields] = useState({
+    hostname: sw.hostname ?? "", building: sw.building ?? "", ipAddress: sw.ipAddress ?? "",
+    model: sw.model ?? "", location: sw.location ?? "", status: sw.status ?? "unknown",
+    notes: sw.notes ?? "", configFile: sw.configFile ?? "",
+  });
+  const updateSwitch = useUpdateSwitch();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const save = async () => {
+    try {
+      await updateSwitch.mutateAsync({ id: sw.id, data: fields as any });
+      await queryClient.invalidateQueries({ queryKey: getListSwitchesQueryKey() });
+      toast({ title: "Switch updated", description: fields.hostname });
+      setEditOpen(false);
+    } catch (e: any) {
+      toast({ title: "Couldn't update switch", description: e?.message ?? "Check the values and try again.", variant: "destructive" });
+    }
+  };
   return (
     <div className="border-b last:border-b-0 py-2 px-1">
       <div className="flex items-start justify-between gap-3">
@@ -1150,6 +1281,11 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
       </div>
       <MaintenanceLogList owner={owner} entries={log} />
       <div className="flex flex-wrap gap-2 mt-2">
+        {canEdit && (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-3 w-3 mr-1" /> Edit switch
+          </Button>
+        )}
         <MaintenanceNotesEditor owner={owner} hasHistory={log.length > 0} />
         <Link href={switchPostIncidentHref(sw)}>
           <Button variant="outline" size="sm" className="h-7 text-xs">
@@ -1169,6 +1305,40 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
           </Button>
         )}
       </div>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit switch</DialogTitle>
+            <DialogDescription>Update the inventory record. The internal record ID and collected telemetry remain protected.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            {([
+              ["Hostname", "hostname", "SW-BUILDING-ROOM"], ["Building", "building", "Building name"],
+              ["Management IP", "ipAddress", "192.168.2.x"], ["Model", "model", "Vendor and model"],
+              ["Location", "location", "Room, closet, or rack"], ["Configuration reference", "configFile", "File or reference"],
+            ] as const).map(([label, key, placeholder]) => (
+              <label key={key} className="text-sm font-medium space-y-1.5">{label}
+                <Input value={fields[key]} placeholder={placeholder} onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))} />
+              </label>
+            ))}
+            <label className="text-sm font-medium space-y-1.5">Status
+              <Select value={fields.status} onValueChange={(status) => setFields((f) => ({ ...f, status }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="online">Online</SelectItem><SelectItem value="offline">Offline</SelectItem><SelectItem value="unknown">Unknown</SelectItem></SelectContent>
+              </Select>
+            </label>
+            <label className="text-sm font-medium space-y-1.5 sm:col-span-2">Notes
+              <Textarea rows={5} value={fields.notes} onChange={(e) => setFields((f) => ({ ...f, notes: e.target.value }))} />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={updateSwitch.isPending || !fields.hostname.trim() || !fields.building.trim() || !fields.ipAddress.trim()}>
+              {updateSwitch.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save switch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1561,6 +1731,32 @@ function CampusMapPanel() {
   );
 }
 
+function BuildingHealthBadge({ healthColor }: { healthColor: MasterBuildingSummary["healthColor"] }) {
+  const tone = {
+    green: "bg-green-100 text-green-700 border-green-300",
+    amber: "bg-amber-100 text-amber-700 border-amber-300",
+    red: "bg-red-100 text-red-700 border-red-300",
+    unknown: "bg-gray-100 text-gray-500 border-gray-300",
+  }[healthColor];
+  const label = {
+    green: "All devices up",
+    amber: "One or more degraded",
+    red: "One or more down",
+    unknown: "No live data",
+  }[healthColor];
+  return <Badge variant="outline" className={tone}>{label}</Badge>;
+}
+
+function BuildingCategoryLabel({ summary }: { summary: MasterBuildingSummary }) {
+  const label = {
+    "campus-building": "Campus building",
+    "remote-site": "Remote site",
+    cloud: "Cloud",
+    connectivity: "Connectivity object group",
+  }[summary.category ?? "campus-building"];
+  return <span className="text-xs text-muted-foreground">{label}</span>;
+}
+
 export default function Network() {
   const searchString = useSearch();
   const { user } = useAuth();
@@ -1585,6 +1781,32 @@ export default function Network() {
   };
   const { data: switches, isLoading: switchesLoading } = useListSwitches({});
   const { data: vlans, isLoading: vlansLoading } = useListVlans({});
+  const [buildingSummaries, setBuildingSummaries] = useState<MasterBuildingSummary[]>([]);
+  const [buildingsLoading, setBuildingsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBuildingsLoading(true);
+    authFetch(`${API}/network/buildings`, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await response.text());
+        return response.json() as Promise<MasterBuildingSummary[]>;
+      })
+      .then((rows) => {
+        if (cancelled) return;
+        setBuildingSummaries(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBuildingSummaries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBuildingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const q = search.toLowerCase();
   const allSwitches: NetworkSwitch[] = switches ?? [];
@@ -1592,35 +1814,12 @@ export default function Network() {
   const filteredSwitches = allSwitches.filter((s) => matchSwitch(s, q));
   const filteredVlans = allVlans.filter((v) => matchVlan(v, q));
 
-  const buildings = useMemo(() => {
-    const m: Record<string, { switches: NetworkSwitch[]; vlans: Vlan[] }> = {};
-    for (const s of allSwitches) {
-      const b = s.building || "Unassigned";
-      (m[b] ||= { switches: [], vlans: [] }).switches.push(s);
-    }
-    for (const v of allVlans) {
-      const b = v.building || "Unassigned";
-      (m[b] ||= { switches: [], vlans: [] }).vlans.push(v);
-    }
-    let entries = Object.entries(m).sort(([a], [b]) => a.localeCompare(b));
-    if (q) {
-      entries = entries
-        .map(([name, group]) => {
-          const swMatch = group.switches.filter((s) => matchSwitch(s, q));
-          const vlMatch = group.vlans.filter((v) => matchVlan(v, q));
-          const buildingMatches = name.toLowerCase().includes(q);
-          if (buildingMatches) return [name, group] as const;
-          if (swMatch.length || vlMatch.length) {
-            return [name, { switches: swMatch, vlans: vlMatch }] as const;
-          }
-          return null;
-        })
-        .filter(Boolean) as [string, { switches: NetworkSwitch[]; vlans: Vlan[] }][];
-    }
-    return entries;
-  }, [allSwitches, allVlans, q]);
+  const buildings = useMemo(
+    () => buildingSummaries.filter((summary) => matchesBuildingSearch(summary, q, allSwitches, allVlans)),
+    [allSwitches, allVlans, buildingSummaries, q],
+  );
 
-  const isLoading = switchesLoading || vlansLoading;
+  const isLoading = switchesLoading || vlansLoading || buildingsLoading;
 
   return (
     <div className="space-y-6">
@@ -1649,6 +1848,7 @@ export default function Network() {
           <ExportAllMaintenanceDialog
             switches={allSwitches}
             vlans={allVlans}
+            buildingSummaries={buildingSummaries}
             open={exportAllOpen}
             onOpenChange={setExportAllOpen}
           />
@@ -1704,58 +1904,43 @@ export default function Network() {
               {q ? "No buildings match your search." : "No buildings yet — add switches or VLANs to get started."}
             </div>
           ) : (
-            <Accordion
-              type="multiple"
-              defaultValue={buildings.slice(0, 3).map(([n]) => n)}
-              className="space-y-2"
-            >
-              {buildings.map(([name, group]) => (
-                <AccordionItem
-                  key={name}
-                  value={name}
-                  className="border rounded-md px-3 bg-card"
-                >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Building2 className="h-4 w-4 text-primary shrink-0" />
-                      <span className="font-medium">{name}</span>
-                      <span className="ml-auto text-xs text-muted-foreground flex gap-3">
-                        <span>{group.switches.length} switch{group.switches.length === 1 ? "" : "es"}</span>
-                        <span>{group.vlans.length} VLAN{group.vlans.length === 1 ? "" : "s"}</span>
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid md:grid-cols-2 gap-4 pt-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
-                          <Server className="h-3 w-3" /> Switches
-                        </p>
-                        {group.switches.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">No switches recorded.</p>
-                        ) : (
-                          <div className="rounded border bg-background/40">
-                            {group.switches.map((s) => <SwitchRow key={s.id} sw={s} onAskAI={askAI} />)}
-                          </div>
-                        )}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {buildings.map((building) => (
+                <Card key={building.name} className="hover:border-primary/30 transition-colors">
+                  <CardContent className="py-4 px-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-primary shrink-0" />
+                          <p className="font-medium leading-tight">{building.name}</p>
+                        </div>
+                        <div className="mt-1">
+                          <BuildingCategoryLabel summary={building} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
-                          <NetworkIcon className="h-3 w-3" /> VLANs
-                        </p>
-                        {group.vlans.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">No VLANs recorded.</p>
-                        ) : (
-                          <div className="rounded border bg-background/40">
-                            {group.vlans.map((v) => <VlanRow key={v.id} vlan={v} onAskAI={askAI} />)}
-                          </div>
-                        )}
-                      </div>
+                      <BuildingHealthBadge healthColor={building.healthColor} />
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+                    <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                      <span>{building.nodeCount} node{building.nodeCount === 1 ? "" : "s"}</span>
+                      <span>{building.vlanCount} VLAN{building.vlanCount === 1 ? "" : "s"}</span>
+                      {typeof building.deviceCount === "number" && typeof building.connectivityObjectCount === "number" && (
+                        <span>{building.deviceCount} device{building.deviceCount === 1 ? "" : "s"} + {building.connectivityObjectCount} object{building.connectivityObjectCount === 1 ? "" : "s"}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This building list is sourced from the canonical Buildings inventory so the main Network view stays aligned with the live campus map and health model.
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      <Link href={`/network/buildings/${encodeURIComponent(building.name)}`}>
+                        <Button variant="outline" size="sm">
+                          Open building details
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </Accordion>
+            </div>
           )}
         </TabsContent>
 

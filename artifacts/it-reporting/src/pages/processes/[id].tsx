@@ -21,25 +21,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { PROCESS_CATEGORIES } from "./index";
+import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("auth_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function downloadExport(url: string, filename: string) {
-  const res = await fetch(url, { headers: authHeaders(), credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objectUrl;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(objectUrl);
-}
 
 export default function ProcessDetail() {
   const { id: idStr } = useParams<{ id: string }>();
@@ -138,7 +122,7 @@ export default function ProcessDetail() {
     setExporting(kind);
     try {
       const safe = (p?.title ?? "process").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
-      await downloadExport(`${API_BASE}/export/process/${id}/${kind}`, `${safe}.${kind}`);
+      await downloadAuthenticatedFile(`${API_BASE}/export/process/${id}/${kind}`, `${safe}.${kind}`);
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
     } finally {

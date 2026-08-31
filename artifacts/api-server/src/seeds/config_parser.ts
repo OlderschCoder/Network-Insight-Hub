@@ -1,6 +1,6 @@
 /**
  * Network device config parser — Aruba CX and Cisco IOS.
- * Extracts VLANs, SVI IPs, management IP, and building metadata.
+ * Extracts VLANs, interfaces, SVI IPs, management IP, and building metadata.
  * Used by import_device_configs.ts to auto-populate switch and VLAN records.
  */
 
@@ -14,6 +14,19 @@ export type ParsedVlan = {
   isVoice: boolean;
 };
 
+export type ParsedPort = {
+  interfaceName: string;
+  description: string | null;
+  isPhysical: boolean;
+  adminStatus: "up" | "down" | null;
+  speedMbps: number | null;
+  portMode: "trunk" | "access" | "routed" | "peerlink" | "heartbeat" | "unknown";
+  nativeVlan: number | null;
+  allowedVlans: number[] | null;
+  portchannel: string | null;
+  vpcId: number | null;
+};
+
 export type ParsedSwitch = {
   hostname: string;
   building: string;
@@ -23,6 +36,7 @@ export type ParsedSwitch = {
   firmwareVersion: string | null;
   format: "aruba-cx" | "cisco-ios" | "unknown";
   vlans: ParsedVlan[];
+  ports: ParsedPort[];
 };
 
 // ── Strip terminal artifacts ─────────────────────────────────────────────────
@@ -53,12 +67,12 @@ function detectFormat(content: string): "aruba-cx" | "cisco-ios" | "unknown" {
 // ── Building mapping ─────────────────────────────────────────────────────────
 
 const BUILDING_MAP: Record<string, string> = {
-  aa:          "Academic Arts",
+  aa:          "Hobble",
   slc:         "Student Life Center",
   scc:         "Student Community Center",
   h:           "Health Sciences",
   m:           "Maintenance",
-  a:           "Administration",
+  a:           "Hobble",
   t:           "Technology",
   ta:          "Technology A",
   tb:          "Technology B",
@@ -80,8 +94,8 @@ const BUILDING_MAP: Record<string, string> = {
   sa:          "Sports & Activities",
   softballpb:  "Softball Press Box",
   healthcenter:"Health Center",
-  a144:        "Academic Arts 144",
-  a161:        "Academic Arts 161",
+  a144:        "Hobble",
+  a161:        "Hobble",
 };
 
 export function buildingFromHostname(hostname: string): { building: string; code: string } {
@@ -138,6 +152,111 @@ function networkFromCidr(cidr: string): string {
   const ipInt = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
   const net = (ipInt & mask) >>> 0;
   return `${(net >>> 24) & 0xFF}.${(net >>> 16) & 0xFF}.${(net >>> 8) & 0xFF}.${net & 0xFF}/${pfx}`;
+}
+
+function expandVlanList(raw: string): number[] {
+  const values = new Set<number>();
+  for (const token of raw.replace(/\s+/g, "").split(",")) {
+    if (!token) continue;
+    const range = /^(\d+)-(\d+)$/.exec(token);
+    if (range) {
+      const start = Math.max(1, parseInt(range[1], 10));
+      const end = Math.min(4094, parseInt(range[2], 10));
+      for (let vlan = start; vlan <= end; vlan++) values.add(vlan);
+      continue;
+    }
+    const vlan = parseInt(token, 10);
+    if (vlan >= 1 && vlan <= 4094) values.add(vlan);
+  }
+  return [...values].sort((a, b) => a - b);
+}
+
+function isPhysicalInterface(name: string): boolean {
+  return /^(?:ethernet|eth|gigabitethernet|gi|fastethernet|fa|tengigabitethernet|te|twentyfivegige|tw|fortygigabitethernet|fo|hundredgig(?:e|abitethernet)|hu|\d+\/\d+\/\d+)/i.test(name);
+}
+
+function canonicalInterfaceName(raw: string): string {
+  return raw.trim()
+    .replace(/^HundredGig(?:abitEthernet|E)/i, "Hu")
+    .replace(/^FortyGigabitEthernet/i, "Fo")
+    .replace(/^TwentyFiveGigE/i, "Tw")
+    .replace(/^TenGigabitEthernet/i, "Te")
+    .replace(/^GigabitEthernet/i, "Gi")
+    .replace(/^FastEthernet/i, "Fa")
+    .replace(/^Ethernet/i, "Eth")
+    .replace(/^Port-channel/i, "Po")
+    .replace(/\s+/g, "");
+}
+
+function parseInterfaceBlocks(content: string, format: "aruba-cx" | "cisco-ios"): ParsedPort[] {
+  const lines = content.split("\n");
+  const ports: ParsedPort[] = [];
+  const portchannelVpc = new Map<string, { vpcId: number | null; mode: ParsedPort["portMode"] }>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const start = /^interface\s+(.+?)\s*$/i.exec(lines[i].trim());
+    if (!start) continue;
+    const interfaceName = canonicalInterfaceName(start[1]);
+    const body: string[] = [];
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      const trimmed = lines[j].trim();
+      if (/^interface\s+/i.test(trimmed)) break;
+      if (format === "cisco-ios" && trimmed === "!") break;
+      if (format === "aruba-cx" && /^(?:vlan\s+\d+|router\s+|vrf\s+|hostname\s+)/i.test(trimmed)) break;
+      body.push(trimmed);
+    }
+    i = Math.max(i, j - 1);
+
+    const text = body.join("\n");
+    const description = /^description\s+(.+)$/im.exec(text)?.[1]?.trim() ?? null;
+    const explicitlyDown = /^shutdown$/im.test(text) && !/^no shutdown$/im.test(text);
+    const explicitlyUp = /^no shutdown$/im.test(text);
+    const adminStatus = explicitlyDown ? "down" : explicitlyUp ? "up" : null;
+    const accessVlan = parseInt(/^(?:switchport access vlan|vlan access)\s+(\d+)/im.exec(text)?.[1] ?? "", 10);
+    const nativeVlan = parseInt(/^(?:switchport trunk native vlan|vlan trunk native)\s+(\d+)/im.exec(text)?.[1] ?? "", 10);
+    const allowedRaw = /^(?:switchport trunk allowed vlan(?:\s+add)?|vlan trunk allowed)\s+(.+)$/im.exec(text)?.[1] ?? "";
+    const channelId = /^(?:channel-group|lag)\s+(\d+)/im.exec(text)?.[1] ?? null;
+    const portchannel = channelId ? `Po${channelId}` : null;
+    const vpcIdRaw = /^vpc\s+(\d+)/im.exec(text)?.[1] ?? null;
+    const isPeerLink = /^vpc peer-link$/im.test(text);
+    const isHeartbeat = /peer[- ]keepalive|heartbeat/i.test(interfaceName + "\n" + text);
+    const isRouted = /^no switchport$/im.test(text) || /^ip address\s+/im.test(text);
+    let portMode: ParsedPort["portMode"] = "unknown";
+    if (isPeerLink) portMode = "peerlink";
+    else if (isHeartbeat) portMode = "heartbeat";
+    else if (isRouted) portMode = "routed";
+    else if (/^(?:switchport mode trunk|vlan trunk allowed)/im.test(text) || allowedRaw) portMode = "trunk";
+    else if (/^(?:switchport mode access|vlan access)/im.test(text) || Number.isFinite(accessVlan)) portMode = "access";
+
+    const speedRaw = /^speed\s+(\d+)/im.exec(text)?.[1] ?? null;
+    const speedMbps = speedRaw ? parseInt(speedRaw, 10) : null;
+    const parsed: ParsedPort = {
+      interfaceName,
+      description,
+      isPhysical: isPhysicalInterface(interfaceName),
+      adminStatus,
+      speedMbps: speedMbps && speedMbps > 0 ? speedMbps : null,
+      portMode,
+      nativeVlan: Number.isFinite(nativeVlan) ? nativeVlan : Number.isFinite(accessVlan) ? accessVlan : null,
+      allowedVlans: allowedRaw ? expandVlanList(allowedRaw) : Number.isFinite(accessVlan) ? [accessVlan] : null,
+      portchannel,
+      vpcId: vpcIdRaw ? parseInt(vpcIdRaw, 10) : null,
+    };
+    ports.push(parsed);
+
+    const poMatch = /^(?:port-channel|po)(\d+)$/i.exec(interfaceName.replace(/\s+/g, ""));
+    if (poMatch) portchannelVpc.set(`po${poMatch[1]}`, { vpcId: parsed.vpcId, mode: parsed.portMode });
+  }
+
+  for (const port of ports) {
+    if (!port.portchannel) continue;
+    const aggregate = portchannelVpc.get(port.portchannel.toLowerCase());
+    if (!aggregate) continue;
+    if (port.vpcId == null) port.vpcId = aggregate.vpcId;
+    if (aggregate.mode === "peerlink") port.portMode = "peerlink";
+  }
+  return ports;
 }
 
 // ── Aruba CX parser ──────────────────────────────────────────────────────────
@@ -235,7 +354,7 @@ function parseArubaCX(content: string): Omit<ParsedSwitch, "building" | "buildin
     });
   }
 
-  return { hostname, model, firmwareVersion, format: "aruba-cx", ipAddress, vlans };
+  return { hostname, model, firmwareVersion, format: "aruba-cx", ipAddress, vlans, ports: parseInterfaceBlocks(content, "aruba-cx") };
 }
 
 // ── Cisco IOS parser ─────────────────────────────────────────────────────────
@@ -325,7 +444,7 @@ function parseCiscoIOS(content: string): Omit<ParsedSwitch, "building" | "buildi
     });
   }
 
-  return { hostname, model, firmwareVersion, format: "cisco-ios", ipAddress, vlans };
+  return { hostname, model, firmwareVersion, format: "cisco-ios", ipAddress, vlans, ports: parseInterfaceBlocks(content, "cisco-ios") };
 }
 
 // ── Main export ──────────────────────────────────────────────────────────────

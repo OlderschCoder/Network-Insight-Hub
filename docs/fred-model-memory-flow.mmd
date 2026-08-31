@@ -1,0 +1,19 @@
+flowchart LR
+  U[Authenticated IT user] --> UI[Fixed-height Fred chat]
+  UI --> S[(Durable per-user session)]
+  UI --> API[Fred API]
+  API --> R{Workload profile}
+  R -->|routine| T[GPT-5.6 Terra]
+  R -->|deep| C[GPT-5.6 Sol; Claude when ZDR-qualified]
+  R -->|verify| V[GPT-5.6 Terra]
+  T --> TOOLS[Typed live evidence tools]
+  C --> SNAP[Timestamped architecture evidence snapshot]
+  SNAP --> C
+  C --> D[As-is architecture + Mermaid]
+  D --> V
+  V --> A[Acceptance review]
+  API --> M[(Team and personal governed memory)]
+  API --> F[(Fred file library)]
+  TOOLS --> API
+  M --> API
+  F --> API

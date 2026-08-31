@@ -22,10 +22,15 @@ import analyticsRouter from "./analytics";
 import aiKnowledgeRouter from "./ai_knowledge";
 import cioShadowNotesRouter from "./cio_shadow_notes";
 import deviceConfigsRouter from "./device_configs";
+import fredFilesRouter from "./fred_files";
 import incidentsRouter from "./incidents";
 import networkMapRouter from "./network_map";
 import networkNodesRouter from "./network_nodes";
 import internalReportsRouter from "./internal_reports";
+import passwordResetActivityRouter from "./password_reset_activity";
+import bannerDocumentsRouter from "./banner_documents";
+import mfaTapActivityRouter from "./mfa_tap_activity";
+import learnRouter from "./learn";
 
 const router: IRouter = Router();
 
@@ -51,10 +56,15 @@ router.use("/azure-resources", azureResourcesRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/ai-knowledge", aiKnowledgeRouter);
 router.use("/cio-shadow-notes", cioShadowNotesRouter);
+router.use("/fred-files", fredFilesRouter);
 router.use("/network/configs", deviceConfigsRouter);
 router.use("/network", networkNodesRouter);
 router.use("/incidents", incidentsRouter);
 router.use("/network-map", networkMapRouter);
 router.use("/internal", internalReportsRouter);
+router.use("/password-reset-activity", passwordResetActivityRouter);
+router.use("/banner", bannerDocumentsRouter);
+router.use("/mfa-tap-activity", mfaTapActivityRouter);
+router.use("/learn", learnRouter);
 
 export default router;

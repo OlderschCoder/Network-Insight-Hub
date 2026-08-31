@@ -15,13 +15,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Logo, Signature } from "@/components/system";
+import { Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { AppLauncher } from "@/components/AppLauncher";
-import { TopNav } from "@/components/TopNav";
+import { AppSidebar } from "@/components/AppSidebar";
 import { ZendeskAlerts } from "@/components/ZendeskAlerts";
 import { ZendeskChatWidget } from "@/components/ZendeskChatWidget";
 import { useEffect, useState } from "react";
+import { findActiveItem, getNavGroups } from "@/config/nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,13 +31,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   ListChecks as ListChecksIcon,
   ShieldAlert as ShieldAlertIcon,
   Activity as ActivityIcon,
   Network as NetworkIcon,
 } from "lucide-react";
-import { LogOut, Zap, Sparkles, LayoutGrid, Search } from "lucide-react";
+import { LogOut, Zap, Sparkles, Search } from "lucide-react";
+import { trackProductUsage } from "@/lib/usage-tracking";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -275,6 +278,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const logoutMutation = useLogout();
   const [launcherOpen, setLauncherOpen] = useState(false);
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const navGroups = getNavGroups(isCIO, canNetworkTools);
+  const activeItem = findActiveItem(navGroups, location);
+  const activeGroup = navGroups.find((group) =>
+    group.items.some((item) => activeItem?.href === item.href),
+  );
+
+  useEffect(() => {
+    if (!user || !location) return;
+    trackProductUsage("page_view", location);
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === "visible") trackProductUsage("heartbeat", location, 60);
+    }, 60_000);
+    return () => window.clearInterval(heartbeat);
+  }, [location, user?.id]);
 
   const handleLogout = async () => {
     try {
@@ -296,68 +314,82 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background">
-      <header className="flex h-14 shrink-0 items-center gap-3 bg-sidebar px-4 text-sidebar-foreground">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <Logo variant="white" className="h-7" />
-        </Link>
-
-        <TopNav />
-
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setLauncherOpen(true)}
-            className="hidden h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-white/70 transition-colors hover:bg-white/15 md:flex"
-            aria-label="Search pages"
-          >
-            <Search className="h-4 w-4" />
-            <span className="hidden lg:inline">Search</span>
-            <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
-              ⌘K
-            </kbd>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLauncherOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 md:hidden"
-            aria-label="Open menu"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-
-          <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button:hover]:bg-white/20">
-            <QuickAddMenu iconOnly />
+    <SidebarProvider defaultOpen>
+      <AppSidebar />
+      <SidebarInset className="min-h-svh min-w-0">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
+          <div className="flex min-w-0 items-center gap-3">
+            <SidebarTrigger className="h-9 w-9 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white" />
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                {activeGroup?.label ?? "Workspace"}
+              </p>
+              <p className="truncate text-sm font-semibold text-white md:text-base">
+                {activeItem?.label ?? "Insights"}
+              </p>
+            </div>
           </div>
 
-          <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-violet-400/30 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30 hover:text-white"
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLauncherOpen(true)}
+              className="hidden h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-white/70 transition-colors hover:bg-white/15 sm:flex"
+              aria-label="Search pages"
             >
-              <Sparkles className="h-4 w-4 mr-1.5" />
-              Fred
-            </Button>
-          </Link>
+              <Search className="h-4 w-4" />
+              <span className="hidden lg:inline">Search</span>
+              <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
+                ⌘K
+              </kbd>
+            </button>
 
-          <ZendeskAlerts />
+            <button
+              type="button"
+              onClick={() => setLauncherOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+              aria-label="Search pages"
+            >
+              <Search className="h-4 w-4" />
+            </button>
 
-          <AccountMenu name={user?.name} role={user?.role} jobTitle={user?.jobTitle} onLogout={handleLogout} />
-        </div>
-      </header>
+            <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button:hover]:bg-white/20">
+              <QuickAddMenu iconOnly />
+            </div>
 
-      <ZendeskChatWidget />
+            <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-violet-400/30 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30 hover:text-white"
+              >
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                Fred
+              </Button>
+            </Link>
 
-      <main className="flex-1 overflow-auto bg-background">
-        <div className="p-6">{children}</div>
-        <footer className="border-t border-border px-6 py-4">
-          <Signature />
-        </footer>
-      </main>
+            <ZendeskAlerts />
 
-      <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
-    </div>
+            <AccountMenu
+              name={user?.name}
+              role={user?.role}
+              jobTitle={user?.jobTitle}
+              onLogout={handleLogout}
+            />
+          </div>
+        </header>
+
+        <ZendeskChatWidget />
+
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
+          <div className="min-w-0 flex-1 p-4 md:p-6">{children}</div>
+          <footer className="border-t border-border px-6 py-4">
+            <Signature />
+          </footer>
+        </main>
+
+        <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -26,25 +26,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`.replace(/\/+/g, "/");
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("auth_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function downloadExport(url: string, filename: string) {
-  const res = await fetch(url, { headers: authHeaders(), credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objectUrl;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(objectUrl);
-}
 
 const statusLabel: Record<string, string> = {
   planning: "Planning",
@@ -229,7 +213,7 @@ export default function ProjectDetail() {
     setExporting(kind);
     try {
       const safe = (p?.title ?? "project").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
-      await downloadExport(`${API_BASE}/export/project/${id}/${kind}`, `${safe}.${kind}`);
+      await downloadAuthenticatedFile(`${API_BASE}/export/project/${id}/${kind}`, `${safe}.${kind}`);
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
     } finally {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/authFetch";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +24,8 @@ import {
   Network, Plus, Search, Link2, Upload, RefreshCw, ChevronRight,
   AlertTriangle, CheckCircle2, Clock, Trash2, Pencil, Server, Route,
 } from "lucide-react";
+import { TelemetryImportButton } from "./telemetry-import";
+import { TelemetrySwitchPortMap } from "./switch-port-map";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -141,6 +143,7 @@ export default function NetworkMapPage() {
   const [editingLink, setEditingLink] = useState<NetLink | null>(null);
   const [upstreamPath, setUpstreamPath] = useState<UpstreamPathResult | null>(null);
   const [loadingPath, setLoadingPath] = useState(false);
+  const configImportInputRef = useRef<HTMLInputElement | null>(null);
 
   const { data: nodes = [], isLoading: nodesLoading } = useQuery<NetNode[]>({
     queryKey: ["/api/network-map/nodes"],
@@ -212,6 +215,66 @@ export default function NetworkMapPage() {
     onError: (e: Error) => toast({ title: "Seed failed", description: e.message, variant: "destructive" }),
   });
 
+  const normalizeMutation = useMutation({
+    mutationFn: () => apiReq("POST", "/api/network-map/normalize"),
+    onSuccess: (data: { switchGroupsMerged: number; nodeGroupsMerged: number; linkRowsDeleted: number }) => {
+      qc.invalidateQueries({ queryKey: ["/api/network-map/nodes"] });
+      qc.invalidateQueries({ queryKey: ["/api/network-map/links"] });
+      toast({
+        title: "Normalized by IP",
+        description: `Merged ${data.switchGroupsMerged} switch groups, ${data.nodeGroupsMerged} node groups, removed ${data.linkRowsDeleted} duplicate links.`,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Normalize failed", description: e.message, variant: "destructive" }),
+  });
+
+  const importConfigsMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      for (const file of files) formData.append("files", file);
+      const response = await authFetch("/api/network/configs/import-batch", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(err.error ?? response.statusText);
+      }
+      return response.json() as Promise<{
+        received: number;
+        configsImported: number;
+        configsSkipped: number;
+        switchesCreated: number;
+        switchesUpdated: number;
+        nodesCreated: number;
+        nodesUpdated: number;
+        vlansCreated: number;
+        vlansUpdated: number;
+        unsupportedStored: number;
+        errors: string[];
+      }>;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["/api/network-map/nodes"] });
+      qc.invalidateQueries({ queryKey: ["/api/network-map/links"] });
+      qc.invalidateQueries({ queryKey: ["/api/network/switches"] });
+      const errorCount = data.errors.length;
+      toast({
+        title: `Imported ${data.configsImported} config files`,
+        description: `${data.switchesCreated + data.switchesUpdated} switches, ${data.nodesCreated + data.nodesUpdated} nodes, and ${data.vlansCreated + data.vlansUpdated} VLAN updates processed${errorCount ? ` (${errorCount} errors)` : ""}.`,
+        variant: errorCount ? "destructive" : "default",
+      });
+    },
+    onError: (e: Error) => toast({ title: "Config import failed", description: e.message, variant: "destructive" }),
+  });
+
+  const handleConfigImportSelection = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    importConfigsMutation.mutate(files);
+    event.target.value = "";
+  }, [importConfigsMutation]);
+
   const handleUpstreamPath = useCallback(async (node: NetNode) => {
     setLoadingPath(true);
     setUpstreamPath(null);
@@ -237,10 +300,35 @@ export default function NetworkMapPage() {
             <p className="text-sm text-muted-foreground">
               Physical topology — nodes, links, upstream paths
             </p>
+            <p className="text-xs text-muted-foreground">
+              Management IP is authoritative for discovery, imports, and manual edits.
+            </p>
           </div>
         </div>
         {canWrite && (
           <div className="flex items-center gap-2 flex-wrap">
+            <TelemetryImportButton onImported={() => {
+              qc.invalidateQueries({ queryKey: ["/api/network-map/nodes"] });
+              qc.invalidateQueries({ queryKey: ["/api/network-map/links"] });
+              qc.invalidateQueries({ queryKey: ["/api/network-map/ports"] });
+              qc.invalidateQueries({ queryKey: ["/api/network/switches"] });
+            }} />
+            <input
+              ref={configImportInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleConfigImportSelection}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => configImportInputRef.current?.click()}
+              disabled={importConfigsMutation.isPending}
+            >
+              <Upload className={`h-4 w-4 mr-1 ${importConfigsMutation.isPending ? "animate-pulse" : ""}`} />
+              Import Config Files
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -249,6 +337,15 @@ export default function NetworkMapPage() {
             >
               <RefreshCw className={`h-4 w-4 mr-1 ${seedMutation.isPending ? "animate-spin" : ""}`} />
               Seed from Switches
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => normalizeMutation.mutate()}
+              disabled={normalizeMutation.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${normalizeMutation.isPending ? "animate-spin" : ""}`} />
+              Normalize by IP
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowLldpImport(true)}>
               <Upload className="h-4 w-4 mr-1" /> Import LLDP
@@ -294,17 +391,17 @@ export default function NetworkMapPage() {
           </div>
 
           <div className="border rounded-lg overflow-x-auto">
-            <Table>
+            <Table className="table-fixed min-w-[980px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead>Hostname</TableHead>
-                  <TableHead>Building</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Criticality</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[16rem]">Hostname</TableHead>
+                  <TableHead className="w-[12rem]">Building</TableHead>
+                  <TableHead className="w-[9rem]">IP</TableHead>
+                  <TableHead className="w-[9rem]">Role</TableHead>
+                  <TableHead className="w-[7rem]">Kind</TableHead>
+                  <TableHead className="w-[8rem]">Criticality</TableHead>
+                  <TableHead className="w-[7rem]">Status</TableHead>
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -330,15 +427,15 @@ export default function NetworkMapPage() {
                     onClick={() => setSelectedNode(node)}
                   >
                     <TableCell className="text-base">{NODE_KIND_ICON[node.nodeKind] ?? "⚙️"}</TableCell>
-                    <TableCell className="font-mono text-sm font-medium">{node.hostname}</TableCell>
-                    <TableCell className="text-sm">{node.building}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium truncate" title={node.hostname}>{node.hostname}</TableCell>
+                    <TableCell className="text-sm truncate" title={node.building}>{node.building}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{node.mgmtIp ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`text-xs ${ROLE_COLOR[node.role] ?? ""}`}>
                         {node.role}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{node.nodeKind}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground truncate" title={node.nodeKind}>{node.nodeKind}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`text-xs ${CRIT_COLOR[node.criticality] ?? ""}`}>
                         {node.criticality}
@@ -414,18 +511,18 @@ export default function NetworkMapPage() {
           </div>
 
           <div className="border rounded-lg overflow-x-auto">
-            <Table>
+            <Table className="table-fixed min-w-[1040px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>A Side</TableHead>
-                  <TableHead>A Port</TableHead>
-                  <TableHead></TableHead>
-                  <TableHead>B Port</TableHead>
-                  <TableHead>B Side</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Speed</TableHead>
-                  <TableHead>Confidence</TableHead>
-                  <TableHead>Last Verified</TableHead>
+                  <TableHead className="w-[15rem]">A Side</TableHead>
+                  <TableHead className="w-[10rem]">A Port</TableHead>
+                  <TableHead className="w-[3rem]"></TableHead>
+                  <TableHead className="w-[10rem]">B Port</TableHead>
+                  <TableHead className="w-[15rem]">B Side</TableHead>
+                  <TableHead className="w-[7rem]">Kind</TableHead>
+                  <TableHead className="w-[7rem]">Speed</TableHead>
+                  <TableHead className="w-[8rem]">Confidence</TableHead>
+                  <TableHead className="w-[9rem]">Last Verified</TableHead>
                   {canWrite && <TableHead className="w-16"></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -450,12 +547,12 @@ export default function NetworkMapPage() {
                   const stale = link.isStale;
                   return (
                     <TableRow key={link.id} className={stale ? "opacity-50" : ""}>
-                      <TableCell className="font-mono text-xs">{a?.hostname ?? link.aNodeId.slice(0, 8)}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{link.aPort}</TableCell>
+                      <TableCell className="font-mono text-xs truncate" title={a?.hostname ?? link.aNodeId.slice(0, 8)}>{a?.hostname ?? link.aNodeId.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground truncate" title={link.aPort}>{link.aPort}</TableCell>
                       <TableCell className="text-muted-foreground">↔</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{link.bPort}</TableCell>
-                      <TableCell className="font-mono text-xs">{b?.hostname ?? link.bNodeId.slice(0, 8)}</TableCell>
-                      <TableCell className="text-xs">{link.linkKind}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground truncate" title={link.bPort}>{link.bPort}</TableCell>
+                      <TableCell className="font-mono text-xs truncate" title={b?.hostname ?? link.bNodeId.slice(0, 8)}>{b?.hostname ?? link.bNodeId.slice(0, 8)}</TableCell>
+                      <TableCell className="text-xs truncate" title={link.linkKind}>{link.linkKind}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {link.speedMbps ? `${link.speedMbps >= 1000 ? `${link.speedMbps / 1000}G` : `${link.speedMbps}M`}` : "—"}
                       </TableCell>
@@ -492,7 +589,7 @@ export default function NetworkMapPage() {
 
         {/* ── Port Map tab ──────────────────────────────────── */}
         <TabsContent value="portmap" className="mt-3">
-          <SwitchPortMap nodes={nodes} links={links} nodeById={nodeById} />
+          <TelemetrySwitchPortMap nodes={nodes} links={links} nodeById={nodeById} />
         </TabsContent>
       </Tabs>
 

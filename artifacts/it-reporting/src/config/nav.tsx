@@ -17,7 +17,10 @@ import {
   LayoutGrid,
   Siren,
   Building2,
+  KeyRound,
   GraduationCap,
+  PhoneCall,
+  BookOpenCheck,
 } from "lucide-react";
 
 export type NavItem = {
@@ -80,9 +83,22 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     ],
   };
 
-  const enterpriseSystems: NavGroup = {
-    label: "Enterprise Systems",
+  const itApps: NavGroup = {
+    label: "IT Apps",
     items: [
+      {
+        href: "/it-apps",
+        label: "App Directory",
+        desc: "IT applications, shared tools, and operational reports",
+        icon: LayoutGrid,
+        match: (l) => l === "/it-apps",
+      },
+      {
+        href: "/it-apps/cisco-calling",
+        label: "Cisco Calling",
+        desc: "Phone directory, device status, buildings, and E-911",
+        icon: PhoneCall,
+      },
       {
         href: "/banner",
         label: "Banner",
@@ -92,7 +108,25 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     ],
   };
 
-  return [myWork, operations, infrastructure, enterpriseSystems];
+  const service: NavGroup = {
+    label: "Service",
+    items: [
+      {
+        href: "/learn",
+        label: "Learn",
+        desc: "Practice real IT situations with guided simulations",
+        icon: BookOpenCheck,
+      },
+      {
+        href: "/student-access",
+        label: "High School Student Access",
+        desc: "Student self-service and faculty access grants",
+        icon: KeyRound,
+      },
+    ],
+  };
+
+  return [myWork, operations, infrastructure, itApps, service];
 }
 
 export function isNavItemActive(item: NavItem, location: string): boolean {

@@ -33,7 +33,7 @@ import {
 import { format } from "date-fns";
 import { ArrowLeft, Lock, Send, Download, Save, Plus, X, Briefcase, Mail, AlertTriangle, Wrench, Target, Cloud } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { authFetch } from "@/lib/authFetch";
+import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -287,19 +287,10 @@ export default function ReportDetail() {
 
   const handleExport = async (type: "docx" | "xlsx" | "pdf") => {
     try {
-      const res = await authFetch(`${import.meta.env.BASE_URL}api/export/report/${id}/${type}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`Export failed (${res.status})`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `it-report-${(report as any)?.weekOf ?? id}.${type}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadAuthenticatedFile(
+        `${import.meta.env.BASE_URL}api/export/report/${id}/${type}`,
+        `it-report-${(report as any)?.weekOf ?? id}.${type}`,
+      );
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message, variant: "destructive" });
     }

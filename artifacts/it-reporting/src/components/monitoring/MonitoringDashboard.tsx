@@ -97,6 +97,7 @@ interface MonitoringSnapshot {
     building: string;
     vendor: string | null;
     role: string | null;
+    kind: string;
     liveStatus: LiveStatus;
     lastSeen: string | null;
   }>;
@@ -391,8 +392,8 @@ export function MonitoringDashboard({ publicMode = false }: { publicMode?: boole
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <OverviewCard
               title="Devices up"
-              value={`${snapshot.overview.upDevices} / ${GREEN_SWITCH_THRESHOLD}`}
-              detail={`${snapshot.overview.upDevices >= GREEN_SWITCH_THRESHOLD ? "Green threshold met" : `${GREEN_SWITCH_THRESHOLD - snapshot.overview.upDevices} more needed for green`} • ${snapshot.overview.downDevices} maintenance/down • ${snapshot.overview.unknownDevices} pending configuration`}
+              value={`${snapshot.overview.upDevices} / ${snapshot.overview.totalDevices}`}
+              detail={`${snapshot.overview.upDevices >= GREEN_SWITCH_THRESHOLD ? `Green threshold met (${GREEN_SWITCH_THRESHOLD})` : `${GREEN_SWITCH_THRESHOLD - snapshot.overview.upDevices} more needed for green`} • ${snapshot.overview.downDevices} maintenance/down • ${snapshot.overview.unknownDevices} pending configuration`}
               icon={<Wifi className="h-5 w-5" />}
             />
             <OverviewCard
@@ -559,7 +560,8 @@ export function MonitoringDashboard({ publicMode = false }: { publicMode?: boole
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                               {device.building}
-                              {device.role ? ` • ${device.role}` : ""}
+                              {device.kind ? ` • ${device.kind === "svi" ? "SVI" : device.kind === "endpoint" ? "monitored endpoint" : device.kind}` : ""}
+                              {device.role && device.role !== device.kind ? ` • ${device.role}` : ""}
                               {device.vendor ? ` • ${device.vendor}` : ""}
                             </p>
                           </div>

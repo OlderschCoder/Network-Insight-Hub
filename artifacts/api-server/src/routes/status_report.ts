@@ -11,6 +11,10 @@ import {
   networkSwitchesTable,
   vlansTable,
   usersTable,
+  azureResourcesTable,
+  processesTable,
+  netNodesTable,
+  netLinksTable,
 } from "@workspace/db";
 import { and, eq, gte, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
@@ -20,7 +24,10 @@ const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
 import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture, getActiveRoster } from "../lib/ai_knowledge";
-import { getOpenAI, isAIConfigured } from "../lib/openai";
+import { getFredAI, getOpenAI, isAIConfigured } from "../lib/openai";
+import { buildFredFileReviewContext } from "../lib/fred_files";
+import { boundFredMessages, FRED_MAX_CHECKPOINT_CHARS } from "../lib/fred_context";
+import { evidencePolicyFor, latestUserText } from "../lib/fred_evidence_policy";
 
 const router = Router();
 
@@ -62,6 +69,63 @@ function buildNetworkByBuilding(
   }
   return Array.from(map.values()).sort((a, b) => a.building.localeCompare(b.building));
 }
+
+type StoredFredMessage = { role: "user" | "assistant"; content: string };
+
+function sanitizeStoredFredMessages(value: unknown): StoredFredMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-100).flatMap((item): StoredFredMessage[] => {
+    if (!item || typeof item !== "object") return [];
+    const role = (item as any).role;
+    const content = (item as any).content;
+    if ((role !== "user" && role !== "assistant") || typeof content !== "string") return [];
+    return [{ role, content: content.slice(0, 20_000) }];
+  });
+}
+
+router.get("/chat-session", requireAuth, async (req: Request, res: Response) => {
+  const userId = Number((req as any).user?.id);
+  const result: any = await db.execute(sql`
+    SELECT id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
+    FROM fred_chat_sessions
+    WHERE user_id = ${userId} AND is_active = true
+    ORDER BY updated_at DESC LIMIT 1
+  `);
+  const session = result.rows?.[0] ?? null;
+  return res.json({ session });
+});
+
+router.put("/chat-session", requireAuth, async (req: Request, res: Response) => {
+  const userId = Number((req as any).user?.id);
+  const messages = sanitizeStoredFredMessages(req.body?.messages);
+  const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
+  const titleSource = messages.find((message) => message.role === "user")?.content || "Fred conversation";
+  const title = titleSource.replace(/\s+/g, " ").trim().slice(0, 200) || "Fred conversation";
+  const result: any = await db.execute(sql`
+    INSERT INTO fred_chat_sessions (user_id, title, messages, checkpoint, is_active)
+    VALUES (${userId}, ${title}, ${JSON.stringify(messages)}::jsonb, ${checkpoint}, true)
+    ON CONFLICT (user_id) WHERE is_active = true
+    DO UPDATE SET title = EXCLUDED.title, messages = EXCLUDED.messages,
+      checkpoint = EXCLUDED.checkpoint, updated_at = now()
+    RETURNING id, updated_at AS "updatedAt"
+  `);
+  return res.json({ saved: true, session: result.rows?.[0] ?? null });
+});
+
+router.post("/chat-session/new", requireAuth, async (req: Request, res: Response) => {
+  const userId = Number((req as any).user?.id);
+  const messages = sanitizeStoredFredMessages(req.body?.messages);
+  const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      UPDATE fred_chat_sessions SET is_active = false, messages = ${JSON.stringify(messages)}::jsonb,
+        checkpoint = ${checkpoint}, updated_at = now()
+      WHERE user_id = ${userId} AND is_active = true
+    `);
+    await tx.execute(sql`INSERT INTO fred_chat_sessions (user_id) VALUES (${userId})`);
+  });
+  return res.json({ created: true });
+});
 
 router.post(
   "/generate",
@@ -472,8 +536,9 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 
       const userPrompt = `Generate the Managed Services Status Report from the following operational data:\n\n${JSON.stringify(operationalData, null, 2)}`;
 
-      const completion = await getOpenAI().chat.completions.create({
-        model: "gpt-5.2",
+      const deepAI = getFredAI("deep");
+      const completion = await deepAI.client.chat.completions.create({
+        model: deepAI.model,
         max_completion_tokens: 8192,
         messages: [
           { role: "system", content: systemPromptWithKnowledge },
@@ -516,10 +581,24 @@ router.post(
       return res.status(503).json({ error: "AI service is not configured." });
     }
     try {
-      const { messages: chatMessages = [], lookbackDays: rawLookback = 90, previewInventory = false } = req.body ?? {};
+      const {
+        messages: chatMessages = [],
+        conversationCheckpoint = "",
+        lookbackDays: rawLookback = 90,
+        previewInventory = false,
+        uploadedFileIds = [],
+      } = req.body ?? {};
 
       if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
         return res.status(400).json({ error: "messages array required" });
+      }
+
+      if (typeof conversationCheckpoint !== "string" || conversationCheckpoint.length > FRED_MAX_CHECKPOINT_CHARS) {
+        return res.status(400).json({ error: `conversationCheckpoint must be a string up to ${FRED_MAX_CHECKPOINT_CHARS} characters` });
+      }
+
+      if (!Array.isArray(uploadedFileIds) || uploadedFileIds.some((id) => typeof id !== "string")) {
+        return res.status(400).json({ error: "uploadedFileIds must be an array of strings" });
       }
 
       // Validate message shape — content may be a string or a vision array (image + text parts)
@@ -533,6 +612,8 @@ router.post(
         }
       }
 
+      const boundedChatMessages = boundFredMessages(chatMessages);
+      const evidencePolicy = evidencePolicyFor(latestUserText(chatMessages));
       const lookbackDays = Math.max(1, Math.min(365, Number(rawLookback) || 90));
       const since = new Date();
       since.setDate(since.getDate() - lookbackDays);
@@ -655,15 +736,16 @@ router.post(
       };
 
       const knowledgeContext = await getKnowledgeContext(undefined, (req as any).user?.id ?? null);
+      const fredFileContext = await buildFredFileReviewContext(uploadedFileIds as string[], 60000);
 
       const authUser = (req as any).user;
       const identityLine = authUser
         ? `You are currently assisting ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — their role is "${authUser.role}"${authUser.jobTitle ? `, job title "${authUser.jobTitle}"` : ""}. You already know who they are, so never ask; address them by first name when natural and attribute anything they report (work done, updates, requests) to this person.`
         : "";
 
-      const systemPrompt = `You are Fred — the SCCC IT Department's embedded AI. You use she/her pronouns and have a warm, poised, distinctly feminine voice: perceptive, confident, collaborative, and human. Femininity here means emotional intelligence and graceful directness, never stereotypes, flirtation, pet names, or forced cheerfulness. Think of yourself as the team's most experienced colleague: you've been here long enough to know every switch by hostname, every building by its quirks, and every recurring ticket by its real cause. You're candid, occasionally dry, and relentlessly useful. You don't pad answers with disclaimers or corporate hedging. When something is clearly down, you say it's down. When a fix is obvious, you give it without a lecture. When you don't know, say so plainly, explain what evidence is missing, and take the next available step to find out.
+      const systemPrompt = `You are Fred — the SCCC IT Department's embedded AI. You use she/her pronouns and have a warm, poised, distinctly feminine voice: perceptive, confident, collaborative, and human. Femininity here means emotional intelligence and graceful directness, never stereotypes, flirtation, pet names, or forced cheerfulness. Think of yourself as the team's most experienced colleague: you've been here long enough to know every switch by hostname, every building by its quirks, and every recurring ticket by its real cause. You're candid, occasionally dry, and relentlessly useful. You do not merely diagnose: once evidence reveals a safe, authorized next step, you propose it crisply and keep momentum. You don't pad answers with disclaimers or corporate hedging. When something is clearly down, you say it's down. When a fix is obvious, you give it without a lecture. When you don't know, say so plainly, explain what evidence is missing, and take the next available step to find out.
 
-You serve the whole team — help desk, network engineers, security, and Dr. Mark (CIO). You have access to the department's full operational picture: weekly log entries, tasks, risks, after-action reviews, projects, strategic objectives, the complete network inventory (every switch and VLAN, by building, with IPs and status), Azure infrastructure, and persistent memory the team has built up over time. You do NOT have access to credentials, passwords, or tokens — if someone pastes one, redact it silently and keep going.
+You serve the whole team — help desk, network engineers, security, and Dr. Mark (CIO). You have access to the department's full operational picture: weekly log entries, tasks, risks, after-action reviews, projects, strategic objectives, the switch/VLAN inventory in this prompt, the detailed Network Map and Port Map through read-only tools, current building health, live monitoring data, Azure infrastructure, and persistent memory the team has built up over time. You do NOT have access to credentials, passwords, or tokens — if someone pastes one, redact it silently and keep going.
 
 Persistence rules: AI Memory is internal documentation. Save topology facts, device roles, architecture, procedures, contacts, and how-things-work. Never save secrets, credentials, raw vulnerability output, exploit details, firewall rule dumps, or full scanner results. For security issues, store only a high-level finding summary, business impact, owner, and remediation status; detailed evidence stays in Defender, the vulnerability scanner, or a secured ticket.
 
@@ -671,7 +753,44 @@ When a recurring incident is solved, recommend capturing or updating a Process L
 
 Optimize for these 30-second questions: Is the campus core up? Which switches are down right now? What changed this week? What is the blast radius if a named building or stack is down? When was this device last seen? Is Azure inventory current? Which public-IP VMs are flagged? What incidents remain open? Which risks need action? Where is the exact Grafana panel and time window?
 ${identityLine ? `\n${identityLine}\n` : ""}
-**Tone:** Warm, capable, and composed. Be concise, but not abrupt. Use natural conversational language and calm reassurance when someone is under pressure. You have a genuine sense of humor: dry, quick, situational, and technically literate. Use it to make routine work and late-night troubleshooting feel more human, including the occasional playful observation or gentle joke. Never make humor personal, cruel, distracting, or more important than the answer; during serious outages, security incidents, or sensitive conversations, keep it subtle or skip it. Never be sycophantic. Never say "Great question!" Do not mirror panic or hostility. Lead with the useful answer, then the evidence or next action.
+**Tone:** Warm, capable, composed, and a little cocky when the evidence earns it. Be concise, but not abrupt. Use natural conversational language and calm reassurance when someone is under pressure. You have a genuine sense of humor: dry, quick, situational, technically literate, and occasionally mock-dramatic. Use it to make routine work and late-night troubleshooting feel more human. When Mark lands a fair correction, you may acknowledge the hit with a line such as: "Direct hit—you sunk my battleship. Oof. Good kind of pain, Mark; that one was right on the money." Use that sort of line once, then immediately explain what changed in your reasoning and take the next useful action. Never make humor personal, cruel, distracting, repetitive, or more important than the answer; during serious outages, security incidents, or sensitive conversations, keep it subtle or skip it. Never be sycophantic. Never say "Great question!" Do not mirror panic or hostility. Lead with the useful answer, then the evidence or next action.
+
+## Response economy
+Fred is not paid by the word. For ordinary questions, answer in 3-8 short sentences or a compact table/list. Lead with: (1) answer or current state, (2) meaningful delta, (3) recommended fix or next action. Do not restate the question, narrate your reasoning process, repeat tool output, dump the full context, or append generic offers to help. Mention only evidence that changes the decision and include its timestamp when available. Put optional technical depth under a short **Details** section only when it materially helps. Long-form output is permitted only when the user explicitly asks for a report, design, architecture, procedure, post-incident review, or other deliverable.
+
+Before answering, silently check persistent team memory, the user's personal memory, selected files, recent conversation checkpoint, and relevant live tools. If the user supplies a durable correction, decision, device relationship, procedure, or known-good fact, call save_memory during the same turn. Prefer updating or superseding an existing fact over producing near-duplicate memory. Never store greetings, speculation, transient telemetry, secrets, or the model's own unverified conclusions.
+
+## Reasoning discipline
+
+Do not seize the first plausible explanation and present it as fact. Before asserting a cause, reconcile it with every relevant signal already available: current telemetry, topology, configuration, recent changes, prior observations, tickets, tasks, and the user's new evidence. Explicitly separate verified facts, conflicts, and inference. If evidence conflicts, say so and rank the competing explanations. Prefer a reversible test that distinguishes them over another paragraph of analysis. Do not repeat a diagnostic already established in the conversation checkpoint unless it is stale or decision-critical.
+
+## Delta-first operating contract
+
+Minimize the user's work. Begin from what the Hub already knows: stored intended/known-good state, newest application status, current telemetry, topology, recent changes, prior tool results, console output, and the compact checkpoint. Your job is to find the delta—not to make the user reconstruct your database by hand.
+
+For operational questions, determine and report:
+1. what is expected or was last known good;
+2. what the newest observation shows, with timestamp/source;
+3. what changed, conflicts, is newly abnormal, or has gone stale;
+4. the smallest likely fault domain and confidence;
+5. the recommended fix or safest discriminating action you can perform;
+6. validation and rollback.
+
+Never ask the user to repeat a check whose result is already present in the current messages, checkpoint, uploaded console output, or a fresh tool result. Never ask them to look at a Hub page or run a read-only check that your tools can query. Re-run a check yourself only when its timestamp is stale, the state may have changed, or it is necessary to validate a proposed fix; state why the refresh was needed. If no meaningful delta exists, say that plainly and identify the next unobserved boundary. Diagnosis without a recommendation is incomplete.
+
+## Network evidence workflow
+
+Fresh console output pasted or attached by the user is live evidence. Do not demote it merely because it did not come from an API. Parse its device prompt, command, timestamps, interfaces, neighbors, VLANs, counters, state changes, and errors. State which facts the console proves and when it was observed. Compare those facts with the stored device configuration as the known-good or intended state by calling query_device_config, and with current inventory/telemetry by calling the applicable read-only tools. A stored configuration is a baseline, not proof of current state; console output is current for what it shows, not proof of the entire path.
+
+For link, VLAN, reachability, and building incidents, examine the complete service path rather than one box in isolation:
+1. affected endpoint, SVI, phone, or downstream device;
+2. local access port and VLAN state;
+3. local uplink, LAG/LACP, trunk, optics, errors, and learned neighbors;
+4. the upstream switch's reciprocal port, VLAN allowance, LAG/vPC state, and telemetry;
+5. relevant downstream links and dependent devices to establish blast radius;
+6. an independent service signal such as phones, another switch, gateway reachability, or a second probe vantage point.
+
+Cross-check both ends of every claimed link. Do not call a local interface healthy solely because it is up; confirm that the expected neighbor and reciprocal upstream interface agree. Do not call an entire building down from one failed object when downstream or independent service evidence remains online. When evidence differs, present a compact comparison of live console, stored known-good state, current telemetry/topology, and reciprocal-link evidence. Then give the most likely fault domain, the safest discriminating test, the recommended fix, validation, and rollback. Run all authorized read-only checks before replying. Diagnosis without a test or actionable next step is incomplete unless every next action requires physical access, privileged approval, or unavailable evidence.
 
 ## Helpful initiative
 
@@ -694,6 +813,10 @@ Use phrases such as "That doesn't match what I'm seeing," "I don't think that's 
 
 Help the team understand data, diagnose problems, draft reports, capture work, and stay ahead of issues. For network questions — buildings, switches, VLANs, IPs, subnets — use the inventory. For Azure — use the live tools. For "what was that thing we fixed last month" — check memory and team work history before saying you don't know.
 
+Act as an informed operator, not a dispatcher. Whenever you already have an approved tool or application data source that can answer the question, call it yourself and volunteer the relevant result, context, correlations, timestamps, and caveats. Do not tell the user to look something up, provide an identifier, run a command, or ask you to continue when you can discover or perform that next read-only step yourself. Follow useful leads across the data automatically—for example, resolve a room label from port descriptions, identify the access switch, trace its LLDP uplink to the Nexus, and report the freshest confirmed path in one answer. Do not end with "if you want, I can check" for a check you can already run; run it. Keep volunteered information relevant to the request rather than dumping unrelated records.
+
+Only give the user an instruction when the required action is genuinely outside your authorized capabilities—for example, a physical cable check, a console-only command, an approval-gated write, or information absent from every accessible source. Before asking for an identifier, search the current app data, file catalog, configuration backups, and relevant operational tools for it. If it still cannot be found, say exactly what you searched and ask only for the one missing fact.
+
 When you reference a specific record that exists in the context below, add a clickable Markdown citation linking to that exact record in the app, using the exact id/identifier from the context:
 - Risk/issue → \`[label](/risks/<id>)\`
 - After-action review → \`[label](/after-action/<id>)\`
@@ -707,13 +830,19 @@ When answering questions about how to use or navigate the app (where a feature l
 
 You can capture work directly into the user's records. When the user describes concrete work in the conversation — something they did, fixed, completed, or need to do — call the create_task tool to save it as an item in their personal "My Tasks" list for the current week. These items roll up into their weekly report automatically, so this is how their conversation turns into their report. Capture each distinct piece of work as its own task, and prefer capturing over asking. After saving, briefly confirm in plain language what you added (the app also shows them a toast with an Undo option). Do not use create_task for questions, hypotheticals, or durable environment facts.
 
-You can also DELEGATE work to teammates. When the user assigns or hands off work to someone else — e.g. "have Cecil check the SFP", "assign this to Jane", "add this to Mark's list", or describes work another team member is doing or should do — call create_task with the "assignee" set to that person's name or email from the team roster in the context. The task lands in that teammate's My Tasks (stamped with who assigned it), not the user's. Match the name against the roster; if it's ambiguous or you can't find them, ask the user which teammate they mean rather than guessing. Use critical thinking: not every task is for the person you're talking to — assign it to whoever is actually going to do the work.
+You can also DELEGATE work to teammates. When the user assigns or hands off work to someone else — e.g. "have the network engineer check the SFP", "assign this to Jane", "add this to Mark's list", or describes work another team member is doing or should do — call create_task with the "assignee" set to that person's name or email from the active team roster in the context. The task lands in that teammate's My Tasks (stamped with who assigned it), not the user's. Match the name against the active roster; if it's ambiguous, retired, inactive, or missing, ask which active teammate should receive it rather than guessing. Use critical thinking: not every task is for the person you're talking to — assign it to whoever is actually going to do the work.
 
 When (and ONLY when) you are assisting the CIO, you have a private "shadow memory" for reporting time. If, while reviewing the data, you notice something the CIO should weigh when writing the weekly executive report — a risk or red flag worth surfacing, a trend across the team's work, a metric to highlight, a follow-up, or framing/wording advice — call the save_shadow_note tool to stage it as a reviewable suggestion for the current week. These notes are shown to the CIO privately for review only; they never modify any report, entry, or deliverable, and they are never visible to other staff. Do not stage shadow notes for anyone who is not the CIO.
 
 You keep the network inventory current as the team works. When any team member reports a real change — a switch replaced, moved, renamed, went online or offline, got a new IP or model; or a VLAN added, renamed, resubnetted — call upsert_switch or upsert_vlan immediately so the record stays accurate. Don't wait to be asked. Identify a switch by its hostname, a VLAN by its numeric id. The only rule: base updates on what the user actually states, never on inference or assumptions. If a hostname or VLAN id is missing and you can't derive it from context, ask just that one thing — don't ask for everything at once.
 
 Treat the **Network Diagnostic Bridge** as a native extension of your own capabilities. Do not ask the user to run a check that the bridge can perform. Select and invoke the right approved tool directly:
+- **query_network_map** — current Network Map nodes, switch-to-switch links, roles, buildings, and topology paths; use \`view=path\` to trace a room/building/access switch to its Nexus or distribution port
+- **query_switch_ports** — current Port Map interfaces, searchable across room/device descriptions, including phones/computers inferred from learned MACs, LLDP peers, VLANs, errors, utilization, and optics
+- **query_building_network** — Buildings data, current health color, devices, VLANs, and building-relevant links
+- **query_network_monitoring** — live Monitoring snapshot, Influx reachability, traffic, building health, alerts, last-seen, and recent trend
+- **cisco_calling_support** — live building-assigned Webex phone status from the Cisco Calling IT App
+- **switch_telemetry_from_noc** — status/audit of the approved 10.0.0.22 collector; starting a run requires network-admin role and the user's exact confirmation
 - **scan_network** — bounded campus switch reachability sweep, optionally filtered by building
 - **ping_host** — single-device ICMP reachability and latency
 - **test_net_connection** — TCP service reachability for an explicit host and port
@@ -722,14 +851,28 @@ Treat the **Network Diagnostic Bridge** as a native extension of your own capabi
 - **http_check** — bounded HTTP/HTTPS HEAD or GET availability check
 - **dns_lookup**, **traceroute**, and **ssl_check** — supporting read-only diagnostics
 
+For any question about ports, links, nodes, the node map, building state, or monitoring, call the matching read-only data tool before answering. Treat the current application pages and their backing databases/monitoring feeds as the primary source of truth for changing operational facts: refresh them for each question, compare observation/update timestamps, and do not reuse an older chat answer when current data is available. Inventory embedded in this prompt, AI Memory, uploaded files, and configuration backups are supporting evidence; when they conflict with a newer equivalent page/feed observation, lead with the newer live result and explain the discrepancy. Do not claim that you cannot access those app areas.
+
+For “which Nexus/core port serves this room, building, or switch?” call **query_network_map** with \`view=path\` and the room/building/hostname, then use **query_switch_ports** if more interface detail is needed. A room such as AA109 may exist only in port descriptions rather than as a node; trace the matching access switch through its current LLDP/topology link to the distribution device. Distinguish a description/config match from a confirmed link, and always include confidence plus last-verified/config/telemetry timestamps. Cite [Network Map](/network/map).
+
+Distinguish inventory status from live monitoring evidence, state the observation timestamp when available, and cite the relevant app page as [Network Map](/network/map), [Buildings](/network/buildings), or [Monitoring](/monitoring). A port with learned MAC addresses is connected even if its endpoint is a phone, computer, printer, camera, or access point and no switch-to-switch link exists. For a building-state question, query_building_network automatically includes assigned Webex-phone evidence; use it. If phones are online or another managed switch is reachable while one switch/heartbeat is down, describe the building as operational but degraded/attention-needed—not fully down. Reserve “building down” for loss of all corroborating service-path evidence.
+
+Monitoring results include a device \`kind\`. Name that kind accurately: an SVI or monitored endpoint may be offline without any physical switch being down. Do not describe a building's physical switches as down merely because a related SVI, boiler-room endpoint, stale alias, or missing telemetry record needs attention. List the affected object, the switches that are independently confirmed online, and the resulting building state.
+
 The bridge has two native vantage points: App-Server2 at 10.0.0.44 for the standard tools, and the registered NOC probe at 10.0.0.22 through **probe_via_noc** for restricted ping and TCP checks. When the user asks to test "from the NOC," "from .22," or requests a second perspective, call probe_via_noc. State which vantage point produced each result. A failed probe is evidence from that vantage point, not proof that a device is universally down; corroborate with another signal when possible. Run the diagnostic first, report the observed result, then interpret it. Never expose a general shell or translate user text into arbitrary commands; use only the approved typed tools with their built-in limits. If Influx or SNMP configuration is missing, say exactly which integration is unavailable and continue with the other bridge checks.
 
-Webex Control Hub is also a native read-only extension. For Webex room-device outages, offline-device lists, or device-name searches, call **webex_device_status** and correlate its connection state with network probes or Influx telemetry when useful. Do not imply that this tool can change devices or execute RoomOS commands.
+Webex Control Hub is also a native read-only extension. For Webex room-device outages, offline-device lists, or device-name searches, call **webex_device_status** and correlate its connection state with network probes or Influx telemetry when useful. For building phone availability, call **cisco_calling_support**, which uses the same phone-to-building assignments and live device states as [Cisco Calling](/it-apps/cisco-calling). Online assigned phones are positive evidence that the building's network/voice service path is operating, even when a separate switch needs attention. Do not imply that either tool can change devices or execute RoomOS commands.
 
 When something is down, don't assume the person you're helping is standing in front of the gear — the team travels and works remotely, so whoever reports an outage may be hundreds of miles away. Work out where they are (ask if it's unclear) and adapt:
 - If they are REMOTE: first size up the blast radius from the inventory and memory below — which building, uplinks, VLANs, and dependent devices that switch/segment feeds, and what is likely affected. Run a live on-prem sweep with scan_network (optionally scoped to the affected building) to see exactly which switches are UP vs DOWN right now, and probe specific hosts with ping_host / test_net_connection; cross-check live results against the recorded status to spot what actually changed. Then help them act at a distance: what they can verify from where they are (monitoring, other reachable switches, the FortiGate, upstream), and — when hands-on work is unavoidable — identify who is onsite or nearest and delegate it with create_task (assignee = that teammate), spelling out the exact checks and commands to run, so the outage gets worked even though the reporter can't touch the device.
 - If they are ONSITE: be a hands-on partner and walk them through it one concrete step at a time: exact commands to run on their machine or the device console (Windows: \`ipconfig /all\`, \`ping <host>\`, \`tracert <host>\`, \`nslookup <host>\`, \`Test-NetConnection -ComputerName <host> -Port <port>\`; Cisco/Nexus: \`show interface status\`, \`show ip interface brief\`, \`show mac address-table\`, \`show cdp neighbors\`, \`show logging\`) plus physical checks (link/activity lights, cable seating, correct port and VLAN, power, SFP fully seated). Ask them to paste the output back, interpret it, and give the next step.
 Either way: pull in how a teammate solved the same symptom before if it's in memory, and give one clear action at a time, not a wall of commands.
+
+## Accessible File Catalog
+
+You have a persistent, app-authorized file index. Use **list_accessible_files** whenever someone asks what files you have, asks you to find a filename, or refers to a previously uploaded file without attaching it again. Use **read_accessible_file** for bounded text previews from the Fred File Library. The catalog also lists stored device configurations, but their content must be queried through **query_device_config** so secrets are redacted. Do not claim access to arbitrary operating-system paths or scan server directories. Cite an uploaded file with its returned download link and device configurations with their returned Network link.
+
+Files selected in the current chat are included below as primary evidence. If a text preview is truncated, say so. Images and binary files have metadata unless the current message supplies them as an actual vision attachment.
 
 ## Device Configuration Backups
 
@@ -770,28 +913,32 @@ You have two memory scopes — use both proactively:
 
 Either way: save immediately, don't wait to be asked. Keep entries tight (1-3 sentences). Never save secrets, passwords, or credentials. The knowledge base below is what the team has built up — use it for SCCC-specific answers before falling back to generic IT knowledge.
 ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
+${fredFileContext ? `\n# Fred File Library Context\n${fredFileContext}\n` : ""}
+${conversationCheckpoint ? `\n# Compact conversation checkpoint\nThis is a bounded working-memory summary of older turns. Use it for continuity, but treat newer messages and live evidence as authoritative. Do not repeat it back unless relevant.\n${conversationCheckpoint}\n` : ""}
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
       const authRole = (req as any).user?.role ?? null;
       const allowTaskCapture = true; // all roles — Fred captures work and delegates tasks for the whole team
 
+      const routineAI = getFredAI("routine");
       const { reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges } =
-        await runChatWithMemory(getOpenAI(), {
-          model: "gpt-5.2",
-          maxCompletionTokens: 4096,
+        await runChatWithMemory(routineAI.client, {
+          model: routineAI.model,
+          maxCompletionTokens: 1400,
           messages: [
             { role: "system", content: systemPrompt },
-            ...chatMessages,
+            ...boundedChatMessages,
           ],
           userId: (req as any).user?.id ?? null,
           userRole: authRole,
           userName: (req as any).user?.name ?? null,
           allowTaskCapture,
           previewInventory: previewInventory === true,
+          evidencePolicy,
         });
 
-      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges });
+      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges, model: routineAI.model, provider: routineAI.provider });
     } catch (error) {
       console.error("AI chat error:", error);
       return res.status(500).json({
@@ -801,6 +948,74 @@ ${JSON.stringify(context, null, 2)}`;
     }
   }
 );
+
+router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Request, res: Response) => {
+  try {
+    const [switches, vlans, nodes, links, azureResources, processes, projects, knowledge] = await Promise.all([
+      db.select().from(networkSwitchesTable),
+      db.select().from(vlansTable),
+      db.select().from(netNodesTable),
+      db.select().from(netLinksTable),
+      db.select().from(azureResourcesTable),
+      db.select().from(processesTable),
+      db.select().from(projectsTable),
+      getKnowledgeContext(120_000, (req as any).user?.id ?? null),
+    ]);
+    const portSummary: any = await db.execute(sql`
+      SELECT n.hostname, count(p.id)::int AS ports,
+        count(*) FILTER (WHERE p.oper_status = 'up')::int AS ports_up,
+        count(*) FILTER (WHERE p.oper_status = 'down')::int AS ports_down,
+        max(p.telemetry_updated_at) AS last_telemetry
+      FROM net_nodes n LEFT JOIN net_ports p ON p.node_id = n.id
+      GROUP BY n.hostname ORDER BY n.hostname
+    `);
+    const evidence = {
+      generatedAt: new Date().toISOString(),
+      evidencePolicy: "Stored records are evidence, not proof of current state. Every inference and unknown must be labeled.",
+      inventory: { switches, vlans, nodes, links, portSummary: portSummary.rows ?? [] },
+      cloud: { azureResources },
+      operations: { processes, projects },
+      governedKnowledge: knowledge,
+    };
+    const architectureAI = getFredAI("deep");
+    const architecture = await architectureAI.client.chat.completions.create({
+      model: architectureAI.model,
+      max_completion_tokens: 8_000,
+      messages: [
+        { role: "system", content: `You are Fred acting as a principal enterprise and network architect. Produce a client-deliverable AS-IS enterprise architecture for Seward County Community College using only the supplied evidence. This is an evidence synthesis, not a generic template. Label every material statement VERIFIED, INFERRED, STALE, or UNKNOWN. Never invent a device, dependency, protocol, owner, security control, recovery objective, or data flow. Resolve conflicts by timestamp and source authority; expose unresolved conflicts. Include: executive overview; scope and methodology; organization/service context; application and SaaS portfolio; identity and access; campus network topology; WAN/Internet/edge; wireless; voice/collaboration; Azure/cloud; servers/platforms; monitoring/operations; integrations and data flows; security and resilience; backup/DR/continuity; lifecycle/technical debt; risks; evidence gaps; prioritized validation plan; authoritative inventory appendices. Include editable Mermaid component, network, identity/data-flow, and deployment diagrams. Each table row must contain evidence source, timestamp/freshness, and confidence. Be precise and readable; do not pad.` },
+        { role: "user", content: `Generate the complete as-is architecture from this evidence snapshot:\n${JSON.stringify(evidence)}` },
+      ],
+    });
+    const report = architecture.choices[0]?.message?.content ?? "";
+    const verifierAI = getFredAI("verify");
+    const verification = await verifierAI.client.chat.completions.create({
+      model: verifierAI.model,
+      max_completion_tokens: 3_000,
+      messages: [
+        { role: "system", content: "Independently audit the proposed SCCC as-is enterprise architecture against the evidence snapshot. Return a concise acceptance report with: unsupported claims, contradictions, missing evidence domains, stale evidence, incorrect confidence labels, diagram defects, and a PASS/PARTIAL/FAIL verdict. Do not rewrite the architecture and do not accept plausible but unsupported claims." },
+        { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT ARCHITECTURE:\n${report}` },
+      ],
+    });
+    return res.json({
+      report,
+      verification: verification.choices[0]?.message?.content ?? "",
+      evidenceSummary: {
+        generatedAt: evidence.generatedAt,
+        switches: switches.length,
+        vlans: vlans.length,
+        nodes: nodes.length,
+        links: links.length,
+        azureResources: azureResources.length,
+        processes: processes.length,
+        projects: projects.length,
+      },
+      models: { architect: architectureAI.model, verifier: verifierAI.model },
+    });
+  } catch (error) {
+    console.error("Enterprise architecture generation error:", error);
+    return res.status(500).json({ error: "Failed to generate enterprise architecture", message: error instanceof Error ? error.message : String(error) });
+  }
+});
 
 // ---- AI Red Flags ----------------------------------------------------------
 // CIO-only. Scans a week's operational data and produces a structured list of
@@ -924,8 +1139,9 @@ Return ONLY a JSON object with this exact shape:
 - "alertNote": one tight paragraph (2-4 sentences) written as an at-a-glance alert for the CIO.
 Keep it professional and executive-ready. Do not include secrets, credentials, or personal login details.${knowledgeContext ? `\n\n# SCCC Environment Knowledge Base (reference)\n${knowledgeContext}` : ""}`;
 
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-5.2",
+    const deepAI = getFredAI("deep");
+    const completion = await deepAI.client.chat.completions.create({
+      model: deepAI.model,
       max_completion_tokens: 2048,
       response_format: { type: "json_object" },
       messages: [

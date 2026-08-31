@@ -38,6 +38,7 @@ type ResetActivity = {
     successful: number;
     failed: number;
     denied: number;
+    assisted?: number;
   };
   rows: Array<{
     utc: string;
@@ -68,6 +69,9 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   if (outcome === "success") {
     return <Badge className="bg-emerald-600 hover:bg-emerald-600">Successful</Badge>;
   }
+  if (outcome === "assisted") {
+    return <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-500">IT assistance</Badge>;
+  }
   if (outcome === "denied") return <Badge variant="destructive">Denied</Badge>;
   return <Badge variant="secondary">Failed</Badge>;
 }
@@ -87,6 +91,7 @@ export default function PasswordResetActivity() {
   const metrics = [
     { label: "Total attempts", value: data?.summary.total ?? 0, icon: KeyRound },
     { label: "Successful", value: data?.summary.successful ?? 0, icon: CheckCircle2 },
+    { label: "IT assistance", value: data?.summary.assisted ?? 0, icon: Clock3 },
     { label: "Failed", value: data?.summary.failed ?? 0, icon: AlertTriangle },
     { label: "Denied", value: data?.summary.denied ?? 0, icon: ShieldAlert },
   ];
@@ -100,7 +105,7 @@ export default function PasswordResetActivity() {
             Student Password Reset Activity
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Successful, failed, and denied first-time account password resets from approved kiosks.
+            Password-reset activity from managed campus kiosks and the internal OnlineKiosk service.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -158,7 +163,7 @@ export default function PasswordResetActivity() {
                     <TableHead>Outcome</TableHead>
                     <TableHead>Kiosk</TableHead>
                     <TableHead>Source IP</TableHead>
-                    <TableHead>Detail / request ID</TableHead>
+                    <TableHead>Detail</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,7 +176,6 @@ export default function PasswordResetActivity() {
                       <TableCell className="font-mono text-xs">{row.sourceIp}</TableCell>
                       <TableCell className="max-w-[320px] text-xs text-muted-foreground">
                         <div>{row.detail || "—"}</div>
-                        {row.requestId ? <div className="mt-1 font-mono">{row.requestId}</div> : null}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -180,7 +184,7 @@ export default function PasswordResetActivity() {
             </div>
           ) : (
             <div className="py-12 text-center text-muted-foreground">
-              No kiosk password reset attempts were recorded during this period.
+              No password reset attempts were recorded during this period.
             </div>
           )}
         </CardContent>

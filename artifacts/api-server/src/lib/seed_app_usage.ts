@@ -23,7 +23,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "There is no fixed sidebar. Navigation is a command palette: click the 'Menu — search or jump to any page' button in the top header, or press Cmd/Ctrl+K, then type or click a destination. Pages are grouped into 'My Work' (Home/Dashboard, My Tasks, Weekly Log), 'Systems & Tools' (Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant, User Guide), 'Reports & Records' (Risks & Issues, Post-Incident Reviews, Reports), and a CIO-only 'Leadership & Admin' group (Projects, Department Goals, Usage Analytics, Admin). The header also has 'Quick Add' and 'Ask AI' shortcuts.",
+      "There is no fixed sidebar. Navigation is a command palette: click the 'Menu — search or jump to any page' button in the top header, or press Cmd/Ctrl+K, then type or click a destination. Pages are grouped into 'My Work' (Home/Dashboard, My Tasks, Weekly Log), 'Systems & Tools' (Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant, User Guide), 'Reports & Records' (Risks & Issues, Post-Incident Reviews, Reports), and a CIO-only 'Leadership & Admin' group (Projects, Department Goals, Usage Analytics, Admin). IT Apps is Fred's operational launcher: it contains Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics Dashboard, and Continuity LMS. The header also has 'Quick Add' and 'Ask AI' shortcuts.",
   },
   {
     category: "general",
@@ -71,7 +71,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Network Tools",
     content:
-      "Network Tools (/network/tools) is visible only to network-admin roles (CIO, network, network engineer). It has two parts: (1) FortiGate website whitelist — add a URL to the FortiGate web-filter exemption list via live API (only works when the server can reach the FortiGate, i.e. on the SCCC network/VPN); and (2) client-side PowerShell script generators (Install Printer, Add Laptop, Remove Equipment) that produce a downloadable .ps1 file to run on the target Windows machine — nothing runs on the server.",
+      "Network Tools (/network/tools) is visible only to network-admin roles (CIO, network, network engineer). It has two parts: (1) FortiGate website whitelist — add a URL to the FortiGate web-filter exemption list via live API (only works when the server can reach the FortiGate, i.e. on the SCCC network/VPN); and (2) client-side PowerShell script generators (Install Printer, Add Laptop, Remove Equipment) that produce a downloadable .ps1 file to run on the target Windows machine — nothing runs on the server. Day-to-day phone support for the wider IT team is under IT Apps > Cisco Calling (/it-apps/cisco-calling), not Network Tools.",
   },
   {
     category: "general",
@@ -83,7 +83,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Monitoring and IT Apps",
     content:
-      "Monitoring (/monitoring) embeds live Grafana dashboards for at-a-glance system health. IT Apps (/it-apps) is a unified embedded view of the other apps built for the IT department. Both open external tools inside the platform so users don't have to hunt for links.",
+      "Monitoring (/monitoring) embeds live Grafana dashboards for at-a-glance system health. IT Apps (/it-apps) is Fred's shared launcher for operational systems: Cisco Calling (/it-apps/cisco-calling), Banner (/banner), IT Calls (1200) (/it-apps/webex-calling), ETHOS EUP, ACR Analytics Dashboard (/acr/analytics/), and Continuity LMS (/acr/continuity/). Use IT Apps when a user asks where one of those shared tools lives.",
   },
   {
     category: "general",

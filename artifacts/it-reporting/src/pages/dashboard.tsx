@@ -2,7 +2,8 @@ import { useGetDashboardSummary, useGetRecentActivity, useGetWeekStatus } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText, AlertCircle, RefreshCw } from "lucide-react";
+import { Activity, ShieldAlert, CheckCircle2, XCircle, Clock, Server, FileText, AlertCircle, RefreshCw, BookOpenCheck, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { QuoteOfDay } from "@/components/QuoteOfDay";
 import { ZendeskResolved } from "@/components/ZendeskResolved";
@@ -10,13 +11,23 @@ import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { HowToUse } from "@/components/HowToUse";
 import { useAuth } from "@/context/AuthContext";
 import MyWork from "@/components/MyWork";
+import ItHuntGroupCard from "@/components/ItHuntGroupCard";
 
 export default function Dashboard() {
   const { isCIO } = useAuth();
   if (!isCIO) {
-    return <MyWork />;
+    return <div className="space-y-6"><LearnHomeCard /><MyWork /></div>;
   }
-  return <CIODashboard />;
+  return <div className="space-y-6"><LearnHomeCard /><CIODashboard /></div>;
+}
+
+function LearnHomeCard() {
+  return <Card className="border-blue-300 bg-gradient-to-r from-blue-50 to-emerald-50">
+    <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex gap-3"><div className="rounded-full bg-blue-100 p-3"><BookOpenCheck className="h-6 w-6 text-blue-700" /></div><div><h2 className="text-xl font-semibold">Learn through real IT situations</h2><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Practice At My Desk and Onsite simulations. Fred teaches the diagnostic questions, but you work the checks and identify the predetermined outcome.</p></div></div>
+      <Button asChild className="shrink-0"><Link href="/learn">Open Learn<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+    </CardContent>
+  </Card>;
 }
 
 function CIODashboard() {
@@ -90,7 +101,7 @@ function CIODashboard() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">This Week's Entries</CardTitle>
@@ -150,6 +161,8 @@ function CIODashboard() {
             </p>
           </CardContent>
         </Card>
+
+        <ItHuntGroupCard summary={summary} isError={isSummaryError} />
       </div>
 
       <ZendeskResolved />

@@ -1,0 +1,22 @@
+flowchart LR
+  H[Every user's Home page] --> U[Learn]
+  U --> M{Exercise mode}
+  M -->|At My Desk| L[Desk simulation]
+  M -->|Onsite| L2[Onsite simulation]
+  L2 --> C
+  L --> C[Coach supplies diagnostic question and why]
+  C --> F[Isolated Fred training coach]
+  F --> N1[Mandatory TRAINING EXERCISE notice]
+  F --> N2[No production tools or hidden answer]
+  L --> C[Coach supplies diagnostic question and why]
+  C --> P[Open relevant Hub page]
+  P --> K[Run predetermined simulated check]
+  K --> E[Observe result and interpret evidence]
+  E --> D{Choose next action}
+  D -->|misdirected| X[Explain consequence and retry]
+  X --> C
+  D -->|supported| N[Advance investigation]
+  N --> R{Identified or resolved?}
+  R -->|no| C
+  R -->|yes| O[Resolve, escalate, and document]
+  O --> DB[(Per-user scenario progress)]

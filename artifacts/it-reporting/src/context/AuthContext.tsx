@@ -14,6 +14,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem("auth_token"));
@@ -41,7 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("auth_token", newToken);
     setToken(newToken);
     queryClient.setQueryData(getGetMeQueryKey(), newUser);
-    setLocation("/");
+    const redirectTarget = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY) || "/";
+    sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    setLocation(redirectTarget);
   };
 
   const handleLogout = () => {

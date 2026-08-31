@@ -29,6 +29,10 @@ import {
   Download,
   Loader2,
   RefreshCw,
+  Clock,
+  LogIn,
+  Eye,
+  MessageSquare,
 } from "lucide-react";
 import {
   Bar,
@@ -68,6 +72,27 @@ const FEATURE_KEYS = [
   "objectives",
 ] as const;
 type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+type Engagement = {
+  sessionStarts: number;
+  pageViews: number;
+  activeSeconds: number;
+  fredMessages: number;
+  lastSeenAt: string | null;
+};
+
+type UsageAnalyticsV2 = UsageAnalytics & {
+  summary: UsageAnalytics["summary"] & {
+    engagedUsers: number;
+    sessionStarts: number;
+    pageViews: number;
+    activeMinutes: number;
+    fredMessages: number;
+  };
+  perUser: Array<UsagePerUser & { engagement: Engagement }>;
+  topPages: Array<{ path: string; views: number; users: number }>;
+  measurementNote: string;
+};
 
 const ROLE_COLORS: Record<string, string> = {
   cio: "#7c3aed",
@@ -112,6 +137,7 @@ export default function AnalyticsPage() {
 
   const { data, isLoading, isError, refetch, isFetching } =
     useGetUsageAnalytics({ days });
+  const measured = data as UsageAnalyticsV2 | undefined;
 
   const sortedUsers = useMemo<UsagePerUser[]>(() => {
     if (!data?.perUser) return [];
@@ -173,14 +199,24 @@ export default function AnalyticsPage() {
       "Email",
       "Role",
       "Active",
+      "Session Starts",
+      "Page Views",
+      "Active Minutes",
+      "Fred Messages",
+      "Last Activity",
       ...FEATURE_KEYS.map((k) => FEATURE_LABELS[k]),
-      "Total",
+      "Operational Records",
     ];
     const rows = sortedUsers.map((u) => [
       u.name,
       u.email,
       u.role,
       u.isActive ? "yes" : "no",
+      (u as UsagePerUser & { engagement: Engagement }).engagement?.sessionStarts ?? 0,
+      (u as UsagePerUser & { engagement: Engagement }).engagement?.pageViews ?? 0,
+      Math.round(((u as UsagePerUser & { engagement: Engagement }).engagement?.activeSeconds ?? 0) / 60),
+      (u as UsagePerUser & { engagement: Engagement }).engagement?.fredMessages ?? 0,
+      (u as UsagePerUser & { engagement: Engagement }).engagement?.lastSeenAt ?? "",
       ...FEATURE_KEYS.map((k) => u.counts[k] ?? 0),
       u.total,
     ]);
@@ -250,7 +286,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Usage Analytics</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Who is contributing what across the IT department, and how much.
+            Product engagement and recorded work are reported separately—assignment is not usage.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -317,29 +353,56 @@ export default function AnalyticsPage() {
         </div>
       ) : data ? (
         <>
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardContent className="pt-5 text-sm">
+              <strong>Measurement note:</strong> {measured?.measurementNote}
+              <span className="ml-1 text-muted-foreground">Page and active-time telemetry begins with this release; earlier history is limited to retained sign-in sessions and work records.</span>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <SummaryCard label="People signed in" value={`${measured?.summary.engagedUsers ?? 0} / ${data.summary.totalUsers}`} hint="Authenticated engagement" testId="card-engaged" />
+            <SummaryCard label="Session starts" value={String(measured?.summary.sessionStarts ?? 0)} hint="Retained sign-in sessions" testId="card-sessions" />
+            <SummaryCard label="Page views" value={String(measured?.summary.pageViews ?? 0)} hint="Captured after this release" testId="card-page-views" />
+            <SummaryCard label="Active minutes" value={String(measured?.summary.activeMinutes ?? 0)} hint="Visible-page heartbeats" testId="card-active-minutes" />
+            <SummaryCard label="Fred messages" value={String(measured?.summary.fredMessages ?? 0)} hint="Questions sent to Fred" testId="card-fred-messages" />
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle>Product engagement by user</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>User</TableHead><TableHead className="text-right"><LogIn className="inline h-4 w-4 mr-1" />Sessions</TableHead><TableHead className="text-right"><Eye className="inline h-4 w-4 mr-1" />Pages</TableHead><TableHead className="text-right"><Clock className="inline h-4 w-4 mr-1" />Active min</TableHead><TableHead className="text-right"><MessageSquare className="inline h-4 w-4 mr-1" />Fred</TableHead><TableHead>Last activity</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(measured?.perUser ?? []).map((u) => <TableRow key={`engagement-${u.userId}`}><TableCell className="font-medium">{u.name}</TableCell><TableCell className="text-right">{u.engagement.sessionStarts}</TableCell><TableCell className="text-right">{u.engagement.pageViews}</TableCell><TableCell className="text-right">{Math.round(u.engagement.activeSeconds / 60)}</TableCell><TableCell className="text-right">{u.engagement.fredMessages}</TableCell><TableCell>{u.engagement.lastSeenAt ? new Date(u.engagement.lastSeenAt).toLocaleString() : "—"}</TableCell></TableRow>)}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard
-              label="Total contributions"
+              label="Operational records"
               value={String(data.summary.totalContributions)}
               hint={`In the last ${data.range.days} days`}
               testId="card-total"
             />
             <SummaryCard
-              label="Active contributors"
+              label="People owning records"
               value={`${data.summary.activeContributors} / ${data.summary.totalUsers}`}
-              hint="Users with at least 1 contribution"
+              hint="Ownership is not product usage"
               testId="card-active"
             />
             <SummaryCard
-              label="Top contributor"
+              label="Largest record portfolio"
               value={topUserName}
-              hint="Most contributions in window"
+              hint="Created or assigned records"
               testId="card-top-user"
             />
             <SummaryCard
-              label="Most-used area"
+              label="Most-recorded area"
               value={topFeature}
-              hint="Feature with most activity"
+              hint="Record type—not page usage"
               testId="card-top-feature"
             />
           </div>
@@ -347,7 +410,7 @@ export default function AnalyticsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Daily activity</CardTitle>
+                <CardTitle>Operational records by day</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -367,7 +430,7 @@ export default function AnalyticsPage() {
                         stroke="#2563eb"
                         fill="#2563eb"
                         fillOpacity={0.2}
-                        name="Contributions"
+                        name="Records"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -377,7 +440,7 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Most-used features</CardTitle>
+                <CardTitle>Operational records by area</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -396,7 +459,7 @@ export default function AnalyticsPage() {
                         width={130}
                       />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#2563eb" name="Contributions" />
+                      <Bar dataKey="count" fill="#2563eb" name="Records" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -406,12 +469,12 @@ export default function AnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Top contributors</CardTitle>
+              <CardTitle>Largest record portfolios</CardTitle>
             </CardHeader>
             <CardContent>
               {topContributors.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">
-                  No contributions in this window yet.
+                  No operational records in this window yet.
                 </p>
               ) : (
                 <div className="h-72">
@@ -421,7 +484,7 @@ export default function AnalyticsPage() {
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={70} />
                       <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="total" name="Contributions">
+                      <Bar dataKey="total" name="Records">
                         {topContributors.map((u, i) => (
                           <Cell key={i} fill={colorForRole(u.role)} />
                         ))}
@@ -435,7 +498,7 @@ export default function AnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Activity by role</CardTitle>
+              <CardTitle>Operational records by role</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -443,7 +506,7 @@ export default function AnalyticsPage() {
                   <TableRow>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Users</TableHead>
-                    <TableHead className="text-right">Contributions</TableHead>
+                    <TableHead className="text-right">Records</TableHead>
                     <TableHead className="text-right">Per user (avg)</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -479,7 +542,7 @@ export default function AnalyticsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Per-user breakdown</CardTitle>
+              <CardTitle>Operational records by owner</CardTitle>
               <span className="text-xs text-muted-foreground">
                 Click any column to sort
               </span>
@@ -496,7 +559,7 @@ export default function AnalyticsPage() {
                       </TableHead>
                     ))}
                     <TableHead className="text-right">
-                      <SortHeader k="total" label="Total" />
+                      <SortHeader k="total" label="Total records" />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
