@@ -4076,6 +4076,60 @@ export const QUERY_FORMAL_ARCHITECTURE_TOOL: OpenAI.Chat.Completions.ChatComplet
     },
   };
 
+export const CREATE_FORMAL_EA_ACTIONS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "create_formal_ea_actions",
+    description: "CIO-only: create deduplicated My Tasks action items from the latest approved formal EA's verification, contradiction, quarantine, stale evidence, evidence gap, risk, single-point-of-failure, and remediation findings.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", minimum: 1, maximum: 25, description: "Maximum new tasks to create, highest-priority first. Defaults to 10." },
+      },
+    },
+  },
+};
+
+async function executeCreateFormalEaActions(
+  rawArgs: string,
+  actor: { id: number | null; role: string | null },
+): Promise<string> {
+  if (String(actor.role || "").toLowerCase() !== "cio" || actor.id == null) {
+    return "Error: only the CIO can create formal EA action items.";
+  }
+  const args = JSON.parse(rawArgs || "{}");
+  const limit = Math.max(1, Math.min(25, Number(args.limit) || 10));
+  const result: any = await db.execute(sql`
+    SELECT f.id, f.finding_type AS "findingType", f.content, f.priority,
+      s.section_number AS "sectionNumber", s.heading,
+      d.id AS "documentId", d.version
+    FROM formal_ea_findings f
+    JOIN formal_ea_sections s ON s.id = f.section_id
+    JOIN formal_ea_documents d ON d.id = f.document_id
+    WHERE d.id = (SELECT id FROM formal_ea_documents WHERE approval_status = 'approved' ORDER BY effective_at DESC, id DESC LIMIT 1)
+      AND f.finding_type IN ('contradiction','quarantine','stale_evidence','evidence_gap','risk','single_point_of_failure','remediation')
+    ORDER BY CASE lower(coalesce(f.priority, '')) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END,
+      f.id
+  `);
+  const itemDate = todayInCentral();
+  const weekOf = isoWeekStart(itemDate);
+  let created = 0;
+  let duplicates = 0;
+  for (const finding of result.rows ?? []) {
+    if (created >= limit) break;
+    const marker = `[formal-ea-finding:${finding.id}]`;
+    const existing: any = await db.execute(sql`SELECT 1 FROM log_items WHERE user_id = ${actor.id} AND notes LIKE ${`%${marker}%`} LIMIT 1`);
+    if (existing.rows?.length) { duplicates += 1; continue; }
+    const summary = String(finding.content || "Verify formal EA finding").replace(/\s+/g, " ").trim();
+    const title = `EA ${finding.findingType}: ${summary}`.slice(0, 300);
+    const notes = `${marker}\nFormal EA document ${finding.documentId}, version ${finding.version}; section ${finding.sectionNumber || "un-numbered"} — ${finding.heading}.\nPriority: ${finding.priority || "not assigned"}.\nVerify the finding with current authoritative evidence, record the source and timestamp, and document the resulting correction, retirement, quarantine, acceptance, or remediation decision.\n\nSource finding: ${finding.content}`;
+    await db.insert(logItemsTable).values({ userId: actor.id, title, category: "task", notes, itemDate, weekOf });
+    created += 1;
+  }
+  const remaining = Math.max(0, (result.rows?.length ?? 0) - created - duplicates);
+  return `Created ${created} formal EA action item(s) in My Tasks; skipped ${duplicates} duplicate(s); ${remaining} eligible finding(s) remain for review.`;
+}
+
 export async function executeQueryFormalArchitecture(
   rawArgs: string,
 ): Promise<string> {
@@ -4330,7 +4384,7 @@ export async function runChatWithMemory(
     QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
     QUERY_FORMAL_ARCHITECTURE_TOOL,
     ...(String(userRole || "").toLowerCase() === "cio"
-      ? [UPDATE_ARCHITECTURE_ELEMENT_TOOL]
+      ? [CREATE_FORMAL_EA_ACTIONS_TOOL, UPDATE_ARCHITECTURE_ELEMENT_TOOL]
       : []),
     QUERY_AZURE_VM_TOOL,
     QUERY_AZURE_SECURITY_TOOL,
@@ -4683,6 +4737,19 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "query_formal_architecture failed");
           resultText = "Error: formal architecture query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "create_formal_ea_actions"
+      ) {
+        try {
+          resultText = await executeCreateFormalEaActions(
+            call.function.arguments,
+            { id: opts.userId, role: userRole },
+          );
+        } catch (err) {
+          logger.error({ err }, "create_formal_ea_actions failed");
+          resultText = "Error: formal EA action-item creation failed";
         }
       } else if (
         call.type === "function" &&
