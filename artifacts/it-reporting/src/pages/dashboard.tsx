@@ -75,14 +75,14 @@ function CIODashboard() {
         </div>
       </div>
 
-      <HowToUse />
-
       <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-slate-50">
         <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3"><div className="rounded-full bg-emerald-100 p-3"><Network className="h-6 w-6 text-emerald-700" /></div><div><h2 className="text-xl font-semibold">SCCC Enterprise Architecture</h2><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Capture a complete, versioned as-is evidence snapshot, generate the CIO report, and make its structured JSON available to Fred for later questions.</p></div></div>
           <Button asChild className="shrink-0"><Link href="/ai-report?tab=architecture">Open Architecture<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
+
+      <HowToUse />
 
       <QuoteOfDay />
 
