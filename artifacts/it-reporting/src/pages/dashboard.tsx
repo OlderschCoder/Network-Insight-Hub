@@ -18,7 +18,16 @@ export default function Dashboard() {
   if (!isCIO) {
     return <div className="space-y-6"><LearnHomeCard /><MyWork /></div>;
   }
-  return <div className="space-y-6"><LearnHomeCard /><CIODashboard /></div>;
+  return <CIODashboard />;
+}
+
+function EnterpriseArchitectureHomeCard() {
+  return <Card className="h-full border-emerald-300 bg-gradient-to-r from-emerald-50 to-slate-50">
+    <CardContent className="flex h-full flex-col gap-4 pt-6 sm:justify-between">
+      <div className="flex gap-3"><div className="rounded-full bg-emerald-100 p-3"><Network className="h-6 w-6 text-emerald-700" /></div><div><h2 className="text-xl font-semibold">SCCC Enterprise Architecture</h2><p className="mt-1 text-sm text-muted-foreground">Capture the as-is report and update Fred’s queryable architecture database.</p></div></div>
+      <Button asChild className="self-start"><Link href="/ai-report?tab=architecture">Run Enterprise Architecture<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+    </CardContent>
+  </Card>;
 }
 
 function LearnHomeCard() {
@@ -75,12 +84,10 @@ function CIODashboard() {
         </div>
       </div>
 
-      <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-slate-50">
-        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-3"><div className="rounded-full bg-emerald-100 p-3"><Network className="h-6 w-6 text-emerald-700" /></div><div><h2 className="text-xl font-semibold">SCCC Enterprise Architecture</h2><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Capture a complete, versioned as-is evidence snapshot, generate the CIO report, and make its structured JSON available to Fred for later questions.</p></div></div>
-          <Button asChild className="shrink-0"><Link href="/ai-report?tab=architecture">Open Architecture<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <LearnHomeCard />
+        <EnterpriseArchitectureHomeCard />
+      </div>
 
       <HowToUse />
 
