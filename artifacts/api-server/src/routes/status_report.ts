@@ -15,6 +15,9 @@ import {
   processesTable,
   netNodesTable,
   netLinksTable,
+  netPortsTable,
+  netRoutingAdjacenciesTable,
+  deviceConfigsTable,
 } from "@workspace/db";
 import { and, eq, gte, lte, ne, notInArray, or, sql } from "drizzle-orm";
 
@@ -29,6 +32,7 @@ import { buildFredFileReviewContext } from "../lib/fred_files";
 import { boundFredMessages, FRED_MAX_CHECKPOINT_CHARS } from "../lib/fred_context";
 import { evidencePolicyFor, latestUserText } from "../lib/fred_evidence_policy";
 import { extractActiveIncidentState } from "../lib/fred_active_state";
+import { buildNetworkInventoryAppendix, extractNetworkConfigFacts } from "../lib/fred_architecture_inventory";
 
 const router = Router();
 
@@ -1005,15 +1009,19 @@ ${JSON.stringify(context, null, 2)}`;
 
 router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Request, res: Response) => {
   try {
-    const [switches, vlans, nodes, links, azureResources, processes, projects, knowledge] = await Promise.all([
+    const [switches, vlans, nodes, links, ports, routing, configs, azureResources, processes, projects, knowledge, phoneResult] = await Promise.all([
       db.select().from(networkSwitchesTable),
       db.select().from(vlansTable),
       db.select().from(netNodesTable),
       db.select().from(netLinksTable),
+      db.select().from(netPortsTable),
+      db.select().from(netRoutingAdjacenciesTable),
+      db.select().from(deviceConfigsTable),
       db.select().from(azureResourcesTable),
       db.select().from(processesTable),
       db.select().from(projectsTable),
       getKnowledgeContext(120_000, (req as any).user?.id ?? null),
+      db.execute(sql`SELECT building, count(*)::int AS count FROM phone_building_assignments GROUP BY building ORDER BY building`),
     ]);
     const portSummary: any = await db.execute(sql`
       SELECT n.hostname, count(p.id)::int AS ports,
@@ -1023,10 +1031,23 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
       FROM net_nodes n LEFT JOIN net_ports p ON p.node_id = n.id
       GROUP BY n.hostname ORDER BY n.hostname
     `);
+    const phoneAssignments = (phoneResult as any).rows ?? [];
+    const physicalPorts = ports.filter((port) => port.isPhysical !== false);
+    const configFacts = extractNetworkConfigFacts(configs);
+    const nodeById = new Map(nodes.map((node) => [String(node.id), node]));
+    const buildingCoverage = Array.from(new Set([...switches.map((row) => row.building), ...nodes.map((row) => row.building), ...vlans.map((row) => row.building)].filter(Boolean))).sort().map((building) => ({
+      building,
+      monitoredObjects: switches.filter((row) => row.building === building).length,
+      mapNodes: nodes.filter((row) => row.building === building).length,
+      vlans: vlans.filter((row) => row.building === building).length,
+      ports: physicalPorts.filter((port) => nodeById.get(String(port.nodeId))?.building === building).length,
+      phones: Number(phoneAssignments.find((row: any) => row.building === building)?.count ?? 0),
+    }));
     const evidence = {
       generatedAt: new Date().toISOString(),
       evidencePolicy: "Stored records are evidence, not proof of current state. Every inference and unknown must be labeled.",
-      inventory: { switches, vlans, nodes, links, portSummary: portSummary.rows ?? [] },
+      completenessRequirement: "The narrative must reconcile every dataset count and every building. Detailed physical ports are emitted in a deterministic appendix and may not be silently sampled or described as unavailable.",
+      inventory: { switches, vlans, nodes, links, routing, portSummary: portSummary.rows ?? [], buildingCoverage, phoneAssignments, configFacts },
       cloud: { azureResources },
       operations: { processes, projects },
       governedKnowledge: knowledge,
@@ -1034,20 +1055,22 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
     const architectureAI = getFredAI("deep");
     const architecture = await architectureAI.client.chat.completions.create({
       model: architectureAI.model,
-      max_completion_tokens: 8_000,
+      max_completion_tokens: 16_000,
       messages: [
-        { role: "system", content: `You are Fred acting as a principal enterprise and network architect. Produce a client-deliverable AS-IS enterprise architecture for Seward County Community College using only the supplied evidence. This is an evidence synthesis, not a generic template. Label every material statement VERIFIED, INFERRED, STALE, or UNKNOWN. Never invent a device, dependency, protocol, owner, security control, recovery objective, or data flow. Resolve conflicts by timestamp and source authority; expose unresolved conflicts. Include: executive overview; scope and methodology; organization/service context; application and SaaS portfolio; identity and access; campus network topology; WAN/Internet/edge; wireless; voice/collaboration; Azure/cloud; servers/platforms; monitoring/operations; integrations and data flows; security and resilience; backup/DR/continuity; lifecycle/technical debt; risks; evidence gaps; prioritized validation plan; authoritative inventory appendices. Include editable Mermaid component, network, identity/data-flow, and deployment diagrams. Each table row must contain evidence source, timestamp/freshness, and confidence. Be precise and readable; do not pad.` },
+        { role: "system", content: `You are Fred acting as a principal enterprise and network architect. Produce a client-deliverable AS-IS enterprise architecture for Seward County Community College using only the supplied evidence. This is an evidence synthesis, not a generic template. Label every material statement VERIFIED, INFERRED, STALE, or UNKNOWN. Never invent a device, dependency, protocol, owner, security control, recovery objective, or data flow. Resolve conflicts by timestamp and source authority; expose unresolved conflicts. Include: executive overview; scope and methodology; organization/service context; application and SaaS portfolio; identity and access; campus network topology; WAN/Internet/edge; wireless; voice/collaboration; Azure/cloud; servers/platforms; monitoring/operations; integrations and data flows; security and resilience; backup/DR/continuity; lifecycle/technical debt; risks; evidence gaps; prioritized validation plan. Include editable Mermaid component, network, identity/data-flow, and deployment diagrams. Each table row must contain evidence source, timestamp/freshness, and confidence. Begin with a coverage reconciliation table listing the exact counts supplied for monitored objects, map nodes by kind, buildings, VLANs, reciprocal links, physical ports, routing adjacencies, phone assignments, configuration backups analyzed, and Azure resources. Cover every building in buildingCoverage and explicitly distinguish physical switches from SVIs, firewalls, stacks, and other monitored objects. Use configFacts for VRF/VDOM/routing claims. Do not claim Port Map detail was unavailable: a complete deterministic Port Map appendix will be attached after your narrative. Be precise and readable; do not pad.` },
         { role: "user", content: `Generate the complete as-is architecture from this evidence snapshot:\n${JSON.stringify(evidence)}` },
       ],
     });
-    const report = architecture.choices[0]?.message?.content ?? "";
+    const narrative = architecture.choices[0]?.message?.content ?? "";
+    const appendix = buildNetworkInventoryAppendix({ generatedAt: evidence.generatedAt, switches, nodes, vlans, links, ports: physicalPorts, routing, phoneAssignments, configFacts });
+    const report = `${narrative}${appendix}`;
     const verifierAI = getFredAI("verify");
     const verification = await verifierAI.client.chat.completions.create({
       model: verifierAI.model,
       max_completion_tokens: 3_000,
       messages: [
         { role: "system", content: "Independently audit the proposed SCCC as-is enterprise architecture against the evidence snapshot. Return a concise acceptance report with: unsupported claims, contradictions, missing evidence domains, stale evidence, incorrect confidence labels, diagram defects, and a PASS/PARTIAL/FAIL verdict. Do not rewrite the architecture and do not accept plausible but unsupported claims." },
-        { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT ARCHITECTURE:\n${report}` },
+        { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT NARRATIVE (deterministic appendices are validated by the supplied counts):\n${narrative}` },
       ],
     });
     return res.json({
@@ -1059,6 +1082,11 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
         vlans: vlans.length,
         nodes: nodes.length,
         links: links.length,
+        physicalPorts: physicalPorts.length,
+        routingAdjacencies: routing.length,
+        phoneAssignments: phoneAssignments.reduce((sum: number, row: any) => sum + Number(row.count), 0),
+        configurationsAnalyzed: configFacts.length,
+        buildings: buildingCoverage.length,
         azureResources: azureResources.length,
         processes: processes.length,
         projects: projects.length,

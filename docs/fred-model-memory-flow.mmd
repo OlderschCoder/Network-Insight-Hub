@@ -14,8 +14,11 @@ flowchart LR
   OR --> X[Claude or Gemini when ZDR-qualified]
   T --> TOOLS[Typed live evidence tools]
   C --> SNAP[Timestamped architecture evidence snapshot]
+  DB[(Switches, buildings, VLANs, links, ports, phones, routing, configs)] --> SNAP
   SNAP --> C
   C --> D[As-is architecture + Mermaid]
+  DB --> APP[Deterministic complete inventory appendices]
+  APP --> D
   D --> V
   V --> A[Acceptance review]
   API --> M[(Team and personal governed memory)]

@@ -57,12 +57,21 @@ permanent memory automatically.
 ## Enterprise architecture acceptance workflow
 
 The CIO-only Architecture tab captures a timestamped evidence snapshot from the
-network inventory/topology, summarized port telemetry, Azure resource inventory,
+network inventory/topology, every VLAN and reciprocal link, routing adjacencies,
+building phone-assignment counts, safe VRF/VDOM/routing facts extracted from the
+latest stored device configurations, summarized port telemetry, Azure resource inventory,
 processes, projects, and governed knowledge. The configured deep model creates
 an evidence-labelled as-is architecture with Mermaid diagrams. A separately configured model independently
 checks unsupported claims, contradictions, stale evidence, confidence labels,
 missing domains, and diagram defects. A generated document is not accepted merely
 because it reads well; the verification verdict and evidence gaps remain attached.
+
+The downloadable Markdown also receives deterministic appendices generated
+directly from database rows. These include a completeness manifest, every
+monitored object, every VLAN, every topology link with both ports, every routing
+adjacency, per-building service coverage, and every physical Port Map interface.
+The model cannot sample or omit these appendices; its narrative must reconcile
+their exact counts and cover every building.
 
 ## Operations
 
