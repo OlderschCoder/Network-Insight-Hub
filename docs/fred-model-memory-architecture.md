@@ -122,6 +122,12 @@ post-generation projection error therefore cannot hide a report whose immutable
 snapshot was already committed. Projection input is deduplicated by entity type
 and natural key before bulk insertion.
 
+Architecture chapter and verification calls use the lowest supported reasoning
+overhead because factual evidence synthesis is already constrained by the
+snapshot. This keeps refreshes below the reverse-proxy request window. If a
+proxy timeout still occurs, the UI restores the latest committed snapshot and
+does not clear the existing report while a refresh is running.
+
 ## Operations
 
 After changing model variables or credentials, restart `sccc-api.service`. Verify

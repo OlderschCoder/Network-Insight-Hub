@@ -2251,9 +2251,24 @@ function EnterpriseArchitectureTab() {
   const [verification, setVerification] = useState("");
   const [meta, setMeta] = useState<any>(null);
 
+  const loadLatest = async (): Promise<boolean> => {
+    const response = await fetch(`${API_BASE}/status-report/enterprise-architecture/latest`, { headers: authHeaders() });
+    if (!response.ok) return false;
+    const data = await response.json();
+    setReport(data.report || "");
+    setVerification(data.verification || "");
+    setMeta({
+      evidence: data.evidenceSummary,
+      models: data.models,
+      snapshotId: data.snapshotId,
+      normalized: { entities: data.entityCount, relationships: data.relationshipCount },
+    });
+    return true;
+  };
+
   useEffect(() => {
     let cancelled = false;
-    const loadLatest = async () => {
+    const restoreLatest = async () => {
       const response = await fetch(`${API_BASE}/status-report/enterprise-architecture/latest`, { headers: authHeaders() });
       if (!response.ok) return;
       const data = await response.json();
@@ -2267,14 +2282,12 @@ function EnterpriseArchitectureTab() {
         normalized: { entities: data.entityCount, relationships: data.relationshipCount },
       });
     };
-    void loadLatest();
+    void restoreLatest();
     return () => { cancelled = true; };
   }, []);
 
   const generate = async () => {
     setLoading(true);
-    setReport("");
-    setVerification("");
     try {
       const response = await fetch(`${API_BASE}/status-report/enterprise-architecture`, {
         method: "POST",
@@ -2287,7 +2300,12 @@ function EnterpriseArchitectureTab() {
       setVerification(data.verification || "");
       setMeta({ evidence: data.evidenceSummary, models: data.models, snapshotId: data.snapshotId, normalized: data.normalized });
     } catch (error: any) {
-      toast({ title: "Architecture generation failed", description: error.message, variant: "destructive" });
+      const recovered = await loadLatest().catch(() => false);
+      toast({
+        title: recovered ? "Refresh timed out — saved architecture restored" : "Architecture generation failed",
+        description: recovered ? `Showing saved snapshot #${meta?.snapshotId ?? 1}. No completed architecture was lost.` : error.message,
+        variant: recovered ? "default" : "destructive",
+      });
     } finally {
       setLoading(false);
     }

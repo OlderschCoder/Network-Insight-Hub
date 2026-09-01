@@ -1086,6 +1086,7 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
     const chapterResults = await Promise.all(chapterSpecs.map((chapter) => architectureAI.client.chat.completions.create({
       model: architectureAI.model,
       max_completion_tokens: 7_000,
+      ...(architectureAI.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
       messages: [
         { role: "system", content: architectRules },
         { role: "user", content: `Chapter: ${chapter.title}\nAssignment: ${chapter.task}\nEvidence snapshot:\n${JSON.stringify(chapter.data)}` },
@@ -1102,6 +1103,7 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
     const verification = await verifierAI.client.chat.completions.create({
       model: verifierAI.model,
       max_completion_tokens: 3_000,
+      ...(verifierAI.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
       messages: [
         { role: "system", content: "Independently audit the proposed SCCC as-is enterprise architecture against the evidence snapshot. Return a concise acceptance report with: unsupported claims, contradictions, missing evidence domains, stale evidence, incorrect confidence labels, diagram defects, and a PASS/PARTIAL/FAIL verdict. Do not rewrite the architecture and do not accept plausible but unsupported claims." },
         { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT NARRATIVE (deterministic appendices are validated by the supplied counts):\n${narrative}` },
