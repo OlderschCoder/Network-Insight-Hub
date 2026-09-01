@@ -8,6 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -604,7 +611,6 @@ function ChatTab({
   const [fredPreview, setFredPreview] = useState<FredLibraryPreview | null>(null);
   const [fredPreviewLoading, setFredPreviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [topicsOpen, setTopicsOpen] = useState(false);
   const [topics, setTopics] = useState<FredChatSessionSummary[]>([]);
   const [topicsLoading, setTopicsLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
@@ -1400,6 +1406,7 @@ function ChatTab({
       });
       const data = response.ok ? await response.json() : null;
       setChat({ key: storageKey, messages: [], checkpoint: "", title: "New Fred topic", savedAt: String(data?.session?.updatedAt ?? new Date().toISOString()), sessionId: data?.session?.id ? String(data.session.id) : null });
+      void loadTopics();
     } catch {
       // The local checkpoint still protects continuity when the server is temporarily unavailable.
       setChat({ key: storageKey, messages: [], checkpoint: "", title: "New Fred topic", savedAt: new Date().toISOString(), sessionId: null });
@@ -1437,8 +1444,14 @@ function ChatTab({
       savedAt: String(session?.updatedAt ?? new Date().toISOString()),
       sessionId: session?.id ? String(session.id) : null,
     });
-    setTopicsOpen(false);
   };
+
+  useEffect(() => {
+    if (!storageKey) return;
+    void loadTopics();
+    // The authenticated user key is the boundary for the per-user topic list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
   const qrUrl = fredMobileUrl();
   const qrImage = qrUrl
@@ -1489,6 +1502,39 @@ function ChatTab({
               aria-label="Fred conversation topic"
               placeholder="Conversation topic"
             />
+            <div className={`mt-2 ${mobileFieldMode ? "w-full" : "w-full max-w-md"}`}>
+              <Select
+                value={chat.sessionId ?? undefined}
+                onOpenChange={(open) => { if (open) void loadTopics(); }}
+                onValueChange={(sessionId) => {
+                  if (sessionId === chat.sessionId) return;
+                  void openTopic(sessionId).catch((error) => toast({
+                    title: "Could not open topic",
+                    description: error instanceof Error ? error.message : String(error),
+                    variant: "destructive",
+                  }));
+                }}
+              >
+                <SelectTrigger className={mobileFieldMode ? "h-10" : "h-8"} aria-label="Open a saved Fred topic">
+                  <span className="mr-2 inline-flex items-center gap-1.5 truncate">
+                    <History className="h-4 w-4 shrink-0" />
+                    <SelectValue placeholder={topicsLoading ? "Loading topics..." : "Open an old topic"} />
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-[22rem]">
+                  {topics.map((topic) => (
+                    <SelectItem key={topic.id} value={topic.id}>
+                      <span className="flex max-w-[32rem] items-center gap-2">
+                        <span className="truncate font-medium">{topic.title || "Untitled Fred topic"}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {topic.messageCount} messages · {new Date(topic.updatedAt).toLocaleDateString()}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className={mobileFieldMode ? "grid grid-cols-2 gap-2" : "flex items-center gap-2 flex-wrap"}>
             {mobileFieldMode && (
@@ -1991,37 +2037,6 @@ function ChatTab({
                 >
                   <Copy className="h-4 w-4 mr-1" /> Copy
                 </Button>
-                <Dialog open={topicsOpen} onOpenChange={(open) => { setTopicsOpen(open); if (open) void loadTopics(); }}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" title="Open saved Fred topics">
-                      <History className="h-4 w-4 mr-1" /> Topics
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Fred topics</DialogTitle>
-                      <DialogDescription>Reopen an incident or reference conversation with its messages and working checkpoint intact.</DialogDescription>
-                    </DialogHeader>
-                    <div className="max-h-[55dvh] space-y-2 overflow-y-scroll pr-2 [scrollbar-gutter:stable]">
-                      {topicsLoading && <p className="text-sm text-muted-foreground">Loading topics...</p>}
-                      {!topicsLoading && topics.length === 0 && <p className="text-sm text-muted-foreground">No saved topics yet.</p>}
-                      {topics.map((topic) => (
-                        <button
-                          type="button"
-                          key={topic.id}
-                          className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-accent"
-                          onClick={() => void openTopic(topic.id).catch((error) => toast({ title: "Could not open topic", description: error instanceof Error ? error.message : String(error), variant: "destructive" }))}
-                        >
-                          <span>
-                            <span className="block font-medium">{topic.title || "Untitled Fred topic"}</span>
-                            <span className="block text-xs text-muted-foreground">{topic.messageCount} messages · {new Date(topic.updatedAt).toLocaleString()}</span>
-                          </span>
-                          {topic.isActive && <Badge variant="secondary">Current</Badge>}
-                        </button>
-                      ))}
-                    </div>
-                  </DialogContent>
-                </Dialog>
                 <Button
                   variant="ghost"
                   size="sm"
