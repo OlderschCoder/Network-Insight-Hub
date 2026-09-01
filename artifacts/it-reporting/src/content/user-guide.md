@@ -31,7 +31,7 @@ The header also has **Quick Add** (fast new item) and **Ask AI** shortcuts.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
-- The dashboard's **Zendesk Tickets Resolved** card is visible to every authenticated IT user. It always shows the same six-person roster—Tracy, Mark, Maria, Lucas, Illia, and Craig—including a zero when someone has no resolved tickets in the selected period.
+- The dashboard's **Zendesk Tickets Resolved** and **Team Submission Status** data use the same current six-person roster—Tracy, Mark, Maria, Lucas, Illia, and Craig—including a zero when someone has no activity in the selected period. Retired or former staff remain attached to historical records but are excluded from current-team status.
 - **Cisco Webex Phones** is marked **New Feature** under **Systems & Tools → IT Apps**. Use it for the phone directory, live device status, building assignments, and E-911 health.
 
 ### Building-first network support

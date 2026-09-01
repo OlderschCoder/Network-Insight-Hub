@@ -45,6 +45,9 @@ as a parallel sign-in path.
 - Rolls individual work into department weekly reporting.
 - Shows the authenticated team a shared Zendesk resolved-ticket scorecard limited
   to Tracy, Mark, Maria, Lucas, Illia, and Craig, including zero-count rows.
+- Applies that same current-team roster to weekly submission status. Retired and
+  former staff remain in historical attribution but do not appear as current
+  participants.
 - Tracks risks, issues, projects, goals, incidents, and post-incident reviews.
 - Maintains a Process Library for reusable operational runbooks.
 - Measures authenticated product usage such as sessions, pages visited, active

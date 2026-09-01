@@ -10,6 +10,7 @@ describe("Zendesk dashboard roster", () => {
       expect(isZendeskDashboardTeamMember({ name, isActive: true })).toBe(true);
     }
     expect(isZendeskDashboardTeamMember({ name: "Another Agent", isActive: true })).toBe(false);
+    expect(isZendeskDashboardTeamMember({ name: "Cecil Stoll", isActive: true })).toBe(false);
     expect(isZendeskDashboardTeamMember({ name: "Tracy Smith", isActive: false })).toBe(false);
   });
 

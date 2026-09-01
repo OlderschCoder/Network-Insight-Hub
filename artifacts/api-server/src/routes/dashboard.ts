@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { db, entriesTable, reportsTable, risksTable, networkSwitchesTable, afterActionReportsTable, usersTable } from "@workspace/db";
+import {
+  isZendeskDashboardTeamMember,
+  zendeskDashboardTeamOrder,
+} from "../lib/zendesk_dashboard_team";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { logger } from "../lib/logger";
@@ -578,7 +582,9 @@ router.get("/activity", requireAuth, async (req: any, res) => {
 router.get("/week-status", requireAuth, async (_req: any, res) => {
   try {
     const weekOf = getWeekStart();
-    const allUsers = await db.select().from(usersTable);
+    const allUsers = (await db.select().from(usersTable))
+      .filter(isZendeskDashboardTeamMember)
+      .sort((a, b) => zendeskDashboardTeamOrder(a.name) - zendeskDashboardTeamOrder(b.name));
     const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, weekOf));
 
     const submissions = allUsers.map(user => {
