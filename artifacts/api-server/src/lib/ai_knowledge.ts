@@ -2757,6 +2757,21 @@ export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise
   const building = String(args.building || "").trim();
   const query = String(args.query || "").trim();
   const pattern = `%${query}%`;
+  if (!entityType && !building && !query) {
+    const summaryResult: any = await db.execute(sql`
+      WITH latest AS (SELECT id, generated_at, summary FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
+      SELECT latest.id AS "snapshotId", latest.generated_at AS "generatedAt", latest.summary,
+        (SELECT count(*)::int FROM fred_architecture_entities e WHERE e.snapshot_id = latest.id) AS "elementCount",
+        (SELECT count(*)::int FROM fred_architecture_relationships r WHERE r.snapshot_id = latest.id) AS "relationshipCount",
+        (SELECT jsonb_object_agg(entity_type, count) FROM (
+          SELECT entity_type, count(*)::int AS count FROM fred_architecture_entities e
+          WHERE e.snapshot_id = latest.id GROUP BY entity_type ORDER BY entity_type
+        ) grouped) AS "countsByType"
+      FROM latest
+    `);
+    const summary = summaryResult.rows?.[0];
+    return summary ? JSON.stringify(summary, null, 2) : "No durable enterprise-architecture snapshot has been generated yet.";
+  }
   const result: any = await db.execute(sql`
     WITH latest AS (SELECT id, generated_at, summary FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
     SELECT e.entity_type AS "entityType", e.natural_key AS "naturalKey", e.name, e.building,
@@ -2786,7 +2801,10 @@ export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise
       SELECT relationship_type AS "relationshipType", from_type AS "fromType", from_key AS "fromKey",
         to_type AS "toType", to_key AS "toKey", attributes, evidence_status AS "evidenceStatus", source
       FROM fred_architecture_relationships, latest
-      WHERE snapshot_id = latest.id AND (from_key = ANY(${keys}::text[]) OR to_key = ANY(${keys}::text[]))
+      WHERE snapshot_id = latest.id AND (
+        from_key IN (SELECT jsonb_array_elements_text(${JSON.stringify(keys)}::jsonb))
+        OR to_key IN (SELECT jsonb_array_elements_text(${JSON.stringify(keys)}::jsonb))
+      )
       ORDER BY relationship_type LIMIT 300
     `);
     relationships = relResult.rows ?? [];

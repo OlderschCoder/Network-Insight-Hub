@@ -95,6 +95,10 @@ query the normalized `fred_architecture_entities` and
 VLAN, application, or owner. This makes all captured evidence available over
 multiple bounded retrievals without placing the multi-megabyte snapshot in
 every model prompt.
+With no filters, the tool returns only snapshot metadata, total element and
+relationship counts, and counts by entity type. Relationship expansion occurs
+only for filtered record queries, using JSON-array membership rather than
+constructing an invalid PostgreSQL record cast.
 Snapshot evidence remains historical: Fred must compare its timestamp with
 live diagnostic tools before describing current operational state.
 
