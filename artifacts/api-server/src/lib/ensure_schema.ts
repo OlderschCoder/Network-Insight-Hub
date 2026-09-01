@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { logger } from "./logger";
+import { storeArchitectureProjection } from "./fred_architecture_store";
 
 // Idempotently reconcile known schema drift on self-hosted databases.
 //
@@ -25,6 +26,63 @@ export async function ensureSchema(): Promise<void> {
     logger.info("Ensured durable Fred architecture snapshots table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure Fred architecture snapshots table");
+  }
+
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_entities" (
+      "id" bigserial PRIMARY KEY,
+      "snapshot_id" bigint NOT NULL REFERENCES "fred_architecture_snapshots"("id") ON DELETE CASCADE,
+      "entity_type" varchar(40) NOT NULL,
+      "natural_key" varchar(500) NOT NULL,
+      "name" varchar(500) NOT NULL,
+      "building" varchar(200),
+      "attributes" jsonb NOT NULL DEFAULT '{}'::jsonb,
+      "evidence_status" varchar(20) NOT NULL DEFAULT 'stored',
+      "source" varchar(300) NOT NULL,
+      "source_timestamp" timestamptz,
+      UNIQUE ("snapshot_id", "entity_type", "natural_key")
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_lookup_idx" ON "fred_architecture_entities" ("snapshot_id", "entity_type", "natural_key")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_building_idx" ON "fred_architecture_entities" ("snapshot_id", "building")`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_relationships" (
+      "id" bigserial PRIMARY KEY,
+      "snapshot_id" bigint NOT NULL REFERENCES "fred_architecture_snapshots"("id") ON DELETE CASCADE,
+      "relationship_type" varchar(60) NOT NULL,
+      "from_type" varchar(40) NOT NULL,
+      "from_key" varchar(500) NOT NULL,
+      "to_type" varchar(40) NOT NULL,
+      "to_key" varchar(500) NOT NULL,
+      "attributes" jsonb NOT NULL DEFAULT '{}'::jsonb,
+      "evidence_status" varchar(20) NOT NULL DEFAULT 'stored',
+      "source" varchar(300) NOT NULL
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_relationships_lookup_idx" ON "fred_architecture_relationships" ("snapshot_id", "from_key", "to_key")`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_overrides" (
+      "id" bigserial PRIMARY KEY,
+      "entity_type" varchar(40) NOT NULL,
+      "natural_key" varchar(500) NOT NULL,
+      "operation" varchar(20) NOT NULL DEFAULT 'update',
+      "patch" jsonb NOT NULL,
+      "reason" text NOT NULL,
+      "source" varchar(100) NOT NULL DEFAULT 'fred_chat',
+      "created_by" integer REFERENCES "users"("id") ON DELETE SET NULL,
+      "created_by_name" varchar(255),
+      "created_at" timestamptz NOT NULL DEFAULT now(),
+      "superseded_at" timestamptz
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_overrides_current_idx" ON "fred_architecture_overrides" ("entity_type", "natural_key", "created_at" DESC) WHERE "superseded_at" IS NULL`);
+    const latest: any = await db.execute(sql`
+      SELECT s.id, s.evidence FROM fred_architecture_snapshots s
+      WHERE NOT EXISTS (SELECT 1 FROM fred_architecture_entities e WHERE e.snapshot_id = s.id)
+      ORDER BY s.generated_at DESC LIMIT 1
+    `);
+    if (latest.rows?.[0]) {
+      const normalized = await storeArchitectureProjection(Number(latest.rows[0].id), latest.rows[0].evidence);
+      logger.info({ snapshotId: latest.rows[0].id, ...normalized }, "Backfilled latest Fred architecture snapshot into normalized tables");
+    }
+    logger.info("Ensured normalized Fred architecture working tables exist");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure normalized Fred architecture working tables");
   }
 
   try {

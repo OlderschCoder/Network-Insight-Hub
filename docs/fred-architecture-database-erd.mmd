@@ -1,0 +1,53 @@
+erDiagram
+  USERS ||--o{ FRED_ARCHITECTURE_SNAPSHOTS : generates
+  FRED_ARCHITECTURE_SNAPSHOTS ||--o{ FRED_ARCHITECTURE_ENTITIES : projects
+  FRED_ARCHITECTURE_SNAPSHOTS ||--o{ FRED_ARCHITECTURE_RELATIONSHIPS : projects
+  USERS ||--o{ FRED_ARCHITECTURE_OVERRIDES : records
+  FRED_ARCHITECTURE_ENTITIES ||--o{ FRED_ARCHITECTURE_OVERRIDES : "matched by type and natural key"
+
+  FRED_ARCHITECTURE_SNAPSHOTS {
+    bigint id PK
+    int generated_by FK
+    timestamptz generated_at
+    jsonb evidence "immutable complete export"
+    jsonb summary
+    text report
+    text verification
+    jsonb models
+  }
+  FRED_ARCHITECTURE_ENTITIES {
+    bigint id PK
+    bigint snapshot_id FK
+    varchar entity_type
+    varchar natural_key
+    varchar name
+    varchar building
+    jsonb attributes
+    varchar evidence_status
+    varchar source
+    timestamptz source_timestamp
+  }
+  FRED_ARCHITECTURE_RELATIONSHIPS {
+    bigint id PK
+    bigint snapshot_id FK
+    varchar relationship_type
+    varchar from_type
+    varchar from_key
+    varchar to_type
+    varchar to_key
+    jsonb attributes
+    varchar evidence_status
+    varchar source
+  }
+  FRED_ARCHITECTURE_OVERRIDES {
+    bigint id PK
+    varchar entity_type
+    varchar natural_key
+    varchar operation
+    jsonb patch
+    text reason
+    int created_by FK
+    varchar created_by_name
+    timestamptz created_at
+    timestamptz superseded_at
+  }

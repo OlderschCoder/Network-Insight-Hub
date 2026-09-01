@@ -23,6 +23,11 @@ flowchart LR
   D --> V
   V --> REVIEW[Acceptance review]
   GEN --> JSON[(Versioned architecture JSON snapshots)]
+  JSON --> ENT[(Normalized architecture entities)]
+  JSON --> REL[(Normalized architecture relationships)]
+  CHATFIX[(Attributed CIO chat corrections)] --> ENT
+  ENT -->|bounded record query| API
+  REL -->|dependency traversal| API
   D --> JSON
   REVIEW --> JSON
   JSON -->|bounded domain/query retrieval| API

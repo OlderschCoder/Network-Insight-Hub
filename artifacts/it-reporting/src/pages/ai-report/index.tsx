@@ -2265,7 +2265,7 @@ function EnterpriseArchitectureTab() {
       if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
       setReport(data.report || "");
       setVerification(data.verification || "");
-      setMeta({ evidence: data.evidenceSummary, models: data.models, snapshotId: data.snapshotId });
+      setMeta({ evidence: data.evidenceSummary, models: data.models, snapshotId: data.snapshotId, normalized: data.normalized });
     } catch (error: any) {
       toast({ title: "Architecture generation failed", description: error.message, variant: "destructive" });
     } finally {
@@ -2314,7 +2314,7 @@ function EnterpriseArchitectureTab() {
           </Button>
           {report && <Button variant="outline" onClick={download}><Download className="mr-2 h-4 w-4" />Download Markdown</Button>}
           {meta?.snapshotId && <Button variant="outline" onClick={downloadJson}><Download className="mr-2 h-4 w-4" />Download evidence JSON</Button>}
-          {meta && <p className="w-full text-xs text-muted-foreground">Snapshot #{meta.snapshotId ?? "pending"} · Architect: {meta.models?.architect} · Verifier: {meta.models?.verifier} · Evidence captured {meta.evidence?.generatedAt}</p>}
+          {meta && <p className="w-full text-xs text-muted-foreground">Snapshot #{meta.snapshotId ?? "pending"} · {meta.normalized?.entities ?? 0} queryable elements · {meta.normalized?.relationships ?? 0} relationships · Architect: {meta.models?.architect} · Verifier: {meta.models?.verifier} · Evidence captured {meta.evidence?.generatedAt}</p>}
         </CardContent>
       </Card>
       {report && <Card className="max-h-[65svh] overflow-hidden"><CardHeader><CardTitle>Architecture deliverable</CardTitle></CardHeader><CardContent className="max-h-[55svh] overflow-y-auto"><MarkdownMessage content={report} /></CardContent></Card>}

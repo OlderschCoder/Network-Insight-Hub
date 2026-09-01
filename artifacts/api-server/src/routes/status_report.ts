@@ -33,6 +33,7 @@ import { boundFredMessages, FRED_MAX_CHECKPOINT_CHARS } from "../lib/fred_contex
 import { evidencePolicyFor, latestUserText } from "../lib/fred_evidence_policy";
 import { extractActiveIncidentState } from "../lib/fred_active_state";
 import { buildNetworkInventoryAppendix, extractNetworkConfigFacts } from "../lib/fred_architecture_inventory";
+import { storeArchitectureProjection } from "../lib/fred_architecture_store";
 
 const router = Router();
 
@@ -815,7 +816,7 @@ Fred is not paid by the word. For ordinary questions, answer in 3-8 short senten
 
 Before answering, silently check persistent team memory, the user's personal memory, selected files, recent conversation checkpoint, and relevant live tools. If the user supplies a durable correction, decision, device relationship, procedure, or known-good fact, call save_memory during the same turn. Prefer updating or superseding an existing fact over producing near-duplicate memory. Never store greetings, speculation, transient telemetry, secrets, or the model's own unverified conclusions.
 
-For enterprise architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions, query the durable architecture snapshot first. Retrieve one domain at a time and narrow by building, hostname, IP, VLAN, application, or owner. The snapshot is structured evidence, not a substitute for current telemetry: compare its generated timestamp with live tools and label deltas. Never claim the architecture is unavailable merely because it is too large for one prompt.
+For enterprise architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions, query the normalized architecture database first. Narrow by entity type, building, hostname, IP, VLAN, application, or owner and follow relationships when tracing dependencies. It is structured stored evidence, not a substitute for current telemetry: compare its snapshot timestamp with live tools and label deltas. Never claim the architecture is unavailable merely because it is too large for one prompt. Only when the CIO explicitly asks to correct or update one exact architecture element may you call update_architecture_element; query first for its exact naturalKey, change only the stated fields, preserve the supplied reason, and clearly state that the live source system was not changed.
 
 ## Reasoning discipline
 
@@ -1128,11 +1129,14 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
         ${JSON.stringify(evidenceSummary)}::jsonb, ${report}, ${verification.choices[0]?.message?.content ?? ""}, ${JSON.stringify(models)}::jsonb)
       RETURNING id
     `);
+    const snapshotId = Number(stored.rows?.[0]?.id);
+    const normalized = snapshotId ? await storeArchitectureProjection(snapshotId, durableEvidence) : { entities: 0, relationships: 0 };
     return res.json({
       report,
       verification: verification.choices[0]?.message?.content ?? "",
       evidenceSummary,
-      snapshotId: stored.rows?.[0]?.id ?? null,
+      snapshotId: snapshotId || null,
+      normalized,
       models,
     });
   } catch (error) {

@@ -90,12 +90,27 @@ human-readable report, independent review, generating models, author, and
 timestamp. The Architecture tab exposes both Markdown and JSON downloads.
 
 Fred reads the latest snapshot through `query_architecture_snapshot`. It must
-select a domain (`inventory`, `cloud`, `operations`, or governed `knowledge`)
-and should narrow large domains by hostname, building, IP, VLAN, application,
-or owner. This makes all captured evidence available over multiple bounded
-retrievals without placing the multi-megabyte snapshot in every model prompt.
+query the normalized `fred_architecture_entities` and
+`fred_architecture_relationships` projection by type, hostname, building, IP,
+VLAN, application, or owner. This makes all captured evidence available over
+multiple bounded retrievals without placing the multi-megabyte snapshot in
+every model prompt.
 Snapshot evidence remains historical: Fred must compare its timestamp with
 live diagnostic tools before describing current operational state.
+
+The projection includes buildings, monitored switches, map nodes, every
+physical port, VLANs, topology links, routing adjacencies, phone-building
+rollups, configuration facts, Azure resources, processes, and projects. Every
+row retains its source, source timestamp, evidence status, snapshot ID, and
+original structured attributes. Building containment, node-to-port, and
+node-to-node topology relationships are first-class rows rather than prose.
+
+When the CIO explicitly tells Fred to correct one exact element, Fred first
+queries its natural key and then writes a minimal patch to
+`fred_architecture_overrides`. The prior override is superseded, not deleted.
+Queries overlay the latest correction while keeping the immutable generated
+snapshot intact. Chat corrections never change live equipment or upstream
+inventory, never accept secrets, and never outrank newer live evidence.
 
 The CIO Dashboard contains a direct **SCCC Enterprise Architecture** button.
 It opens the dedicated Architecture tab, not routine Fred chat, because report

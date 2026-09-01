@@ -2736,12 +2736,14 @@ export const QUERY_ARCHITECTURE_SNAPSHOT_TOOL: OpenAI.Chat.Completions.ChatCompl
   type: "function",
   function: {
     name: "query_architecture_snapshot",
-    description: "Read the latest durable SCCC enterprise-architecture JSON snapshot. Use it before answering architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions. Select one domain at a time so the complete structured evidence remains queryable without loading the entire snapshot into context.",
+    description: "Query Fred's normalized SCCC architecture database from the latest immutable snapshot, with current attributed chat corrections overlaid. Use it before answering architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions.",
     parameters: {
       type: "object",
       properties: {
-        domain: { type: "string", enum: ["summary", "inventory", "cloud", "operations", "knowledge"], description: "Snapshot section to retrieve; defaults to summary." },
-        query: { type: "string", description: "Optional case-insensitive filter such as a hostname, building, IP, VLAN, application, or owner." },
+        entityType: { type: "string", description: "Optional exact type: building, switch, network_node, port, vlan, network_link, routing_adjacency, phone_building, device_configuration, azure_resource, process, or project." },
+        building: { type: "string", description: "Optional exact building filter." },
+        query: { type: "string", description: "Optional case-insensitive search across key, name, building, and structured attributes." },
+        includeRelationships: { type: "boolean", description: "Include matching from/to relationships; defaults to true." },
         maxChars: { type: "integer", minimum: 1000, maximum: 24000, description: "Maximum returned characters; defaults to 12000." },
       },
     },
@@ -2750,27 +2752,82 @@ export const QUERY_ARCHITECTURE_SNAPSHOT_TOOL: OpenAI.Chat.Completions.ChatCompl
 
 export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
-  const domain = ["inventory", "cloud", "operations", "knowledge"].includes(args.domain) ? args.domain : "summary";
   const maxChars = Math.min(24_000, Math.max(1_000, Number(args.maxChars) || 12_000));
+  const entityType = String(args.entityType || "").trim();
+  const building = String(args.building || "").trim();
+  const query = String(args.query || "").trim();
+  const pattern = `%${query}%`;
   const result: any = await db.execute(sql`
-    SELECT id, generated_at AS "generatedAt", evidence, summary
-    FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1
+    WITH latest AS (SELECT id, generated_at, summary FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
+    SELECT e.entity_type AS "entityType", e.natural_key AS "naturalKey", e.name, e.building,
+      e.attributes || COALESCE(o.patch, '{}'::jsonb) AS attributes,
+      e.evidence_status AS "evidenceStatus", e.source, e.source_timestamp AS "sourceTimestamp",
+      o.id AS "overrideId", o.reason AS "overrideReason", o.created_at AS "overrideAt",
+      latest.id AS "snapshotId", latest.generated_at AS "generatedAt", latest.summary
+    FROM latest JOIN fred_architecture_entities e ON e.snapshot_id = latest.id
+    LEFT JOIN LATERAL (
+      SELECT id, patch, reason, created_at FROM fred_architecture_overrides
+      WHERE entity_type = e.entity_type AND natural_key = e.natural_key AND superseded_at IS NULL
+      ORDER BY created_at DESC LIMIT 1
+    ) o ON true
+    WHERE (${entityType} = '' OR e.entity_type = ${entityType})
+      AND (${building} = '' OR lower(COALESCE(e.building, '')) = lower(${building}))
+      AND (${query} = '' OR e.natural_key ILIKE ${pattern} OR e.name ILIKE ${pattern}
+        OR COALESCE(e.building, '') ILIKE ${pattern} OR e.attributes::text ILIKE ${pattern})
+    ORDER BY e.entity_type, e.name LIMIT 200
   `);
-  const row = result.rows?.[0];
-  if (!row) return "No durable enterprise-architecture snapshot has been generated yet.";
-  const value = domain === "summary"
-    ? { snapshotId: row.id, generatedAt: row.generatedAt, summary: row.summary }
-    : domain === "knowledge"
-      ? row.evidence?.governedKnowledge
-      : row.evidence?.[domain];
-  const query = String(args.query || "").trim().toLowerCase();
-  let text = JSON.stringify({ snapshotId: row.id, generatedAt: row.generatedAt, domain, evidence: value }, null, 2);
-  if (query) {
-    const lines = text.split("\n");
-    const matches = lines.flatMap((line, index) => line.toLowerCase().includes(query) ? lines.slice(Math.max(0, index - 2), index + 3) : []);
-    text = JSON.stringify({ snapshotId: row.id, generatedAt: row.generatedAt, domain, query, matchingEvidence: [...new Set(matches)] }, null, 2);
+  const rows = result.rows ?? [];
+  if (!rows.length) return "No matching normalized architecture records were found. Generate an as-is snapshot if the database is empty, or broaden the filter.";
+  let relationships: unknown[] = [];
+  if (args.includeRelationships !== false) {
+    const keys = rows.slice(0, 100).map((row: any) => row.naturalKey);
+    const relResult: any = await db.execute(sql`
+      WITH latest AS (SELECT id FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
+      SELECT relationship_type AS "relationshipType", from_type AS "fromType", from_key AS "fromKey",
+        to_type AS "toType", to_key AS "toKey", attributes, evidence_status AS "evidenceStatus", source
+      FROM fred_architecture_relationships, latest
+      WHERE snapshot_id = latest.id AND (from_key = ANY(${keys}::text[]) OR to_key = ANY(${keys}::text[]))
+      ORDER BY relationship_type LIMIT 300
+    `);
+    relationships = relResult.rows ?? [];
   }
-  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n... narrow domain/query for the remaining structured evidence.`;
+  const first = rows[0];
+  let text = JSON.stringify({ snapshotId: first.snapshotId, generatedAt: first.generatedAt, summary: first.summary, filters: { entityType, building, query }, entities: rows.map(({ snapshotId, generatedAt, summary, ...row }: any) => row), relationships }, null, 2);
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n... narrow entityType, building, or query for the remaining structured evidence.`;
+}
+
+export const UPDATE_ARCHITECTURE_ELEMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "update_architecture_element",
+    description: "Record a CIO-requested correction to one exact element in Fred's architecture working database. Use only when the user explicitly asks to update/correct a known element. This creates an attributed override and preserves history; it does not change the immutable source snapshot or a live device.",
+    parameters: { type: "object", properties: {
+      entityType: { type: "string" }, naturalKey: { type: "string" },
+      patch: { type: "object", description: "Only corrected fields and values." },
+      reason: { type: "string", description: "Why the correction is authoritative." },
+    }, required: ["entityType", "naturalKey", "patch", "reason"] },
+  },
+};
+
+export async function executeUpdateArchitectureElement(rawArgs: string, actor: { id: number | null; name: string | null; role: string | null }): Promise<string> {
+  if (String(actor.role || "").toLowerCase() !== "cio") return "Error: only the CIO can update Fred's architecture working database.";
+  const args = JSON.parse(rawArgs || "{}");
+  const entityType = String(args.entityType || "").trim();
+  const naturalKey = String(args.naturalKey || "").trim();
+  const reason = String(args.reason || "").trim();
+  const patch = args.patch && typeof args.patch === "object" && !Array.isArray(args.patch) ? args.patch : null;
+  if (!entityType || !naturalKey || !reason || !patch || !Object.keys(patch).length) return "Error: exact entityType, naturalKey, non-empty patch, and reason are required.";
+  const scrubbed = redactSecretLike(JSON.stringify(patch));
+  if (scrubbed.redacted) return "Error: architecture corrections cannot contain credentials or secrets.";
+  const exists: any = await db.execute(sql`WITH latest AS (SELECT id FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
+    SELECT 1 FROM fred_architecture_entities, latest WHERE snapshot_id = latest.id AND entity_type = ${entityType} AND natural_key = ${naturalKey} LIMIT 1`);
+  if (!exists.rows?.[0]) return "Error: exact architecture element not found. Query the architecture database first to obtain its naturalKey.";
+  const inserted: any = await db.transaction(async (tx) => {
+    await tx.execute(sql`UPDATE fred_architecture_overrides SET superseded_at = now() WHERE entity_type = ${entityType} AND natural_key = ${naturalKey} AND superseded_at IS NULL`);
+    return tx.execute(sql`INSERT INTO fred_architecture_overrides (entity_type, natural_key, patch, reason, created_by, created_by_name)
+      VALUES (${entityType}, ${naturalKey}, ${JSON.stringify(patch)}::jsonb, ${reason}, ${actor.id}, ${actor.name}) RETURNING id, created_at AS "createdAt"`);
+  });
+  return JSON.stringify({ updated: true, overrideId: inserted.rows?.[0]?.id, entityType, naturalKey, patch, reason, createdAt: inserted.rows?.[0]?.createdAt, note: "Immutable snapshot preserved; correction is overlaid in Fred queries until superseded or replaced by a newer authoritative source." });
 }
 async function executeGrafanaPanelLink(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}"); const base = process.env.GRAFANA_URL?.replace(/\/$/, ""); if (!base) return "Grafana linking is not configured; set GRAFANA_URL.";
@@ -2850,6 +2907,7 @@ export async function runChatWithMemory(
     QUERY_INFLUX_LAST_SEEN_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
     QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
+    ...(String(userRole || "").toLowerCase() === "cio" ? [UPDATE_ARCHITECTURE_ELEMENT_TOOL] : []),
     QUERY_AZURE_VM_TOOL,
     QUERY_AZURE_SECURITY_TOOL,
     QUERY_AZURE_HEALTH_TOOL,
@@ -3021,6 +3079,8 @@ export async function runChatWithMemory(
         try { resultText = await executeGrafanaPanelLink(call.function.arguments); } catch (err) { logger.error({ err }, "grafana_panel_link failed"); resultText = "Error: Grafana link generation failed"; }
       } else if (call.type === "function" && call.function.name === "query_architecture_snapshot") {
         try { resultText = await executeQueryArchitectureSnapshot(call.function.arguments); } catch (err) { logger.error({ err }, "query_architecture_snapshot failed"); resultText = "Error: architecture snapshot query failed"; }
+      } else if (call.type === "function" && call.function.name === "update_architecture_element") {
+        try { resultText = await executeUpdateArchitectureElement(call.function.arguments, { id: opts.userId, name: opts.userName ?? null, role: userRole }); } catch (err) { logger.error({ err }, "update_architecture_element failed"); resultText = "Error: architecture element update failed"; }
       } else if (call.type === "function" && call.function.name === "query_azure_vm") {
         try {
           resultText = await executeQueryAzureVm(call.function.arguments);
