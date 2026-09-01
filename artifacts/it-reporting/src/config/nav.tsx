@@ -42,7 +42,7 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     items: [
       {
         href: "/",
-        label: isCIO ? "Dashboard" : "Home",
+        label: "Home",
         desc: "Your overview and personal workspace",
         icon: LayoutDashboard,
         match: (l) => l === "/",

@@ -95,6 +95,11 @@ as a parallel sign-in path.
 
 ### Monitoring, Azure, telephony, and IT applications
 
+- Uses one shared **IT Home** for every authenticated IT staff member. Personal
+  work, learning, operational health, Zendesk activity, and team status remain
+  consistent across roles; authorized CIO controls are added without replacing
+  the shared homepage.
+
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.
 - Reads bounded network telemetry through approved tools rather than exposing a

@@ -15,10 +15,7 @@ import ItHuntGroupCard from "@/components/ItHuntGroupCard";
 
 export default function Dashboard() {
   const { isCIO } = useAuth();
-  if (!isCIO) {
-    return <div className="space-y-6"><LearnHomeCard /><MyWork /></div>;
-  }
-  return <CIODashboard />;
+  return <SharedHome isCIO={isCIO} />;
 }
 
 function EnterpriseArchitectureHomeCard() {
@@ -39,7 +36,7 @@ function LearnHomeCard() {
   </Card>;
 }
 
-function CIODashboard() {
+function SharedHome({ isCIO }: { isCIO: boolean }) {
   const {
     data: summary,
     isError: isSummaryError,
@@ -65,7 +62,7 @@ function CIODashboard() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">IT Home</h1>
         <div className="flex items-center gap-3">
           <QuickAddItemDialog />
           {weekStatus ? (
@@ -84,10 +81,12 @@ function CIODashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className={`grid gap-4 ${isCIO ? "lg:grid-cols-2" : ""}`}>
         <LearnHomeCard />
-        <EnterpriseArchitectureHomeCard />
+        {isCIO && <EnterpriseArchitectureHomeCard />}
       </div>
+
+      <MyWork />
 
       <HowToUse />
 
