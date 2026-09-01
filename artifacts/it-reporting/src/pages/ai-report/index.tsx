@@ -136,6 +136,23 @@ function checkpointAll(messages: ChatMessage[], previousCheckpoint = "") {
     .slice(-FRED_CHECKPOINT_LIMIT);
 }
 
+function requestsEnterpriseArchitecture(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return /\b(?:as[- ]is|current state)\b/.test(normalized)
+    && /\benterprise architecture\b/.test(normalized)
+    && /\b(?:network|switch|vlan|port|azure|entra|identity)\b/.test(normalized);
+}
+
+function boundMessagesForAI(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) => {
+    if (message.role !== "assistant" || typeof message.content !== "string" || message.content.length <= 30_000) return message;
+    return {
+      ...message,
+      content: `${message.content.slice(0, 30_000)}\n\n[The complete architecture deliverable and deterministic inventory appendices remain stored in this Fred topic. Use the retained coverage manifest and ask for a specific section rather than resending the entire document.]`,
+    };
+  });
+}
+
 interface LiveObservationState {
   imageUrl: string;
   reply: string;
@@ -1007,11 +1024,32 @@ function ChatTab({
     setLoading(true);
     trackProductUsage("fred_message", "/ai-report");
     try {
+      if (requestsEnterpriseArchitecture(draftInput)) {
+        const response = await fetch(`${API_BASE}/status-report/enterprise-architecture`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.message ?? `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const coverage = data.evidenceSummary
+          ? `\n\n## Evidence coverage manifest\n\n\`\`\`json\n${JSON.stringify(data.evidenceSummary, null, 2)}\n\`\`\``
+          : "";
+        const verification = data.verification
+          ? `\n\n# Independent acceptance review\n\n${data.verification}`
+          : "";
+        setMessages([...newMessages, { role: "assistant", content: `${data.report ?? ""}${coverage}${verification}` }]);
+        toast({ title: "As-is architecture generated", description: "The complete report, authoritative appendices, coverage manifest, and independent review are retained in this topic." });
+        return;
+      }
       const res = await fetch(`${API_BASE}/status-report/chat`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
-          messages: compacted.recentMessages,
+          messages: boundMessagesForAI(compacted.recentMessages),
           conversationCheckpoint: compacted.checkpoint,
           lookbackDays,
           previewInventory: isNetworkAdmin,

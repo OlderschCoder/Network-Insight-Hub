@@ -84,7 +84,7 @@ function sanitizeStoredFredMessages(value: unknown): StoredFredMessage[] {
     const role = (item as any).role;
     const content = (item as any).content;
     if ((role !== "user" && role !== "assistant") || typeof content !== "string") return [];
-    return [{ role, content: content.slice(0, 20_000) }];
+    return [{ role, content: content.slice(0, 1_000_000) }];
   });
 }
 

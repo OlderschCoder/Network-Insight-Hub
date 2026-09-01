@@ -76,6 +76,13 @@ adjacency, per-building service coverage, and every physical Port Map interface.
 The model cannot sample or omit these appendices; its narrative must reconcile
 their exact counts and cover every building.
 
+An explicit request for the current/as-is enterprise architecture in Ask Fred
+is routed to this same complete generator rather than the routine 1,400-token
+chat path. The report, coverage manifest, deterministic appendices, and
+independent verification review are retained in the conversation topic. Later
+turns send only a bounded architecture reference back to the model, preventing
+the full deliverable from being retransmitted on every question.
+
 ## Operations
 
 After changing model variables or credentials, restart `sccc-api.service`. Verify

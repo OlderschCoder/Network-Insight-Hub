@@ -5,6 +5,7 @@ flowchart LR
   H --> S
   UI --> A[Protected active incident state]
   UI --> API[Fred API]
+  UI -->|explicit as-is architecture request| SNAP
   A --> API
   API --> R{Workload profile}
   R -->|routine: direct OpenAI| T[GPT-5.6 Terra]
