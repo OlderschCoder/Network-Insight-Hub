@@ -56,6 +56,15 @@ when an exact value cannot be obtained from Hub evidence, Fred asks only for
 that missing value. Returned console output becomes current evidence for the
 next step.
 
+When diagnosis reaches the first change-producing recommendation, Fred asks
+once whether to create a change log, with the authenticated user and current
+Central timestamp already filled in. A confirmed log remains in the durable
+topic and accumulates the target, reason, before evidence, exact commands,
+returned results, after state, validation, rollback, actor, and timestamps.
+Fred appends only the new event during the work and presents a compact final
+summary at resolution. Read-only diagnosis does not trigger the question, and
+a declined log is not requested again in that topic.
+
 Verified configuration changes are reconciled into every writable source Fred
 is authorized to maintain. Switches and VLANs are updated directly, durable
 known-good facts are retained in governed team memory, and exact architecture
