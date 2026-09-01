@@ -2798,7 +2798,7 @@ export const QUERY_NETWORK_MAP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool 
     function: {
       name: "query_network_map",
       description:
-        "Read the Network Map's current nodes, switch-to-switch links, and room/building-to-Nexus paths. Use the path view for questions such as which core/distribution port serves a room, building, or access switch; it cross-checks node metadata, Port Map descriptions, and confirmed topology links. Read-only.",
+        "Read the Network Map's current nodes, switch-to-switch links, room/building-to-Nexus paths, and inventory freshness. The overview reports switches with stale or never-collected telemetry and stale or missing configuration evidence. Use it before trusting topology or port data and tell the user exactly which devices need collection or a new config import. Use the path view for questions such as which core/distribution port serves a room, building, or access switch. Read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -2844,10 +2844,18 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
     ? args.status
     : "all";
   const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
-  const [nodes, links, ports] = await Promise.all([
+  const [nodes, links, ports, configImports] = await Promise.all([
     db.select().from(netNodesTable),
     db.select().from(netLinksTable),
     db.select().from(netPortsTable),
+    db
+      .select({
+        deviceName: deviceConfigsTable.deviceName,
+        filename: deviceConfigsTable.filename,
+        createdAt: deviceConfigsTable.createdAt,
+      })
+      .from(deviceConfigsTable)
+      .orderBy(desc(deviceConfigsTable.createdAt)),
   ]);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const physicalPorts = ports.filter((port) => port.isPhysical !== false);
@@ -2863,6 +2871,43 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
   );
 
   if (view === "overview") {
+    const telemetryCutoff = Date.now() - 36 * 60 * 60 * 1000;
+    const configCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const infrastructureNodes = nodes.filter((node) =>
+      ["switch", "router", "firewall"].includes(normalizedText(node.nodeKind)),
+    );
+    const freshnessByNode = infrastructureNodes.map((node) => {
+      const nodePorts = physicalPorts.filter((port) => port.nodeId === node.id);
+      const telemetryDates = nodePorts
+        .map((port) => port.telemetryUpdatedAt?.getTime())
+        .filter((value): value is number => typeof value === "number");
+      const portConfigDates = nodePorts
+        .map((port) => port.configUpdatedAt?.getTime())
+        .filter((value): value is number => typeof value === "number");
+      const identity = normalizedText(node.hostname).replace(/\.sccc\.edu$/, "");
+      const importedConfig = configImports.find((item) => {
+        const device = normalizedText(item.deviceName).replace(/\.sccc\.edu$/, "");
+        const filename = normalizedText(item.filename);
+        return device === identity || filename.includes(identity);
+      });
+      const latestTelemetry = telemetryDates.length ? Math.max(...telemetryDates) : null;
+      const latestConfig = Math.max(
+        portConfigDates.length ? Math.max(...portConfigDates) : 0,
+        importedConfig?.createdAt?.getTime() ?? 0,
+      ) || null;
+      return {
+        hostname: node.hostname,
+        building: getCanonicalBuildingName(node.building),
+        managementIp: node.mgmtIp,
+        physicalPorts: nodePorts.length,
+        latestTelemetryAt: latestTelemetry ? new Date(latestTelemetry).toISOString() : null,
+        telemetryState: latestTelemetry == null ? "never_collected" : latestTelemetry < telemetryCutoff ? "stale" : "current",
+        latestConfigAt: latestConfig ? new Date(latestConfig).toISOString() : null,
+        configState: latestConfig == null ? "not_imported" : latestConfig < configCutoff ? "stale" : "current",
+      };
+    });
+    const telemetryNeedsAttention = freshnessByNode.filter((item) => item.telemetryState !== "current");
+    const configNeedsAttention = freshnessByNode.filter((item) => item.configState !== "current");
     return boundedNetworkResult({
       source: "/network/map",
       generatedAt: new Date().toISOString(),
@@ -2887,6 +2932,24 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
         counts[key] = (counts[key] ?? 0) + 1;
         return counts;
       }, {}),
+      freshness: {
+        rules: {
+          telemetry: "stale after 36 hours; expected from the telemetry JSON collector",
+          configuration: "stale after 90 days; refresh after every approved configuration change",
+        },
+        telemetry: {
+          current: freshnessByNode.length - telemetryNeedsAttention.length,
+          stale: freshnessByNode.filter((item) => item.telemetryState === "stale").length,
+          neverCollected: freshnessByNode.filter((item) => item.telemetryState === "never_collected").length,
+          needsAttention: telemetryNeedsAttention,
+        },
+        configuration: {
+          current: freshnessByNode.length - configNeedsAttention.length,
+          stale: freshnessByNode.filter((item) => item.configState === "stale").length,
+          notImported: freshnessByNode.filter((item) => item.configState === "not_imported").length,
+          needsAttention: configNeedsAttention,
+        },
+      },
       note: "A connected port is operationally up or has learned MAC/LLDP evidence; it may connect to a switch, phone, computer, access point, or another endpoint.",
     });
   }

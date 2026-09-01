@@ -130,12 +130,16 @@ export function TelemetrySwitchPortMap({
   nodes,
   links,
   nodeById,
+  initialNodeId,
+  showSelector = true,
 }: {
   nodes: NetNode[];
   links: NetLink[];
   nodeById: Map<string, NetNode>;
+  initialNodeId?: string;
+  showSelector?: boolean;
 }) {
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialNodeId ?? "");
   const [hoveredName, setHoveredName] = useState<string | null>(null);
   const [pinnedName, setPinnedName] = useState<string | null>(null);
   const switches = useMemo(
@@ -146,10 +150,14 @@ export function TelemetrySwitchPortMap({
   );
 
   useEffect(() => {
+    if (initialNodeId && initialNodeId !== selectedId) {
+      setSelectedId(initialNodeId);
+      return;
+    }
     if (!selectedId && switches.length) {
       setSelectedId((switches.find((node) => node.role === "core") ?? switches[0]).id);
     }
-  }, [selectedId, switches]);
+  }, [initialNodeId, selectedId, switches]);
 
   const selectedSwitch = nodeById.get(selectedId) ?? switches.find((node) => node.role === "core") ?? switches[0];
   const effectiveId = selectedSwitch?.id ?? "";
@@ -247,12 +255,14 @@ export function TelemetrySwitchPortMap({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={effectiveId} onValueChange={(value) => { setSelectedId(value); setPinnedName(null); setHoveredName(null); }}>
-          <SelectTrigger className="w-72"><SelectValue placeholder="Select switch…" /></SelectTrigger>
-          <SelectContent>
-            {switches.map((node) => <SelectItem key={node.id} value={node.id}>{node.hostname} — {node.building}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {showSelector && (
+          <Select value={effectiveId} onValueChange={(value) => { setSelectedId(value); setPinnedName(null); setHoveredName(null); }}>
+            <SelectTrigger className="w-72"><SelectValue placeholder="Select switch…" /></SelectTrigger>
+            <SelectContent>
+              {switches.map((node) => <SelectItem key={node.id} value={node.id}>{node.hostname} — {node.building}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         {selectedSwitch && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <span className="font-mono">{selectedSwitch.mgmtIp ?? "no IP"}</span>
@@ -336,4 +346,32 @@ export function TelemetrySwitchPortMap({
       )}
     </div>
   );
+}
+
+export function SingleSwitchPortMap({ nodeId }: { nodeId: string }) {
+  const { data: nodes = [], isLoading: nodesLoading } = useQuery<NetNode[]>({
+    queryKey: ["/api/network-map/nodes"],
+    queryFn: async () => {
+      const response = await authFetch("/api/network-map/nodes");
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    },
+  });
+  const { data: links = [], isLoading: linksLoading } = useQuery<NetLink[]>({
+    queryKey: ["/api/network-map/links"],
+    queryFn: async () => {
+      const response = await authFetch("/api/network-map/links");
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    },
+  });
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+
+  if (nodesLoading || linksLoading) {
+    return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading switch faceplate…</div>;
+  }
+  const selected = nodeById.get(nodeId);
+  if (!selected) return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This switch is not yet linked to the Port Map inventory.</div>;
+
+  return <TelemetrySwitchPortMap nodes={[selected]} links={links} nodeById={nodeById} initialNodeId={nodeId} showSelector={false} />;
 }

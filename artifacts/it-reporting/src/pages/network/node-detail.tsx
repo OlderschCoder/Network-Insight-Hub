@@ -27,6 +27,7 @@ import {
   ArrowLeft, Server, Activity, Pencil, Save, X, Trash2, Plus, RefreshCw,
   Wifi, WifiOff, AlertTriangle, Cable, ChevronRight, Building2, Loader2,
 } from "lucide-react";
+import { SingleSwitchPortMap } from "./switch-port-map";
 
 const API = "/api";
 
@@ -410,12 +411,17 @@ export default function NodeDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="details">
+      <Tabs defaultValue="ports">
         <TabsList>
+          <TabsTrigger value="ports">Port Map</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="links">Ports / Links ({node.links.length})</TabsTrigger>
+          <TabsTrigger value="links">Link Records ({node.links.length})</TabsTrigger>
           <TabsTrigger value="live">Live Status</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="ports" className="mt-4">
+          <SingleSwitchPortMap nodeId={node.id} />
+        </TabsContent>
 
         {/* ── Details Tab ── */}
         <TabsContent value="details" className="space-y-4 mt-4">

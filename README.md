@@ -92,6 +92,12 @@ as a parallel sign-in path.
 - Governs VLANs 301–322 as the voice/E911 range. CIO-verified physical-building
   ownership is preserved across configuration imports; VLANs awaiting physical
   confirmation remain Campus Wide instead of being guessed.
+- Keeps Visualizer building boundaries auto-sized around their current switches
+  and selected elements. A switch detail opens on its physical Port Map while
+  the broader building Port Map remains available for cross-switch work.
+- Gives Fred inventory-freshness evidence: telemetry older than 36 hours or
+  never collected, plus configuration evidence older than 90 days or missing.
+  Fred reports the affected devices so collection/import work is actionable.
 
 ### Monitoring, Azure, telephony, and IT applications
 

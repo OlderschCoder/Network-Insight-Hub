@@ -1022,13 +1022,16 @@ export default function NetworkVisualize() {
   // The Azure container is auto-sized to fit its currently selected VM
   // children — never apply a stale saved width/height to it, otherwise the
   // border could fail to encircle newly-added VMs.
-  const AUTO_SIZED_CONTAINERS = new Set(["container-azure"]);
   const hydratedNodes = useMemo<Node[]>(() => {
     return computed.nodes.map((n) => {
       const saved = savedById.get(n.id);
       if (!saved) return n;
       const next: Node = { ...n, position: { x: saved.x, y: saved.y } };
-      const allowSize = !AUTO_SIZED_CONTAINERS.has(n.id);
+      // Containers are always computed from their current children. Reusing a
+      // saved historical width/height lets newly selected switches or VLANs
+      // spill outside the building border even though their positions are
+      // correctly parented.
+      const allowSize = n.data?.exportShape !== "container" && !n.id.startsWith("nmb-");
       if (allowSize && (saved.width != null || saved.height != null)) {
         next.style = {
           ...n.style,
