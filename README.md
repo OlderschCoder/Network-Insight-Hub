@@ -99,6 +99,9 @@ as a parallel sign-in path.
   work, learning, operational health, Zendesk activity, and team status remain
   consistent across roles; authorized CIO controls are added without replacing
   the shared homepage.
+- Places the current operational pulse first: network availability, risks,
+  incidents, calling, Zendesk performance, submissions, and recent activity
+  precede learning guidance, personal work, and the Quote of the Day.
 
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.

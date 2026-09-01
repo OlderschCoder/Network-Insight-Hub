@@ -81,16 +81,10 @@ function SharedHome({ isCIO }: { isCIO: boolean }) {
         </div>
       </div>
 
-      <div className={`grid gap-4 ${isCIO ? "lg:grid-cols-2" : ""}`}>
-        <LearnHomeCard />
-        {isCIO && <EnterpriseArchitectureHomeCard />}
+      <div>
+        <h2 className="text-xl font-semibold">Current operational pulse</h2>
+        <p className="text-sm text-muted-foreground">Live service health, workload, and team response indicators.</p>
       </div>
-
-      <MyWork />
-
-      <HowToUse />
-
-      <QuoteOfDay />
 
       {isSummaryError && (
         <div
@@ -277,6 +271,17 @@ function SharedHome({ isCIO }: { isCIO: boolean }) {
           </CardContent>
         </Card>
       </div>
+
+      <div className={`grid gap-4 ${isCIO ? "lg:grid-cols-2" : ""}`}>
+        <LearnHomeCard />
+        {isCIO && <EnterpriseArchitectureHomeCard />}
+      </div>
+
+      <MyWork />
+
+      <HowToUse />
+
+      <QuoteOfDay />
     </div>
   );
 }
