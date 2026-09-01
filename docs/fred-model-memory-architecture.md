@@ -45,7 +45,10 @@ question, narrate hidden reasoning, dump tool output, or append generic offers.
 Long-form output is reserved for explicitly requested deliverables.
 
 The transcript is confined to a fixed-height, permanently scrollable panel so
-long conversations do not expand the entire application page.
+long conversations do not expand the entire application page. On desktop the
+panel participates in the application shell's full flex-height chain: it reaches
+the bottom content boundary and resizes with the browser viewport while the
+header, topic controls, and composer remain visible.
 
 Temporary incident topology is maintained separately from durable memory. Fred
 extracts user-reported bypasses, disconnected paths, direct connections, and

@@ -316,7 +316,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen>
       <AppSidebar />
-      <SidebarInset className="min-h-svh min-w-0">
+      <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
           <div className="flex min-w-0 items-center gap-3">
             <SidebarTrigger className="h-9 w-9 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white" />
@@ -382,7 +382,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ZendeskChatWidget />
 
         <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
-          <div className="min-w-0 flex-1 p-4 md:p-6">{children}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:p-6">{children}</div>
           <footer className="border-t border-border px-6 py-4">
             <Signature />
           </footer>

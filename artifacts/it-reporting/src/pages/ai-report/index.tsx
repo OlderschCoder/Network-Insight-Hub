@@ -1432,7 +1432,7 @@ function ChatTab({
   }, [mobileFieldMode, nearLiveEnabled, cameraOpen, lookbackDays]);
 
   return (
-    <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : "h-[calc(100svh-15rem)] min-h-[32rem] max-h-[48rem] w-full"}`}>
+    <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : "h-full min-h-[32rem] w-full flex-1"}`}>
       <CardHeader className={`shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : ""}`}>
         <div className={`gap-3 ${mobileFieldMode ? "flex flex-col" : "flex items-center justify-between flex-wrap"}`}>
           <div>
@@ -2276,7 +2276,7 @@ export default function AIReport() {
   const contextHint = pageHintFromPath(fromPath);
 
   return (
-    <div className="flex min-h-[calc(100svh-11rem)] min-w-0 flex-col gap-6">
+    <div className="flex h-full min-h-[calc(100svh-11rem)] min-w-0 flex-1 flex-col gap-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Sparkles className="h-7 w-7" />
@@ -2314,7 +2314,7 @@ export default function AIReport() {
             <CIOInsightsTab />
           </TabsContent>
         )}
-        <TabsContent value="chat" className="mt-6 flex min-h-0 flex-1">
+        <TabsContent value="chat" className="mt-6 min-h-0 flex-1 data-[state=active]:flex">
           <ChatTab contextHint={contextHint} />
         </TabsContent>
         <TabsContent value="memory" className="mt-6">
