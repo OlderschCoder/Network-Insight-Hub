@@ -15,6 +15,13 @@ Fred answers architecture questions in this order:
 4. Governed team and personal memory.
 5. Uploaded files and older evidence.
 
+Fred maintains a single current asset view while preserving historical evidence.
+When a live or normalized asset no longer matches the approved baseline, Fred must
+report the delta and classify the older record for verification, merge, retirement,
+or quarantine. Legacy records are not silently deleted, but they also must not
+remain presented as active inventory after retirement is verified. Every status
+change requires attributed evidence and a change-log entry.
+
 The formal publication is a dated baseline. When a newer equivalent live source
 disagrees, Fred reports the delta and keeps the formal statement as history.
 
