@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "fs";
 import { db, deviceConfigsTable, networkSwitchesTable, vlansTable } from "@workspace/db";
+import { voiceVlanAuthority } from "./voice_vlan_registry";
 import { eq } from "drizzle-orm";
 import { fileURLToPath } from "url";
 import { join } from "path";
@@ -160,7 +161,10 @@ async function upsertVlans(ctx: ImportContext, parsed: ParsedConfig) {
     if (vlan.vlanId <= 0 || vlan.vlanId > 4094) continue;
     if (vlan.name === `VLAN${vlan.vlanId}` && !vlan.subnet && !vlan.gateway) continue;
 
-    const key = `${vlan.vlanId}:${parsed.building}`;
+    const authority = voiceVlanAuthority(vlan.vlanId);
+    const targetBuilding = authority?.building ?? parsed.building;
+    const targetType = authority?.type ?? vlan.type;
+    const key = `${vlan.vlanId}:${targetBuilding}`;
     const existing = existingMap.get(key);
     const anyExisting = existingVlans.find((row) => row.vlanId === vlan.vlanId);
 
@@ -174,8 +178,8 @@ async function upsertVlans(ctx: ImportContext, parsed: ParsedConfig) {
         vlanId: vlan.vlanId,
         name: vlan.name,
         description: vlan.description ?? undefined,
-        building: parsed.building,
-        type: vlan.type,
+        building: targetBuilding,
+        type: targetType,
         subnet: vlan.subnet ?? undefined,
         gateway: vlan.gateway ?? undefined,
         notes: `Auto-imported from ${parsed.hostname} config`,
@@ -187,6 +191,8 @@ async function upsertVlans(ctx: ImportContext, parsed: ParsedConfig) {
 
     if (existing) {
       const updates: Record<string, unknown> = {};
+      if (authority && existing.building !== targetBuilding) updates.building = targetBuilding;
+      if (authority && existing.type !== targetType) updates.type = targetType;
       if (vlan.subnet && !existing.subnet) updates.subnet = vlan.subnet;
       if (vlan.gateway && !existing.gateway) updates.gateway = vlan.gateway;
       if (vlan.description && !existing.description) updates.description = vlan.description;
@@ -210,6 +216,8 @@ async function upsertVlans(ctx: ImportContext, parsed: ParsedConfig) {
     }
 
     const updates: Record<string, unknown> = {};
+    if (authority && anyExisting?.building !== targetBuilding) updates.building = targetBuilding;
+    if (authority && anyExisting?.type !== targetType) updates.type = targetType;
     if (vlan.subnet && !anyExisting?.subnet) updates.subnet = vlan.subnet;
     if (vlan.gateway && !anyExisting?.gateway) updates.gateway = vlan.gateway;
     if (vlan.description && !anyExisting?.description) updates.description = vlan.description;

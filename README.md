@@ -89,6 +89,9 @@ as a parallel sign-in path.
 - Provides a **Cisco Webex Phones** workspace for the phone directory, live
   device status, building assignments, and E-911 health; the menu and IT Apps
   directory identify it as a new feature.
+- Governs VLANs 301–322 as the voice/E911 range. CIO-verified physical-building
+  ownership is preserved across configuration imports; VLANs awaiting physical
+  confirmation remain Campus Wide instead of being guessed.
 
 ### Monitoring, Azure, telephony, and IT applications
 

@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "import:formal-ea": "tsx src/scripts/import_formal_ea.ts"
+    "import:formal-ea": "tsx src/scripts/import_formal_ea.ts",
+    "apply:voice-vlans": "tsx src/scripts/apply_voice_vlan_authority.ts"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.21",
