@@ -31,6 +31,7 @@ export type NavItem = {
   match?: (loc: string) => boolean;
   cioBadge?: boolean;
   netBadge?: boolean;
+  newBadge?: boolean;
 };
 
 export type NavGroup = { label: string; items: NavItem[]; separator?: number[] };
@@ -95,9 +96,10 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
       },
       {
         href: "/it-apps/cisco-calling",
-        label: "Cisco Calling",
+        label: "Cisco Webex Phones",
         desc: "Phone directory, device status, buildings, and E-911",
         icon: PhoneCall,
+        newBadge: true,
       },
       {
         href: "/banner",

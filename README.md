@@ -43,6 +43,8 @@ as a parallel sign-in path.
 - Lets authorized staff delegate work to another active team member with
   attribution to the assigning person.
 - Rolls individual work into department weekly reporting.
+- Shows the authenticated team a shared Zendesk resolved-ticket scorecard limited
+  to Tracy, Mark, Maria, Lucas, Illia, and Craig, including zero-count rows.
 - Tracks risks, issues, projects, goals, incidents, and post-incident reviews.
 - Maintains a Process Library for reusable operational runbooks.
 - Measures authenticated product usage such as sessions, pages visited, active
@@ -77,6 +79,9 @@ as a parallel sign-in path.
   source, action, and field-level before/after values. Authorized updates can be
   rolled back, and the rollback creates another audit record.
 - Supports maintenance notes and exportable switch/VLAN maintenance history.
+- Provides a **Cisco Webex Phones** workspace for the phone directory, live
+  device status, building assignments, and E-911 health; the menu and IT Apps
+  directory identify it as a new feature.
 
 ### Monitoring, Azure, telephony, and IT applications
 

@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "./auth";
+import {
+  isZendeskDashboardTeamMember,
+  zendeskDashboardTeamOrder,
+} from "../lib/zendesk_dashboard_team";
 
 const router = Router();
 
@@ -399,7 +403,9 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
     }
 
     // Pull SCCC reporting team so we can include teammates with zero resolved
-    const teamUsers = await db.select().from(usersTable);
+    const teamUsers = (await db.select().from(usersTable)).filter(
+      isZendeskDashboardTeamMember,
+    );
     const localPart = (e: string | null | undefined) =>
       (e ?? "").toLowerCase().split("@")[0].replace(/[._]/g, "");
     const lastName = (n: string) =>
@@ -431,21 +437,20 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
         return lastName(u.name) === zLast;
       });
       if (teamMatch) matchedTeamIds.add(teamMatch.id);
+      if (!teamMatch) continue;
       rows.push({
         zendeskUserId: zid,
-        name: teamMatch?.name ?? z?.name ?? `User ${zid}`,
-        email: teamMatch?.email ?? z?.email ?? null,
+        name: teamMatch.name,
+        email: teamMatch.email,
         resolvedCount: count,
-        isTeamMember: !!teamMatch,
-        teamRole: teamMatch?.role ?? null,
+        isTeamMember: true,
+        teamRole: teamMatch.role,
       });
     }
 
     // Add any team members who had zero resolved tickets in this window
     for (const u of teamUsers) {
       if (matchedTeamIds.has(u.id)) continue;
-      // Only show users likely to handle tickets (not CIO/Project Manager/staff)
-      if (u.role === "cio" || u.role === "staff") continue;
       rows.push({
         zendeskUserId: null,
         name: u.name,
@@ -456,15 +461,14 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
       });
     }
 
-    const breakdown = rows.sort((a, b) => {
-      if (a.isTeamMember !== b.isTeamMember) return a.isTeamMember ? -1 : 1;
-      return b.resolvedCount - a.resolvedCount;
-    });
+    const breakdown = rows.sort(
+      (a, b) => zendeskDashboardTeamOrder(a.name) - zendeskDashboardTeamOrder(b.name),
+    );
 
     return res.json({
       sinceDate: since,
       days,
-      totalResolved: totals.solved,
+      totalResolved: breakdown.reduce((sum, row) => sum + row.resolvedCount, 0),
       breakdown,
     });
   } catch (e: any) {

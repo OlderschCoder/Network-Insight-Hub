@@ -110,7 +110,7 @@ export function AppSidebar() {
                             icon={<Icon className="mt-0.5 h-4 w-4 shrink-0" />}
                             label={item.label}
                             desc={item.desc}
-                            badge={item.cioBadge ? "CIO" : item.netBadge ? "NET" : null}
+                            badge={item.newBadge ? "NEW" : item.cioBadge ? "CIO" : item.netBadge ? "NET" : null}
                             showSeparator={showSeparator}
                           />
                         );

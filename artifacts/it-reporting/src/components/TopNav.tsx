@@ -63,6 +63,9 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
                       {it.netBadge && (
                         <Badge variant="outline" className="h-4 px-1 text-[10px] text-muted-foreground">NET</Badge>
                       )}
+                      {it.newBadge && (
+                        <Badge variant="outline" className="h-4 px-1 text-[10px] font-bold text-emerald-700">NEW</Badge>
+                      )}
                     </span>
                     <span className="block text-xs leading-snug text-muted-foreground">{it.desc}</span>
                   </span>

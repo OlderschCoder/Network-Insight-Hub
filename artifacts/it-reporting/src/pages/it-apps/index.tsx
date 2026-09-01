@@ -15,13 +15,15 @@ type AppLink = {
   description: string;
   href: string;
   external?: boolean;
+  newFeature?: boolean;
 };
 
 const OPERATIONS_APPS: AppLink[] = [
   {
-    name: "Cisco Calling",
+    name: "Cisco Webex Phones",
     description: "One combined phone directory and device-status table, plus building and E-911 health.",
     href: "/it-apps/cisco-calling",
+    newFeature: true,
   },
   {
     name: "Banner",
@@ -88,6 +90,7 @@ function AppCard({ app, icon: Icon }: { app: AppLink; icon?: React.ComponentType
         <div className="flex items-center gap-2">
           {Icon ? <Icon className="h-5 w-5 shrink-0 text-primary" /> : null}
           <h3 className="font-semibold">{app.name}</h3>
+          {app.newFeature ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">New Feature</span> : null}
         </div>
         {app.external ? <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}
       </div>
