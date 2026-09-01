@@ -9,6 +9,11 @@ const key = (...parts: unknown[]) => parts.map(value).filter(Boolean).join(":");
 export function buildArchitectureProjection(evidence: any): { entities: Entity[]; relationships: Relationship[] } {
   const generatedAt = value(evidence?.generatedAt) || new Date().toISOString();
   const inventory = evidence?.inventory ?? {};
+  const switchHostnameCounts = new Map<string, number>();
+  for (const row of inventory.switches ?? []) {
+    const hostname = value(row.hostname).toLowerCase();
+    if (hostname) switchHostnameCounts.set(hostname, (switchHostnameCounts.get(hostname) ?? 0) + 1);
+  }
   const entities: Entity[] = [];
   const relationships: Relationship[] = [];
   const add = (entity_type: string, natural_key: string, name: string, attributes: unknown, source: string, building?: string | null, source_timestamp?: string | null) => {
@@ -22,7 +27,10 @@ export function buildArchitectureProjection(evidence: any): { entities: Entity[]
 
   for (const row of inventory.buildingCoverage ?? []) add("building", value(row.building), value(row.building), row, "Buildings", row.building);
   for (const row of inventory.switches ?? []) {
-    const natural_key = value(row.hostname) || value(row.id);
+    const hostname = value(row.hostname) || value(row.id);
+    const natural_key = (switchHostnameCounts.get(hostname.toLowerCase()) ?? 0) > 1
+      ? key(hostname, row.ipAddress || row.id)
+      : hostname;
     add("switch", natural_key, value(row.hostname), row, "Network Inventory", row.building, row.updatedAt);
     contains(row.building, "switch", natural_key, "Network Inventory");
   }
@@ -64,6 +72,8 @@ export async function storeArchitectureProjection(snapshotId: number, evidence: 
   const { db } = await import("@workspace/db");
   const projection = buildArchitectureProjection(evidence);
   await db.transaction(async (tx) => {
+    await tx.execute(sql`DELETE FROM fred_architecture_relationships WHERE snapshot_id = ${snapshotId}`);
+    await tx.execute(sql`DELETE FROM fred_architecture_entities WHERE snapshot_id = ${snapshotId}`);
     if (projection.entities.length) await tx.execute(sql`
       INSERT INTO fred_architecture_entities (snapshot_id, entity_type, natural_key, name, building, attributes, source, source_timestamp)
       SELECT ${snapshotId}, x.entity_type, x.natural_key, x.name, NULLIF(x.building, ''), x.attributes, x.source, NULLIF(x.source_timestamp, '')::timestamptz

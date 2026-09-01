@@ -148,7 +148,7 @@ function CIODashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Network Status</CardTitle>
+            <CardTitle className="text-sm font-medium">Monitored Network Objects</CardTitle>
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -158,7 +158,7 @@ function CIODashboard() {
                 : `${summary?.onlineSwitches || 0} / ${summary?.totalSwitches || 0}`}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {isSummaryError ? "Couldn't load stats" : "Switches online"}
+              {isSummaryError ? "Couldn't load stats" : "Online · includes switches, management IPs, and SVIs"}
             </p>
           </CardContent>
         </Card>

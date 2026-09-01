@@ -126,6 +126,12 @@ post-generation projection error therefore cannot hide a report whose immutable
 snapshot was already committed. Projection input is deduplicated by entity type
 and natural key before bulk insertion.
 
+Network Inventory rows are monitored objects, not necessarily unique physical
+switches. When one hostname has both a management address and an SVI address,
+the normalized natural key includes the IP address so both records remain
+queryable. The CIO Dashboard labels its 43/44-style rollup **Monitored Network
+Objects** and notes that the count includes switches, management IPs, and SVIs.
+
 Architecture chapter and verification calls use the lowest supported reasoning
 overhead because factual evidence synthesis is already constrained by the
 snapshot. This keeps refreshes below the reverse-proxy request window. If a

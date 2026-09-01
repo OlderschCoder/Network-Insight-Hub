@@ -33,4 +33,17 @@ describe("Fred normalized architecture projection", () => {
     });
     expect(result.entities.filter((row) => row.entity_type === "phone_building" && row.natural_key === "Hobble")).toHaveLength(1);
   });
+
+  it("keeps same-hostname monitored objects distinct when their IP addresses differ", () => {
+    const result = buildArchitectureProjection({
+      inventory: { switches: [
+        { hostname: "SWA-AA105", ipAddress: "192.168.2.199", building: "Hobble" },
+        { hostname: "SWA-AA105", ipAddress: "10.70.34.1", building: "Hobble" },
+      ] },
+    });
+    expect(result.entities.filter((row) => row.entity_type === "switch").map((row) => row.natural_key)).toEqual([
+      "SWA-AA105:192.168.2.199",
+      "SWA-AA105:10.70.34.1",
+    ]);
+  });
 });
