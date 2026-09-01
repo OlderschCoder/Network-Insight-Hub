@@ -815,6 +815,8 @@ Fred is not paid by the word. For ordinary questions, answer in 3-8 short senten
 
 Before answering, silently check persistent team memory, the user's personal memory, selected files, recent conversation checkpoint, and relevant live tools. If the user supplies a durable correction, decision, device relationship, procedure, or known-good fact, call save_memory during the same turn. Prefer updating or superseding an existing fact over producing near-duplicate memory. Never store greetings, speculation, transient telemetry, secrets, or the model's own unverified conclusions.
 
+For enterprise architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions, query the durable architecture snapshot first. Retrieve one domain at a time and narrow by building, hostname, IP, VLAN, application, or owner. The snapshot is structured evidence, not a substitute for current telemetry: compare its generated timestamp with live tools and label deltas. Never claim the architecture is unavailable merely because it is too large for one prompt.
+
 ## Reasoning discipline
 
 Do not seize the first plausible explanation and present it as fact. Before asserting a cause, reconcile it with every relevant signal already available: current telemetry, topology, configuration, recent changes, prior observations, tickets, tasks, and the user's new evidence. Explicitly separate verified facts, conflicts, and inference. If evidence conflicts, say so and rank the competing explanations. Prefer a reversible test that distinguishes them over another paragraph of analysis. Do not repeat a diagnostic already established in the conversation checkpoint unless it is stale or decision-critical.
@@ -1052,16 +1054,47 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
       operations: { processes, projects },
       governedKnowledge: knowledge,
     };
+    const durableEvidence = {
+      ...evidence,
+      inventory: { ...evidence.inventory, ports: physicalPorts },
+    };
     const architectureAI = getFredAI("deep");
-    const architecture = await architectureAI.client.chat.completions.create({
+    const architectRules = `You are Fred acting as a principal enterprise and network architect. Write one complete chapter of SCCC's current AS-IS architecture using only supplied evidence. Label material claims VERIFIED, INFERRED, STALE, CONTRADICTED, or UNKNOWN. Never invent components, owners, protocols, controls, recovery objectives, or flows. Every major conclusion needs its source and timestamp/freshness. Resolve conflicts by timestamp and authority or expose them. Complete the assigned chapter within the response; do not trail off, promise later work, or say the data is too large. Use concise tables and valid editable Mermaid where requested.`;
+    const chapterSpecs = [
+      {
+        title: "Executive, scope, and service architecture",
+        task: "Reconcile exact coverage counts; provide executive state, scope/method, organization/service context, application/SaaS portfolio, major dependencies, and a component Mermaid diagram.",
+        data: { generatedAt: evidence.generatedAt, inventory: { buildingCoverage, portSummary: evidence.inventory.portSummary, configFacts }, cloudCounts: { azureResources: azureResources.length }, operations: evidence.operations, governedKnowledge: knowledge },
+      },
+      {
+        title: "Campus network, buildings, voice, and connectivity",
+        task: "Cover every building; distinguish physical switches, stacks, SVIs, firewalls and other objects; document topology, ports summary, VLANs, routing, edge/WAN, wireless, voice, contradictions, stale data, SPOFs, and a network Mermaid diagram. A deterministic every-port appendix is attached later.",
+        data: { generatedAt: evidence.generatedAt, inventory: evidence.inventory },
+      },
+      {
+        title: "Azure, platforms, identity, and integrations",
+        task: "Document Azure resources and servers, identity/Entra, Banner and EUP, SaaS integrations, dependencies and data flows, ownership evidence, security/resilience, backup/DR, contradictions, gaps, and identity/data-flow plus deployment Mermaid diagrams.",
+        data: { generatedAt: evidence.generatedAt, cloud: evidence.cloud, governedKnowledge: knowledge },
+      },
+      {
+        title: "Operations, risk, continuity, and remediation",
+        task: "Document monitoring and operational processes, known-good versus current evidence rules, projects, ownership, lifecycle/technical debt, backup/continuity evidence, risks and single points of failure, then give a prioritized validation and remediation plan.",
+        data: { generatedAt: evidence.generatedAt, operations: evidence.operations, governedKnowledge: knowledge, coverage: buildingCoverage },
+      },
+    ];
+    const chapterResults = await Promise.all(chapterSpecs.map((chapter) => architectureAI.client.chat.completions.create({
       model: architectureAI.model,
-      max_completion_tokens: 16_000,
+      max_completion_tokens: 7_000,
       messages: [
-        { role: "system", content: `You are Fred acting as a principal enterprise and network architect. Produce a client-deliverable AS-IS enterprise architecture for Seward County Community College using only the supplied evidence. This is an evidence synthesis, not a generic template. Label every material statement VERIFIED, INFERRED, STALE, or UNKNOWN. Never invent a device, dependency, protocol, owner, security control, recovery objective, or data flow. Resolve conflicts by timestamp and source authority; expose unresolved conflicts. Include: executive overview; scope and methodology; organization/service context; application and SaaS portfolio; identity and access; campus network topology; WAN/Internet/edge; wireless; voice/collaboration; Azure/cloud; servers/platforms; monitoring/operations; integrations and data flows; security and resilience; backup/DR/continuity; lifecycle/technical debt; risks; evidence gaps; prioritized validation plan. Include editable Mermaid component, network, identity/data-flow, and deployment diagrams. Each table row must contain evidence source, timestamp/freshness, and confidence. Begin with a coverage reconciliation table listing the exact counts supplied for monitored objects, map nodes by kind, buildings, VLANs, reciprocal links, physical ports, routing adjacencies, phone assignments, configuration backups analyzed, and Azure resources. Cover every building in buildingCoverage and explicitly distinguish physical switches from SVIs, firewalls, stacks, and other monitored objects. Use configFacts for VRF/VDOM/routing claims. Do not claim Port Map detail was unavailable: a complete deterministic Port Map appendix will be attached after your narrative. Be precise and readable; do not pad.` },
-        { role: "user", content: `Generate the complete as-is architecture from this evidence snapshot:\n${JSON.stringify(evidence)}` },
+        { role: "system", content: architectRules },
+        { role: "user", content: `Chapter: ${chapter.title}\nAssignment: ${chapter.task}\nEvidence snapshot:\n${JSON.stringify(chapter.data)}` },
       ],
-    });
-    const narrative = architecture.choices[0]?.message?.content ?? "";
+    })));
+    const narrative = chapterResults.map((result, index) => {
+      const content = result.choices[0]?.message?.content ?? "";
+      const finish = result.choices[0]?.finish_reason ?? "unknown";
+      return `# ${chapterSpecs[index].title}\n\n${content}\n\n_Chapter completion: ${finish === "stop" ? "complete" : `requires review (${finish})`}._`;
+    }).join("\n\n---\n\n");
     const appendix = buildNetworkInventoryAppendix({ generatedAt: evidence.generatedAt, switches, nodes, vlans, links, ports: physicalPorts, routing, phoneAssignments, configFacts });
     const report = `${narrative}${appendix}`;
     const verifierAI = getFredAI("verify");
@@ -1073,30 +1106,50 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
         { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT NARRATIVE (deterministic appendices are validated by the supplied counts):\n${narrative}` },
       ],
     });
+    const evidenceSummary = {
+      generatedAt: evidence.generatedAt,
+      switches: switches.length,
+      vlans: vlans.length,
+      nodes: nodes.length,
+      links: links.length,
+      physicalPorts: physicalPorts.length,
+      routingAdjacencies: routing.length,
+      phoneAssignments: phoneAssignments.reduce((sum: number, row: any) => sum + Number(row.count), 0),
+      configurationsAnalyzed: configFacts.length,
+      buildings: buildingCoverage.length,
+      azureResources: azureResources.length,
+      processes: processes.length,
+      projects: projects.length,
+    };
+    const models = { architect: architectureAI.model, verifier: verifierAI.model };
+    const stored: any = await db.execute(sql`
+      INSERT INTO fred_architecture_snapshots (generated_by, generated_at, evidence, summary, report, verification, models)
+      VALUES (${Number((req as any).user?.id) || null}, ${evidence.generatedAt}, ${JSON.stringify(durableEvidence)}::jsonb,
+        ${JSON.stringify(evidenceSummary)}::jsonb, ${report}, ${verification.choices[0]?.message?.content ?? ""}, ${JSON.stringify(models)}::jsonb)
+      RETURNING id
+    `);
     return res.json({
       report,
       verification: verification.choices[0]?.message?.content ?? "",
-      evidenceSummary: {
-        generatedAt: evidence.generatedAt,
-        switches: switches.length,
-        vlans: vlans.length,
-        nodes: nodes.length,
-        links: links.length,
-        physicalPorts: physicalPorts.length,
-        routingAdjacencies: routing.length,
-        phoneAssignments: phoneAssignments.reduce((sum: number, row: any) => sum + Number(row.count), 0),
-        configurationsAnalyzed: configFacts.length,
-        buildings: buildingCoverage.length,
-        azureResources: azureResources.length,
-        processes: processes.length,
-        projects: projects.length,
-      },
-      models: { architect: architectureAI.model, verifier: verifierAI.model },
+      evidenceSummary,
+      snapshotId: stored.rows?.[0]?.id ?? null,
+      models,
     });
   } catch (error) {
     console.error("Enterprise architecture generation error:", error);
     return res.status(500).json({ error: "Failed to generate enterprise architecture", message: error instanceof Error ? error.message : String(error) });
   }
+});
+
+router.get("/enterprise-architecture/latest.json", requireAuth, requireCIO, async (_req: Request, res: Response) => {
+  const result: any = await db.execute(sql`
+    SELECT id, generated_at AS "generatedAt", evidence, summary, verification, models
+    FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1
+  `);
+  const snapshot = result.rows?.[0];
+  if (!snapshot) return res.status(404).json({ error: "No architecture snapshot has been generated yet." });
+  res.setHeader("Content-Disposition", `attachment; filename="sccc-enterprise-architecture-${String(snapshot.generatedAt).slice(0, 10)}.json"`);
+  return res.json(snapshot);
 });
 
 // ---- AI Red Flags ----------------------------------------------------------

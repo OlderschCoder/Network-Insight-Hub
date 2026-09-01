@@ -83,6 +83,24 @@ independent verification review are retained in the conversation topic. Later
 turns send only a bounded architecture reference back to the model, preventing
 the full deliverable from being retransmitted on every question.
 
+Each successful CIO architecture run also creates an immutable row in
+`fred_architecture_snapshots`. The row contains the full structured evidence
+JSON—including every physical Port Map record—plus the count manifest,
+human-readable report, independent review, generating models, author, and
+timestamp. The Architecture tab exposes both Markdown and JSON downloads.
+
+Fred reads the latest snapshot through `query_architecture_snapshot`. It must
+select a domain (`inventory`, `cloud`, `operations`, or governed `knowledge`)
+and should narrow large domains by hostname, building, IP, VLAN, application,
+or owner. This makes all captured evidence available over multiple bounded
+retrievals without placing the multi-megabyte snapshot in every model prompt.
+Snapshot evidence remains historical: Fred must compare its timestamp with
+live diagnostic tools before describing current operational state.
+
+The CIO Dashboard contains a direct **SCCC Enterprise Architecture** button.
+It opens the dedicated Architecture tab, not routine Fred chat, because report
+generation and durable evidence capture are one governed operation.
+
 ## Operations
 
 After changing model variables or credentials, restart `sccc-api.service`. Verify

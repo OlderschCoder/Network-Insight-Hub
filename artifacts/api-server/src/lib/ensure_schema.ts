@@ -11,6 +11,23 @@ import { logger } from "./logger";
 // logged, not fatal, so a reconcile problem never prevents the server starting.
 export async function ensureSchema(): Promise<void> {
   try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_snapshots" (
+      "id" bigserial PRIMARY KEY,
+      "generated_by" integer REFERENCES "users"("id") ON DELETE SET NULL,
+      "generated_at" timestamptz NOT NULL DEFAULT now(),
+      "evidence" jsonb NOT NULL,
+      "summary" jsonb NOT NULL,
+      "report" text NOT NULL,
+      "verification" text NOT NULL DEFAULT '',
+      "models" jsonb NOT NULL DEFAULT '{}'::jsonb
+    )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_snapshots_generated_idx" ON "fred_architecture_snapshots" ("generated_at" DESC)`);
+    logger.info("Ensured durable Fred architecture snapshots table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure Fred architecture snapshots table");
+  }
+
+  try {
     await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_chat_sessions" (
       "id" bigserial PRIMARY KEY,
       "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,

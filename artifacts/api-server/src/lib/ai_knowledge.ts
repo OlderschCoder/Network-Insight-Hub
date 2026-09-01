@@ -2731,6 +2731,47 @@ async function executeQueryInfluxLastSeen(rawArgs: string): Promise<string> {
 export const GRAFANA_PANEL_LINK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function", function: { name: "grafana_panel_link", description: "Create a read-only Grafana dashboard or panel link for an exact recent time window.", parameters: { type: "object", properties: { dashboardUid: { type: "string" }, panelId: { type: "number" }, minutes: { type: "number", minimum: 5, maximum: 10080 }, host: { type: "string" } } } }
 };
+
+export const QUERY_ARCHITECTURE_SNAPSHOT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "query_architecture_snapshot",
+    description: "Read the latest durable SCCC enterprise-architecture JSON snapshot. Use it before answering architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions. Select one domain at a time so the complete structured evidence remains queryable without loading the entire snapshot into context.",
+    parameters: {
+      type: "object",
+      properties: {
+        domain: { type: "string", enum: ["summary", "inventory", "cloud", "operations", "knowledge"], description: "Snapshot section to retrieve; defaults to summary." },
+        query: { type: "string", description: "Optional case-insensitive filter such as a hostname, building, IP, VLAN, application, or owner." },
+        maxChars: { type: "integer", minimum: 1000, maximum: 24000, description: "Maximum returned characters; defaults to 12000." },
+      },
+    },
+  },
+};
+
+export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const domain = ["inventory", "cloud", "operations", "knowledge"].includes(args.domain) ? args.domain : "summary";
+  const maxChars = Math.min(24_000, Math.max(1_000, Number(args.maxChars) || 12_000));
+  const result: any = await db.execute(sql`
+    SELECT id, generated_at AS "generatedAt", evidence, summary
+    FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1
+  `);
+  const row = result.rows?.[0];
+  if (!row) return "No durable enterprise-architecture snapshot has been generated yet.";
+  const value = domain === "summary"
+    ? { snapshotId: row.id, generatedAt: row.generatedAt, summary: row.summary }
+    : domain === "knowledge"
+      ? row.evidence?.governedKnowledge
+      : row.evidence?.[domain];
+  const query = String(args.query || "").trim().toLowerCase();
+  let text = JSON.stringify({ snapshotId: row.id, generatedAt: row.generatedAt, domain, evidence: value }, null, 2);
+  if (query) {
+    const lines = text.split("\n");
+    const matches = lines.flatMap((line, index) => line.toLowerCase().includes(query) ? lines.slice(Math.max(0, index - 2), index + 3) : []);
+    text = JSON.stringify({ snapshotId: row.id, generatedAt: row.generatedAt, domain, query, matchingEvidence: [...new Set(matches)] }, null, 2);
+  }
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n... narrow domain/query for the remaining structured evidence.`;
+}
 async function executeGrafanaPanelLink(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}"); const base = process.env.GRAFANA_URL?.replace(/\/$/, ""); if (!base) return "Grafana linking is not configured; set GRAFANA_URL.";
   const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60)); const uid = String(args.dashboardUid || "").trim(); const path = uid ? `/d/${encodeURIComponent(uid)}` : "/dashboards"; const q = new URLSearchParams({ from: `now-${minutes}m`, to: "now" });
@@ -2808,6 +2849,7 @@ export async function runChatWithMemory(
     CISCO_CALLING_SUPPORT_TOOL,
     QUERY_INFLUX_LAST_SEEN_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
+    QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
     QUERY_AZURE_VM_TOOL,
     QUERY_AZURE_SECURITY_TOOL,
     QUERY_AZURE_HEALTH_TOOL,
@@ -2840,7 +2882,7 @@ export async function runChatWithMemory(
   });
 
   for (let round = 0; round < 5; round++) {
-    const evidenceOnlyTools = tools.filter((tool) => evidenceToolNames.has(tool.function.name));
+    const evidenceOnlyTools = tools.filter((tool) => tool.type === "function" && evidenceToolNames.has(tool.function.name));
     const mustGatherEvidence = Boolean(opts.evidencePolicy && evidenceCalls < opts.evidencePolicy.minimumCalls && evidenceOnlyTools.length > 0);
     const completion = await openai.chat.completions.create({
       model: opts.model,
@@ -2976,7 +3018,10 @@ export async function runChatWithMemory(
       } else if (call.type === "function" && call.function.name === "query_influx_last_seen") {
         try { resultText = await executeQueryInfluxLastSeen(call.function.arguments); } catch (err) { logger.error({ err }, "query_influx_last_seen failed"); resultText = "Error: InfluxDB query failed"; }
       } else if (call.type === "function" && call.function.name === "grafana_panel_link") {
-        try { resultText = await executeGrafanaPanelLink(call.function.arguments); } catch (err) { logger.error({ err }, "grafana_panel_link failed"); resultText = "Error: Grafana link generation failed"; }      } else if (call.type === "function" && call.function.name === "query_azure_vm") {
+        try { resultText = await executeGrafanaPanelLink(call.function.arguments); } catch (err) { logger.error({ err }, "grafana_panel_link failed"); resultText = "Error: Grafana link generation failed"; }
+      } else if (call.type === "function" && call.function.name === "query_architecture_snapshot") {
+        try { resultText = await executeQueryArchitectureSnapshot(call.function.arguments); } catch (err) { logger.error({ err }, "query_architecture_snapshot failed"); resultText = "Error: architecture snapshot query failed"; }
+      } else if (call.type === "function" && call.function.name === "query_azure_vm") {
         try {
           resultText = await executeQueryAzureVm(call.function.arguments);
         } catch (err) {

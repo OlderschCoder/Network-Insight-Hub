@@ -2265,7 +2265,7 @@ function EnterpriseArchitectureTab() {
       if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
       setReport(data.report || "");
       setVerification(data.verification || "");
-      setMeta({ evidence: data.evidenceSummary, models: data.models });
+      setMeta({ evidence: data.evidenceSummary, models: data.models, snapshotId: data.snapshotId });
     } catch (error: any) {
       toast({ title: "Architecture generation failed", description: error.message, variant: "destructive" });
     } finally {
@@ -2283,6 +2283,21 @@ function EnterpriseArchitectureTab() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadJson = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/status-report/enterprise-architecture/latest.json`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `SCCC-As-Is-Enterprise-Architecture-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({ title: "JSON download failed", description: error.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -2298,7 +2313,8 @@ function EnterpriseArchitectureTab() {
             {loading ? "Building and verifying…" : "Generate as-is architecture"}
           </Button>
           {report && <Button variant="outline" onClick={download}><Download className="mr-2 h-4 w-4" />Download Markdown</Button>}
-          {meta && <p className="w-full text-xs text-muted-foreground">Architect: {meta.models?.architect} · Verifier: {meta.models?.verifier} · Evidence captured {meta.evidence?.generatedAt}</p>}
+          {meta?.snapshotId && <Button variant="outline" onClick={downloadJson}><Download className="mr-2 h-4 w-4" />Download evidence JSON</Button>}
+          {meta && <p className="w-full text-xs text-muted-foreground">Snapshot #{meta.snapshotId ?? "pending"} · Architect: {meta.models?.architect} · Verifier: {meta.models?.verifier} · Evidence captured {meta.evidence?.generatedAt}</p>}
         </CardContent>
       </Card>
       {report && <Card className="max-h-[65svh] overflow-hidden"><CardHeader><CardTitle>Architecture deliverable</CardTitle></CardHeader><CardContent className="max-h-[55svh] overflow-y-auto"><MarkdownMessage content={report} /></CardContent></Card>}
@@ -2310,7 +2326,10 @@ function EnterpriseArchitectureTab() {
 export default function AIReport() {
   const { isCIO } = useAuth();
   const search = useSearch();
-  const fromPath = new URLSearchParams(search).get("from") ?? "";
+  const searchParams = new URLSearchParams(search);
+  const fromPath = searchParams.get("from") ?? "";
+  const requestedTab = searchParams.get("tab");
+  const defaultTab = isCIO && requestedTab === "architecture" ? "architecture" : "chat";
   const contextHint = pageHintFromPath(fromPath);
 
   return (
@@ -2325,7 +2344,7 @@ export default function AIReport() {
         </p>
       </div>
 
-      <Tabs defaultValue="chat" className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue={defaultTab} className="flex min-h-0 flex-1 flex-col">
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           {isCIO && <TabsTrigger value="architecture">Architecture</TabsTrigger>}

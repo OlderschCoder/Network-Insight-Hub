@@ -3,10 +3,9 @@ flowchart LR
   UI --> S[(Durable per-user session)]
   UI --> H[Topic browser and archive]
   H --> S
-  UI --> A[Protected active incident state]
+  UI --> ACTIVE[Protected active incident state]
   UI --> API[Fred API]
-  UI -->|explicit as-is architecture request| SNAP
-  A --> API
+  ACTIVE --> API
   API --> R{Workload profile}
   R -->|routine: direct OpenAI| T[GPT-5.6 Terra]
   R -->|deep: direct OpenAI| C[GPT-5.6 Sol]
@@ -14,14 +13,19 @@ flowchart LR
   R -->|non-OpenAI model| OR[OpenRouter ZDR gateway]
   OR --> X[Claude or Gemini when ZDR-qualified]
   T --> TOOLS[Typed live evidence tools]
-  C --> SNAP[Timestamped architecture evidence snapshot]
-  DB[(Switches, buildings, VLANs, links, ports, phones, routing, configs)] --> SNAP
-  SNAP --> C
-  C --> D[As-is architecture + Mermaid]
+  DB[(Switches, buildings, VLANs, links, ports, phones, routing, configs)] --> GEN[Architecture generator]
+  CIO[CIO Dashboard architecture button] --> GEN
+  UI -->|explicit as-is architecture request| GEN
+  GEN --> C
   DB --> APP[Deterministic complete inventory appendices]
+  C --> D[As-is architecture + Mermaid]
   APP --> D
   D --> V
-  V --> A[Acceptance review]
+  V --> REVIEW[Acceptance review]
+  GEN --> JSON[(Versioned architecture JSON snapshots)]
+  D --> JSON
+  REVIEW --> JSON
+  JSON -->|bounded domain/query retrieval| API
   API --> M[(Team and personal governed memory)]
   API --> F[(Fred file library)]
   TOOLS --> API
