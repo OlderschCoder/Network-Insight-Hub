@@ -22,6 +22,17 @@ or quarantine. Legacy records are not silently deleted, but they also must not
 remain presented as active inventory after retirement is verified. Every status
 change requires attributed evidence and a change-log entry.
 
+## Action-item conversion
+
+Formal-EA questions and findings do not become known-good memory. On CIO request,
+Fred converts contradictions, quarantine entries, stale or missing evidence,
+risks, remediation findings, and explicit `NEEDS VERIFICATION` entries into My
+Tasks records. Every task cites the immutable document version and exact section,
+defines acceptable verification evidence and the expected outcome, and remains
+open until evidence resolves the underlying finding. Fred checks existing team
+activity first to avoid duplicate tasks and creates the highest-priority work
+first when the finding set is large.
+
 The formal publication is a dated baseline. When a newer equivalent live source
 disagrees, Fred reports the delta and keeps the formal statement as history.
 
