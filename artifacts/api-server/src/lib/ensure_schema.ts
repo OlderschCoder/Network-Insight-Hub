@@ -22,7 +22,9 @@ export async function ensureSchema(): Promise<void> {
       "verification" text NOT NULL DEFAULT '',
       "models" jsonb NOT NULL DEFAULT '{}'::jsonb
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_snapshots_generated_idx" ON "fred_architecture_snapshots" ("generated_at" DESC)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_architecture_snapshots_generated_idx" ON "fred_architecture_snapshots" ("generated_at" DESC)`,
+    );
     logger.info("Ensured durable Fred architecture snapshots table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure Fred architecture snapshots table");
@@ -42,8 +44,12 @@ export async function ensureSchema(): Promise<void> {
       "source_timestamp" timestamptz,
       UNIQUE ("snapshot_id", "entity_type", "natural_key")
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_lookup_idx" ON "fred_architecture_entities" ("snapshot_id", "entity_type", "natural_key")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_building_idx" ON "fred_architecture_entities" ("snapshot_id", "building")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_lookup_idx" ON "fred_architecture_entities" ("snapshot_id", "entity_type", "natural_key")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_architecture_entities_building_idx" ON "fred_architecture_entities" ("snapshot_id", "building")`,
+    );
     await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_relationships" (
       "id" bigserial PRIMARY KEY,
       "snapshot_id" bigint NOT NULL REFERENCES "fred_architecture_snapshots"("id") ON DELETE CASCADE,
@@ -56,7 +62,9 @@ export async function ensureSchema(): Promise<void> {
       "evidence_status" varchar(20) NOT NULL DEFAULT 'stored',
       "source" varchar(300) NOT NULL
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_relationships_lookup_idx" ON "fred_architecture_relationships" ("snapshot_id", "from_key", "to_key")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_architecture_relationships_lookup_idx" ON "fred_architecture_relationships" ("snapshot_id", "from_key", "to_key")`,
+    );
     await db.execute(sql`CREATE TABLE IF NOT EXISTS "fred_architecture_overrides" (
       "id" bigserial PRIMARY KEY,
       "entity_type" varchar(40) NOT NULL,
@@ -70,19 +78,132 @@ export async function ensureSchema(): Promise<void> {
       "created_at" timestamptz NOT NULL DEFAULT now(),
       "superseded_at" timestamptz
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_architecture_overrides_current_idx" ON "fred_architecture_overrides" ("entity_type", "natural_key", "created_at" DESC) WHERE "superseded_at" IS NULL`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_architecture_overrides_current_idx" ON "fred_architecture_overrides" ("entity_type", "natural_key", "created_at" DESC) WHERE "superseded_at" IS NULL`,
+    );
     const latest: any = await db.execute(sql`
       SELECT s.id, s.evidence FROM fred_architecture_snapshots s
       WHERE NOT EXISTS (SELECT 1 FROM fred_architecture_entities e WHERE e.snapshot_id = s.id)
       ORDER BY s.generated_at DESC LIMIT 1
     `);
     if (latest.rows?.[0]) {
-      const normalized = await storeArchitectureProjection(Number(latest.rows[0].id), latest.rows[0].evidence);
-      logger.info({ snapshotId: latest.rows[0].id, ...normalized }, "Backfilled latest Fred architecture snapshot into normalized tables");
+      const normalized = await storeArchitectureProjection(
+        Number(latest.rows[0].id),
+        latest.rows[0].evidence,
+      );
+      logger.info(
+        { snapshotId: latest.rows[0].id, ...normalized },
+        "Backfilled latest Fred architecture snapshot into normalized tables",
+      );
     }
     logger.info("Ensured normalized Fred architecture working tables exist");
   } catch (err) {
-    logger.error({ err }, "Failed to ensure normalized Fred architecture working tables");
+    logger.error(
+      { err },
+      "Failed to ensure normalized Fred architecture working tables",
+    );
+  }
+
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "formal_ea_documents" (
+      "id" bigserial PRIMARY KEY,
+      "title" varchar(500) NOT NULL,
+      "version" varchar(100) NOT NULL,
+      "architecture_state_date" date NOT NULL,
+      "effective_at" timestamptz NOT NULL,
+      "source_snapshot_id" bigint REFERENCES "fred_architecture_snapshots"("id") ON DELETE RESTRICT,
+      "source_snapshot_generated_at" timestamptz,
+      "approval_status" varchar(40) NOT NULL,
+      "document_status" varchar(100) NOT NULL,
+      "author" varchar(255) NOT NULL,
+      "approved_by" varchar(255),
+      "approved_at" timestamptz,
+      "classification" varchar(255) NOT NULL,
+      "content_sha256" varchar(64) NOT NULL UNIQUE,
+      "markdown_filename" varchar(500) NOT NULL,
+      "markdown_storage_path" text NOT NULL,
+      "word_filename" varchar(500),
+      "word_storage_path" text,
+      "word_sha256" varchar(64),
+      "supersedes_document_id" bigint REFERENCES "formal_ea_documents"("id") ON DELETE RESTRICT,
+      "imported_by" integer REFERENCES "users"("id") ON DELETE SET NULL,
+      "imported_by_name" varchar(255),
+      "created_at" timestamptz NOT NULL DEFAULT now()
+    )`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "formal_ea_documents_effective_idx" ON "formal_ea_documents" ("effective_at" DESC, "id" DESC)`,
+    );
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "formal_ea_sections" (
+      "id" bigserial PRIMARY KEY,
+      "document_id" bigint NOT NULL REFERENCES "formal_ea_documents"("id") ON DELETE RESTRICT,
+      "ordinal" integer NOT NULL,
+      "level" integer NOT NULL,
+      "section_number" varchar(100),
+      "heading" varchar(1000) NOT NULL,
+      "heading_path" jsonb NOT NULL DEFAULT '[]'::jsonb,
+      "content" text NOT NULL,
+      "content_sha256" varchar(64) NOT NULL,
+      UNIQUE ("document_id", "ordinal")
+    )`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "formal_ea_sections_lookup_idx" ON "formal_ea_sections" ("document_id", "section_number", "ordinal")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "formal_ea_sections_search_idx" ON "formal_ea_sections" USING gin (to_tsvector('english', coalesce("heading", '') || ' ' || coalesce("content", '')))`,
+    );
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "formal_ea_findings" (
+      "id" bigserial PRIMARY KEY,
+      "document_id" bigint NOT NULL REFERENCES "formal_ea_documents"("id") ON DELETE RESTRICT,
+      "section_id" bigint NOT NULL REFERENCES "formal_ea_sections"("id") ON DELETE RESTRICT,
+      "finding_type" varchar(80) NOT NULL,
+      "confidence" varchar(40),
+      "priority" varchar(40),
+      "title" varchar(1000) NOT NULL,
+      "content" text NOT NULL,
+      "source_reference" varchar(500) NOT NULL,
+      "attributes" jsonb NOT NULL DEFAULT '{}'::jsonb
+    )`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "formal_ea_findings_lookup_idx" ON "formal_ea_findings" ("document_id", "finding_type", "confidence", "priority")`,
+    );
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "formal_ea_entity_links" (
+      "id" bigserial PRIMARY KEY,
+      "document_id" bigint NOT NULL REFERENCES "formal_ea_documents"("id") ON DELETE RESTRICT,
+      "section_id" bigint NOT NULL REFERENCES "formal_ea_sections"("id") ON DELETE RESTRICT,
+      "snapshot_id" bigint NOT NULL REFERENCES "fred_architecture_snapshots"("id") ON DELETE RESTRICT,
+      "entity_type" varchar(40) NOT NULL,
+      "natural_key" varchar(500) NOT NULL,
+      "link_type" varchar(40) NOT NULL DEFAULT 'mentions',
+      UNIQUE ("document_id", "section_id", "snapshot_id", "entity_type", "natural_key", "link_type")
+    )`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "formal_ea_entity_links_lookup_idx" ON "formal_ea_entity_links" ("snapshot_id", "entity_type", "natural_key")`,
+    );
+    await db.execute(sql`CREATE OR REPLACE FUNCTION reject_formal_ea_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'formal EA records are immutable; import a superseding version'; END $$`);
+    for (const table of [
+      "formal_ea_documents",
+      "formal_ea_sections",
+      "formal_ea_findings",
+      "formal_ea_entity_links",
+    ]) {
+      await db.execute(
+        sql.raw(`DROP TRIGGER IF EXISTS ${table}_immutable ON ${table}`),
+      );
+      await db.execute(
+        sql.raw(
+          `CREATE TRIGGER ${table}_immutable BEFORE UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION reject_formal_ea_mutation()`,
+        ),
+      );
+    }
+    logger.info(
+      "Ensured immutable formal enterprise-architecture document tables exist",
+    );
+  } catch (err) {
+    logger.error(
+      { err },
+      "Failed to ensure formal enterprise-architecture document tables",
+    );
   }
 
   try {
@@ -96,8 +217,12 @@ export async function ensureSchema(): Promise<void> {
       "created_at" timestamptz NOT NULL DEFAULT now(),
       "updated_at" timestamptz NOT NULL DEFAULT now()
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "fred_chat_sessions_user_updated_idx" ON "fred_chat_sessions" ("user_id", "updated_at" DESC)`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "fred_chat_sessions_one_active_idx" ON "fred_chat_sessions" ("user_id") WHERE "is_active" = true`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "fred_chat_sessions_user_updated_idx" ON "fred_chat_sessions" ("user_id", "updated_at" DESC)`,
+    );
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS "fred_chat_sessions_one_active_idx" ON "fred_chat_sessions" ("user_id") WHERE "is_active" = true`,
+    );
     logger.info("Ensured durable Fred chat sessions table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure durable Fred chat sessions table");
@@ -117,7 +242,9 @@ export async function ensureSchema(): Promise<void> {
       "updated_at" timestamptz DEFAULT now() NOT NULL,
       UNIQUE ("user_id", "scenario_id")
     )`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "learn_progress_user_idx" ON "learn_scenario_progress" ("user_id", "status")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "learn_progress_user_idx" ON "learn_scenario_progress" ("user_id", "status")`,
+    );
     logger.info("Ensured Learn scenario progress table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure Learn scenario progress table");
@@ -331,9 +458,15 @@ export async function ensureSchema(): Promise<void> {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_nodes_mgmt_ip_idx" ON "net_nodes" ("mgmt_ip")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_nodes_building_idx" ON "net_nodes" ("building")`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_nodes_hostname_uq" ON "net_nodes" ("hostname")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_nodes_mgmt_ip_idx" ON "net_nodes" ("mgmt_ip")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_nodes_building_idx" ON "net_nodes" ("building")`,
+    );
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_nodes_hostname_uq" ON "net_nodes" ("hostname")`,
+    );
     logger.info("Ensured net_nodes table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure net_nodes table");
@@ -363,9 +496,15 @@ export async function ensureSchema(): Promise<void> {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_a_node_idx" ON "net_links" ("a_node_id")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_b_node_idx" ON "net_links" ("b_node_id")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_links_last_verified_idx" ON "net_links" ("last_verified_at")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_links_a_node_idx" ON "net_links" ("a_node_id")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_links_b_node_idx" ON "net_links" ("b_node_id")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_links_last_verified_idx" ON "net_links" ("last_verified_at")`,
+    );
     logger.info("Ensured net_links table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure net_links table");
@@ -417,13 +556,27 @@ export async function ensureSchema(): Promise<void> {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_ports_node_interface_uq" ON "net_ports" ("node_id", "interface_name")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_node_idx" ON "net_ports" ("node_id")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_ports_telemetry_updated_idx" ON "net_ports" ("telemetry_updated_at")`);
-    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "status_reason" varchar(120)`);
-    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "media_type" varchar(80)`);
-    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "mac_count" integer NOT NULL DEFAULT 0`);
-    await db.execute(sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "lldp_neighbor_count" integer NOT NULL DEFAULT 0`);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS "net_ports_node_interface_uq" ON "net_ports" ("node_id", "interface_name")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_ports_node_idx" ON "net_ports" ("node_id")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_ports_telemetry_updated_idx" ON "net_ports" ("telemetry_updated_at")`,
+    );
+    await db.execute(
+      sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "status_reason" varchar(120)`,
+    );
+    await db.execute(
+      sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "media_type" varchar(80)`,
+    );
+    await db.execute(
+      sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "mac_count" integer NOT NULL DEFAULT 0`,
+    );
+    await db.execute(
+      sql`ALTER TABLE "net_ports" ADD COLUMN IF NOT EXISTS "lldp_neighbor_count" integer NOT NULL DEFAULT 0`,
+    );
     logger.info("Ensured net_ports table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure net_ports table");
@@ -449,8 +602,12 @@ export async function ensureSchema(): Promise<void> {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_device_idx" ON "net_routing_adjacencies" ("device_node_id")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_state_idx" ON "net_routing_adjacencies" ("state")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_device_idx" ON "net_routing_adjacencies" ("device_node_id")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "net_routing_adj_state_idx" ON "net_routing_adjacencies" ("state")`,
+    );
     logger.info("Ensured net_routing_adjacencies table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure net_routing_adjacencies table");
@@ -520,8 +677,12 @@ export async function ensureSchema(): Promise<void> {
         "ingested_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_start_idx" ON "webex_it_call_legs" ("start_time")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_correlation_idx" ON "webex_it_call_legs" ("correlation_id")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_start_idx" ON "webex_it_call_legs" ("start_time")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "webex_it_call_legs_correlation_idx" ON "webex_it_call_legs" ("correlation_id")`,
+    );
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "webex_it_call_sync_state" (
         "id" integer PRIMARY KEY NOT NULL,
@@ -531,7 +692,9 @@ export async function ensureSchema(): Promise<void> {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`INSERT INTO "webex_it_call_sync_state" ("id") VALUES (1) ON CONFLICT ("id") DO NOTHING`);
+    await db.execute(
+      sql`INSERT INTO "webex_it_call_sync_state" ("id") VALUES (1) ON CONFLICT ("id") DO NOTHING`,
+    );
     logger.info("Ensured Webex IT call history tables exist");
   } catch (err) {
     logger.error({ err }, "Failed to ensure Webex IT call history tables");
@@ -546,7 +709,10 @@ export async function ensureSchema(): Promise<void> {
     );
     logger.info("Ensured reports.include_cloud_inventory column exists");
   } catch (err) {
-    logger.error({ err }, "Failed to ensure reports.include_cloud_inventory column");
+    logger.error(
+      { err },
+      "Failed to ensure reports.include_cloud_inventory column",
+    );
   }
 
   // Product engagement is distinct from work records. A task assignment or PIR
@@ -567,8 +733,12 @@ export async function ensureSchema(): Promise<void> {
         CONSTRAINT "product_usage_events_duration_check" CHECK ("duration_seconds" BETWEEN 0 AND 120)
       )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "product_usage_events_user_time_idx" ON "product_usage_events" ("user_id", "created_at")`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS "product_usage_events_path_time_idx" ON "product_usage_events" ("path", "created_at")`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "product_usage_events_user_time_idx" ON "product_usage_events" ("user_id", "created_at")`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS "product_usage_events_path_time_idx" ON "product_usage_events" ("path", "created_at")`,
+    );
     logger.info("Ensured product usage event table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure product usage event table");

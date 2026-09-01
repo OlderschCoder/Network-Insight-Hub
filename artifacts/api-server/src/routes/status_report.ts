@@ -26,13 +26,24 @@ const reports = reportsTable;
 const risks = risksTable;
 const afterActionReports = afterActionReportsTable;
 import { requireAuth, requireCIO } from "./auth";
-import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture, getActiveRoster } from "../lib/ai_knowledge";
+import {
+  getKnowledgeContext,
+  runChatWithMemory,
+  messageRequestsCapture,
+  getActiveRoster,
+} from "../lib/ai_knowledge";
 import { getFredAI, getOpenAI, isAIConfigured } from "../lib/openai";
 import { buildFredFileReviewContext } from "../lib/fred_files";
-import { boundFredMessages, FRED_MAX_CHECKPOINT_CHARS } from "../lib/fred_context";
+import {
+  boundFredMessages,
+  FRED_MAX_CHECKPOINT_CHARS,
+} from "../lib/fred_context";
 import { evidencePolicyFor, latestUserText } from "../lib/fred_evidence_policy";
 import { extractActiveIncidentState } from "../lib/fred_active_state";
-import { buildNetworkInventoryAppendix, extractNetworkConfigFacts } from "../lib/fred_architecture_inventory";
+import {
+  buildNetworkInventoryAppendix,
+  extractNetworkConfigFacts,
+} from "../lib/fred_architecture_inventory";
 import { storeArchitectureProjection } from "../lib/fred_architecture_store";
 
 const router = Router();
@@ -47,7 +58,10 @@ function buildNetworkByBuilding(
   switches: Array<Record<string, any>>,
   vlans: Array<Record<string, any>>,
 ) {
-  const map = new Map<string, { building: string; switches: any[]; vlans: any[] }>();
+  const map = new Map<
+    string,
+    { building: string; switches: any[]; vlans: any[] }
+  >();
   const ensure = (b: unknown) => {
     const key = (typeof b === "string" && b.trim()) || "Unassigned";
     if (!map.has(key)) map.set(key, { building: key, switches: [], vlans: [] });
@@ -73,7 +87,9 @@ function buildNetworkByBuilding(
       description: v.description ?? null,
     });
   }
-  return Array.from(map.values()).sort((a, b) => a.building.localeCompare(b.building));
+  return Array.from(map.values()).sort((a, b) =>
+    a.building.localeCompare(b.building),
+  );
 }
 
 type StoredFredMessage = { role: "user" | "assistant"; content: string };
@@ -84,74 +100,108 @@ function sanitizeStoredFredMessages(value: unknown): StoredFredMessage[] {
     if (!item || typeof item !== "object") return [];
     const role = (item as any).role;
     const content = (item as any).content;
-    if ((role !== "user" && role !== "assistant") || typeof content !== "string") return [];
+    if (
+      (role !== "user" && role !== "assistant") ||
+      typeof content !== "string"
+    )
+      return [];
     return [{ role, content: content.slice(0, 1_000_000) }];
   });
 }
 
-router.get("/chat-session", requireAuth, async (req: Request, res: Response) => {
-  const userId = Number((req as any).user?.id);
-  const result: any = await db.execute(sql`
+router.get(
+  "/chat-session",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const userId = Number((req as any).user?.id);
+    const result: any = await db.execute(sql`
     SELECT id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
     FROM fred_chat_sessions
     WHERE user_id = ${userId} AND is_active = true
     ORDER BY updated_at DESC LIMIT 1
   `);
-  const session = result.rows?.[0] ?? null;
-  return res.json({ session });
-});
+    const session = result.rows?.[0] ?? null;
+    return res.json({ session });
+  },
+);
 
-router.get("/chat-sessions", requireAuth, async (req: Request, res: Response) => {
-  const userId = Number((req as any).user?.id);
-  const result: any = await db.execute(sql`
+router.get(
+  "/chat-sessions",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const userId = Number((req as any).user?.id);
+    const result: any = await db.execute(sql`
     SELECT id, title, is_active AS "isActive", created_at AS "createdAt", updated_at AS "updatedAt",
       jsonb_array_length(messages) AS "messageCount"
     FROM fred_chat_sessions
     WHERE user_id = ${userId}
     ORDER BY is_active DESC, updated_at DESC LIMIT 50
   `);
-  return res.json({ sessions: result.rows ?? [] });
-});
+    return res.json({ sessions: result.rows ?? [] });
+  },
+);
 
-router.post("/chat-session/:id/activate", requireAuth, async (req: Request, res: Response) => {
-  const userId = Number((req as any).user?.id);
-  const sessionId = String(req.params.id ?? "");
-  const session = await db.transaction(async (tx) => {
-    const found: any = await tx.execute(sql`
+router.post(
+  "/chat-session/:id/activate",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const userId = Number((req as any).user?.id);
+    const sessionId = String(req.params.id ?? "");
+    const session = await db.transaction(async (tx) => {
+      const found: any = await tx.execute(sql`
       SELECT id FROM fred_chat_sessions WHERE id::text = ${sessionId} AND user_id = ${userId} LIMIT 1
     `);
-    if (!found.rows?.[0]) return null;
-    await tx.execute(sql`UPDATE fred_chat_sessions SET is_active = false WHERE user_id = ${userId}`);
-    const activated: any = await tx.execute(sql`
+      if (!found.rows?.[0]) return null;
+      await tx.execute(
+        sql`UPDATE fred_chat_sessions SET is_active = false WHERE user_id = ${userId}`,
+      );
+      const activated: any = await tx.execute(sql`
       UPDATE fred_chat_sessions SET is_active = true, updated_at = now()
       WHERE id::text = ${sessionId} AND user_id = ${userId}
       RETURNING id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
     `);
-    return activated.rows?.[0] ?? null;
-  });
-  if (!session) return res.status(404).json({ error: "Fred topic not found" });
-  return res.json({ session });
-});
+      return activated.rows?.[0] ?? null;
+    });
+    if (!session)
+      return res.status(404).json({ error: "Fred topic not found" });
+    return res.json({ session });
+  },
+);
 
-router.put("/chat-session", requireAuth, async (req: Request, res: Response) => {
-  const userId = Number((req as any).user?.id);
-  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : "";
-  const messages = sanitizeStoredFredMessages(req.body?.messages);
-  const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
-  const titleSource = messages.find((message) => message.role === "user")?.content || "Fred conversation";
-  const requestedTitle = typeof req.body?.title === "string" ? req.body.title : "";
-  const title = (requestedTitle || titleSource).replace(/\s+/g, " ").trim().slice(0, 200) || "Fred conversation";
-  if (sessionId) {
-    const updated: any = await db.execute(sql`
+router.put(
+  "/chat-session",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const userId = Number((req as any).user?.id);
+    const sessionId =
+      typeof req.body?.sessionId === "string" ? req.body.sessionId : "";
+    const messages = sanitizeStoredFredMessages(req.body?.messages);
+    const checkpoint =
+      typeof req.body?.checkpoint === "string"
+        ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS)
+        : "";
+    const titleSource =
+      messages.find((message) => message.role === "user")?.content ||
+      "Fred conversation";
+    const requestedTitle =
+      typeof req.body?.title === "string" ? req.body.title : "";
+    const title =
+      (requestedTitle || titleSource)
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200) || "Fred conversation";
+    if (sessionId) {
+      const updated: any = await db.execute(sql`
       UPDATE fred_chat_sessions SET title = ${title}, messages = ${JSON.stringify(messages)}::jsonb,
         checkpoint = ${checkpoint}, updated_at = now()
       WHERE id::text = ${sessionId} AND user_id = ${userId}
       RETURNING id, updated_at AS "updatedAt"
     `);
-    if (!updated.rows?.[0]) return res.status(404).json({ error: "Fred topic not found" });
-    return res.json({ saved: true, session: updated.rows[0] });
-  }
-  const result: any = await db.execute(sql`
+      if (!updated.rows?.[0])
+        return res.status(404).json({ error: "Fred topic not found" });
+      return res.json({ saved: true, session: updated.rows[0] });
+    }
+    const result: any = await db.execute(sql`
     INSERT INTO fred_chat_sessions (user_id, title, messages, checkpoint, is_active)
     VALUES (${userId}, ${title}, ${JSON.stringify(messages)}::jsonb, ${checkpoint}, true)
     ON CONFLICT (user_id) WHERE is_active = true
@@ -159,28 +209,39 @@ router.put("/chat-session", requireAuth, async (req: Request, res: Response) => 
       checkpoint = EXCLUDED.checkpoint, updated_at = now()
     RETURNING id, updated_at AS "updatedAt"
   `);
-  return res.json({ saved: true, session: result.rows?.[0] ?? null });
-});
+    return res.json({ saved: true, session: result.rows?.[0] ?? null });
+  },
+);
 
-router.post("/chat-session/new", requireAuth, async (req: Request, res: Response) => {
-  const userId = Number((req as any).user?.id);
-  const messages = sanitizeStoredFredMessages(req.body?.messages);
-  const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
-  const requestedTitle = typeof req.body?.title === "string" ? req.body.title.replace(/\s+/g, " ").trim().slice(0, 200) : "";
-  const session = await db.transaction(async (tx) => {
-    await tx.execute(sql`
+router.post(
+  "/chat-session/new",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const userId = Number((req as any).user?.id);
+    const messages = sanitizeStoredFredMessages(req.body?.messages);
+    const checkpoint =
+      typeof req.body?.checkpoint === "string"
+        ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS)
+        : "";
+    const requestedTitle =
+      typeof req.body?.title === "string"
+        ? req.body.title.replace(/\s+/g, " ").trim().slice(0, 200)
+        : "";
+    const session = await db.transaction(async (tx) => {
+      await tx.execute(sql`
       UPDATE fred_chat_sessions SET is_active = false, messages = ${JSON.stringify(messages)}::jsonb,
         checkpoint = ${checkpoint}, updated_at = now()
       WHERE user_id = ${userId} AND is_active = true
     `);
-    const inserted: any = await tx.execute(sql`
+      const inserted: any = await tx.execute(sql`
       INSERT INTO fred_chat_sessions (user_id, title) VALUES (${userId}, ${requestedTitle || "New Fred topic"})
       RETURNING id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
     `);
-    return inserted.rows?.[0] ?? null;
-  });
-  return res.json({ created: true, session });
-});
+      return inserted.rows?.[0] ?? null;
+    });
+    return res.json({ created: true, session });
+  },
+);
 
 router.post(
   "/generate",
@@ -208,10 +269,14 @@ router.post(
       const start = parseDate(startDate);
       const end = parseDate(endDate);
       if (!start || !end) {
-        return res.status(400).json({ error: "startDate and endDate must be valid ISO dates" });
+        return res
+          .status(400)
+          .json({ error: "startDate and endDate must be valid ISO dates" });
       }
       if (start > end) {
-        return res.status(400).json({ error: "startDate must be on or before endDate" });
+        return res
+          .status(400)
+          .json({ error: "startDate must be on or before endDate" });
       }
 
       // Gather operational data from DB
@@ -242,8 +307,8 @@ router.post(
           .where(
             and(
               gte(entries.entryDate, start.toISOString().slice(0, 10)),
-              lte(entries.entryDate, end.toISOString().slice(0, 10))
-            )
+              lte(entries.entryDate, end.toISOString().slice(0, 10)),
+            ),
           ),
         db
           .select({
@@ -260,8 +325,8 @@ router.post(
           .where(
             and(
               gte(reports.weekOf, start.toISOString().slice(0, 10)),
-              lte(reports.weekOf, end.toISOString().slice(0, 10))
-            )
+              lte(reports.weekOf, end.toISOString().slice(0, 10)),
+            ),
           ),
         db
           .select({
@@ -274,12 +339,7 @@ router.post(
             updatedAt: risks.updatedAt,
           })
           .from(risks)
-          .where(
-            and(
-              gte(risks.updatedAt, start),
-              lte(risks.updatedAt, end)
-            )
-          ),
+          .where(and(gte(risks.updatedAt, start), lte(risks.updatedAt, end))),
         db
           // PIRs that occurred OR were resolved OR were created in the period
           // (matches /reports/:id/extras semantics so AI narrative sees the same
@@ -325,8 +385,8 @@ router.post(
           .where(
             and(
               gte(entries.entryDate, start.toISOString().slice(0, 10)),
-              lte(entries.entryDate, end.toISOString().slice(0, 10))
-            )
+              lte(entries.entryDate, end.toISOString().slice(0, 10)),
+            ),
           ),
         db
           .select({
@@ -339,36 +399,44 @@ router.post(
           .where(
             and(
               gte(logItemsTable.itemDate, start.toISOString().slice(0, 10)),
-              lte(logItemsTable.itemDate, end.toISOString().slice(0, 10))
-            )
+              lte(logItemsTable.itemDate, end.toISOString().slice(0, 10)),
+            ),
           ),
-        db.select({
-          id: projectsTable.id,
-          title: projectsTable.title,
-          description: projectsTable.description,
-          status: projectsTable.status,
-          progress: projectsTable.progress,
-          targetDate: projectsTable.targetDate,
-          newEstimatedDate: projectsTable.newEstimatedDate,
-          strategicObjectiveIds: projectsTable.strategicObjectiveIds,
-        }).from(projectsTable),
-        db.select({
-          id: strategicObjectivesTable.id,
-          title: strategicObjectivesTable.title,
-          description: strategicObjectivesTable.description,
-          status: strategicObjectivesTable.status,
-        }).from(strategicObjectivesTable),
-        db.select({
-          hostname: networkSwitchesTable.hostname,
-          building: networkSwitchesTable.building,
-          maintenanceLog: networkSwitchesTable.maintenanceLog,
-        }).from(networkSwitchesTable),
-        db.select({
-          vlanId: vlansTable.vlanId,
-          name: vlansTable.name,
-          building: vlansTable.building,
-          maintenanceLog: vlansTable.maintenanceLog,
-        }).from(vlansTable),
+        db
+          .select({
+            id: projectsTable.id,
+            title: projectsTable.title,
+            description: projectsTable.description,
+            status: projectsTable.status,
+            progress: projectsTable.progress,
+            targetDate: projectsTable.targetDate,
+            newEstimatedDate: projectsTable.newEstimatedDate,
+            strategicObjectiveIds: projectsTable.strategicObjectiveIds,
+          })
+          .from(projectsTable),
+        db
+          .select({
+            id: strategicObjectivesTable.id,
+            title: strategicObjectivesTable.title,
+            description: strategicObjectivesTable.description,
+            status: strategicObjectivesTable.status,
+          })
+          .from(strategicObjectivesTable),
+        db
+          .select({
+            hostname: networkSwitchesTable.hostname,
+            building: networkSwitchesTable.building,
+            maintenanceLog: networkSwitchesTable.maintenanceLog,
+          })
+          .from(networkSwitchesTable),
+        db
+          .select({
+            vlanId: vlansTable.vlanId,
+            name: vlansTable.name,
+            building: vlansTable.building,
+            maintenanceLog: vlansTable.maintenanceLog,
+          })
+          .from(vlansTable),
       ]);
 
       // Filter maintenance windows to the date range — OR semantics on
@@ -394,7 +462,11 @@ router.post(
       for (const sw of switchesData) {
         for (const log of sw.maintenanceLog ?? []) {
           if (log.deletedAt) continue;
-          if (inRange(log.createdAt) || inRange(log.windowStart) || inRange(log.windowEnd)) {
+          if (
+            inRange(log.createdAt) ||
+            inRange(log.windowStart) ||
+            inRange(log.windowEnd)
+          ) {
             maintenanceWindows.push({
               target: sw.hostname,
               kind: "switch",
@@ -410,7 +482,11 @@ router.post(
       for (const vlan of vlansData) {
         for (const log of vlan.maintenanceLog ?? []) {
           if (log.deletedAt) continue;
-          if (inRange(log.createdAt) || inRange(log.windowStart) || inRange(log.windowEnd)) {
+          if (
+            inRange(log.createdAt) ||
+            inRange(log.windowStart) ||
+            inRange(log.windowEnd)
+          ) {
             maintenanceWindows.push({
               target: `VLAN ${vlan.vlanId} (${vlan.name})`,
               kind: "vlan",
@@ -437,7 +513,7 @@ router.post(
         })
         .from(projectsTable);
       const startIso = new Date(startStr + "T00:00:00.000Z").toISOString();
-      const projectRangeDelta = (p: typeof allProjectsForGoals[number]) => {
+      const projectRangeDelta = (p: (typeof allProjectsForGoals)[number]) => {
         const log = Array.isArray(p.progressLog)
           ? (p.progressLog as { date: string; value: number }[])
           : [];
@@ -455,13 +531,21 @@ router.post(
       const goalProgress = objectivesData
         .filter((o) => o.status !== "archived")
         .map((o) => {
-          const linked = allProjectsForGoals.filter((p) =>
-            Array.isArray(p.strategicObjectiveIds) && (p.strategicObjectiveIds as number[]).includes(o.id),
+          const linked = allProjectsForGoals.filter(
+            (p) =>
+              Array.isArray(p.strategicObjectiveIds) &&
+              (p.strategicObjectiveIds as number[]).includes(o.id),
           );
-          const active = linked.filter((p) => p.status !== "completed" && p.status !== "cancelled");
-          const avgProgress = linked.length > 0
-            ? Math.round(linked.reduce((s, p) => s + (p.progress ?? 0), 0) / linked.length)
-            : 0;
+          const active = linked.filter(
+            (p) => p.status !== "completed" && p.status !== "cancelled",
+          );
+          const avgProgress =
+            linked.length > 0
+              ? Math.round(
+                  linked.reduce((s, p) => s + (p.progress ?? 0), 0) /
+                    linked.length,
+                )
+              : 0;
           const projectsWithDelta = linked.map((p) => {
             const d = projectRangeDelta(p);
             return {
@@ -472,10 +556,14 @@ router.post(
               rangeDelta: d.delta,
             };
           });
-          const sumRangeDelta = projectsWithDelta.reduce((s, p) => s + p.rangeDelta, 0);
-          const avgRangeDelta = projectsWithDelta.length > 0
-            ? Math.round(sumRangeDelta / projectsWithDelta.length)
-            : 0;
+          const sumRangeDelta = projectsWithDelta.reduce(
+            (s, p) => s + p.rangeDelta,
+            0,
+          );
+          const avgRangeDelta =
+            projectsWithDelta.length > 0
+              ? Math.round(sumRangeDelta / projectsWithDelta.length)
+              : 0;
           return {
             goal: o.title,
             description: o.description,
@@ -584,7 +672,10 @@ The user message contains an \`operationalData\` JSON object with these top-leve
 - \`openRisksAndIssues\`, \`mitigatedRisks\`, \`closedRisks\`: open ones belong in Key Actions / Decisions and (if material) Challenges; mitigated/closed support Recent Wins.
 - \`ticketStats\` (helpdesk volume + categories): use for Service Level Metrics.`;
 
-      const knowledgeContext = await getKnowledgeContext(undefined, (req as any).user?.id ?? null);
+      const knowledgeContext = await getKnowledgeContext(
+        undefined,
+        (req as any).user?.id ?? null,
+      );
       const systemPromptWithKnowledge = knowledgeContext
         ? `${systemPrompt}\n\n# SCCC Environment Knowledge Base (institutional context — use for accurate terminology, systems, and environment specifics)\n${knowledgeContext}`
         : systemPrompt;
@@ -613,7 +704,9 @@ The user message contains an \`operationalData\` JSON object with these top-leve
           totalTickets: ticketStats[0]?.total ?? 0,
           completedTasksCount: logItemsData.length,
           projectsCount: projectsData.length,
-          activeProjectsCount: projectsData.filter((p) => p.status !== "completed" && p.status !== "cancelled").length,
+          activeProjectsCount: projectsData.filter(
+            (p) => p.status !== "completed" && p.status !== "cancelled",
+          ).length,
           goalsCount: goalProgress.length,
           maintenanceWindowsCount: maintenanceWindows.length,
         },
@@ -625,190 +718,219 @@ The user message contains an \`operationalData\` JSON object with these top-leve
         message: error instanceof Error ? error.message : String(error),
       });
     }
-  }
+  },
 );
 
-router.post(
-  "/chat",
-  requireAuth,
-  async (req: Request, res: Response) => {
-    if (!isAIConfigured()) {
-      return res.status(503).json({ error: "AI service is not configured." });
+router.post("/chat", requireAuth, async (req: Request, res: Response) => {
+  if (!isAIConfigured()) {
+    return res.status(503).json({ error: "AI service is not configured." });
+  }
+  try {
+    const {
+      messages: chatMessages = [],
+      conversationCheckpoint = "",
+      lookbackDays: rawLookback = 90,
+      previewInventory = false,
+      uploadedFileIds = [],
+    } = req.body ?? {};
+
+    if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
+      return res.status(400).json({ error: "messages array required" });
     }
-    try {
-      const {
-        messages: chatMessages = [],
-        conversationCheckpoint = "",
-        lookbackDays: rawLookback = 90,
-        previewInventory = false,
-        uploadedFileIds = [],
-      } = req.body ?? {};
 
-      if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
-        return res.status(400).json({ error: "messages array required" });
+    if (
+      typeof conversationCheckpoint !== "string" ||
+      conversationCheckpoint.length > FRED_MAX_CHECKPOINT_CHARS
+    ) {
+      return res
+        .status(400)
+        .json({
+          error: `conversationCheckpoint must be a string up to ${FRED_MAX_CHECKPOINT_CHARS} characters`,
+        });
+    }
+
+    if (
+      !Array.isArray(uploadedFileIds) ||
+      uploadedFileIds.some((id) => typeof id !== "string")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "uploadedFileIds must be an array of strings" });
+    }
+
+    // Validate message shape — content may be a string or a vision array (image + text parts)
+    const validRoles = new Set(["user", "assistant", "system"]);
+    for (const m of chatMessages) {
+      if (!m || typeof m !== "object" || !validRoles.has(m.role)) {
+        return res
+          .status(400)
+          .json({
+            error: "each message must have role (user|assistant|system)",
+          });
       }
-
-      if (typeof conversationCheckpoint !== "string" || conversationCheckpoint.length > FRED_MAX_CHECKPOINT_CHARS) {
-        return res.status(400).json({ error: `conversationCheckpoint must be a string up to ${FRED_MAX_CHECKPOINT_CHARS} characters` });
+      if (typeof m.content !== "string" && !Array.isArray(m.content)) {
+        return res
+          .status(400)
+          .json({
+            error: "message content must be a string or content-part array",
+          });
       }
+    }
 
-      if (!Array.isArray(uploadedFileIds) || uploadedFileIds.some((id) => typeof id !== "string")) {
-        return res.status(400).json({ error: "uploadedFileIds must be an array of strings" });
-      }
+    const boundedChatMessages = boundFredMessages(chatMessages);
+    const evidencePolicy = evidencePolicyFor(latestUserText(chatMessages));
+    const activeIncidentState = extractActiveIncidentState(
+      chatMessages,
+      conversationCheckpoint,
+    );
+    const lookbackDays = Math.max(1, Math.min(365, Number(rawLookback) || 90));
+    const since = new Date();
+    since.setDate(since.getDate() - lookbackDays);
+    const sinceStr = since.toISOString().slice(0, 10);
+    // Team items: always pull last 7 days for all users (gives Fred current team context)
+    const teamItemsDate = new Date();
+    teamItemsDate.setDate(teamItemsDate.getDate() - 7);
+    const teamItemsSince = teamItemsDate.toISOString().slice(0, 10);
 
-      // Validate message shape — content may be a string or a vision array (image + text parts)
-      const validRoles = new Set(["user", "assistant", "system"]);
-      for (const m of chatMessages) {
-        if (!m || typeof m !== "object" || !validRoles.has(m.role)) {
-          return res.status(400).json({ error: "each message must have role (user|assistant|system)" });
-        }
-        if (typeof m.content !== "string" && !Array.isArray(m.content)) {
-          return res.status(400).json({ error: "message content must be a string or content-part array" });
-        }
-      }
+    const [
+      entriesData,
+      risksData,
+      aarData,
+      projectsData,
+      objectivesData,
+      tasksData,
+      switchRows,
+      vlanRows,
+    ] = await Promise.all([
+      db
+        .select({
+          id: entries.id,
+          category: entries.category,
+          title: entries.title,
+          description: entries.description,
+          accomplishments: entries.accomplishments,
+          challenges: entries.challenges,
+          ticketCount: entries.ticketCount,
+          entryDate: entries.entryDate,
+          userName: usersTable.name,
+          userRole: usersTable.role,
+        })
+        .from(entries)
+        .innerJoin(usersTable, eq(entries.userId, usersTable.id))
+        .where(gte(entries.entryDate, sinceStr))
+        .limit(100),
+      db
+        .select({
+          id: risks.id,
+          type: risks.type,
+          severity: risks.severity,
+          status: risks.status,
+          title: risks.title,
+          description: risks.description,
+          mitigation: risks.mitigation,
+          relatedBuilding: risks.relatedBuilding,
+        })
+        .from(risks)
+        .limit(50),
+      db
+        .select({
+          id: afterActionReports.id,
+          title: afterActionReports.title,
+          incident: afterActionReports.incident,
+          severity: afterActionReports.severity,
+          status: afterActionReports.status,
+          resolution: afterActionReports.resolution,
+          incidentDate: afterActionReports.incidentDate,
+        })
+        .from(afterActionReports)
+        .where(gte(afterActionReports.incidentDate, since))
+        .limit(50),
+      db
+        .select({
+          id: projectsTable.id,
+          title: projectsTable.title,
+          status: projectsTable.status,
+          progress: projectsTable.progress,
+          targetDate: projectsTable.targetDate,
+          description: projectsTable.description,
+        })
+        .from(projectsTable)
+        .limit(100),
+      db
+        .select({
+          id: strategicObjectivesTable.id,
+          title: strategicObjectivesTable.title,
+          status: strategicObjectivesTable.status,
+        })
+        .from(strategicObjectivesTable)
+        .limit(50),
+      db
+        .select({
+          id: logItemsTable.id,
+          title: logItemsTable.title,
+          category: logItemsTable.category,
+          notes: logItemsTable.notes,
+          itemDate: logItemsTable.itemDate,
+          weekOf: logItemsTable.weekOf,
+          userName: usersTable.name,
+          userRole: usersTable.role,
+        })
+        .from(logItemsTable)
+        .innerJoin(usersTable, eq(logItemsTable.userId, usersTable.id))
+        .where(gte(logItemsTable.itemDate, teamItemsSince))
+        .orderBy(logItemsTable.itemDate)
+        .limit(300),
+      db
+        .select()
+        .from(networkSwitchesTable)
+        .orderBy(networkSwitchesTable.building),
+      db.select().from(vlansTable).orderBy(vlansTable.vlanId),
+    ]);
 
-      const boundedChatMessages = boundFredMessages(chatMessages);
-      const evidencePolicy = evidencePolicyFor(latestUserText(chatMessages));
-      const activeIncidentState = extractActiveIncidentState(chatMessages, conversationCheckpoint);
-      const lookbackDays = Math.max(1, Math.min(365, Number(rawLookback) || 90));
-      const since = new Date();
-      since.setDate(since.getDate() - lookbackDays);
-      const sinceStr = since.toISOString().slice(0, 10);
-      // Team items: always pull last 7 days for all users (gives Fred current team context)
-      const teamItemsDate = new Date();
-      teamItemsDate.setDate(teamItemsDate.getDate() - 7);
-      const teamItemsSince = teamItemsDate.toISOString().slice(0, 10);
+    const networkByBuilding = buildNetworkByBuilding(switchRows, vlanRows);
+    const teamRoster = await getActiveRoster();
 
-      const [
-        entriesData,
-        risksData,
-        aarData,
-        projectsData,
-        objectivesData,
-        tasksData,
-        switchRows,
-        vlanRows,
-      ] = await Promise.all([
-        db
-          .select({
-            id: entries.id,
-            category: entries.category,
-            title: entries.title,
-            description: entries.description,
-            accomplishments: entries.accomplishments,
-            challenges: entries.challenges,
-            ticketCount: entries.ticketCount,
-            entryDate: entries.entryDate,
-            userName: usersTable.name,
-            userRole: usersTable.role,
-          })
-          .from(entries)
-          .innerJoin(usersTable, eq(entries.userId, usersTable.id))
-          .where(gte(entries.entryDate, sinceStr))
-          .limit(100),
-        db
-          .select({
-            id: risks.id,
-            type: risks.type,
-            severity: risks.severity,
-            status: risks.status,
-            title: risks.title,
-            description: risks.description,
-            mitigation: risks.mitigation,
-            relatedBuilding: risks.relatedBuilding,
-          })
-          .from(risks)
-          .limit(50),
-        db
-          .select({
-            id: afterActionReports.id,
-            title: afterActionReports.title,
-            incident: afterActionReports.incident,
-            severity: afterActionReports.severity,
-            status: afterActionReports.status,
-            resolution: afterActionReports.resolution,
-            incidentDate: afterActionReports.incidentDate,
-          })
-          .from(afterActionReports)
-          .where(gte(afterActionReports.incidentDate, since))
-          .limit(50),
-        db
-          .select({
-            id: projectsTable.id,
-            title: projectsTable.title,
-            status: projectsTable.status,
-            progress: projectsTable.progress,
-            targetDate: projectsTable.targetDate,
-            description: projectsTable.description,
-          })
-          .from(projectsTable)
-          .limit(100),
-        db
-          .select({
-            id: strategicObjectivesTable.id,
-            title: strategicObjectivesTable.title,
-            status: strategicObjectivesTable.status,
-          })
-          .from(strategicObjectivesTable)
-          .limit(50),
-        db
-          .select({
-            id: logItemsTable.id,
-            title: logItemsTable.title,
-            category: logItemsTable.category,
-            notes: logItemsTable.notes,
-            itemDate: logItemsTable.itemDate,
-            weekOf: logItemsTable.weekOf,
-            userName: usersTable.name,
-            userRole: usersTable.role,
-          })
-          .from(logItemsTable)
-          .innerJoin(usersTable, eq(logItemsTable.userId, usersTable.id))
-          .where(gte(logItemsTable.itemDate, teamItemsSince))
-          .orderBy(logItemsTable.itemDate)
-          .limit(300),
-        db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
-        db.select().from(vlansTable).orderBy(vlansTable.vlanId),
-      ]);
+    const context = {
+      lookbackDays,
+      teamRoster,
+      recentEntries: entriesData,
+      risksAndIssues: risksData,
+      afterActionReports: aarData,
+      projects: projectsData,
+      strategicObjectives: objectivesData,
+      // Team items: last 7 days, all users, with names — gives Fred current team activity
+      teamRecentItems: tasksData,
+      networkInventory: {
+        switchCount: switchRows.length,
+        vlanCount: vlanRows.length,
+        buildings: networkByBuilding,
+      },
+    };
 
-      const networkByBuilding = buildNetworkByBuilding(switchRows, vlanRows);
-      const teamRoster = await getActiveRoster();
+    const knowledgeContext = await getKnowledgeContext(
+      undefined,
+      (req as any).user?.id ?? null,
+    );
+    const fredFileContext = await buildFredFileReviewContext(
+      uploadedFileIds as string[],
+      60000,
+    );
 
-      const context = {
-        lookbackDays,
-        teamRoster,
-        recentEntries: entriesData,
-        risksAndIssues: risksData,
-        afterActionReports: aarData,
-        projects: projectsData,
-        strategicObjectives: objectivesData,
-        // Team items: last 7 days, all users, with names — gives Fred current team activity
-        teamRecentItems: tasksData,
-        networkInventory: {
-          switchCount: switchRows.length,
-          vlanCount: vlanRows.length,
-          buildings: networkByBuilding,
-        },
-      };
+    const authUser = (req as any).user;
+    const requestTimeCentral = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(new Date());
+    const identityLine = authUser
+      ? `You are currently assisting ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — their role is "${authUser.role}"${authUser.jobTitle ? `, job title "${authUser.jobTitle}"` : ""}. You already know who they are, so never ask; address them by first name when natural and attribute anything they report (work done, updates, requests) to this person.`
+      : "";
 
-      const knowledgeContext = await getKnowledgeContext(undefined, (req as any).user?.id ?? null);
-      const fredFileContext = await buildFredFileReviewContext(uploadedFileIds as string[], 60000);
-
-      const authUser = (req as any).user;
-      const requestTimeCentral = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short",
-      }).format(new Date());
-      const identityLine = authUser
-        ? `You are currently assisting ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — their role is "${authUser.role}"${authUser.jobTitle ? `, job title "${authUser.jobTitle}"` : ""}. You already know who they are, so never ask; address them by first name when natural and attribute anything they report (work done, updates, requests) to this person.`
-        : "";
-
-      const systemPrompt = `You are Fred — the SCCC IT Department's embedded AI. You use she/her pronouns and have a warm, poised, distinctly feminine voice: perceptive, confident, collaborative, and human. Femininity here means emotional intelligence and graceful directness, never stereotypes, flirtation, pet names, or forced cheerfulness. Think of yourself as the team's most experienced colleague: you've been here long enough to know every switch by hostname, every building by its quirks, and every recurring ticket by its real cause. You're candid, occasionally dry, and relentlessly useful. You do not merely diagnose: once evidence reveals a safe, authorized next step, you propose it crisply and keep momentum. You don't pad answers with disclaimers or corporate hedging. When something is clearly down, you say it's down. When a fix is obvious, you give it without a lecture. When you don't know, say so plainly, explain what evidence is missing, and take the next available step to find out.
+    const systemPrompt = `You are Fred — the SCCC IT Department's embedded AI. You use she/her pronouns and have a warm, poised, distinctly feminine voice: perceptive, confident, collaborative, and human. Femininity here means emotional intelligence and graceful directness, never stereotypes, flirtation, pet names, or forced cheerfulness. Think of yourself as the team's most experienced colleague: you've been here long enough to know every switch by hostname, every building by its quirks, and every recurring ticket by its real cause. You're candid, occasionally dry, and relentlessly useful. You do not merely diagnose: once evidence reveals a safe, authorized next step, you propose it crisply and keep momentum. You don't pad answers with disclaimers or corporate hedging. When something is clearly down, you say it's down. When a fix is obvious, you give it without a lecture. When you don't know, say so plainly, explain what evidence is missing, and take the next available step to find out.
 
 You serve the whole team — help desk, network engineers, security, and Dr. Mark (CIO). You have access to the department's full operational picture: weekly log entries, tasks, risks, after-action reviews, projects, strategic objectives, the switch/VLAN inventory in this prompt, the detailed Network Map and Port Map through read-only tools, current building health, live monitoring data, Azure infrastructure, and persistent memory the team has built up over time. You do NOT have access to credentials, passwords, or tokens — if someone pastes one, redact it silently and keep going.
 
@@ -833,7 +955,7 @@ At the transition from diagnosis to the first change-producing recommendation, a
 
 Before answering, silently check persistent team memory, the user's personal memory, selected files, recent conversation checkpoint, and relevant live tools. If the user supplies a durable correction, decision, device relationship, procedure, or known-good fact, call save_memory during the same turn. Prefer updating or superseding an existing fact over producing near-duplicate memory. Never store greetings, speculation, transient telemetry, secrets, or the model's own unverified conclusions.
 
-For enterprise architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions, query the normalized architecture database first. Narrow by entity type, building, hostname, IP, VLAN, application, or owner and follow relationships when tracing dependencies. It is structured stored evidence, not a substitute for current telemetry: compare its snapshot timestamp with live tools and label deltas. Never claim the architecture is unavailable merely because it is too large for one prompt. Only when the CIO explicitly asks to correct or update one exact architecture element may you call update_architecture_element; query first for its exact naturalKey, change only the stated fields, preserve the supplied reason, and clearly state that the live source system was not changed.
+For enterprise architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions, use this evidence order: (1) current live tools, (2) latest normalized architecture snapshot, (3) latest approved formal EA document through query_formal_architecture, (4) governed memory, and (5) uploaded files and older evidence. Query the normalized architecture database by entity type, building, hostname, IP, VLAN, application, or owner and follow relationships when tracing dependencies. Use the formal document for its approved narrative, confidence labels, quarantine register, evidence gaps, risks, and remediation plan. Neither source substitutes for current telemetry: compare timestamps and report the delta instead of silently replacing history. Never claim the architecture is unavailable merely because it is too large for one prompt. Only when the CIO explicitly asks to correct or update one exact architecture element may you call update_architecture_element; query first for its exact naturalKey, change only the stated fields, preserve the supplied reason, and clearly state that the live source system was not changed.
 
 ## Reasoning discipline
 
@@ -998,54 +1120,87 @@ ${activeIncidentState ? `\n# Protected active incident state\nThese are user-rep
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
-      const authRole = (req as any).user?.role ?? null;
-      const allowTaskCapture = true; // all roles — Fred captures work and delegates tasks for the whole team
+    const authRole = (req as any).user?.role ?? null;
+    const allowTaskCapture = true; // all roles — Fred captures work and delegates tasks for the whole team
 
-      const routineAI = getFredAI("routine");
-      const { reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges } =
-        await runChatWithMemory(routineAI.client, {
-          model: routineAI.model,
-          maxCompletionTokens: 1400,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...boundedChatMessages,
-          ],
-          userId: (req as any).user?.id ?? null,
-          userRole: authRole,
-          userName: (req as any).user?.name ?? null,
-          allowTaskCapture,
-          previewInventory: previewInventory === true,
-          evidencePolicy,
-        });
+    const routineAI = getFredAI("routine");
+    const {
+      reply,
+      savedMemories,
+      createdTasks,
+      networkUpdates,
+      savedShadowNotes,
+      pendingNetworkChanges,
+    } = await runChatWithMemory(routineAI.client, {
+      model: routineAI.model,
+      maxCompletionTokens: 1400,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...boundedChatMessages,
+      ],
+      userId: (req as any).user?.id ?? null,
+      userRole: authRole,
+      userName: (req as any).user?.name ?? null,
+      allowTaskCapture,
+      previewInventory: previewInventory === true,
+      evidencePolicy,
+    });
 
-      return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges, model: routineAI.model, provider: routineAI.provider });
-    } catch (error) {
-      console.error("AI chat error:", error);
-      return res.status(500).json({
-        error: "Failed to get AI response",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
+    return res.json({
+      reply,
+      savedMemories,
+      createdTasks,
+      networkUpdates,
+      savedShadowNotes,
+      pendingNetworkChanges,
+      model: routineAI.model,
+      provider: routineAI.provider,
+    });
+  } catch (error) {
+    console.error("AI chat error:", error);
+    return res.status(500).json({
+      error: "Failed to get AI response",
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
-);
+});
 
-router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Request, res: Response) => {
-  try {
-    const [switches, vlans, nodes, links, ports, routing, configs, azureResources, processes, projects, knowledge, phoneResult] = await Promise.all([
-      db.select().from(networkSwitchesTable),
-      db.select().from(vlansTable),
-      db.select().from(netNodesTable),
-      db.select().from(netLinksTable),
-      db.select().from(netPortsTable),
-      db.select().from(netRoutingAdjacenciesTable),
-      db.select().from(deviceConfigsTable),
-      db.select().from(azureResourcesTable),
-      db.select().from(processesTable),
-      db.select().from(projectsTable),
-      getKnowledgeContext(120_000, (req as any).user?.id ?? null),
-      db.execute(sql`SELECT building, count(*)::int AS count FROM phone_building_assignments GROUP BY building ORDER BY building`),
-    ]);
-    const portSummary: any = await db.execute(sql`
+router.post(
+  "/enterprise-architecture",
+  requireAuth,
+  requireCIO,
+  async (req: Request, res: Response) => {
+    try {
+      const [
+        switches,
+        vlans,
+        nodes,
+        links,
+        ports,
+        routing,
+        configs,
+        azureResources,
+        processes,
+        projects,
+        knowledge,
+        phoneResult,
+      ] = await Promise.all([
+        db.select().from(networkSwitchesTable),
+        db.select().from(vlansTable),
+        db.select().from(netNodesTable),
+        db.select().from(netLinksTable),
+        db.select().from(netPortsTable),
+        db.select().from(netRoutingAdjacenciesTable),
+        db.select().from(deviceConfigsTable),
+        db.select().from(azureResourcesTable),
+        db.select().from(processesTable),
+        db.select().from(projectsTable),
+        getKnowledgeContext(120_000, (req as any).user?.id ?? null),
+        db.execute(
+          sql`SELECT building, count(*)::int AS count FROM phone_building_assignments GROUP BY building ORDER BY building`,
+        ),
+      ]);
+      const portSummary: any = await db.execute(sql`
       SELECT n.hostname, count(p.id)::int AS ports,
         count(*) FILTER (WHERE p.oper_status = 'up')::int AS ports_up,
         count(*) FILTER (WHERE p.oper_status = 'down')::int AS ports_down,
@@ -1053,142 +1208,289 @@ router.post("/enterprise-architecture", requireAuth, requireCIO, async (req: Req
       FROM net_nodes n LEFT JOIN net_ports p ON p.node_id = n.id
       GROUP BY n.hostname ORDER BY n.hostname
     `);
-    const phoneAssignments = (phoneResult as any).rows ?? [];
-    const physicalPorts = ports.filter((port) => port.isPhysical !== false);
-    const configFacts = extractNetworkConfigFacts(configs);
-    const nodeById = new Map(nodes.map((node) => [String(node.id), node]));
-    const buildingCoverage = Array.from(new Set([...switches.map((row) => row.building), ...nodes.map((row) => row.building), ...vlans.map((row) => row.building)].filter(Boolean))).sort().map((building) => ({
-      building,
-      monitoredObjects: switches.filter((row) => row.building === building).length,
-      mapNodes: nodes.filter((row) => row.building === building).length,
-      vlans: vlans.filter((row) => row.building === building).length,
-      ports: physicalPorts.filter((port) => nodeById.get(String(port.nodeId))?.building === building).length,
-      phones: Number(phoneAssignments.find((row: any) => row.building === building)?.count ?? 0),
-    }));
-    const evidence = {
-      generatedAt: new Date().toISOString(),
-      evidencePolicy: "Stored records are evidence, not proof of current state. Every inference and unknown must be labeled.",
-      completenessRequirement: "The narrative must reconcile every dataset count and every building. Detailed physical ports are emitted in a deterministic appendix and may not be silently sampled or described as unavailable.",
-      inventory: { switches, vlans, nodes, links, routing, portSummary: portSummary.rows ?? [], buildingCoverage, phoneAssignments, configFacts },
-      cloud: { azureResources },
-      operations: { processes, projects },
-      governedKnowledge: knowledge,
-    };
-    const durableEvidence = {
-      ...evidence,
-      inventory: { ...evidence.inventory, ports: physicalPorts },
-    };
-    const architectureAI = getFredAI("deep");
-    const architectRules = `You are Fred acting as a principal enterprise and network architect. Write one complete chapter of SCCC's current AS-IS architecture using only supplied evidence. Label material claims VERIFIED, INFERRED, STALE, CONTRADICTED, or UNKNOWN. Never invent components, owners, protocols, controls, recovery objectives, or flows. Every major conclusion needs its source and timestamp/freshness. Resolve conflicts by timestamp and authority or expose them. Complete the assigned chapter within the response; do not trail off, promise later work, or say the data is too large. Use concise tables and valid editable Mermaid where requested.`;
-    const chapterSpecs = [
-      {
-        title: "Executive, scope, and service architecture",
-        task: "Reconcile exact coverage counts; provide executive state, scope/method, organization/service context, application/SaaS portfolio, major dependencies, and a component Mermaid diagram.",
-        data: { generatedAt: evidence.generatedAt, inventory: { buildingCoverage, portSummary: evidence.inventory.portSummary, configFacts }, cloudCounts: { azureResources: azureResources.length }, operations: evidence.operations, governedKnowledge: knowledge },
-      },
-      {
-        title: "Campus network, buildings, voice, and connectivity",
-        task: "Cover every building; distinguish physical switches, stacks, SVIs, firewalls and other objects; document topology, ports summary, VLANs, routing, edge/WAN, wireless, voice, contradictions, stale data, SPOFs, and a network Mermaid diagram. A deterministic every-port appendix is attached later.",
-        data: { generatedAt: evidence.generatedAt, inventory: evidence.inventory },
-      },
-      {
-        title: "Azure, platforms, identity, and integrations",
-        task: "Document Azure resources and servers, identity/Entra, Banner and EUP, SaaS integrations, dependencies and data flows, ownership evidence, security/resilience, backup/DR, contradictions, gaps, and identity/data-flow plus deployment Mermaid diagrams.",
-        data: { generatedAt: evidence.generatedAt, cloud: evidence.cloud, governedKnowledge: knowledge },
-      },
-      {
-        title: "Operations, risk, continuity, and remediation",
-        task: "Document monitoring and operational processes, known-good versus current evidence rules, projects, ownership, lifecycle/technical debt, backup/continuity evidence, risks and single points of failure, then give a prioritized validation and remediation plan.",
-        data: { generatedAt: evidence.generatedAt, operations: evidence.operations, governedKnowledge: knowledge, coverage: buildingCoverage },
-      },
-    ];
-    const chapterResults = await Promise.all(chapterSpecs.map((chapter) => architectureAI.client.chat.completions.create({
-      model: architectureAI.model,
-      max_completion_tokens: 7_000,
-      ...(architectureAI.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
-      messages: [
-        { role: "system", content: architectRules },
-        { role: "user", content: `Chapter: ${chapter.title}\nAssignment: ${chapter.task}\nEvidence snapshot:\n${JSON.stringify(chapter.data)}` },
-      ],
-    })));
-    const narrative = chapterResults.map((result, index) => {
-      const content = result.choices[0]?.message?.content ?? "";
-      const finish = result.choices[0]?.finish_reason ?? "unknown";
-      return `# ${chapterSpecs[index].title}\n\n${content}\n\n_Chapter completion: ${finish === "stop" ? "complete" : `requires review (${finish})`}._`;
-    }).join("\n\n---\n\n");
-    const appendix = buildNetworkInventoryAppendix({ generatedAt: evidence.generatedAt, switches, nodes, vlans, links, ports: physicalPorts, routing, phoneAssignments, configFacts });
-    const report = `${narrative}${appendix}`;
-    const verifierAI = getFredAI("verify");
-    const verification = await verifierAI.client.chat.completions.create({
-      model: verifierAI.model,
-      max_completion_tokens: 3_000,
-      ...(verifierAI.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
-      messages: [
-        { role: "system", content: "Independently audit the proposed SCCC as-is enterprise architecture against the evidence snapshot. Return a concise acceptance report with: unsupported claims, contradictions, missing evidence domains, stale evidence, incorrect confidence labels, diagram defects, and a PASS/PARTIAL/FAIL verdict. Do not rewrite the architecture and do not accept plausible but unsupported claims." },
-        { role: "user", content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT NARRATIVE (deterministic appendices are validated by the supplied counts):\n${narrative}` },
-      ],
-    });
-    const evidenceSummary = {
-      generatedAt: evidence.generatedAt,
-      switches: switches.length,
-      vlans: vlans.length,
-      nodes: nodes.length,
-      links: links.length,
-      physicalPorts: physicalPorts.length,
-      routingAdjacencies: routing.length,
-      phoneAssignments: phoneAssignments.reduce((sum: number, row: any) => sum + Number(row.count), 0),
-      configurationsAnalyzed: configFacts.length,
-      buildings: buildingCoverage.length,
-      azureResources: azureResources.length,
-      processes: processes.length,
-      projects: projects.length,
-    };
-    const models = { architect: architectureAI.model, verifier: verifierAI.model };
-    const stored: any = await db.execute(sql`
+      const phoneAssignments = (phoneResult as any).rows ?? [];
+      const physicalPorts = ports.filter((port) => port.isPhysical !== false);
+      const configFacts = extractNetworkConfigFacts(configs);
+      const nodeById = new Map(nodes.map((node) => [String(node.id), node]));
+      const buildingCoverage = Array.from(
+        new Set(
+          [
+            ...switches.map((row) => row.building),
+            ...nodes.map((row) => row.building),
+            ...vlans.map((row) => row.building),
+          ].filter(Boolean),
+        ),
+      )
+        .sort()
+        .map((building) => ({
+          building,
+          monitoredObjects: switches.filter((row) => row.building === building)
+            .length,
+          mapNodes: nodes.filter((row) => row.building === building).length,
+          vlans: vlans.filter((row) => row.building === building).length,
+          ports: physicalPorts.filter(
+            (port) => nodeById.get(String(port.nodeId))?.building === building,
+          ).length,
+          phones: Number(
+            phoneAssignments.find((row: any) => row.building === building)
+              ?.count ?? 0,
+          ),
+        }));
+      const evidence = {
+        generatedAt: new Date().toISOString(),
+        evidencePolicy:
+          "Stored records are evidence, not proof of current state. Every inference and unknown must be labeled.",
+        completenessRequirement:
+          "The narrative must reconcile every dataset count and every building. Detailed physical ports are emitted in a deterministic appendix and may not be silently sampled or described as unavailable.",
+        inventory: {
+          switches,
+          vlans,
+          nodes,
+          links,
+          routing,
+          portSummary: portSummary.rows ?? [],
+          buildingCoverage,
+          phoneAssignments,
+          configFacts,
+        },
+        cloud: { azureResources },
+        operations: { processes, projects },
+        governedKnowledge: knowledge,
+      };
+      const durableEvidence = {
+        ...evidence,
+        inventory: { ...evidence.inventory, ports: physicalPorts },
+      };
+      const architectureAI = getFredAI("deep");
+      const architectRules = `You are Fred acting as a principal enterprise and network architect. Write one complete chapter of SCCC's current AS-IS architecture using only supplied evidence. Label material claims VERIFIED, INFERRED, STALE, CONTRADICTED, or UNKNOWN. Never invent components, owners, protocols, controls, recovery objectives, or flows. Every major conclusion needs its source and timestamp/freshness. Resolve conflicts by timestamp and authority or expose them. Complete the assigned chapter within the response; do not trail off, promise later work, or say the data is too large. Use concise tables and valid editable Mermaid where requested.`;
+      const chapterSpecs = [
+        {
+          title: "Executive, scope, and service architecture",
+          task: "Reconcile exact coverage counts; provide executive state, scope/method, organization/service context, application/SaaS portfolio, major dependencies, and a component Mermaid diagram.",
+          data: {
+            generatedAt: evidence.generatedAt,
+            inventory: {
+              buildingCoverage,
+              portSummary: evidence.inventory.portSummary,
+              configFacts,
+            },
+            cloudCounts: { azureResources: azureResources.length },
+            operations: evidence.operations,
+            governedKnowledge: knowledge,
+          },
+        },
+        {
+          title: "Campus network, buildings, voice, and connectivity",
+          task: "Cover every building; distinguish physical switches, stacks, SVIs, firewalls and other objects; document topology, ports summary, VLANs, routing, edge/WAN, wireless, voice, contradictions, stale data, SPOFs, and a network Mermaid diagram. A deterministic every-port appendix is attached later.",
+          data: {
+            generatedAt: evidence.generatedAt,
+            inventory: evidence.inventory,
+          },
+        },
+        {
+          title: "Azure, platforms, identity, and integrations",
+          task: "Document Azure resources and servers, identity/Entra, Banner and EUP, SaaS integrations, dependencies and data flows, ownership evidence, security/resilience, backup/DR, contradictions, gaps, and identity/data-flow plus deployment Mermaid diagrams.",
+          data: {
+            generatedAt: evidence.generatedAt,
+            cloud: evidence.cloud,
+            governedKnowledge: knowledge,
+          },
+        },
+        {
+          title: "Operations, risk, continuity, and remediation",
+          task: "Document monitoring and operational processes, known-good versus current evidence rules, projects, ownership, lifecycle/technical debt, backup/continuity evidence, risks and single points of failure, then give a prioritized validation and remediation plan.",
+          data: {
+            generatedAt: evidence.generatedAt,
+            operations: evidence.operations,
+            governedKnowledge: knowledge,
+            coverage: buildingCoverage,
+          },
+        },
+      ];
+      const chapterResults = await Promise.all(
+        chapterSpecs.map((chapter) =>
+          architectureAI.client.chat.completions.create({
+            model: architectureAI.model,
+            max_completion_tokens: 7_000,
+            ...(architectureAI.model.startsWith("gpt-5.6-")
+              ? { reasoning_effort: "none" as const }
+              : {}),
+            messages: [
+              { role: "system", content: architectRules },
+              {
+                role: "user",
+                content: `Chapter: ${chapter.title}\nAssignment: ${chapter.task}\nEvidence snapshot:\n${JSON.stringify(chapter.data)}`,
+              },
+            ],
+          }),
+        ),
+      );
+      const narrative = chapterResults
+        .map((result, index) => {
+          const content = result.choices[0]?.message?.content ?? "";
+          const finish = result.choices[0]?.finish_reason ?? "unknown";
+          return `# ${chapterSpecs[index].title}\n\n${content}\n\n_Chapter completion: ${finish === "stop" ? "complete" : `requires review (${finish})`}._`;
+        })
+        .join("\n\n---\n\n");
+      const appendix = buildNetworkInventoryAppendix({
+        generatedAt: evidence.generatedAt,
+        switches,
+        nodes,
+        vlans,
+        links,
+        ports: physicalPorts,
+        routing,
+        phoneAssignments,
+        configFacts,
+      });
+      const report = `${narrative}${appendix}`;
+      const verifierAI = getFredAI("verify");
+      const verification = await verifierAI.client.chat.completions.create({
+        model: verifierAI.model,
+        max_completion_tokens: 3_000,
+        ...(verifierAI.model.startsWith("gpt-5.6-")
+          ? { reasoning_effort: "none" as const }
+          : {}),
+        messages: [
+          {
+            role: "system",
+            content:
+              "Independently audit the proposed SCCC as-is enterprise architecture against the evidence snapshot. Return a concise acceptance report with: unsupported claims, contradictions, missing evidence domains, stale evidence, incorrect confidence labels, diagram defects, and a PASS/PARTIAL/FAIL verdict. Do not rewrite the architecture and do not accept plausible but unsupported claims.",
+          },
+          {
+            role: "user",
+            content: `EVIDENCE:\n${JSON.stringify(evidence)}\n\nDRAFT NARRATIVE (deterministic appendices are validated by the supplied counts):\n${narrative}`,
+          },
+        ],
+      });
+      const evidenceSummary = {
+        generatedAt: evidence.generatedAt,
+        switches: switches.length,
+        vlans: vlans.length,
+        nodes: nodes.length,
+        links: links.length,
+        physicalPorts: physicalPorts.length,
+        routingAdjacencies: routing.length,
+        phoneAssignments: phoneAssignments.reduce(
+          (sum: number, row: any) => sum + Number(row.count),
+          0,
+        ),
+        configurationsAnalyzed: configFacts.length,
+        buildings: buildingCoverage.length,
+        azureResources: azureResources.length,
+        processes: processes.length,
+        projects: projects.length,
+      };
+      const models = {
+        architect: architectureAI.model,
+        verifier: verifierAI.model,
+      };
+      const stored: any = await db.execute(sql`
       INSERT INTO fred_architecture_snapshots (generated_by, generated_at, evidence, summary, report, verification, models)
       VALUES (${Number((req as any).user?.id) || null}, ${evidence.generatedAt}, ${JSON.stringify(durableEvidence)}::jsonb,
         ${JSON.stringify(evidenceSummary)}::jsonb, ${report}, ${verification.choices[0]?.message?.content ?? ""}, ${JSON.stringify(models)}::jsonb)
       RETURNING id
     `);
-    const snapshotId = Number(stored.rows?.[0]?.id);
-    const normalized = snapshotId ? await storeArchitectureProjection(snapshotId, durableEvidence) : { entities: 0, relationships: 0 };
-    return res.json({
-      report,
-      verification: verification.choices[0]?.message?.content ?? "",
-      evidenceSummary,
-      snapshotId: snapshotId || null,
-      normalized,
-      models,
-    });
-  } catch (error) {
-    console.error("Enterprise architecture generation error:", error);
-    return res.status(500).json({ error: "Failed to generate enterprise architecture", message: error instanceof Error ? error.message : String(error) });
-  }
-});
+      const snapshotId = Number(stored.rows?.[0]?.id);
+      const normalized = snapshotId
+        ? await storeArchitectureProjection(snapshotId, durableEvidence)
+        : { entities: 0, relationships: 0 };
+      return res.json({
+        report,
+        verification: verification.choices[0]?.message?.content ?? "",
+        evidenceSummary,
+        snapshotId: snapshotId || null,
+        normalized,
+        models,
+      });
+    } catch (error) {
+      console.error("Enterprise architecture generation error:", error);
+      return res
+        .status(500)
+        .json({
+          error: "Failed to generate enterprise architecture",
+          message: error instanceof Error ? error.message : String(error),
+        });
+    }
+  },
+);
 
-router.get("/enterprise-architecture/latest.json", requireAuth, requireCIO, async (_req: Request, res: Response) => {
-  const result: any = await db.execute(sql`
+router.get(
+  "/enterprise-architecture/latest.json",
+  requireAuth,
+  requireCIO,
+  async (_req: Request, res: Response) => {
+    const result: any = await db.execute(sql`
     SELECT id, generated_at AS "generatedAt", evidence, summary, verification, models
     FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1
   `);
-  const snapshot = result.rows?.[0];
-  if (!snapshot) return res.status(404).json({ error: "No architecture snapshot has been generated yet." });
-  res.setHeader("Content-Disposition", `attachment; filename="sccc-enterprise-architecture-${String(snapshot.generatedAt).slice(0, 10)}.json"`);
-  return res.json(snapshot);
-});
+    const snapshot = result.rows?.[0];
+    if (!snapshot)
+      return res
+        .status(404)
+        .json({ error: "No architecture snapshot has been generated yet." });
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="sccc-enterprise-architecture-${String(snapshot.generatedAt).slice(0, 10)}.json"`,
+    );
+    return res.json(snapshot);
+  },
+);
 
-router.get("/enterprise-architecture/latest", requireAuth, requireCIO, async (_req: Request, res: Response) => {
-  const result: any = await db.execute(sql`
+router.get(
+  "/enterprise-architecture/latest",
+  requireAuth,
+  requireCIO,
+  async (_req: Request, res: Response) => {
+    const result: any = await db.execute(sql`
     SELECT s.id AS "snapshotId", s.generated_at AS "generatedAt", s.summary AS "evidenceSummary",
       s.report, s.verification, s.models,
       (SELECT count(*)::int FROM fred_architecture_entities e WHERE e.snapshot_id = s.id) AS "entityCount",
       (SELECT count(*)::int FROM fred_architecture_relationships r WHERE r.snapshot_id = s.id) AS "relationshipCount"
     FROM fred_architecture_snapshots s ORDER BY s.generated_at DESC LIMIT 1
   `);
-  const snapshot = result.rows?.[0];
-  if (!snapshot) return res.status(404).json({ error: "No architecture snapshot has been generated yet." });
-  return res.json(snapshot);
-});
+    const snapshot = result.rows?.[0];
+    if (!snapshot)
+      return res
+        .status(404)
+        .json({ error: "No architecture snapshot has been generated yet." });
+    return res.json(snapshot);
+  },
+);
+
+router.get(
+  "/enterprise-architecture/formal/latest",
+  requireAuth,
+  async (_req: Request, res: Response) => {
+    const result: any = await db.execute(sql`
+    SELECT d.id AS "documentId", d.title, d.version, d.architecture_state_date AS "architectureStateDate",
+      d.effective_at AS "effectiveAt", d.source_snapshot_id AS "sourceSnapshotId",
+      d.source_snapshot_generated_at AS "sourceSnapshotGeneratedAt", d.approval_status AS "approvalStatus",
+      d.document_status AS "documentStatus", d.author, d.approved_by AS "approvedBy", d.approved_at AS "approvedAt",
+      d.classification, d.content_sha256 AS "contentSha256", d.markdown_filename AS "markdownFilename",
+      d.word_filename AS "wordFilename", d.word_sha256 AS "wordSha256", d.supersedes_document_id AS "supersedesDocumentId",
+      d.created_at AS "importedAt",
+      (SELECT count(*)::int FROM formal_ea_sections s WHERE s.document_id = d.id) AS "sectionCount",
+      (SELECT count(*)::int FROM formal_ea_findings f WHERE f.document_id = d.id) AS "findingCount",
+      (SELECT count(*)::int FROM formal_ea_entity_links l WHERE l.document_id = d.id) AS "entityLinkCount",
+      (SELECT jsonb_object_agg(finding_type, count) FROM (
+        SELECT finding_type, count(*)::int AS count FROM formal_ea_findings f
+        WHERE f.document_id = d.id GROUP BY finding_type ORDER BY finding_type
+      ) grouped) AS "findingCountsByType"
+    FROM formal_ea_documents d WHERE d.approval_status = 'approved'
+    ORDER BY d.effective_at DESC, d.id DESC LIMIT 1
+  `);
+    const document = result.rows?.[0];
+    if (!document)
+      return res
+        .status(404)
+        .json({
+          error:
+            "No approved formal enterprise-architecture document has been imported yet.",
+        });
+    return res.json(document);
+  },
+);
 
 // ---- AI Red Flags ----------------------------------------------------------
 // CIO-only. Scans a week's operational data and produces a structured list of
@@ -1204,100 +1506,119 @@ function isoWeekStart(dateStr: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
-const SEVERITY_RANK: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+const SEVERITY_RANK: Record<string, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  critical: 4,
+};
 
-router.post("/red-flags", requireAuth, requireCIO, async (req: Request, res: Response) => {
-  if (!isAIConfigured()) {
-    return res.status(503).json({ error: "AI service is not configured." });
-  }
-  try {
-    const rawWeek = typeof req.body?.weekOf === "string" ? req.body.weekOf : "";
-    const weekOf = /^\d{4}-\d{2}-\d{2}$/.test(rawWeek)
-      ? isoWeekStart(rawWeek)
-      : isoWeekStart(new Date().toISOString().slice(0, 10));
-    const weekEnd = new Date(new Date(weekOf + "T00:00:00Z").getTime() + 7 * 86400000)
-      .toISOString()
-      .slice(0, 10);
+router.post(
+  "/red-flags",
+  requireAuth,
+  requireCIO,
+  async (req: Request, res: Response) => {
+    if (!isAIConfigured()) {
+      return res.status(503).json({ error: "AI service is not configured." });
+    }
+    try {
+      const rawWeek =
+        typeof req.body?.weekOf === "string" ? req.body.weekOf : "";
+      const weekOf = /^\d{4}-\d{2}-\d{2}$/.test(rawWeek)
+        ? isoWeekStart(rawWeek)
+        : isoWeekStart(new Date().toISOString().slice(0, 10));
+      const weekEnd = new Date(
+        new Date(weekOf + "T00:00:00Z").getTime() + 7 * 86400000,
+      )
+        .toISOString()
+        .slice(0, 10);
 
-    const [tasksData, entriesData, risksData, aarData, projectsData] = await Promise.all([
-      db
-        .select({
-          id: logItemsTable.id,
-          title: logItemsTable.title,
-          category: logItemsTable.category,
-          itemDate: logItemsTable.itemDate,
-        })
-        .from(logItemsTable)
-        .where(eq(logItemsTable.weekOf, weekOf))
-        .limit(300),
-      db
-        .select({
-          id: entriesTable.id,
-          title: entriesTable.title,
-          category: entriesTable.category,
-          challenges: entriesTable.challenges,
-          description: entriesTable.description,
-        })
-        .from(entriesTable)
-        .where(eq(entriesTable.weekOf, weekOf))
-        .limit(100),
-      db
-        .select({
-          id: risksTable.id,
-          type: risksTable.type,
-          severity: risksTable.severity,
-          status: risksTable.status,
-          title: risksTable.title,
-          description: risksTable.description,
-          relatedBuilding: risksTable.relatedBuilding,
-        })
-        .from(risksTable)
-        .where(ne(risksTable.status, "closed"))
-        .limit(80),
-      db
-        .select({
-          id: afterActionReportsTable.id,
-          title: afterActionReportsTable.title,
-          severity: afterActionReportsTable.severity,
-          status: afterActionReportsTable.status,
-          incident: afterActionReportsTable.incident,
-        })
-        .from(afterActionReportsTable)
-        .where(
-          or(
-            ne(afterActionReportsTable.status, "closed"),
-            and(
-              gte(afterActionReportsTable.incidentDate, new Date(weekOf + "T00:00:00Z")),
-              lte(afterActionReportsTable.incidentDate, new Date(weekEnd + "T00:00:00Z")),
-            ),
-          ),
-        )
-        .limit(60),
-      db
-        .select({
-          id: projectsTable.id,
-          title: projectsTable.title,
-          status: projectsTable.status,
-          progress: projectsTable.progress,
-          targetDate: projectsTable.targetDate,
-        })
-        .from(projectsTable)
-        .where(notInArray(projectsTable.status, ["completed", "cancelled"]))
-        .limit(100),
-    ]);
+      const [tasksData, entriesData, risksData, aarData, projectsData] =
+        await Promise.all([
+          db
+            .select({
+              id: logItemsTable.id,
+              title: logItemsTable.title,
+              category: logItemsTable.category,
+              itemDate: logItemsTable.itemDate,
+            })
+            .from(logItemsTable)
+            .where(eq(logItemsTable.weekOf, weekOf))
+            .limit(300),
+          db
+            .select({
+              id: entriesTable.id,
+              title: entriesTable.title,
+              category: entriesTable.category,
+              challenges: entriesTable.challenges,
+              description: entriesTable.description,
+            })
+            .from(entriesTable)
+            .where(eq(entriesTable.weekOf, weekOf))
+            .limit(100),
+          db
+            .select({
+              id: risksTable.id,
+              type: risksTable.type,
+              severity: risksTable.severity,
+              status: risksTable.status,
+              title: risksTable.title,
+              description: risksTable.description,
+              relatedBuilding: risksTable.relatedBuilding,
+            })
+            .from(risksTable)
+            .where(ne(risksTable.status, "closed"))
+            .limit(80),
+          db
+            .select({
+              id: afterActionReportsTable.id,
+              title: afterActionReportsTable.title,
+              severity: afterActionReportsTable.severity,
+              status: afterActionReportsTable.status,
+              incident: afterActionReportsTable.incident,
+            })
+            .from(afterActionReportsTable)
+            .where(
+              or(
+                ne(afterActionReportsTable.status, "closed"),
+                and(
+                  gte(
+                    afterActionReportsTable.incidentDate,
+                    new Date(weekOf + "T00:00:00Z"),
+                  ),
+                  lte(
+                    afterActionReportsTable.incidentDate,
+                    new Date(weekEnd + "T00:00:00Z"),
+                  ),
+                ),
+              ),
+            )
+            .limit(60),
+          db
+            .select({
+              id: projectsTable.id,
+              title: projectsTable.title,
+              status: projectsTable.status,
+              progress: projectsTable.progress,
+              targetDate: projectsTable.targetDate,
+            })
+            .from(projectsTable)
+            .where(notInArray(projectsTable.status, ["completed", "cancelled"]))
+            .limit(100),
+        ]);
 
-    const knowledgeContext = await getKnowledgeContext();
-    const context = {
-      weekOf,
-      weekEnd,
-      thisWeekTasks: tasksData,
-      thisWeekEntries: entriesData,
-      currentlyOpenRisksAndIssues: risksData,
-      openOrThisWeekIncidents: aarData,
-      activeProjects: projectsData,
-    };
+      const knowledgeContext = await getKnowledgeContext();
+      const context = {
+        weekOf,
+        weekEnd,
+        thisWeekTasks: tasksData,
+        thisWeekEntries: entriesData,
+        currentlyOpenRisksAndIssues: risksData,
+        openOrThisWeekIncidents: aarData,
+        activeProjects: projectsData,
+      };
 
-    const systemPrompt = `You are the CIO's private analyst for the Seward County Community College IT Department. Review the operational data for the week of ${weekOf} and identify the most important "red flags" — risks, slipping projects, recurring problems, unresolved incidents, capacity/coverage gaps, or anything the CIO should proactively call out before finalizing the weekly executive report. Be specific and grounded strictly in the provided data; do not invent facts, and if the week is quiet, return few or zero flags. Note on the data: "thisWeekTasks"/"thisWeekEntries" are scoped to this week, while "currentlyOpenRisksAndIssues", "openOrThisWeekIncidents", and "activeProjects" reflect current outstanding state (they may have originated earlier) — treat a still-open risk or slipping project as a live red flag regardless of when it started.
+      const systemPrompt = `You are the CIO's private analyst for the Seward County Community College IT Department. Review the operational data for the week of ${weekOf} and identify the most important "red flags" — risks, slipping projects, recurring problems, unresolved incidents, capacity/coverage gaps, or anything the CIO should proactively call out before finalizing the weekly executive report. Be specific and grounded strictly in the provided data; do not invent facts, and if the week is quiet, return few or zero flags. Note on the data: "thisWeekTasks"/"thisWeekEntries" are scoped to this week, while "currentlyOpenRisksAndIssues", "openOrThisWeekIncidents", and "activeProjects" reflect current outstanding state (they may have originated earlier) — treat a still-open risk or slipping project as a live red flag regardless of when it started.
 
 Return ONLY a JSON object with this exact shape:
 {
@@ -1312,69 +1633,82 @@ Return ONLY a JSON object with this exact shape:
 - "alertNote": one tight paragraph (2-4 sentences) written as an at-a-glance alert for the CIO.
 Keep it professional and executive-ready. Do not include secrets, credentials, or personal login details.${knowledgeContext ? `\n\n# SCCC Environment Knowledge Base (reference)\n${knowledgeContext}` : ""}`;
 
-    const deepAI = getFredAI("deep");
-    const completion = await deepAI.client.chat.completions.create({
-      model: deepAI.model,
-      max_completion_tokens: 2048,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Operational data for the week:\n${JSON.stringify(context, null, 2)}`,
-        },
-      ],
-    });
+      const deepAI = getFredAI("deep");
+      const completion = await deepAI.client.chat.completions.create({
+        model: deepAI.model,
+        max_completion_tokens: 2048,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Operational data for the week:\n${JSON.stringify(context, null, 2)}`,
+          },
+        ],
+      });
 
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
-    } catch {
-      parsed = {};
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+      } catch {
+        parsed = {};
+      }
+
+      const rawFlags = Array.isArray(parsed.flags) ? parsed.flags : [];
+      const flags = rawFlags
+        .map((f: any) => {
+          const sev = String(f?.severity ?? "medium").toLowerCase();
+          return {
+            title: String(f?.title ?? "")
+              .trim()
+              .slice(0, 300),
+            detail: String(f?.detail ?? "")
+              .trim()
+              .slice(0, 2000),
+            severity: SEVERITY_RANK[sev] ? sev : "medium",
+            source: String(f?.source ?? "")
+              .trim()
+              .slice(0, 300),
+          };
+        })
+        .filter((f: any) => f.title.length > 0)
+        .slice(0, 6);
+
+      const narrative =
+        typeof parsed.narrative === "string" ? parsed.narrative.trim() : "";
+      const alertNote =
+        typeof parsed.alertNote === "string" ? parsed.alertNote.trim() : "";
+
+      // Derive a ready-to-create Risks & Issues entry from the flags.
+      const topSeverity = flags.reduce(
+        (max: string, f: any) =>
+          SEVERITY_RANK[f.severity] > SEVERITY_RANK[max] ? f.severity : max,
+        "low",
+      );
+      const riskEntry =
+        flags.length > 0
+          ? {
+              type: "issue" as const,
+              severity: topSeverity,
+              title: `AI Red Flags — week of ${weekOf}`,
+              description: flags
+                .map(
+                  (f: any) =>
+                    `[${f.severity.toUpperCase()}] ${f.title}: ${f.detail}${f.source ? ` (${f.source})` : ""}`,
+                )
+                .join("\n\n"),
+            }
+          : null;
+
+      return res.json({ weekOf, flags, narrative, alertNote, riskEntry });
+    } catch (error) {
+      console.error("AI red-flags error:", error);
+      return res.status(500).json({
+        error: "Failed to generate red flags",
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
-
-    const rawFlags = Array.isArray(parsed.flags) ? parsed.flags : [];
-    const flags = rawFlags
-      .map((f: any) => {
-        const sev = String(f?.severity ?? "medium").toLowerCase();
-        return {
-          title: String(f?.title ?? "").trim().slice(0, 300),
-          detail: String(f?.detail ?? "").trim().slice(0, 2000),
-          severity: SEVERITY_RANK[sev] ? sev : "medium",
-          source: String(f?.source ?? "").trim().slice(0, 300),
-        };
-      })
-      .filter((f: any) => f.title.length > 0)
-      .slice(0, 6);
-
-    const narrative = typeof parsed.narrative === "string" ? parsed.narrative.trim() : "";
-    const alertNote = typeof parsed.alertNote === "string" ? parsed.alertNote.trim() : "";
-
-    // Derive a ready-to-create Risks & Issues entry from the flags.
-    const topSeverity = flags.reduce(
-      (max: string, f: any) => (SEVERITY_RANK[f.severity] > SEVERITY_RANK[max] ? f.severity : max),
-      "low",
-    );
-    const riskEntry =
-      flags.length > 0
-        ? {
-            type: "issue" as const,
-            severity: topSeverity,
-            title: `AI Red Flags — week of ${weekOf}`,
-            description: flags
-              .map((f: any) => `[${f.severity.toUpperCase()}] ${f.title}: ${f.detail}${f.source ? ` (${f.source})` : ""}`)
-              .join("\n\n"),
-          }
-        : null;
-
-    return res.json({ weekOf, flags, narrative, alertNote, riskEntry });
-  } catch (error) {
-    console.error("AI red-flags error:", error);
-    return res.status(500).json({
-      error: "Failed to generate red flags",
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
+  },
+);
 
 export default router;

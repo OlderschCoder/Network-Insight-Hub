@@ -198,6 +198,13 @@ must compare historical snapshot time with live evidence before describing
 current state. CIO corrections create versioned overrides; they do not mutate
 live devices or upstream systems.
 
+Approved formal EA publications have a separate immutable layer linked to the
+source snapshot. Markdown is parsed into searchable sections and normalized
+findings; the corresponding Word file is retained as the publication copy.
+Contradictions, quarantine entries, stale evidence, unknowns, risks, and
+remediation actions retain their classification instead of being flattened into
+known-good memory. See [Formal EA integration](docs/formal-ea-integration.md).
+
 ### AI model routing
 
 Fred uses workload profiles:
@@ -375,6 +382,7 @@ failure, not misrepresented as a passing test.
 ## Related documentation
 
 - [Fred model, memory, and architecture](docs/fred-model-memory-architecture.md)
+- [Formal EA integration](docs/formal-ea-integration.md)
 - [Fred delta-first behavior](docs/fred-delta-first.md)
 - [Fred network evidence workflow](docs/fred-network-evidence.md)
 - [Learn simulations](docs/learn.md)

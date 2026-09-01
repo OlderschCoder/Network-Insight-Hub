@@ -53,14 +53,20 @@ const REDACTED = "[REDACTED]";
  * every AI prompt, secrets are always stripped before persistence. This is a
  * best-effort policy backstop, not a substitute for a real secrets vault.
  */
-const SECRET_REDACTIONS: { re: RegExp; replace: string | ((...m: string[]) => string) }[] = [
+const SECRET_REDACTIONS: {
+  re: RegExp;
+  replace: string | ((...m: string[]) => string);
+}[] = [
   // Full PEM private-key block (to END, or to end-of-text if no END marker).
   {
     re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
     replace: "[REDACTED PRIVATE KEY]",
   },
   { re: /\bAKIA[0-9A-Z]{16}\b/g, replace: REDACTED }, // AWS access key id
-  { re: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]+)?/g, replace: REDACTED }, // JWT
+  {
+    re: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]+)?/g,
+    replace: REDACTED,
+  }, // JWT
   { re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/g, replace: REDACTED }, // Slack token
   { re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b/g, replace: REDACTED }, // GitHub token
   { re: /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g, replace: REDACTED },
@@ -68,7 +74,8 @@ const SECRET_REDACTIONS: { re: RegExp; replace: string | ((...m: string[]) => st
   // "password: hunter2" / "api_key = abc123" — keep the label, scrub the value.
   {
     re: /\b(password|passwd|pwd|passphrase|api[_-]?key|apikey|access[_-]?token|client[_-]?secret|secret[_-]?key)(\s*(?:is|[:=])\s*)['"]?[^\s'"]{6,}['"]?/gi,
-    replace: (_m: string, label: string, sep: string) => `${label}${sep}${REDACTED}`,
+    replace: (_m: string, label: string, sep: string) =>
+      `${label}${sep}${REDACTED}`,
   },
   // Authorization: Bearer/Basic <token> — keep the scheme, scrub the token.
   {
@@ -81,7 +88,10 @@ const SECRET_REDACTIONS: { re: RegExp; replace: string | ((...m: string[]) => st
  * Scrub credential-like substrings from `text`, replacing each with a
  * placeholder. Returns the cleaned text plus whether anything was redacted.
  */
-export function redactSecretLike(text: string): { text: string; redacted: boolean } {
+export function redactSecretLike(text: string): {
+  text: string;
+  redacted: boolean;
+} {
   let out = text;
   for (const { re, replace } of SECRET_REDACTIONS) {
     out = out.replace(re, replace as string & ((...m: string[]) => string));
@@ -107,7 +117,10 @@ export const SECRET_REDACTION_NOTICE =
  * injection into AI system prompts. Capped so a runaway knowledge base can't
  * blow out the model context window.
  */
-export async function getKnowledgeContext(maxChars = MAX_CONTEXT_CHARS, userId?: number | null): Promise<string> {
+export async function getKnowledgeContext(
+  maxChars = MAX_CONTEXT_CHARS,
+  userId?: number | null,
+): Promise<string> {
   try {
     // Load team-scoped memories (shared) + personal memories for this user
     const rows = await db
@@ -122,7 +135,11 @@ export async function getKnowledgeContext(maxChars = MAX_CONTEXT_CHARS, userId?:
           ),
         ),
       )
-      .orderBy(asc(aiKnowledgeTable.scope), asc(aiKnowledgeTable.category), asc(aiKnowledgeTable.title));
+      .orderBy(
+        asc(aiKnowledgeTable.scope),
+        asc(aiKnowledgeTable.category),
+        asc(aiKnowledgeTable.title),
+      );
 
     if (rows.length === 0) return "";
 
@@ -136,7 +153,10 @@ export async function getKnowledgeContext(maxChars = MAX_CONTEXT_CHARS, userId?:
       out += "## Shared Team Knowledge\n";
       for (const r of teamRows) {
         const block = `### [${r.category}] ${r.title}\n${r.content.trim()}\n\n`;
-        if (out.length + block.length > maxChars) { out += "(Additional shared entries omitted.)\n"; break; }
+        if (out.length + block.length > maxChars) {
+          out += "(Additional shared entries omitted.)\n";
+          break;
+        }
         out += block;
       }
     }
@@ -145,7 +165,10 @@ export async function getKnowledgeContext(maxChars = MAX_CONTEXT_CHARS, userId?:
       out += "\n## Your Personal Memory (only you see this)\n";
       for (const r of personalRows) {
         const block = `### [${r.category}] ${r.title}\n${r.content.trim()}\n\n`;
-        if (out.length + block.length > maxChars) { out += "(Additional personal entries omitted.)\n"; break; }
+        if (out.length + block.length > maxChars) {
+          out += "(Additional personal entries omitted.)\n";
+          break;
+        }
         out += block;
       }
     }
@@ -177,12 +200,20 @@ export const SAVE_MEMORY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           description:
             "One of: organization, environment, network, wireless, azure, identity, applications, endpoints, monitoring, security, helpdesk, general, personal",
         },
-        title: { type: "string", description: "Short descriptive title (max 300 chars)" },
-        content: { type: "string", description: "The fact/preference to remember, written to be useful standalone" },
+        title: {
+          type: "string",
+          description: "Short descriptive title (max 300 chars)",
+        },
+        content: {
+          type: "string",
+          description:
+            "The fact/preference to remember, written to be useful standalone",
+        },
         scope: {
           type: "string",
           enum: ["team", "personal"],
-          description: "team = shared with all staff (default). personal = private to this user only.",
+          description:
+            "team = shared with all staff (default). personal = private to this user only.",
         },
       },
       required: ["title", "content"],
@@ -191,8 +222,18 @@ export const SAVE_MEMORY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 };
 
 const ALLOWED_CATEGORIES = new Set([
-  "organization", "environment", "network", "wireless", "azure", "identity",
-  "applications", "endpoints", "monitoring", "security", "helpdesk", "general",
+  "organization",
+  "environment",
+  "network",
+  "wireless",
+  "azure",
+  "identity",
+  "applications",
+  "endpoints",
+  "monitoring",
+  "security",
+  "helpdesk",
+  "general",
 ]);
 
 export interface SavedMemory {
@@ -211,12 +252,16 @@ async function executeSaveMemory(
   } catch {
     return { result: "Error: invalid JSON arguments", saved: null };
   }
-  const title = typeof args?.title === "string" ? args.title.trim().slice(0, 300) : "";
+  const title =
+    typeof args?.title === "string" ? args.title.trim().slice(0, 300) : "";
   const content = typeof args?.content === "string" ? args.content.trim() : "";
   if (!title || !content) {
     return { result: "Error: title and content are required", saved: null };
   }
-  let category = typeof args?.category === "string" ? args.category.trim().toLowerCase() : "general";
+  let category =
+    typeof args?.category === "string"
+      ? args.category.trim().toLowerCase()
+      : "general";
   if (!ALLOWED_CATEGORIES.has(category)) category = "general";
 
   const titleScrub = redactSecretLike(title);
@@ -225,7 +270,10 @@ async function executeSaveMemory(
   const safeTitle = titleScrub.text;
   const safeContent = contentScrub.text;
   if (wasRedacted) {
-    logger.warn({ title: safeTitle }, "save_memory: redacted secret-like content before saving");
+    logger.warn(
+      { title: safeTitle },
+      "save_memory: redacted secret-like content before saving",
+    );
   }
 
   const scope = args?.scope === "personal" ? "personal" : "team";
@@ -242,7 +290,10 @@ async function executeSaveMemory(
     })
     .returning();
 
-  logger.info({ id: row.id, category, title: safeTitle }, "AI saved a memory to the knowledge base");
+  logger.info(
+    { id: row.id, category, title: safeTitle },
+    "AI saved a memory to the knowledge base",
+  );
   return {
     result: `Saved to knowledge base (id ${row.id}).${wasRedacted ? ` ${SECRET_REDACTION_NOTICE}` : ""}`,
     saved: { id: row.id, category: row.category, title: row.title },
@@ -262,7 +313,9 @@ function isoWeekStart(dateStr: string): string {
 function todayInCentral(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
-    year: "numeric", month: "2-digit", day: "2-digit",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(new Date());
 }
 
@@ -340,22 +393,26 @@ function resolveAssignee(
   const q = query.trim().toLowerCase();
   if (!q) return { member: null, error: "no assignee provided" };
 
-  const rosterList = roster.map((m) => `${m.name} (${m.email})`).join(", ") || "(none)";
+  const rosterList =
+    roster.map((m) => `${m.name} (${m.email})`).join(", ") || "(none)";
 
   const exact = roster.filter(
     (m) => m.email.toLowerCase() === q || m.name.toLowerCase() === q,
   );
-  const pool = exact.length > 0 ? exact : roster.filter((m) => {
-    const name = m.name.toLowerCase();
-    const emailLocal = m.email.toLowerCase().split("@")[0];
-    return (
-      name.includes(q) ||
-      q.includes(name) ||
-      name.split(/\s+/).some((part) => part === q) ||
-      emailLocal === q ||
-      m.email.toLowerCase().startsWith(q)
-    );
-  });
+  const pool =
+    exact.length > 0
+      ? exact
+      : roster.filter((m) => {
+          const name = m.name.toLowerCase();
+          const emailLocal = m.email.toLowerCase().split("@")[0];
+          return (
+            name.includes(q) ||
+            q.includes(name) ||
+            name.split(/\s+/).some((part) => part === q) ||
+            emailLocal === q ||
+            m.email.toLowerCase().startsWith(q)
+          );
+        });
 
   if (pool.length === 0) {
     return {
@@ -383,13 +440,18 @@ async function executeCreateTask(
   } catch {
     return { result: "Error: invalid JSON arguments", created: null };
   }
-  const title = typeof args?.title === "string" ? args.title.trim().slice(0, 300) : "";
+  const title =
+    typeof args?.title === "string" ? args.title.trim().slice(0, 300) : "";
   if (!title) {
     return { result: "Error: title is required", created: null };
   }
-  let notes = typeof args?.notes === "string" && args.notes.trim() ? args.notes.trim() : undefined;
+  let notes =
+    typeof args?.notes === "string" && args.notes.trim()
+      ? args.notes.trim()
+      : undefined;
 
-  const assigneeArg = typeof args?.assignee === "string" ? args.assignee.trim() : "";
+  const assigneeArg =
+    typeof args?.assignee === "string" ? args.assignee.trim() : "";
 
   let targetUserId = actor.id;
   let targetName: string | null = actor.name;
@@ -407,7 +469,10 @@ async function executeCreateTask(
   }
 
   if (targetUserId == null) {
-    return { result: "Error: cannot create a task without a signed-in user", created: null };
+    return {
+      result: "Error: cannot create a task without a signed-in user",
+      created: null,
+    };
   }
 
   // Stamp attribution when delegating to someone other than the signed-in user,
@@ -422,7 +487,14 @@ async function executeCreateTask(
 
   const [row] = await db
     .insert(logItemsTable)
-    .values({ userId: targetUserId, title, category: "task", notes, itemDate, weekOf })
+    .values({
+      userId: targetUserId,
+      title,
+      category: "task",
+      notes,
+      itemDate,
+      weekOf,
+    })
     .returning();
 
   logger.info(
@@ -430,7 +502,10 @@ async function executeCreateTask(
     "AI created a task (log item) from chat",
   );
 
-  const forWhom = crossAssign && targetName ? `${targetName}'s My Tasks` : "the user's My Tasks";
+  const forWhom =
+    crossAssign && targetName
+      ? `${targetName}'s My Tasks`
+      : "the user's My Tasks";
   return {
     result: `Created task "${row.title}" in ${forWhom} for the week of ${weekOf} (id ${row.id}).`,
     created: {
@@ -443,28 +518,31 @@ async function executeCreateTask(
 
 // ---- CIO shadow-memory tool -----------------------------------------------
 
-export const SAVE_SHADOW_NOTE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "save_shadow_note",
-    description:
-      "Record a private observation or suggestion for the CIO in the CIO-only 'shadow memory' for the current week. Use this to capture things the CIO should consider AT REPORTING TIME — a risk worth calling out, a trend across the team's work, a metric to highlight, a follow-up, or wording/framing advice for the executive report. These notes are shown to the CIO as reviewable suggestions ONLY; they never modify any actual report, entry, or deliverable. Only call this when the signed-in user is the CIO. Do not save secrets or passwords.",
-    parameters: {
-      type: "object",
-      properties: {
-        content: {
-          type: "string",
-          description: "The observation or suggestion, written to stand on its own so it's useful when reviewed later.",
+export const SAVE_SHADOW_NOTE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "save_shadow_note",
+      description:
+        "Record a private observation or suggestion for the CIO in the CIO-only 'shadow memory' for the current week. Use this to capture things the CIO should consider AT REPORTING TIME — a risk worth calling out, a trend across the team's work, a metric to highlight, a follow-up, or wording/framing advice for the executive report. These notes are shown to the CIO as reviewable suggestions ONLY; they never modify any actual report, entry, or deliverable. Only call this when the signed-in user is the CIO. Do not save secrets or passwords.",
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            description:
+              "The observation or suggestion, written to stand on its own so it's useful when reviewed later.",
+          },
+          category: {
+            type: "string",
+            description:
+              "Optional short tag for the suggestion, e.g. risk, trend, metric, follow-up, framing, general.",
+          },
         },
-        category: {
-          type: "string",
-          description: "Optional short tag for the suggestion, e.g. risk, trend, metric, follow-up, framing, general.",
-        },
+        required: ["content"],
       },
-      required: ["content"],
     },
-  },
-};
+  };
 
 export interface SavedShadowNote {
   id: number;
@@ -478,7 +556,8 @@ async function executeSaveShadowNote(
 ): Promise<{ result: string; saved: SavedShadowNote | null }> {
   if (userRole !== "cio") {
     return {
-      result: "Error: the shadow memory is CIO-only; this suggestion was not saved.",
+      result:
+        "Error: the shadow memory is CIO-only; this suggestion was not saved.",
       saved: null,
     };
   }
@@ -492,7 +571,10 @@ async function executeSaveShadowNote(
   if (!content) {
     return { result: "Error: content is required", saved: null };
   }
-  let category = typeof args?.category === "string" ? args.category.trim().toLowerCase().slice(0, 50) : "general";
+  let category =
+    typeof args?.category === "string"
+      ? args.category.trim().toLowerCase().slice(0, 50)
+      : "general";
   if (!category) category = "general";
 
   const contentScrub = redactSecretLike(content);
@@ -504,7 +586,13 @@ async function executeSaveShadowNote(
   const weekOf = isoWeekStart(todayInCentral());
   const [row] = await db
     .insert(cioShadowNotesTable)
-    .values({ weekOf, category, content: safeContent, source: "ai", createdBy: userId ?? undefined })
+    .values({
+      weekOf,
+      category,
+      content: safeContent,
+      source: "ai",
+      createdBy: userId ?? undefined,
+    })
     .returning();
 
   logger.info({ id: row.id, weekOf }, "AI saved a CIO shadow note");
@@ -527,13 +615,35 @@ export const UPSERT_SWITCH_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        hostname: { type: "string", description: "Switch hostname — the unique identifier used to match or create the switch." },
-        building: { type: "string", description: "Building the switch is located in. Required when creating a new switch." },
-        ipAddress: { type: "string", description: "Management IP address. Required when creating a new switch." },
+        hostname: {
+          type: "string",
+          description:
+            "Switch hostname — the unique identifier used to match or create the switch.",
+        },
+        building: {
+          type: "string",
+          description:
+            "Building the switch is located in. Required when creating a new switch.",
+        },
+        ipAddress: {
+          type: "string",
+          description:
+            "Management IP address. Required when creating a new switch.",
+        },
         model: { type: "string", description: "Hardware model." },
-        status: { type: "string", description: "One of: online, offline, unknown." },
-        location: { type: "string", description: "More specific location within the building (closet, room)." },
-        notes: { type: "string", description: "Free-form notes about the switch or the change." },
+        status: {
+          type: "string",
+          description: "One of: online, offline, unknown.",
+        },
+        location: {
+          type: "string",
+          description:
+            "More specific location within the building (closet, room).",
+        },
+        notes: {
+          type: "string",
+          description: "Free-form notes about the switch or the change.",
+        },
       },
       required: ["hostname"],
     },
@@ -549,14 +659,36 @@ export const UPSERT_VLAN_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        vlanId: { type: "number", description: "Numeric VLAN id — used to match or create the VLAN." },
-        name: { type: "string", description: "VLAN name. Required when creating a new VLAN." },
-        building: { type: "string", description: "Building/scope. Required when creating a new VLAN." },
-        type: { type: "string", description: "One of: data, voice, ospf, management, security, other. Required when creating." },
-        subnet: { type: "string", description: "Subnet in CIDR or dotted form." },
+        vlanId: {
+          type: "number",
+          description: "Numeric VLAN id — used to match or create the VLAN.",
+        },
+        name: {
+          type: "string",
+          description: "VLAN name. Required when creating a new VLAN.",
+        },
+        building: {
+          type: "string",
+          description: "Building/scope. Required when creating a new VLAN.",
+        },
+        type: {
+          type: "string",
+          description:
+            "One of: data, voice, ospf, management, security, other. Required when creating.",
+        },
+        subnet: {
+          type: "string",
+          description: "Subnet in CIDR or dotted form.",
+        },
         gateway: { type: "string", description: "Default gateway IP." },
-        description: { type: "string", description: "Description of the VLAN's purpose." },
-        notes: { type: "string", description: "Free-form notes about the VLAN or the change." },
+        description: {
+          type: "string",
+          description: "Description of the VLAN's purpose.",
+        },
+        notes: {
+          type: "string",
+          description: "Free-form notes about the VLAN or the change.",
+        },
       },
       required: ["vlanId"],
     },
@@ -572,30 +704,45 @@ export const PING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        host: { type: "string", description: "Hostname or IP address to ping, e.g. '192.168.1.1' or 'sw-core-a48'." },
-        count: { type: "integer", description: "Number of echo requests to send (1-8, default 4)." },
+        host: {
+          type: "string",
+          description:
+            "Hostname or IP address to ping, e.g. '192.168.1.1' or 'sw-core-a48'.",
+        },
+        count: {
+          type: "integer",
+          description: "Number of echo requests to send (1-8, default 4).",
+        },
       },
       required: ["host"],
     },
   },
 };
 
-export const TEST_NET_CONNECTION_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "test_net_connection",
-    description:
-      "Test live TCP connectivity from the reporting server to a specific host and port, the way PowerShell's Test-NetConnection -Port does. Use this to check whether a service/port is open and reachable — e.g. HTTPS (443), RDP (3389), SSH (22), SMB (445), DNS (53), a web console, or a switch management port. Returns whether the port is open plus the connection latency. Internal/private hosts require the server to be on the SCCC network or VPN.",
-    parameters: {
-      type: "object",
-      properties: {
-        host: { type: "string", description: "Hostname or IP address, e.g. '10.0.0.5' or 'dc01.sccc.edu'." },
-        port: { type: "integer", description: "TCP port to test (1-65535), e.g. 443, 3389, 22." },
+export const TEST_NET_CONNECTION_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "test_net_connection",
+      description:
+        "Test live TCP connectivity from the reporting server to a specific host and port, the way PowerShell's Test-NetConnection -Port does. Use this to check whether a service/port is open and reachable — e.g. HTTPS (443), RDP (3389), SSH (22), SMB (445), DNS (53), a web console, or a switch management port. Returns whether the port is open plus the connection latency. Internal/private hosts require the server to be on the SCCC network or VPN.",
+      parameters: {
+        type: "object",
+        properties: {
+          host: {
+            type: "string",
+            description:
+              "Hostname or IP address, e.g. '10.0.0.5' or 'dc01.sccc.edu'.",
+          },
+          port: {
+            type: "integer",
+            description: "TCP port to test (1-65535), e.g. 443, 3389, 22.",
+          },
+        },
+        required: ["host", "port"],
       },
-      required: ["host", "port"],
     },
-  },
-};
+  };
 
 async function executePingHost(rawArgs: string): Promise<string> {
   let args: { host?: unknown; count?: unknown };
@@ -607,9 +754,13 @@ async function executePingHost(rawArgs: string): Promise<string> {
   const host = typeof args.host === "string" ? args.host.trim() : "";
   const count = Number.isInteger(args.count) ? (args.count as number) : 4;
   const res = await pingHost(host, count);
-  if (!res.ok && res.error) return `Ping to "${host || "(none)"}" could not run: ${res.error}`;
+  if (!res.ok && res.error)
+    return `Ping to "${host || "(none)"}" could not run: ${res.error}`;
   const status = res.reachable ? "REACHABLE" : "NOT reachable (no reply)";
-  return `Ping ${res.host}: ${status}.\n${res.output || "(no output)"}`.slice(0, 4000);
+  return `Ping ${res.host}: ${status}.\n${res.output || "(no output)"}`.slice(
+    0,
+    4000,
+  );
 }
 
 async function executeTestNetConnection(rawArgs: string): Promise<string> {
@@ -622,9 +773,12 @@ async function executeTestNetConnection(rawArgs: string): Promise<string> {
   const host = typeof args.host === "string" ? args.host.trim() : "";
   const port = typeof args.port === "number" ? args.port : NaN;
   const res = await testNetConnection(host, port);
-  if (res.error === "invalid host") return `Error: "${host}" is not a valid host.`;
-  if (res.error === "invalid port") return `Error: ${String(args.port)} is not a valid TCP port (1-65535).`;
-  if (res.open) return `TCP ${res.host}:${res.port} is OPEN (connected in ${res.latencyMs} ms).`;
+  if (res.error === "invalid host")
+    return `Error: "${host}" is not a valid host.`;
+  if (res.error === "invalid port")
+    return `Error: ${String(args.port)} is not a valid TCP port (1-65535).`;
+  if (res.open)
+    return `TCP ${res.host}:${res.port} is OPEN (connected in ${res.latencyMs} ms).`;
   return `TCP ${res.host}:${res.port} is CLOSED or unreachable${res.error ? ` (${res.error})` : ""}.`;
 }
 
@@ -658,9 +812,16 @@ async function executeScanNetwork(rawArgs: string): Promise<string> {
     return "Error: invalid JSON arguments for scan_network";
   }
   const buildingFilter =
-    typeof args.building === "string" && args.building.trim() ? args.building.trim().toLowerCase() : null;
+    typeof args.building === "string" && args.building.trim()
+      ? args.building.trim().toLowerCase()
+      : null;
 
-  let rows: { hostname: string; building: string; ipAddress: string; status: string }[];
+  let rows: {
+    hostname: string;
+    building: string;
+    ipAddress: string;
+    status: string;
+  }[];
   try {
     rows = await db
       .select({
@@ -676,7 +837,9 @@ async function executeScanNetwork(rawArgs: string): Promise<string> {
   }
 
   const filtered = buildingFilter
-    ? rows.filter((r) => (r.building ?? "").toLowerCase().includes(buildingFilter))
+    ? rows.filter((r) =>
+        (r.building ?? "").toLowerCase().includes(buildingFilter),
+      )
     : rows;
 
   if (filtered.length === 0) {
@@ -691,26 +854,38 @@ async function executeScanNetwork(rawArgs: string): Promise<string> {
     label: `${r.hostname} [${r.building}] (recorded: ${r.status})`,
   }));
 
-  const results = await pingHosts(targets, { concurrency: 16, count: 1, deadlineSec: 2 });
+  const results = await pingHosts(targets, {
+    concurrency: 16,
+    count: 1,
+    deadlineSec: 2,
+  });
 
   const up = results.filter((r) => r.reachable);
   const down = results.filter((r) => !r.reachable);
-  const scopeLabel = buildingFilter ? `building "${String(args.building)}"` : "entire inventory";
+  const scopeLabel = buildingFilter
+    ? `building "${String(args.building)}"`
+    : "entire inventory";
 
   const lines: string[] = [];
   lines.push(
     `On-prem health sweep of ${scopeLabel}: ${results.length} switch(es) scanned — ${up.length} UP, ${down.length} DOWN.`,
   );
-  if (truncated) lines.push(`(Scan capped at the first ${MAX_SCAN_TARGETS} switches.)`);
+  if (truncated)
+    lines.push(`(Scan capped at the first ${MAX_SCAN_TARGETS} switches.)`);
   if (down.length) {
     lines.push("", "DOWN (no ICMP reply):");
-    for (const r of down) lines.push(`- ${r.label ?? r.host} @ ${r.host}${r.error ? ` — ${r.error}` : ""}`);
+    for (const r of down)
+      lines.push(
+        `- ${r.label ?? r.host} @ ${r.host}${r.error ? ` — ${r.error}` : ""}`,
+      );
   }
   lines.push("", "UP (responded):");
   if (up.length) {
     for (const r of up) lines.push(`- ${r.label ?? r.host} @ ${r.host}`);
   } else {
-    lines.push("- (none responded — the server is likely not on the SCCC network/VPN)");
+    lines.push(
+      "- (none responded — the server is likely not on the SCCC network/VPN)",
+    );
   }
   return lines.join("\n").slice(0, 6000);
 }
@@ -733,18 +908,35 @@ interface InventoryToolResult {
   pending: PendingNetworkChange | null;
 }
 
-async function executeUpsertSwitch(rawArgs: string, ctx: InventoryToolCtx): Promise<InventoryToolResult> {
+async function executeUpsertSwitch(
+  rawArgs: string,
+  ctx: InventoryToolCtx,
+): Promise<InventoryToolResult> {
   if (!ctx.userRole || !NETWORK_ADMIN_ROLES.has(ctx.userRole)) {
-    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null, pending: null };
+    return {
+      result:
+        "Error: modifying network inventory requires a network administrator role.",
+      updated: null,
+      pending: null,
+    };
   }
   let args: any;
   try {
     args = JSON.parse(rawArgs);
   } catch {
-    return { result: "Error: invalid JSON arguments", updated: null, pending: null };
+    return {
+      result: "Error: invalid JSON arguments",
+      updated: null,
+      pending: null,
+    };
   }
   const hostname = cleanStr(args?.hostname, 255);
-  if (!hostname) return { result: "Error: hostname is required", updated: null, pending: null };
+  if (!hostname)
+    return {
+      result: "Error: hostname is required",
+      updated: null,
+      pending: null,
+    };
 
   const input = {
     hostname,
@@ -758,30 +950,55 @@ async function executeUpsertSwitch(rawArgs: string, ctx: InventoryToolCtx): Prom
 
   if (ctx.preview) {
     const res = await previewSwitchByHostname(input);
-    if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+    if (!res.ok)
+      return { result: `Error: ${res.error}`, updated: null, pending: null };
     return {
       result: `Proposed switch change staged for the user to review and confirm — it has NOT been applied yet.`,
       updated: null,
       pending: res.pending,
     };
   }
-  const res = await upsertSwitchByHostname(input, { actor: ctx.actor, source: "chat_ai" });
-  if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+  const res = await upsertSwitchByHostname(input, {
+    actor: ctx.actor,
+    source: "chat_ai",
+  });
+  if (!res.ok)
+    return { result: `Error: ${res.error}`, updated: null, pending: null };
   return { result: res.result, updated: res.update, pending: null };
 }
 
-async function executeUpsertVlan(rawArgs: string, ctx: InventoryToolCtx): Promise<InventoryToolResult> {
+async function executeUpsertVlan(
+  rawArgs: string,
+  ctx: InventoryToolCtx,
+): Promise<InventoryToolResult> {
   if (!ctx.userRole || !NETWORK_ADMIN_ROLES.has(ctx.userRole)) {
-    return { result: "Error: modifying network inventory requires a network administrator role.", updated: null, pending: null };
+    return {
+      result:
+        "Error: modifying network inventory requires a network administrator role.",
+      updated: null,
+      pending: null,
+    };
   }
   let args: any;
   try {
     args = JSON.parse(rawArgs);
   } catch {
-    return { result: "Error: invalid JSON arguments", updated: null, pending: null };
+    return {
+      result: "Error: invalid JSON arguments",
+      updated: null,
+      pending: null,
+    };
   }
-  const vlanId = typeof args?.vlanId === "number" && Number.isInteger(args.vlanId) ? args.vlanId : NaN;
-  if (Number.isNaN(vlanId)) return { result: "Error: a numeric vlanId is required", updated: null, pending: null };
+  const vlanId =
+    typeof args?.vlanId === "number" && Number.isInteger(args.vlanId)
+      ? args.vlanId
+      : NaN;
+  if (Number.isNaN(vlanId))
+    return {
+      result: "Error: a numeric vlanId is required",
+      updated: null,
+      pending: null,
+    };
 
   const input = {
     vlanId,
@@ -796,15 +1013,20 @@ async function executeUpsertVlan(rawArgs: string, ctx: InventoryToolCtx): Promis
 
   if (ctx.preview) {
     const res = await previewVlanByVlanId(input);
-    if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+    if (!res.ok)
+      return { result: `Error: ${res.error}`, updated: null, pending: null };
     return {
       result: `Proposed VLAN change staged for the user to review and confirm — it has NOT been applied yet.`,
       updated: null,
       pending: res.pending,
     };
   }
-  const res = await upsertVlanByVlanId(input, { actor: ctx.actor, source: "chat_ai" });
-  if (!res.ok) return { result: `Error: ${res.error}`, updated: null, pending: null };
+  const res = await upsertVlanByVlanId(input, {
+    actor: ctx.actor,
+    source: "chat_ai",
+  });
+  if (!res.ok)
+    return { result: `Error: ${res.error}`, updated: null, pending: null };
   return { result: res.result, updated: res.update, pending: null };
 }
 
@@ -844,7 +1066,8 @@ export const QUERY_AZURE_VM_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
       properties: {
         name: {
           type: "string",
-          description: "VM name or partial name to search for (case-insensitive). Returns all matching VMs.",
+          description:
+            "VM name or partial name to search for (case-insensitive). Returns all matching VMs.",
         },
         resource_group: {
           type: "string",
@@ -858,17 +1081,26 @@ export const QUERY_AZURE_VM_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 
 async function executeQueryAzureVm(rawArgs: string): Promise<string> {
   let args: any;
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON arguments"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON arguments";
+  }
 
-  const nameFilter = typeof args?.name === "string" ? args.name.trim().toLowerCase() : "";
-  const rgFilter = typeof args?.resource_group === "string" ? args.resource_group.trim().toLowerCase() : "";
+  const nameFilter =
+    typeof args?.name === "string" ? args.name.trim().toLowerCase() : "";
+  const rgFilter =
+    typeof args?.resource_group === "string"
+      ? args.resource_group.trim().toLowerCase()
+      : "";
 
   if (!nameFilter) return "Error: name is required";
 
   // Import config and fetch inline to avoid circular deps
   const { getAzureConfig, fetchAzureVms } = await import("./azure");
   const cfg = getAzureConfig();
-  if (!cfg) return "Azure is not configured on this server — AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_SUBSCRIPTION_ID are missing from environment.";
+  if (!cfg)
+    return "Azure is not configured on this server — AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_SUBSCRIPTION_ID are missing from environment.";
 
   let vms;
   try {
@@ -879,11 +1111,13 @@ async function executeQueryAzureVm(rawArgs: string): Promise<string> {
 
   const matches = vms.filter((vm) => {
     const nameMatch = vm.name.toLowerCase().includes(nameFilter);
-    const rgMatch = !rgFilter || (vm.resourceGroup ?? "").toLowerCase().includes(rgFilter);
+    const rgMatch =
+      !rgFilter || (vm.resourceGroup ?? "").toLowerCase().includes(rgFilter);
     return nameMatch && rgMatch;
   });
 
-  if (matches.length === 0) return `No VMs found matching "${args.name}"${rgFilter ? ` in resource group "${args.resource_group}"` : ""}.`;
+  if (matches.length === 0)
+    return `No VMs found matching "${args.name}"${rgFilter ? ` in resource group "${args.resource_group}"` : ""}.`;
 
   return matches
     .map((vm) => {
@@ -901,61 +1135,82 @@ async function executeQueryAzureVm(rawArgs: string): Promise<string> {
 
 // ---- query_azure_security tool -------------------------------------------
 
-export const QUERY_AZURE_SECURITY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_azure_security",
-    description:
-      "Fetch live security alerts from Microsoft Defender for Cloud (formerly Security Center). " +
-      "Use when the user asks about threats, intrusion attempts, suspicious activity, security incidents, " +
-      "or 'what is Defender showing'. Returns active alerts with severity, description, and remediation steps. " +
-      "Always call this during any incident triage alongside query_azure_health.",
-    parameters: {
-      type: "object",
-      properties: {
-        severity: {
-          type: "string",
-          enum: ["High", "Medium", "Low", "all"],
-          description: "Filter by severity. Default 'all'.",
+export const QUERY_AZURE_SECURITY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_azure_security",
+      description:
+        "Fetch live security alerts from Microsoft Defender for Cloud (formerly Security Center). " +
+        "Use when the user asks about threats, intrusion attempts, suspicious activity, security incidents, " +
+        "or 'what is Defender showing'. Returns active alerts with severity, description, and remediation steps. " +
+        "Always call this during any incident triage alongside query_azure_health.",
+      parameters: {
+        type: "object",
+        properties: {
+          severity: {
+            type: "string",
+            enum: ["High", "Medium", "Low", "all"],
+            description: "Filter by severity. Default 'all'.",
+          },
         },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 async function executeQueryAzureSecurity(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { /* ok */ }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    /* ok */
+  }
   const { getAzureConfig, fetchSecurityAlerts } = await import("./azure");
   const cfg = getAzureConfig();
   if (!cfg) return "Azure is not configured — check environment variables.";
   let alerts;
-  try { alerts = await fetchSecurityAlerts(cfg); } catch (err: any) {
+  try {
+    alerts = await fetchSecurityAlerts(cfg);
+  } catch (err: any) {
     return `Security alert fetch failed: ${err?.message ?? String(err)}`;
   }
   const sevFilter = (args?.severity ?? "all").toLowerCase();
-  const filtered = sevFilter === "all" ? alerts : alerts.filter(a => a.severity.toLowerCase() === sevFilter);
-  const active = filtered.filter(a => a.status !== "Dismissed" && a.status !== "Resolved");
-  if (active.length === 0) return sevFilter === "all"
-    ? "✅ No active security alerts in Defender for Cloud."
-    : `✅ No active ${args.severity} alerts.`;
+  const filtered =
+    sevFilter === "all"
+      ? alerts
+      : alerts.filter((a) => a.severity.toLowerCase() === sevFilter);
+  const active = filtered.filter(
+    (a) => a.status !== "Dismissed" && a.status !== "Resolved",
+  );
+  if (active.length === 0)
+    return sevFilter === "all"
+      ? "✅ No active security alerts in Defender for Cloud."
+      : `✅ No active ${args.severity} alerts.`;
   const bySev: Record<string, typeof active> = {};
   for (const a of active) {
     (bySev[a.severity] ??= []).push(a);
   }
   const order = ["High", "Medium", "Low", "Informational"];
-  const lines: string[] = [`🚨 **${active.length} active security alert(s)**\n`];
+  const lines: string[] = [
+    `🚨 **${active.length} active security alert(s)**\n`,
+  ];
   for (const sev of order) {
     const group = bySev[sev];
     if (!group?.length) continue;
     lines.push(`**${sev} (${group.length})**`);
     for (const a of group) {
       lines.push(`• **${a.alertDisplayName}**`);
-      lines.push(`  Time: ${a.timeGeneratedUtc ? new Date(a.timeGeneratedUtc).toLocaleString() : "unknown"}`);
-      if (a.resourceIdentifiers.length) lines.push(`  Resource: ${a.resourceIdentifiers[0]}`);
-      lines.push(`  ${a.description.slice(0, 200)}${a.description.length > 200 ? "…" : ""}`);
-      if (a.remediationSteps.length) lines.push(`  Fix: ${a.remediationSteps[0]}`);
+      lines.push(
+        `  Time: ${a.timeGeneratedUtc ? new Date(a.timeGeneratedUtc).toLocaleString() : "unknown"}`,
+      );
+      if (a.resourceIdentifiers.length)
+        lines.push(`  Resource: ${a.resourceIdentifiers[0]}`);
+      lines.push(
+        `  ${a.description.slice(0, 200)}${a.description.length > 200 ? "…" : ""}`,
+      );
+      if (a.remediationSteps.length)
+        lines.push(`  Fix: ${a.remediationSteps[0]}`);
     }
     lines.push("");
   }
@@ -964,111 +1219,156 @@ async function executeQueryAzureSecurity(rawArgs: string): Promise<string> {
 
 // ---- query_azure_health tool ---------------------------------------------
 
-export const QUERY_AZURE_HEALTH_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_azure_health",
-    description:
-      "Fetch live Azure Resource Health status for all resources or a specific resource. " +
-      "Use when the user asks 'is X down?', 'what resources are unhealthy?', 'are there any Azure outages?', " +
-      "or during any incident to check platform-side vs config-side failures. " +
-      "Returns availability state (Available/Unavailable/Degraded/Unknown) and reason.",
-    parameters: {
-      type: "object",
-      properties: {
-        unhealthy_only: {
-          type: "boolean",
-          description: "If true (default), only return unavailable or degraded resources.",
+export const QUERY_AZURE_HEALTH_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_azure_health",
+      description:
+        "Fetch live Azure Resource Health status for all resources or a specific resource. " +
+        "Use when the user asks 'is X down?', 'what resources are unhealthy?', 'are there any Azure outages?', " +
+        "or during any incident to check platform-side vs config-side failures. " +
+        "Returns availability state (Available/Unavailable/Degraded/Unknown) and reason.",
+      parameters: {
+        type: "object",
+        properties: {
+          unhealthy_only: {
+            type: "boolean",
+            description:
+              "If true (default), only return unavailable or degraded resources.",
+          },
+          resource_name: {
+            type: "string",
+            description: "Optional: filter results by resource name substring.",
+          },
         },
-        resource_name: {
-          type: "string",
-          description: "Optional: filter results by resource name substring.",
-        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 async function executeQueryAzureHealth(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { /* ok */ }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    /* ok */
+  }
   const { getAzureConfig, fetchResourceHealth } = await import("./azure");
   const cfg = getAzureConfig();
   if (!cfg) return "Azure is not configured — check environment variables.";
   let health;
-  try { health = await fetchResourceHealth(cfg); } catch (err: any) {
+  try {
+    health = await fetchResourceHealth(cfg);
+  } catch (err: any) {
     return `Resource health fetch failed: ${err?.message ?? String(err)}`;
   }
   const unhealthyOnly = args?.unhealthy_only !== false;
-  const nameFilter = typeof args?.resource_name === "string" ? args.resource_name.toLowerCase() : "";
+  const nameFilter =
+    typeof args?.resource_name === "string"
+      ? args.resource_name.toLowerCase()
+      : "";
   let results = health;
-  if (nameFilter) results = results.filter(h => h.resourceId.toLowerCase().includes(nameFilter));
-  if (unhealthyOnly) results = results.filter(h => !["available", "unknown"].includes(h.availabilityState.toLowerCase()));
-  if (results.length === 0) return unhealthyOnly
-    ? "✅ All resources reporting healthy (Available)."
-    : `No health records found${nameFilter ? ` matching "${args.resource_name}"` : ""}.`;
-  const stateIcon = (s: string) => s.toLowerCase() === "available" ? "✅" : s.toLowerCase() === "degraded" ? "⚠️" : "🔴";
+  if (nameFilter)
+    results = results.filter((h) =>
+      h.resourceId.toLowerCase().includes(nameFilter),
+    );
+  if (unhealthyOnly)
+    results = results.filter(
+      (h) =>
+        !["available", "unknown"].includes(h.availabilityState.toLowerCase()),
+    );
+  if (results.length === 0)
+    return unhealthyOnly
+      ? "✅ All resources reporting healthy (Available)."
+      : `No health records found${nameFilter ? ` matching "${args.resource_name}"` : ""}.`;
+  const stateIcon = (s: string) =>
+    s.toLowerCase() === "available"
+      ? "✅"
+      : s.toLowerCase() === "degraded"
+        ? "⚠️"
+        : "🔴";
   const lines = [`**Azure Resource Health — ${results.length} result(s)**\n`];
   for (const h of results) {
     const name = h.resourceId.split("/").pop() ?? h.resourceId;
-    lines.push(`${stateIcon(h.availabilityState)} **${name}** — ${h.availabilityState}`);
+    lines.push(
+      `${stateIcon(h.availabilityState)} **${name}** — ${h.availabilityState}`,
+    );
     if (h.summary) lines.push(`  ${h.summary}`);
     if (h.reasonType) lines.push(`  Reason: ${h.reasonType}`);
-    if (h.occurredTime) lines.push(`  Since: ${new Date(h.occurredTime).toLocaleString()}`);
+    if (h.occurredTime)
+      lines.push(`  Since: ${new Date(h.occurredTime).toLocaleString()}`);
   }
   return lines.join("\n");
 }
 
 // ---- query_azure_policy tool --------------------------------------------
 
-export const QUERY_AZURE_POLICY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_azure_policy",
-    description:
-      "Fetch Azure Policy compliance state — which resources are non-compliant and why. " +
-      "Use when the user asks about compliance, policy violations, configuration drift, or 'what's out of policy'. " +
-      "Returns non-compliant resources with policy name, resource type, and resource group.",
-    parameters: {
-      type: "object",
-      properties: {
-        all_states: {
-          type: "boolean",
-          description: "If true, return all states including compliant. Default false (non-compliant only).",
+export const QUERY_AZURE_POLICY_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_azure_policy",
+      description:
+        "Fetch Azure Policy compliance state — which resources are non-compliant and why. " +
+        "Use when the user asks about compliance, policy violations, configuration drift, or 'what's out of policy'. " +
+        "Returns non-compliant resources with policy name, resource type, and resource group.",
+      parameters: {
+        type: "object",
+        properties: {
+          all_states: {
+            type: "boolean",
+            description:
+              "If true, return all states including compliant. Default false (non-compliant only).",
+          },
+          resource_group: {
+            type: "string",
+            description: "Optional: filter by resource group name.",
+          },
         },
-        resource_group: {
-          type: "string",
-          description: "Optional: filter by resource group name.",
-        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 async function executeQueryAzurePolicy(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { /* ok */ }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    /* ok */
+  }
   const { getAzureConfig, fetchPolicyStates } = await import("./azure");
   const cfg = getAzureConfig();
   if (!cfg) return "Azure is not configured — check environment variables.";
   const nonCompliantOnly = !args?.all_states;
   let states;
-  try { states = await fetchPolicyStates(cfg, nonCompliantOnly); } catch (err: any) {
+  try {
+    states = await fetchPolicyStates(cfg, nonCompliantOnly);
+  } catch (err: any) {
     return `Policy compliance fetch failed: ${err?.message ?? String(err)}`;
   }
-  const rgFilter = typeof args?.resource_group === "string" ? args.resource_group.toLowerCase() : "";
-  if (rgFilter) states = states.filter(s => (s.resourceGroup ?? "").toLowerCase().includes(rgFilter));
+  const rgFilter =
+    typeof args?.resource_group === "string"
+      ? args.resource_group.toLowerCase()
+      : "";
+  if (rgFilter)
+    states = states.filter((s) =>
+      (s.resourceGroup ?? "").toLowerCase().includes(rgFilter),
+    );
   if (states.length === 0) return "✅ No non-compliant resources found.";
   const lines = [`⚠️ **${states.length} non-compliant resource(s)**\n`];
   const byPolicy: Record<string, typeof states> = {};
   for (const s of states) (byPolicy[s.policyDefinitionName] ??= []).push(s);
   for (const [policy, items] of Object.entries(byPolicy)) {
-    lines.push(`**Policy: ${policy}** (${items.length} violation${items.length > 1 ? "s" : ""})`);
+    lines.push(
+      `**Policy: ${policy}** (${items.length} violation${items.length > 1 ? "s" : ""})`,
+    );
     for (const item of items.slice(0, 10)) {
       const name = item.resourceId.split("/").pop() ?? item.resourceId;
-      lines.push(`  • ${name} [${item.resourceType.split("/").pop()}] — RG: ${item.resourceGroup ?? "—"}`);
+      lines.push(
+        `  • ${name} [${item.resourceType.split("/").pop()}] — RG: ${item.resourceGroup ?? "—"}`,
+      );
     }
     if (items.length > 10) lines.push(`  …and ${items.length - 10} more`);
     lines.push("");
@@ -1078,47 +1378,67 @@ async function executeQueryAzurePolicy(rawArgs: string): Promise<string> {
 
 // ---- query_azure_resources tool (all-resources on demand) ----------------
 
-export const QUERY_AZURE_RESOURCES_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_azure_resources",
-    description:
-      "List all Azure resources in the subscription — storage, app services, databases, networking, etc. " +
-      "Use when the user asks 'what do we have in Azure?', 'what's in resource group X?', " +
-      "'show me all resources', or needs a full inventory during an incident. " +
-      "Complements query_azure_vm (which is compute-specific). Filters by type or resource group on request.",
-    parameters: {
-      type: "object",
-      properties: {
-        resource_group: {
-          type: "string",
-          description: "Optional: filter by resource group name (case-insensitive partial match).",
+export const QUERY_AZURE_RESOURCES_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_azure_resources",
+      description:
+        "List all Azure resources in the subscription — storage, app services, databases, networking, etc. " +
+        "Use when the user asks 'what do we have in Azure?', 'what's in resource group X?', " +
+        "'show me all resources', or needs a full inventory during an incident. " +
+        "Complements query_azure_vm (which is compute-specific). Filters by type or resource group on request.",
+      parameters: {
+        type: "object",
+        properties: {
+          resource_group: {
+            type: "string",
+            description:
+              "Optional: filter by resource group name (case-insensitive partial match).",
+          },
+          type_filter: {
+            type: "string",
+            description:
+              "Optional: filter by resource type substring, e.g. 'storage', 'sql', 'keyvault'.",
+          },
         },
-        type_filter: {
-          type: "string",
-          description: "Optional: filter by resource type substring, e.g. 'storage', 'sql', 'keyvault'.",
-        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 async function executeQueryAzureResources(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { /* ok */ }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    /* ok */
+  }
   const { getAzureConfig, fetchAzureResources } = await import("./azure");
   const cfg = getAzureConfig();
   if (!cfg) return "Azure is not configured — check environment variables.";
   let resources;
-  try { resources = await fetchAzureResources(cfg); } catch (err: any) {
+  try {
+    resources = await fetchAzureResources(cfg);
+  } catch (err: any) {
     return `Resource list fetch failed: ${err?.message ?? String(err)}`;
   }
-  const rgFilter = typeof args?.resource_group === "string" ? args.resource_group.toLowerCase() : "";
-  const typeFilter = typeof args?.type_filter === "string" ? args.type_filter.toLowerCase() : "";
-  if (rgFilter) resources = resources.filter(r => (r.resourceGroup ?? "").toLowerCase().includes(rgFilter));
-  if (typeFilter) resources = resources.filter(r => r.type.toLowerCase().includes(typeFilter));
-  if (resources.length === 0) return "No resources found matching the specified filters.";
+  const rgFilter =
+    typeof args?.resource_group === "string"
+      ? args.resource_group.toLowerCase()
+      : "";
+  const typeFilter =
+    typeof args?.type_filter === "string" ? args.type_filter.toLowerCase() : "";
+  if (rgFilter)
+    resources = resources.filter((r) =>
+      (r.resourceGroup ?? "").toLowerCase().includes(rgFilter),
+    );
+  if (typeFilter)
+    resources = resources.filter((r) =>
+      r.type.toLowerCase().includes(typeFilter),
+    );
+  if (resources.length === 0)
+    return "No resources found matching the specified filters.";
   const byRg: Record<string, typeof resources> = {};
   for (const r of resources) (byRg[r.resourceGroup ?? "—"] ??= []).push(r);
   const lines = [`**Azure Resources — ${resources.length} total**\n`];
@@ -1126,7 +1446,9 @@ async function executeQueryAzureResources(rawArgs: string): Promise<string> {
     lines.push(`**Resource Group: ${rg}** (${items.length})`);
     for (const r of items) {
       const typeName = r.type.split("/").pop() ?? r.type;
-      lines.push(`  • ${r.name} [${typeName}]${r.location ? ` — ${r.location}` : ""}`);
+      lines.push(
+        `  • ${r.name} [${typeName}]${r.location ? ` — ${r.location}` : ""}`,
+      );
     }
     lines.push("");
   }
@@ -1146,7 +1468,10 @@ export const DNS_LOOKUP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        host: { type: "string", description: "Hostname or IP address to look up" },
+        host: {
+          type: "string",
+          description: "Hostname or IP address to look up",
+        },
         record_type: {
           type: "string",
           enum: ["A", "AAAA", "MX", "CNAME", "TXT", "PTR", "ANY"],
@@ -1160,7 +1485,11 @@ export const DNS_LOOKUP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 
 async function executeDnsLookup(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
   const host = typeof args?.host === "string" ? args.host.trim() : "";
   if (!host) return "Error: host is required";
   const recordType = (args?.record_type ?? "A").toUpperCase();
@@ -1168,9 +1497,14 @@ async function executeDnsLookup(rawArgs: string): Promise<string> {
   const { promisify } = await import("util");
   const exec = promisify(execFile);
   try {
-    const { stdout, stderr } = await exec("dig", ["+short", `+time=5`, `+tries=2`, `-t`, recordType, host], { timeout: 8000 });
+    const { stdout, stderr } = await exec(
+      "dig",
+      ["+short", `+time=5`, `+tries=2`, `-t`, recordType, host],
+      { timeout: 8000 },
+    );
     const result = (stdout ?? "").trim();
-    if (!result && stderr) return `DNS lookup failed: ${stderr.trim().slice(0, 200)}`;
+    if (!result && stderr)
+      return `DNS lookup failed: ${stderr.trim().slice(0, 200)}`;
     if (!result) return `No ${recordType} records found for ${host}`;
     return `**DNS ${recordType} records for ${host}:**\n${result}`;
   } catch (err: any) {
@@ -1203,7 +1537,10 @@ export const TRACEROUTE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
       type: "object",
       properties: {
         host: { type: "string", description: "Hostname or IP to trace to" },
-        max_hops: { type: "number", description: "Maximum hops (default 20, max 20)" },
+        max_hops: {
+          type: "number",
+          description: "Maximum hops (default 20, max 20)",
+        },
       },
       required: ["host"],
     },
@@ -1218,22 +1555,32 @@ function isBlockedTarget(host: string): boolean {
 
 async function executeTraceroute(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
   const host = typeof args?.host === "string" ? args.host.trim() : "";
   if (!host) return "Error: host is required";
-  if (isBlockedTarget(host)) return "Error: that target is not reachable from Fred's server.";
+  if (isBlockedTarget(host))
+    return "Error: that target is not reachable from Fred's server.";
   const maxHops = Math.min(Number(args?.max_hops ?? 20), 20);
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
   const exec = promisify(execFile);
   try {
     // Use traceroute on Linux; -m max hops, -w wait seconds, -n no reverse DNS (faster)
-    const { stdout } = await exec("traceroute", ["-m", String(maxHops), "-w", "2", "-n", host], { timeout: 60000 });
+    const { stdout } = await exec(
+      "traceroute",
+      ["-m", String(maxHops), "-w", "2", "-n", host],
+      { timeout: 60000 },
+    );
     const lines = (stdout ?? "").trim().split("\n").slice(0, 25);
     return `**Traceroute to ${host}** (from Fred server):\n\`\`\`\n${lines.join("\n")}\n\`\`\``;
   } catch (err: any) {
     const out = err?.stdout ?? "";
-    if (out.trim()) return `**Traceroute to ${host}** (partial):\n\`\`\`\n${out.trim()}\n\`\`\``;
+    if (out.trim())
+      return `**Traceroute to ${host}** (partial):\n\`\`\`\n${out.trim()}\n\`\`\``;
     return `Traceroute failed: ${err?.message ?? String(err)}`;
   }
 }
@@ -1253,9 +1600,19 @@ export const HTTP_CHECK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "Full URL to check (must include https:// or http://)" },
-        method: { type: "string", enum: ["GET", "HEAD"], description: "HTTP method. HEAD is faster (default)." },
-        timeout_ms: { type: "number", description: "Timeout in ms (default 8000, max 15000)" },
+        url: {
+          type: "string",
+          description: "Full URL to check (must include https:// or http://)",
+        },
+        method: {
+          type: "string",
+          enum: ["GET", "HEAD"],
+          description: "HTTP method. HEAD is faster (default).",
+        },
+        timeout_ms: {
+          type: "number",
+          description: "Timeout in ms (default 8000, max 15000)",
+        },
       },
       required: ["url"],
     },
@@ -1264,11 +1621,19 @@ export const HTTP_CHECK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 
 async function executeHttpCheck(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
   const url = typeof args?.url === "string" ? args.url.trim() : "";
   if (!url) return "Error: url is required";
   // Block IMDS and loopback
-  if (/^https?:\/\/169\.254\./i.test(url) || /^https?:\/\/127\./i.test(url) || /^https?:\/\/localhost/i.test(url)) {
+  if (
+    /^https?:\/\/169\.254\./i.test(url) ||
+    /^https?:\/\/127\./i.test(url) ||
+    /^https?:\/\/localhost/i.test(url)
+  ) {
     return "Error: that target is not permitted.";
   }
   const method = args?.method === "GET" ? "GET" : "HEAD";
@@ -1289,7 +1654,8 @@ async function executeHttpCheck(rawArgs: string): Promise<string> {
     return `${statusIcon} **${url}**\n  Status: ${res.status} ${res.statusText}${finalUrl}\n  Response time: ${elapsed}ms`;
   } catch (err: any) {
     const elapsed = Date.now() - start;
-    if (err?.name === "AbortError") return `⏱️ **${url}** — timed out after ${timeoutMs}ms`;
+    if (err?.name === "AbortError")
+      return `⏱️ **${url}** — timed out after ${timeoutMs}ms`;
     return `🔴 **${url}** — connection failed after ${elapsed}ms\n  ${err?.message ?? String(err)}`;
   } finally {
     clearTimeout(timer);
@@ -1309,7 +1675,10 @@ export const SSL_CHECK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        host: { type: "string", description: "Hostname to check (no https://, just the domain)" },
+        host: {
+          type: "string",
+          description: "Hostname to check (no https://, just the domain)",
+        },
         port: { type: "number", description: "Port to check (default 443)" },
       },
       required: ["host"],
@@ -1319,8 +1688,15 @@ export const SSL_CHECK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
 
 async function executeSslCheck(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
-  const host = typeof args?.host === "string" ? args.host.replace(/^https?:\/\//i, "").trim() : "";
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
+  const host =
+    typeof args?.host === "string"
+      ? args.host.replace(/^https?:\/\//i, "").trim()
+      : "";
   if (!host) return "Error: host is required";
   if (isBlockedTarget(host)) return "Error: that target is not permitted.";
   const port = Number(args?.port ?? 443);
@@ -1331,10 +1707,14 @@ async function executeSslCheck(rawArgs: string): Promise<string> {
     // Use openssl s_client to get cert details
     const { stdout } = await exec(
       "bash",
-      ["-c", `echo | openssl s_client -connect ${host}:${port} -servername ${host} 2>/dev/null | openssl x509 -noout -dates -issuer -subject -ext subjectAltName 2>/dev/null`],
+      [
+        "-c",
+        `echo | openssl s_client -connect ${host}:${port} -servername ${host} 2>/dev/null | openssl x509 -noout -dates -issuer -subject -ext subjectAltName 2>/dev/null`,
+      ],
       { timeout: 10000 },
     );
-    if (!stdout.trim()) return `Could not retrieve certificate from ${host}:${port} — host may be unreachable or not TLS.`;
+    if (!stdout.trim())
+      return `Could not retrieve certificate from ${host}:${port} — host may be unreachable or not TLS.`;
     const notAfterMatch = /notAfter=(.+)/.exec(stdout);
     const issuerMatch = /issuer=(.+)/.exec(stdout);
     const subjectMatch = /subject=(.+)/.exec(stdout);
@@ -1344,14 +1724,29 @@ async function executeSslCheck(rawArgs: string): Promise<string> {
     while ((m = sanMatch.exec(stdout)) !== null) sans.push(m[1].trim());
 
     const expiry = notAfterMatch ? new Date(notAfterMatch[1].trim()) : null;
-    const daysLeft = expiry ? Math.floor((expiry.getTime() - Date.now()) / 86_400_000) : null;
-    const icon = daysLeft == null ? "❓" : daysLeft <= 7 ? "🔴" : daysLeft <= 30 ? "⚠️" : "✅";
+    const daysLeft = expiry
+      ? Math.floor((expiry.getTime() - Date.now()) / 86_400_000)
+      : null;
+    const icon =
+      daysLeft == null
+        ? "❓"
+        : daysLeft <= 7
+          ? "🔴"
+          : daysLeft <= 30
+            ? "⚠️"
+            : "✅";
 
     const lines = [`${icon} **SSL Certificate: ${host}:${port}**`];
     if (subjectMatch) lines.push(`  Subject: ${subjectMatch[1].trim()}`);
     if (issuerMatch) lines.push(`  Issuer: ${issuerMatch[1].trim()}`);
-    if (expiry) lines.push(`  Expires: ${expiry.toDateString()} (${daysLeft} days${daysLeft! <= 30 ? " ⚠️ RENEW SOON" : ""})`);
-    if (sans.length) lines.push(`  SANs: ${sans.slice(0, 6).join(", ")}${sans.length > 6 ? ` +${sans.length - 6} more` : ""}`);
+    if (expiry)
+      lines.push(
+        `  Expires: ${expiry.toDateString()} (${daysLeft} days${daysLeft! <= 30 ? " ⚠️ RENEW SOON" : ""})`,
+      );
+    if (sans.length)
+      lines.push(
+        `  SANs: ${sans.slice(0, 6).join(", ")}${sans.length > 6 ? ` +${sans.length - 6} more` : ""}`,
+      );
     return lines.join("\n");
   } catch (err: any) {
     return `SSL check failed for ${host}:${port}: ${err?.message ?? String(err)}`;
@@ -1372,10 +1767,14 @@ export const SNMP_GET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     parameters: {
       type: "object",
       properties: {
-        host: { type: "string", description: "Switch IP address (RFC-1918 only)" },
+        host: {
+          type: "string",
+          description: "Switch IP address (RFC-1918 only)",
+        },
         oid: {
           type: "string",
-          description: "OID or friendly name: 'uptime', 'interfaces', 'cpu', 'description'. Defaults to 'uptime'.",
+          description:
+            "OID or friendly name: 'uptime', 'interfaces', 'cpu', 'description'. Defaults to 'uptime'.",
         },
       },
       required: ["host"],
@@ -1392,7 +1791,11 @@ const SNMP_OID_MAP: Record<string, string> = {
 
 async function executeSnmpGet(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
   const host = typeof args?.host === "string" ? args.host.trim() : "";
   if (!host) return "Error: host is required";
   // SNMP is internal-only
@@ -1408,54 +1811,88 @@ async function executeSnmpGet(rawArgs: string): Promise<string> {
   try {
     const isWalk = oidKey === "interfaces";
     const cmd = isWalk ? "snmpwalk" : "snmpget";
-    const { stdout } = await exec(cmd, ["-v2c", "-c", community, "-t", "5", "-r", "1", host, oid], { timeout: 12000 });
-    if (!stdout.trim()) return `No SNMP response from ${host} — device may be unreachable or community string incorrect.`;
+    const { stdout } = await exec(
+      cmd,
+      ["-v2c", "-c", community, "-t", "5", "-r", "1", host, oid],
+      { timeout: 12000 },
+    );
+    if (!stdout.trim())
+      return `No SNMP response from ${host} — device may be unreachable or community string incorrect.`;
     return `**SNMP ${oidKey} @ ${host}:**\n\`\`\`\n${stdout.trim().slice(0, 2000)}\n\`\`\``;
   } catch (err: any) {
     const out = (err?.stdout ?? "").trim();
-    if (out) return `**SNMP ${oidKey} @ ${host}** (partial):\n\`\`\`\n${out.slice(0, 1000)}\n\`\`\``;
+    if (out)
+      return `**SNMP ${oidKey} @ ${host}** (partial):\n\`\`\`\n${out.slice(0, 1000)}\n\`\`\``;
     return `SNMP query failed for ${host}: ${err?.message ?? String(err)}`;
   }
 }
 
 // ---- Fred accessible-file catalog ---------------------------------------
 
-export const LIST_ACCESSIBLE_FILES_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "list_accessible_files",
-    description: "List Fred's persistent, app-authorized file catalog: uploaded Fred Files and stored device-configuration backups. Returns metadata and stable record/download links only; it never scans arbitrary server directories.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Optional filename, device name, MIME type, notes, or uploader search." },
-        source: { type: "string", enum: ["all", "fred_files", "device_configs"], description: "Catalog source; defaults to all." },
-        kind: { type: "string", enum: ["all", "text", "image", "binary", "config"], description: "Optional file-kind filter." },
-        limit: { type: "integer", minimum: 1, maximum: 200, description: "Maximum records; defaults to 100." },
+export const LIST_ACCESSIBLE_FILES_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "list_accessible_files",
+      description:
+        "List Fred's persistent, app-authorized file catalog: uploaded Fred Files and stored device-configuration backups. Returns metadata and stable record/download links only; it never scans arbitrary server directories.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional filename, device name, MIME type, notes, or uploader search.",
+          },
+          source: {
+            type: "string",
+            enum: ["all", "fred_files", "device_configs"],
+            description: "Catalog source; defaults to all.",
+          },
+          kind: {
+            type: "string",
+            enum: ["all", "text", "image", "binary", "config"],
+            description: "Optional file-kind filter.",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 200,
+            description: "Maximum records; defaults to 100.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
-export async function executeListAccessibleFiles(rawArgs: string): Promise<string> {
+export async function executeListAccessibleFiles(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const query = normalizedText(args.query);
-  const source = ["fred_files", "device_configs"].includes(args.source) ? args.source : "all";
-  const kind = ["text", "image", "binary", "config"].includes(args.kind) ? args.kind : "all";
+  const source = ["fred_files", "device_configs"].includes(args.source)
+    ? args.source
+    : "all";
+  const kind = ["text", "image", "binary", "config"].includes(args.kind)
+    ? args.kind
+    : "all";
   const limit = Math.min(200, Math.max(1, Number(args.limit) || 100));
   const [uploadedFiles, configs] = await Promise.all([
     source === "device_configs" ? Promise.resolve([]) : listFredFiles(),
     source === "fred_files"
       ? Promise.resolve([])
-      : db.select({
-        id: deviceConfigsTable.id,
-        deviceName: deviceConfigsTable.deviceName,
-        deviceType: deviceConfigsTable.deviceType,
-        filename: deviceConfigsTable.filename,
-        notes: deviceConfigsTable.notes,
-        sizeBytes: deviceConfigsTable.sizeBytes,
-        createdAt: deviceConfigsTable.createdAt,
-      }).from(deviceConfigsTable).orderBy(desc(deviceConfigsTable.createdAt)),
+      : db
+          .select({
+            id: deviceConfigsTable.id,
+            deviceName: deviceConfigsTable.deviceName,
+            deviceType: deviceConfigsTable.deviceType,
+            filename: deviceConfigsTable.filename,
+            notes: deviceConfigsTable.notes,
+            sizeBytes: deviceConfigsTable.sizeBytes,
+            createdAt: deviceConfigsTable.createdAt,
+          })
+          .from(deviceConfigsTable)
+          .orderBy(desc(deviceConfigsTable.createdAt)),
   ]);
 
   const records = [
@@ -1484,11 +1921,18 @@ export async function executeListAccessibleFiles(rawArgs: string): Promise<strin
       link: `/network?tab=configs&q=${encodeURIComponent(config.deviceName)}`,
       deviceType: config.deviceType,
     })),
-  ].filter((record) => {
-    if (kind !== "all" && record.kind !== kind) return false;
-    if (!query) return true;
-    return Object.values(record).map(normalizedText).join(" ").includes(query);
-  }).sort((a, b) => normalizedText(b.createdAt).localeCompare(normalizedText(a.createdAt)));
+  ]
+    .filter((record) => {
+      if (kind !== "all" && record.kind !== kind) return false;
+      if (!query) return true;
+      return Object.values(record)
+        .map(normalizedText)
+        .join(" ")
+        .includes(query);
+    })
+    .sort((a, b) =>
+      normalizedText(b.createdAt).localeCompare(normalizedText(a.createdAt)),
+    );
 
   return boundedNetworkResult({
     source: "Fred File Library + Device Config Backups",
@@ -1500,32 +1944,49 @@ export async function executeListAccessibleFiles(rawArgs: string): Promise<strin
   });
 }
 
-export const READ_ACCESSIBLE_FILE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "read_accessible_file",
-    description: "Read a bounded preview of a text file from the authorized Fred File Library by the file ID returned from list_accessible_files. Images and binary files return metadata only. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        file_id: { type: "string", description: "A fred_file:<uuid> ID returned by list_accessible_files." },
-        max_chars: { type: "integer", minimum: 500, maximum: 18000, description: "Maximum text preview size; defaults to 12000." },
+export const READ_ACCESSIBLE_FILE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "read_accessible_file",
+      description:
+        "Read a bounded preview of a text file from the authorized Fred File Library by the file ID returned from list_accessible_files. Images and binary files return metadata only. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_id: {
+            type: "string",
+            description:
+              "A fred_file:<uuid> ID returned by list_accessible_files.",
+          },
+          max_chars: {
+            type: "integer",
+            minimum: 500,
+            maximum: 18000,
+            description: "Maximum text preview size; defaults to 12000.",
+          },
+        },
+        required: ["file_id"],
       },
-      required: ["file_id"],
     },
-  },
-};
+  };
 
-export async function executeReadAccessibleFile(rawArgs: string): Promise<string> {
+export async function executeReadAccessibleFile(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const fileId = String(args.file_id || "").trim();
   if (fileId.startsWith("device_config:")) {
     return "Device configuration files must be read with query_device_config so credentials are redacted before content reaches chat.";
   }
-  if (!fileId.startsWith("fred_file:")) return "Error: use a fred_file:<uuid> ID from list_accessible_files.";
+  if (!fileId.startsWith("fred_file:"))
+    return "Error: use a fred_file:<uuid> ID from list_accessible_files.";
   const id = fileId.slice("fred_file:".length);
   if (!/^[0-9a-f-]{36}$/i.test(id)) return "Error: invalid Fred File ID.";
-  const maxChars = Math.min(18_000, Math.max(500, Number(args.max_chars) || 12_000));
+  const maxChars = Math.min(
+    18_000,
+    Math.max(500, Number(args.max_chars) || 12_000),
+  );
   const preview = await getFredFilePreview(id, maxChars);
   if (!preview) return "File not found in the authorized Fred File Library.";
   return boundedNetworkResult({
@@ -1542,48 +2003,56 @@ export async function executeReadAccessibleFile(rawArgs: string): Promise<string
     },
     previewText: preview.previewText,
     truncated: preview.truncated,
-    note: preview.record.reviewKind === "text" ? null : "This file type has metadata only; automatic text extraction is not available.",
+    note:
+      preview.record.reviewKind === "text"
+        ? null
+        : "This file type has metadata only; automatic text extraction is not available.",
   });
 }
 
 // ---- query_device_config tool --------------------------------------------
 
-export const QUERY_DEVICE_CONFIG_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_device_config",
-    description:
-      "Search and retrieve sections from stored network device configuration backups — FortiGate firewalls, Aruba switches, Cisco Nexus fiber distribution. " +
-      "Use when the user asks: how is a device configured, what VLANs are on a switch, what are the trunk ports, what's the SNMP config, how do I rebuild this device, " +
-      "or any question that requires looking at actual device configuration. " +
-      "Returns relevant config sections — not the full file (which can be huge). " +
-      "Secrets (passwords, PSKs, SNMP communities) are redacted in responses. " +
-      "Also use during incident recovery: 'SW-DIST-01 failed — what config do I need to rebuild it?'",
-    parameters: {
-      type: "object",
-      properties: {
-        device_name: {
-          type: "string",
-          description: "Device name or partial name to search (e.g. 'FortiGate', 'SW-DIST-01', 'Nexus')",
+export const QUERY_DEVICE_CONFIG_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_device_config",
+      description:
+        "Search and retrieve sections from stored network device configuration backups — FortiGate firewalls, Aruba switches, Cisco Nexus fiber distribution. " +
+        "Use when the user asks: how is a device configured, what VLANs are on a switch, what are the trunk ports, what's the SNMP config, how do I rebuild this device, " +
+        "or any question that requires looking at actual device configuration. " +
+        "Returns relevant config sections — not the full file (which can be huge). " +
+        "Secrets (passwords, PSKs, SNMP communities) are redacted in responses. " +
+        "Also use during incident recovery: 'SW-DIST-01 failed — what config do I need to rebuild it?'",
+      parameters: {
+        type: "object",
+        properties: {
+          device_name: {
+            type: "string",
+            description:
+              "Device name or partial name to search (e.g. 'FortiGate', 'SW-DIST-01', 'Nexus')",
+          },
+          device_type: {
+            type: "string",
+            enum: ["fortigate", "aruba", "nexus", "other", "any"],
+            description:
+              "Filter by device type. Use 'any' to search all types.",
+          },
+          keyword: {
+            type: "string",
+            description:
+              "Search term within the config: VLAN number, interface name, IP address, feature keyword (e.g. 'vlan 100', 'GigabitEthernet1/0/1', 'snmp', 'ospf', 'trunk')",
+          },
+          section_lines: {
+            type: "number",
+            description:
+              "Lines of context to return around each match (default 15, max 40)",
+          },
         },
-        device_type: {
-          type: "string",
-          enum: ["fortigate", "aruba", "nexus", "other", "any"],
-          description: "Filter by device type. Use 'any' to search all types.",
-        },
-        keyword: {
-          type: "string",
-          description: "Search term within the config: VLAN number, interface name, IP address, feature keyword (e.g. 'vlan 100', 'GigabitEthernet1/0/1', 'snmp', 'ospf', 'trunk')",
-        },
-        section_lines: {
-          type: "number",
-          description: "Lines of context to return around each match (default 15, max 40)",
-        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 const CONFIG_SECRET_PATTERNS = [
   /(set\s+(?:password|passwd|psksecret|secret|community)\s+)(\S+)/gi,
@@ -1604,7 +2073,11 @@ function redactConfigLine(line: string): string {
   return out;
 }
 
-function extractConfigSections(content: string, keyword: string, contextLines: number): string {
+function extractConfigSections(
+  content: string,
+  keyword: string,
+  contextLines: number,
+): string {
   const lines = content.split("\n");
   const kw = keyword.toLowerCase();
   const matchIndices = new Set<number>();
@@ -1612,7 +2085,11 @@ function extractConfigSections(content: string, keyword: string, contextLines: n
   // Find all matching lines
   lines.forEach((line, i) => {
     if (line.toLowerCase().includes(kw)) {
-      for (let j = Math.max(0, i - contextLines); j <= Math.min(lines.length - 1, i + contextLines); j++) {
+      for (
+        let j = Math.max(0, i - contextLines);
+        j <= Math.min(lines.length - 1, i + contextLines);
+        j++
+      ) {
         matchIndices.add(j);
       }
     }
@@ -1635,20 +2112,24 @@ function extractConfigSections(content: string, keyword: string, contextLines: n
 
   return blocks
     .slice(0, 8) // max 8 blocks
-    .map((block) =>
-      block
-        .map((idx) => redactConfigLine(lines[idx]))
-        .join("\n"),
-    )
+    .map((block) => block.map((idx) => redactConfigLine(lines[idx])).join("\n"))
     .join("\n\n--- (gap) ---\n\n");
 }
 
 async function executeQueryDeviceConfig(rawArgs: string): Promise<string> {
   let args: any = {};
-  try { args = JSON.parse(rawArgs); } catch { return "Error: invalid JSON"; }
+  try {
+    args = JSON.parse(rawArgs);
+  } catch {
+    return "Error: invalid JSON";
+  }
 
-  const deviceNameFilter = typeof args?.device_name === "string" ? args.device_name.trim().toLowerCase() : "";
-  const deviceTypeFilter = args?.device_type && args.device_type !== "any" ? args.device_type : "";
+  const deviceNameFilter =
+    typeof args?.device_name === "string"
+      ? args.device_name.trim().toLowerCase()
+      : "";
+  const deviceTypeFilter =
+    args?.device_type && args.device_type !== "any" ? args.device_type : "";
   const keyword = typeof args?.keyword === "string" ? args.keyword.trim() : "";
   const contextLines = Math.min(Number(args?.section_lines ?? 15), 40);
 
@@ -1662,38 +2143,53 @@ async function executeQueryDeviceConfig(rawArgs: string): Promise<string> {
     .from(deviceConfigsTable)
     .orderBy(desc(deviceConfigsTable.createdAt));
 
-  if (deviceTypeFilter) rows = rows.filter((r) => r.deviceType === deviceTypeFilter);
-  if (deviceNameFilter) rows = rows.filter((r) => r.deviceName.toLowerCase().includes(deviceNameFilter));
+  if (deviceTypeFilter)
+    rows = rows.filter((r) => r.deviceType === deviceTypeFilter);
+  if (deviceNameFilter)
+    rows = rows.filter((r) =>
+      r.deviceName.toLowerCase().includes(deviceNameFilter),
+    );
 
   if (rows.length === 0) {
-    return `No device configs found${deviceNameFilter ? ` matching "${args.device_name}"` : ""}${deviceTypeFilter ? ` of type ${deviceTypeFilter}` : ""}. ` +
-      "Upload configs via the Network page or by pasting into this chat.";
+    return (
+      `No device configs found${deviceNameFilter ? ` matching "${args.device_name}"` : ""}${deviceTypeFilter ? ` of type ${deviceTypeFilter}` : ""}. ` +
+      "Upload configs via the Network page or by pasting into this chat."
+    );
   }
 
   // If no keyword — return config inventory for the matched devices
   if (!keyword) {
-    const lines = [`**Device Config Backups (${rows.length} file${rows.length > 1 ? "s" : ""})**\n`];
+    const lines = [
+      `**Device Config Backups (${rows.length} file${rows.length > 1 ? "s" : ""})**\n`,
+    ];
     for (const r of rows) {
       const kb = r.sizeBytes ? `${Math.round(r.sizeBytes / 1024)}KB` : "?KB";
-      lines.push(`• **${r.deviceName}** [${r.deviceType}] — \`${r.filename}\` (${kb})`);
+      lines.push(
+        `• **${r.deviceName}** [${r.deviceType}] — \`${r.filename}\` (${kb})`,
+      );
       if (r.notes) lines.push(`  Notes: ${r.notes}`);
       lines.push(`  Uploaded: ${new Date(r.createdAt).toLocaleDateString()}`);
     }
-    lines.push("\nAsk me about a specific section — e.g. 'show VLANs', 'trunk ports', 'OSPF config', 'interface GE1/0/1'.");
+    lines.push(
+      "\nAsk me about a specific section — e.g. 'show VLANs', 'trunk ports', 'OSPF config', 'interface GE1/0/1'.",
+    );
     return lines.join("\n");
   }
 
   // Search keyword within each config
   const results: string[] = [];
-  for (const r of rows.slice(0, 5)) { // max 5 devices per query
+  for (const r of rows.slice(0, 5)) {
+    // max 5 devices per query
     const section = extractConfigSections(r.content, keyword, contextLines);
     if (!section) {
-      results.push(`**${r.deviceName}** (\`${r.filename}\`): no matches for "${keyword}"`);
+      results.push(
+        `**${r.deviceName}** (\`${r.filename}\`): no matches for "${keyword}"`,
+      );
       continue;
     }
     results.push(
       `## ${r.deviceName} — ${r.deviceType} (\`${r.filename}\`)\n` +
-      `*Sections matching "${keyword}" — secrets redacted:*\n\`\`\`\n${section}\n\`\`\``,
+        `*Sections matching "${keyword}" — secrets redacted:*\n\`\`\`\n${section}\n\`\`\``,
     );
   }
 
@@ -1702,32 +2198,36 @@ async function executeQueryDeviceConfig(rawArgs: string): Promise<string> {
 
 // ---- search_team_work tool -----------------------------------------------
 
-export const SEARCH_TEAM_WORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "search_team_work",
-    description:
-      "Search recent team activity across all staff — log items (My Tasks) and weekly log entries — by keyword, person name, building, or device. Use when the user asks what someone has been working on, whether a building or device was recently serviced, who handled a specific issue, or wants to find context across the whole team. Returns matching items with the person's name, role, and date. Always search before saying 'I don't have that information' — the answer may be in a recent task.",
-    parameters: {
-      type: "object",
-      properties: {
-        keyword: {
-          type: "string",
-          description: "Word or phrase to search for in task titles and notes (case-insensitive). Optional if filtering by person.",
+export const SEARCH_TEAM_WORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "search_team_work",
+      description:
+        "Search recent team activity across all staff — log items (My Tasks) and weekly log entries — by keyword, person name, building, or device. Use when the user asks what someone has been working on, whether a building or device was recently serviced, who handled a specific issue, or wants to find context across the whole team. Returns matching items with the person's name, role, and date. Always search before saying 'I don't have that information' — the answer may be in a recent task.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: {
+            type: "string",
+            description:
+              "Word or phrase to search for in task titles and notes (case-insensitive). Optional if filtering by person.",
+          },
+          person: {
+            type: "string",
+            description:
+              "Filter to a specific team member by first name, last name, or email. Optional.",
+          },
+          days: {
+            type: "number",
+            description:
+              "How many days back to search. Defaults to 30. Max 90.",
+          },
         },
-        person: {
-          type: "string",
-          description: "Filter to a specific team member by first name, last name, or email. Optional.",
-        },
-        days: {
-          type: "number",
-          description: "How many days back to search. Defaults to 30. Max 90.",
-        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
 async function executeSearchTeamWork(rawArgs: string): Promise<string> {
   let args: any;
@@ -1737,8 +2237,10 @@ async function executeSearchTeamWork(rawArgs: string): Promise<string> {
     return "Error: invalid JSON arguments";
   }
 
-  const keyword: string = typeof args?.keyword === "string" ? args.keyword.trim() : "";
-  const person: string = typeof args?.person === "string" ? args.person.trim().toLowerCase() : "";
+  const keyword: string =
+    typeof args?.keyword === "string" ? args.keyword.trim() : "";
+  const person: string =
+    typeof args?.person === "string" ? args.person.trim().toLowerCase() : "";
   const days: number = Math.max(1, Math.min(90, Number(args?.days) || 30));
 
   const since = new Date();
@@ -1766,27 +2268,39 @@ async function executeSearchTeamWork(rawArgs: string): Promise<string> {
   // Filter by keyword and/or person
   const kw = keyword.toLowerCase();
   const filtered = itemRows.filter((r) => {
-    const matchesKw = !kw ||
+    const matchesKw =
+      !kw ||
       r.title.toLowerCase().includes(kw) ||
       (r.notes ?? "").toLowerCase().includes(kw);
-    const matchesPerson = !person ||
+    const matchesPerson =
+      !person ||
       r.userName.toLowerCase().includes(person) ||
       r.userEmail.toLowerCase().includes(person);
     return matchesKw && matchesPerson;
   });
 
   if (filtered.length === 0) {
-    const scope = [keyword && `keyword "${keyword}"`, person && `person "${person}"`].filter(Boolean).join(", ");
+    const scope = [
+      keyword && `keyword "${keyword}"`,
+      person && `person "${person}"`,
+    ]
+      .filter(Boolean)
+      .join(", ");
     return `No matching team work items found in the last ${days} days${scope ? ` for ${scope}` : ""}.`;
   }
 
-  const lines = filtered.slice(0, 50).map((r) =>
-    `[${r.itemDate}] ${r.userName} (${r.userRole}): ${r.title}${r.notes ? ` — ${r.notes.slice(0, 120)}` : ""}`
-  );
+  const lines = filtered
+    .slice(0, 50)
+    .map(
+      (r) =>
+        `[${r.itemDate}] ${r.userName} (${r.userRole}): ${r.title}${r.notes ? ` — ${r.notes.slice(0, 120)}` : ""}`,
+    );
   return `Found ${filtered.length} item(s) (showing up to 50):\n${lines.join("\n")}`;
 }
 
-export function messageRequestsCapture(text: string | null | undefined): boolean {
+export function messageRequestsCapture(
+  text: string | null | undefined,
+): boolean {
   if (!text) return false;
   return CAPTURE_INTENT_PATTERNS.some((re) => re.test(text));
 }
@@ -1809,13 +2323,20 @@ function zdeskConfig() {
   };
 }
 
-async function zdeskFetch<T>(cfg: NonNullable<ReturnType<typeof zdeskConfig>>, method: string, path: string, body?: unknown): Promise<T> {
+async function zdeskFetch<T>(
+  cfg: NonNullable<ReturnType<typeof zdeskConfig>>,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const opts: RequestInit = { method, headers: cfg.headers };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const r = await fetch(`${cfg.base}/${path}`, opts);
   if (!r.ok) {
     const text = await r.text();
-    const e = new Error(`Zendesk ${r.status}: ${text.slice(0, 200)}`) as Error & { status?: number };
+    const e = new Error(
+      `Zendesk ${r.status}: ${text.slice(0, 200)}`,
+    ) as Error & { status?: number };
     e.status = r.status;
     throw e;
   }
@@ -1824,72 +2345,109 @@ async function zdeskFetch<T>(cfg: NonNullable<ReturnType<typeof zdeskConfig>>, m
 
 // ── Zendesk tool definitions ─────────────────────────────────────────────────
 
-export const ZENDESK_GET_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "zendesk_get_ticket",
-    description: "Fetch full details of a Zendesk ticket including the last 20 comments. Use this to read a specific ticket by ID.",
-    parameters: {
-      type: "object",
-      properties: {
-        ticket_id: { type: "number", description: "The numeric Zendesk ticket ID." },
+export const ZENDESK_GET_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "zendesk_get_ticket",
+      description:
+        "Fetch full details of a Zendesk ticket including the last 20 comments. Use this to read a specific ticket by ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          ticket_id: {
+            type: "number",
+            description: "The numeric Zendesk ticket ID.",
+          },
+        },
+        required: ["ticket_id"],
       },
-      required: ["ticket_id"],
     },
-  },
-};
+  };
 
-export const ZENDESK_SEARCH_TICKETS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "zendesk_search_tickets",
-    description: "Search Zendesk tickets. Use to find open tickets, tickets by subject keyword, or tickets assigned to someone.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Search terms e.g. 'VPN', 'printer', 'assignee:john@sccc.edu'. Can be empty to get recent open tickets." },
-        status: { type: "string", enum: ["new", "open", "pending", "hold", "solved", "closed"], description: "Filter by status." },
-        limit: { type: "number", description: "Max results (1–25). Default 10." },
+export const ZENDESK_SEARCH_TICKETS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "zendesk_search_tickets",
+      description:
+        "Search Zendesk tickets. Use to find open tickets, tickets by subject keyword, or tickets assigned to someone.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Search terms e.g. 'VPN', 'printer', 'assignee:john@sccc.edu'. Can be empty to get recent open tickets.",
+          },
+          status: {
+            type: "string",
+            enum: ["new", "open", "pending", "hold", "solved", "closed"],
+            description: "Filter by status.",
+          },
+          limit: {
+            type: "number",
+            description: "Max results (1–25). Default 10.",
+          },
+        },
+        required: [],
       },
-      required: [],
     },
-  },
-};
+  };
 
-export const ZENDESK_ADD_COMMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "zendesk_add_comment",
-    description: "Add a reply or internal note to a Zendesk ticket. Public=true sends a reply to the requester. Public=false adds an internal note only visible to agents. ONLY call this after the team has explicitly confirmed the draft.",
-    parameters: {
-      type: "object",
-      properties: {
-        ticket_id: { type: "number", description: "Ticket ID." },
-        body: { type: "string", description: "The comment or reply text." },
-        public: { type: "boolean", description: "True = reply visible to requester. False = internal agent note." },
+export const ZENDESK_ADD_COMMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "zendesk_add_comment",
+      description:
+        "Add a reply or internal note to a Zendesk ticket. Public=true sends a reply to the requester. Public=false adds an internal note only visible to agents. ONLY call this after the team has explicitly confirmed the draft.",
+      parameters: {
+        type: "object",
+        properties: {
+          ticket_id: { type: "number", description: "Ticket ID." },
+          body: { type: "string", description: "The comment or reply text." },
+          public: {
+            type: "boolean",
+            description:
+              "True = reply visible to requester. False = internal agent note.",
+          },
+        },
+        required: ["ticket_id", "body", "public"],
       },
-      required: ["ticket_id", "body", "public"],
     },
-  },
-};
+  };
 
-export const ZENDESK_UPDATE_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "zendesk_update_ticket",
-    description: "Update a Zendesk ticket: change status, reassign to an agent, or change priority. ONLY call this after the team has explicitly confirmed the action.",
-    parameters: {
-      type: "object",
-      properties: {
-        ticket_id: { type: "number", description: "Ticket ID." },
-        status: { type: "string", enum: ["open", "pending", "hold", "solved"], description: "New status." },
-        assignee_email: { type: "string", description: "Email of the agent to assign the ticket to." },
-        priority: { type: "string", enum: ["urgent", "high", "normal", "low"], description: "New priority." },
+export const ZENDESK_UPDATE_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "zendesk_update_ticket",
+      description:
+        "Update a Zendesk ticket: change status, reassign to an agent, or change priority. ONLY call this after the team has explicitly confirmed the action.",
+      parameters: {
+        type: "object",
+        properties: {
+          ticket_id: { type: "number", description: "Ticket ID." },
+          status: {
+            type: "string",
+            enum: ["open", "pending", "hold", "solved"],
+            description: "New status.",
+          },
+          assignee_email: {
+            type: "string",
+            description: "Email of the agent to assign the ticket to.",
+          },
+          priority: {
+            type: "string",
+            enum: ["urgent", "high", "normal", "low"],
+            description: "New priority.",
+          },
+        },
+        required: ["ticket_id"],
       },
-      required: ["ticket_id"],
     },
-  },
-};
+  };
 
 // ── Zendesk tool executors ───────────────────────────────────────────────────
 
@@ -1898,20 +2456,53 @@ async function executeZendeskGetTicket(argsJson: string): Promise<string> {
   if (!cfg) return "Zendesk is not configured on this server.";
   const { ticket_id } = JSON.parse(argsJson);
   try {
-    type FullTicket = { id: number; subject: string; description: string; status: string; priority: string | null; requester_id: number; assignee_id: number | null; created_at: string; updated_at: string; };
-    type Comment = { id: number; author_id: number; body: string; plain_body?: string; public: boolean; created_at: string; };
+    type FullTicket = {
+      id: number;
+      subject: string;
+      description: string;
+      status: string;
+      priority: string | null;
+      requester_id: number;
+      assignee_id: number | null;
+      created_at: string;
+      updated_at: string;
+    };
+    type Comment = {
+      id: number;
+      author_id: number;
+      body: string;
+      plain_body?: string;
+      public: boolean;
+      created_at: string;
+    };
     type ZUser = { id: number; name: string; email: string };
-    const { ticket } = await zdeskFetch<{ ticket: FullTicket }>(cfg, "GET", `tickets/${ticket_id}.json`);
-    const { comments } = await zdeskFetch<{ comments: Comment[] }>(cfg, "GET", `tickets/${ticket_id}/comments.json?sort_order=asc`);
-    const ids = Array.from(new Set(comments.map(c => c.author_id)));
+    const { ticket } = await zdeskFetch<{ ticket: FullTicket }>(
+      cfg,
+      "GET",
+      `tickets/${ticket_id}.json`,
+    );
+    const { comments } = await zdeskFetch<{ comments: Comment[] }>(
+      cfg,
+      "GET",
+      `tickets/${ticket_id}/comments.json?sort_order=asc`,
+    );
+    const ids = Array.from(new Set(comments.map((c) => c.author_id)));
     const userMap = new Map<number, string>();
     if (ids.length > 0) {
-      const { users } = await zdeskFetch<{ users: ZUser[] }>(cfg, "GET", `users/show_many.json?ids=${ids.join(",")}`);
+      const { users } = await zdeskFetch<{ users: ZUser[] }>(
+        cfg,
+        "GET",
+        `users/show_many.json?ids=${ids.join(",")}`,
+      );
       for (const u of users) userMap.set(u.id, u.name);
     }
-    const recent = comments.slice(-15).map(c =>
-      `[${c.created_at.slice(0, 10)} ${c.public ? "PUBLIC" : "INTERNAL"}] ${userMap.get(c.author_id) ?? c.author_id}:\n${(c.plain_body || c.body || "").trim().slice(0, 500)}`
-    ).join("\n\n");
+    const recent = comments
+      .slice(-15)
+      .map(
+        (c) =>
+          `[${c.created_at.slice(0, 10)} ${c.public ? "PUBLIC" : "INTERNAL"}] ${userMap.get(c.author_id) ?? c.author_id}:\n${(c.plain_body || c.body || "").trim().slice(0, 500)}`,
+      )
+      .join("\n\n");
     return `Ticket #${ticket.id}: ${ticket.subject}\nStatus: ${ticket.status} | Priority: ${ticket.priority ?? "normal"} | Assignee ID: ${ticket.assignee_id ?? "unassigned"}\nCreated: ${ticket.created_at.slice(0, 10)} | Updated: ${ticket.updated_at.slice(0, 10)}\n\n--- Comments (last ${comments.slice(-15).length} of ${comments.length}) ---\n${recent}`;
   } catch (e: any) {
     return `Error fetching ticket: ${e.message}`;
@@ -1923,16 +2514,24 @@ async function executeZendeskSearchTickets(argsJson: string): Promise<string> {
   if (!cfg) return "Zendesk is not configured on this server.";
   const { query = "", status, limit = 10 } = JSON.parse(argsJson);
   try {
-    type ZTicket = { id: number; subject: string; status: string; assignee_id: number | null; updated_at: string };
+    type ZTicket = {
+      id: number;
+      subject: string;
+      status: string;
+      assignee_id: number | null;
+      updated_at: string;
+    };
     let q = `type:ticket ${query}`.trim();
     if (status) q += ` status:${status}`;
     const { results } = await zdeskFetch<{ results: ZTicket[] }>(
-      cfg, "GET",
-      `search.json?query=${encodeURIComponent(q)}&sort_by=updated_at&sort_order=desc&per_page=${Math.min(limit, 25)}`
+      cfg,
+      "GET",
+      `search.json?query=${encodeURIComponent(q)}&sort_by=updated_at&sort_order=desc&per_page=${Math.min(limit, 25)}`,
     );
     if (!results?.length) return "No tickets found matching that query.";
-    const lines = results.map(t =>
-      `#${t.id} [${t.status.toUpperCase()}] ${t.subject} (updated ${t.updated_at.slice(0, 10)})`
+    const lines = results.map(
+      (t) =>
+        `#${t.id} [${t.status.toUpperCase()}] ${t.subject} (updated ${t.updated_at.slice(0, 10)})`,
     );
     return `Found ${results.length} ticket(s):\n${lines.join("\n")}`;
   } catch (e: any) {
@@ -1947,7 +2546,7 @@ async function executeZendeskAddComment(argsJson: string): Promise<string> {
   if (!body?.trim()) return "Error: comment body is required.";
   try {
     await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
-      ticket: { comment: { body: body.trim(), public: !!isPublic } }
+      ticket: { comment: { body: body.trim(), public: !!isPublic } },
     });
     return `✓ ${isPublic ? "Public reply" : "Internal note"} added to ticket #${ticket_id}.`;
   } catch (e: any) {
@@ -1966,17 +2565,23 @@ async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
     try {
       type ZUser = { id: number; name: string; email: string };
       const { users } = await zdeskFetch<{ users: ZUser[] }>(
-        cfg, "GET", `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`
+        cfg,
+        "GET",
+        `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`,
       );
-      if (!users?.[0]) return `Error: No Zendesk user found for ${assignee_email}`;
+      if (!users?.[0])
+        return `Error: No Zendesk user found for ${assignee_email}`;
       update.assignee_id = users[0].id;
     } catch (e: any) {
       return `Error resolving assignee: ${e.message}`;
     }
   }
-  if (Object.keys(update).length === 0) return "Error: no fields to update (provide status, assignee_email, or priority).";
+  if (Object.keys(update).length === 0)
+    return "Error: no fields to update (provide status, assignee_email, or priority).";
   try {
-    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, { ticket: update });
+    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
+      ticket: update,
+    });
     const parts = [];
     if (status) parts.push(`status → ${status}`);
     if (priority) parts.push(`priority → ${priority}`);
@@ -2008,7 +2613,9 @@ function isoValue(value: Date | string | null | undefined): string | null {
 }
 
 function normalizedText(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 type CallingBuildingEvidence = {
@@ -2020,13 +2627,19 @@ type CallingBuildingEvidence = {
   offlinePhoneOwners: number;
   unknownPhoneOwners: number;
   noMatchedDevice: number;
-  devices: Array<{ name: string; product: string; status: "online" | "offline" | "unknown" }>;
+  devices: Array<{
+    name: string;
+    product: string;
+    status: "online" | "offline" | "unknown";
+  }>;
   error?: string;
 };
 
 function looksLikeCallingPhone(name: string, product: string): boolean {
   const value = `${name} ${product}`.toLowerCase();
-  return /(ip phone|desk phone|phone|mpp|ata|dect|vg3|vg4|cp[- ]?\d|(?:^|\D)(?:68|78|79|88|98)\d{2}(?:\D|$))/.test(value);
+  return /(ip phone|desk phone|phone|mpp|ata|dect|vg3|vg4|cp[- ]?\d|(?:^|\D)(?:68|78|79|88|98)\d{2}(?:\D|$))/.test(
+    value,
+  );
 }
 
 async function getCallingBuildingEvidence(
@@ -2050,37 +2663,63 @@ async function getCallingBuildingEvidence(
   try {
     response = await webexFetch("/devices?max=1000");
   } catch {
-    return { ...empty, error: "Webex Calling device status is not configured." };
+    return {
+      ...empty,
+      error: "Webex Calling device status is not configured.",
+    };
   }
-  if (!response.ok) return { ...empty, configured: true, error: `Webex device query failed (${response.status}).` };
+  if (!response.ok)
+    return {
+      ...empty,
+      configured: true,
+      error: `Webex device query failed (${response.status}).`,
+    };
 
   const assignmentResult = await db.execute(sql`
     SELECT "webex_person_id", "building"
       FROM "phone_building_assignments"
   `);
-  const assignmentRows = (Array.isArray(assignmentResult)
-    ? assignmentResult
-    : ((assignmentResult as any)?.rows ?? [])) as Array<{ webex_person_id: string; building: string }>;
+  const assignmentRows = (
+    Array.isArray(assignmentResult)
+      ? assignmentResult
+      : ((assignmentResult as any)?.rows ?? [])
+  ) as Array<{ webex_person_id: string; building: string }>;
   const owners = new Set(
     assignmentRows
-      .filter((row) => normalizedText(getCanonicalBuildingName(row.building)) === normalizedText(canonicalBuilding))
+      .filter(
+        (row) =>
+          normalizedText(getCanonicalBuildingName(row.building)) ===
+          normalizedText(canonicalBuilding),
+      )
       .map((row) => String(row.webex_person_id)),
   );
 
-  const data = await response.json() as { items?: Array<Record<string, unknown>> };
-  const byOwner = new Map<string, Array<{ name: string; product: string; status: "online" | "offline" | "unknown" }>>();
+  const data = (await response.json()) as {
+    items?: Array<Record<string, unknown>>;
+  };
+  const byOwner = new Map<
+    string,
+    Array<{
+      name: string;
+      product: string;
+      status: "online" | "offline" | "unknown";
+    }>
+  >();
   for (const device of data.items ?? []) {
     const ownerId = String(device.personId || device.workspaceId || "").trim();
     if (!ownerId || !owners.has(ownerId)) continue;
     const name = String(device.displayName || device.name || "Unnamed device");
     const product = String(device.product || device.type || "Unknown");
     if (!looksLikeCallingPhone(name, product)) continue;
-    const rawStatus = normalizedText(device.connectionStatus || device.status || "unknown");
-    const status: "online" | "offline" | "unknown" = rawStatus === "connected"
-      ? "online"
-      : rawStatus === "disconnected"
-        ? "offline"
-        : "unknown";
+    const rawStatus = normalizedText(
+      device.connectionStatus || device.status || "unknown",
+    );
+    const status: "online" | "offline" | "unknown" =
+      rawStatus === "connected"
+        ? "online"
+        : rawStatus === "disconnected"
+          ? "offline"
+          : "unknown";
     const devices = byOwner.get(ownerId) ?? [];
     devices.push({ name, product, status });
     byOwner.set(ownerId, devices);
@@ -2090,8 +2729,10 @@ async function getCallingBuildingEvidence(
   let offlinePhoneOwners = 0;
   let unknownPhoneOwners = 0;
   for (const devices of byOwner.values()) {
-    if (devices.some((device) => device.status === "online")) onlinePhoneOwners += 1;
-    else if (devices.some((device) => device.status === "offline")) offlinePhoneOwners += 1;
+    if (devices.some((device) => device.status === "online"))
+      onlinePhoneOwners += 1;
+    else if (devices.some((device) => device.status === "offline"))
+      offlinePhoneOwners += 1;
     else unknownPhoneOwners += 1;
   }
   const devices = Array.from(byOwner.values()).flat();
@@ -2108,54 +2749,100 @@ async function getCallingBuildingEvidence(
   };
 }
 
-export const CISCO_CALLING_SUPPORT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "cisco_calling_support",
-    description: "Read the same building assignments and live Webex phone/device states used by the Cisco Calling IT App. Use this to verify whether phones in a building are online and to corroborate building service availability. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        building: { type: "string", description: "Campus building name, such as Allied Health, Hobble, Humanities, or West Campus." },
-        includeDevices: { type: "boolean", description: "Include matched phone device names and models; defaults to true." },
+export const CISCO_CALLING_SUPPORT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "cisco_calling_support",
+      description:
+        "Read the same building assignments and live Webex phone/device states used by the Cisco Calling IT App. Use this to verify whether phones in a building are online and to corroborate building service availability. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          building: {
+            type: "string",
+            description:
+              "Campus building name, such as Allied Health, Hobble, Humanities, or West Campus.",
+          },
+          includeDevices: {
+            type: "boolean",
+            description:
+              "Include matched phone device names and models; defaults to true.",
+          },
+        },
+        required: ["building"],
       },
-      required: ["building"],
     },
-  },
-};
+  };
 
-export async function executeCiscoCallingSupport(rawArgs: string): Promise<string> {
+export async function executeCiscoCallingSupport(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const building = String(args.building || "").trim();
   if (!building) return "Error: building is required.";
-  const evidence = await getCallingBuildingEvidence(building, args.includeDevices !== false);
-  return boundedNetworkResult({ source: "/it-apps/cisco-calling", generatedAt: new Date().toISOString(), ...evidence });
+  const evidence = await getCallingBuildingEvidence(
+    building,
+    args.includeDevices !== false,
+  );
+  return boundedNetworkResult({
+    source: "/it-apps/cisco-calling",
+    generatedAt: new Date().toISOString(),
+    ...evidence,
+  });
 }
 
-export const QUERY_NETWORK_MAP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_network_map",
-    description: "Read the Network Map's current nodes, switch-to-switch links, and room/building-to-Nexus paths. Use the path view for questions such as which core/distribution port serves a room, building, or access switch; it cross-checks node metadata, Port Map descriptions, and confirmed topology links. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        view: { type: "string", enum: ["overview", "nodes", "links", "path"], description: "Data view; defaults to overview. Use path to trace a room, building, or access switch to its core/Nexus port." },
-        query: { type: "string", description: "Optional hostname, IP, display-name, room label, port description, peer, or port search." },
-        building: { type: "string", description: "Optional building filter." },
-        status: { type: "string", enum: ["all", "online", "offline", "unknown"], description: "Node inventory-status filter." },
-        limit: { type: "integer", minimum: 1, maximum: 200, description: "Maximum detailed records; defaults to 50." },
+export const QUERY_NETWORK_MAP_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_network_map",
+      description:
+        "Read the Network Map's current nodes, switch-to-switch links, and room/building-to-Nexus paths. Use the path view for questions such as which core/distribution port serves a room, building, or access switch; it cross-checks node metadata, Port Map descriptions, and confirmed topology links. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          view: {
+            type: "string",
+            enum: ["overview", "nodes", "links", "path"],
+            description:
+              "Data view; defaults to overview. Use path to trace a room, building, or access switch to its core/Nexus port.",
+          },
+          query: {
+            type: "string",
+            description:
+              "Optional hostname, IP, display-name, room label, port description, peer, or port search.",
+          },
+          building: {
+            type: "string",
+            description: "Optional building filter.",
+          },
+          status: {
+            type: "string",
+            enum: ["all", "online", "offline", "unknown"],
+            description: "Node inventory-status filter.",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 200,
+            description: "Maximum detailed records; defaults to 50.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
 export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
-  const view = ["nodes", "links", "path"].includes(args.view) ? args.view : "overview";
+  const view = ["nodes", "links", "path"].includes(args.view)
+    ? args.view
+    : "overview";
   const query = normalizedText(args.query);
   const building = normalizedText(args.building);
-  const status = ["online", "offline", "unknown"].includes(args.status) ? args.status : "all";
+  const status = ["online", "offline", "unknown"].includes(args.status)
+    ? args.status
+    : "all";
   const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
   const [nodes, links, ports] = await Promise.all([
     db.select().from(netNodesTable),
@@ -2164,11 +2851,16 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
   ]);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const physicalPorts = ports.filter((port) => port.isPhysical !== false);
-  const activePorts = physicalPorts.filter((port) =>
-    normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
+  const activePorts = physicalPorts.filter(
+    (port) =>
+      normalizedText(port.operStatus) === "up" ||
+      (port.macCount ?? 0) > 0 ||
+      (port.lldpNeighborCount ?? 0) > 0,
   );
   const staleCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const staleLinks = links.filter((link) => link.lastVerifiedAt.getTime() < staleCutoff);
+  const staleLinks = links.filter(
+    (link) => link.lastVerifiedAt.getTime() < staleCutoff,
+  );
 
   if (view === "overview") {
     return boundedNetworkResult({
@@ -2180,9 +2872,15 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
         staleLinks: staleLinks.length,
         physicalPorts: physicalPorts.length,
         connectedPorts: activePorts.length,
-        portsWithLearnedMacs: physicalPorts.filter((port) => (port.macCount ?? 0) > 0).length,
-        portsWithLldpNeighbors: physicalPorts.filter((port) => (port.lldpNeighborCount ?? 0) > 0).length,
-        buildings: new Set(nodes.map((node) => getCanonicalBuildingName(node.building))).size,
+        portsWithLearnedMacs: physicalPorts.filter(
+          (port) => (port.macCount ?? 0) > 0,
+        ).length,
+        portsWithLldpNeighbors: physicalPorts.filter(
+          (port) => (port.lldpNeighborCount ?? 0) > 0,
+        ).length,
+        buildings: new Set(
+          nodes.map((node) => getCanonicalBuildingName(node.building)),
+        ).size,
       },
       statusCounts: nodes.reduce<Record<string, number>>((counts, node) => {
         const key = node.status || "unknown";
@@ -2194,28 +2892,71 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
   }
 
   if (view === "path") {
-    if (!query && !building) return "Error: path view requires a room, building, hostname, IP, or port-description query.";
+    if (!query && !building)
+      return "Error: path view requires a room, building, hostname, IP, or port-description query.";
 
-    const isDistributionNode = (node: typeof nodes[number] | undefined) => {
+    const isDistributionNode = (node: (typeof nodes)[number] | undefined) => {
       if (!node) return false;
       const role = normalizedText(node.role);
-      const identity = [node.hostname, node.displayName, node.model, node.location].map(normalizedText).join(" ");
-      return role === "core" || role === "distribution" || identity.includes("nexus") || identity.includes("core");
+      const identity = [
+        node.hostname,
+        node.displayName,
+        node.model,
+        node.location,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      return (
+        role === "core" ||
+        role === "distribution" ||
+        identity.includes("nexus") ||
+        identity.includes("core")
+      );
     };
-    const nodeMatches = (node: typeof nodes[number]) => {
-      const haystack = [node.hostname, node.displayName, node.mgmtIp, node.building, node.location, node.role, node.nodeKind, node.vendor, node.model]
-        .map(normalizedText).join(" ");
-      return (!query || haystack.includes(query))
-        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building));
+    const nodeMatches = (node: (typeof nodes)[number]) => {
+      const haystack = [
+        node.hostname,
+        node.displayName,
+        node.mgmtIp,
+        node.building,
+        node.location,
+        node.role,
+        node.nodeKind,
+        node.vendor,
+        node.model,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      return (
+        (!query || haystack.includes(query)) &&
+        (!building ||
+          normalizedText(getCanonicalBuildingName(node.building)).includes(
+            building,
+          ))
+      );
     };
     const matchedNodes = nodes.filter(nodeMatches);
     const matchedPorts = ports.filter((port) => {
       const node = nodeById.get(port.nodeId);
       if (!node) return false;
-      const portHaystack = [port.interfaceName, port.description, node.hostname, node.displayName, node.mgmtIp, node.building, node.location]
-        .map(normalizedText).join(" ");
-      return (!query || portHaystack.includes(query))
-        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building));
+      const portHaystack = [
+        port.interfaceName,
+        port.description,
+        node.hostname,
+        node.displayName,
+        node.mgmtIp,
+        node.building,
+        node.location,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      return (
+        (!query || portHaystack.includes(query)) &&
+        (!building ||
+          normalizedText(getCanonicalBuildingName(node.building)).includes(
+            building,
+          ))
+      );
     });
 
     // A room label often appears only on an access-port description. Expand
@@ -2231,17 +2972,34 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
       const a = nodeById.get(link.aNodeId);
       const b = nodeById.get(link.bNodeId);
       const linkHaystack = [
-        a?.hostname, a?.displayName, a?.building, link.aPort,
-        b?.hostname, b?.displayName, b?.building, link.bPort,
-        link.lldpPeerHostname, link.lldpPeerMgmtIp, link.notes,
-      ].map(normalizedText).join(" ");
-      return targetNodeIds.has(link.aNodeId) || targetNodeIds.has(link.bNodeId) || (!!query && linkHaystack.includes(query));
+        a?.hostname,
+        a?.displayName,
+        a?.building,
+        link.aPort,
+        b?.hostname,
+        b?.displayName,
+        b?.building,
+        link.bPort,
+        link.lldpPeerHostname,
+        link.lldpPeerMgmtIp,
+        link.notes,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      return (
+        targetNodeIds.has(link.aNodeId) ||
+        targetNodeIds.has(link.bNodeId) ||
+        (!!query && linkHaystack.includes(query))
+      );
     });
 
     // Collector runs may store equivalent links with Eth/Ethernet spelling.
     // Keep the freshest observation for each physical endpoint pair.
-    const canonicalInterface = (value: unknown) => normalizedText(value).replace(/^ethernet/, "eth").replace(/,$/, "");
-    const linkByIdentity = new Map<string, typeof candidateLinks[number]>();
+    const canonicalInterface = (value: unknown) =>
+      normalizedText(value)
+        .replace(/^ethernet/, "eth")
+        .replace(/,$/, "");
+    const linkByIdentity = new Map<string, (typeof candidateLinks)[number]>();
     for (const link of candidateLinks) {
       const endpoints = [
         `${link.aNodeId}:${canonicalInterface(link.aPort)}`,
@@ -2249,10 +3007,16 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
       ].sort();
       const key = endpoints.join("|");
       const existing = linkByIdentity.get(key);
-      if (!existing || link.lastVerifiedAt.getTime() > existing.lastVerifiedAt.getTime()) linkByIdentity.set(key, link);
+      if (
+        !existing ||
+        link.lastVerifiedAt.getTime() > existing.lastVerifiedAt.getTime()
+      )
+        linkByIdentity.set(key, link);
     }
-    const relatedLinks = [...linkByIdentity.values()].sort((a, b) => b.lastVerifiedAt.getTime() - a.lastVerifiedAt.getTime());
-    const formatLink = (link: typeof relatedLinks[number]) => {
+    const relatedLinks = [...linkByIdentity.values()].sort(
+      (a, b) => b.lastVerifiedAt.getTime() - a.lastVerifiedAt.getTime(),
+    );
+    const formatLink = (link: (typeof relatedLinks)[number]) => {
       const a = nodeById.get(link.aNodeId);
       const b = nodeById.get(link.bNodeId);
       return {
@@ -2274,11 +3038,21 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
     const servingDistributionLinks = relatedLinks.filter((link) => {
       const aIsTarget = targetNodeIds.has(link.aNodeId);
       const bIsTarget = targetNodeIds.has(link.bNodeId);
-      return (aIsTarget && !bIsTarget && isDistributionNode(nodeById.get(link.bNodeId)))
-        || (bIsTarget && !aIsTarget && isDistributionNode(nodeById.get(link.aNodeId)));
+      return (
+        (aIsTarget &&
+          !bIsTarget &&
+          isDistributionNode(nodeById.get(link.bNodeId))) ||
+        (bIsTarget &&
+          !aIsTarget &&
+          isDistributionNode(nodeById.get(link.aNodeId)))
+      );
     });
     const directPortMatches = matchedPorts
-      .sort((a, b) => Number(isDistributionNode(nodeById.get(b.nodeId))) - Number(isDistributionNode(nodeById.get(a.nodeId))))
+      .sort(
+        (a, b) =>
+          Number(isDistributionNode(nodeById.get(b.nodeId))) -
+          Number(isDistributionNode(nodeById.get(a.nodeId))),
+      )
       .slice(0, limit)
       .map((port) => {
         const node = nodeById.get(port.nodeId)!;
@@ -2292,7 +3066,10 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
           isPhysical: port.isPhysical !== false,
           adminStatus: port.adminStatus,
           operStatus: port.operStatus,
-          connected: normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
+          connected:
+            normalizedText(port.operStatus) === "up" ||
+            (port.macCount ?? 0) > 0 ||
+            (port.lldpNeighborCount ?? 0) > 0,
           configUpdatedAt: isoValue(port.configUpdatedAt),
           telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
         };
@@ -2312,30 +3089,65 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
         updatedAt: isoValue(node.updatedAt),
       })),
       directPortMatches,
-      servingDistributionLinks: servingDistributionLinks.slice(0, limit).map(formatLink),
+      servingDistributionLinks: servingDistributionLinks
+        .slice(0, limit)
+        .map(formatLink),
       relatedTopologyLinks: relatedLinks.slice(0, limit).map(formatLink),
       interpretation: {
-        confirmedServingPathCount: servingDistributionLinks.filter((link) => normalizedText(link.confidence).startsWith("confirmed")).length,
+        confirmedServingPathCount: servingDistributionLinks.filter((link) =>
+          normalizedText(link.confidence).startsWith("confirmed"),
+        ).length,
         rule: "A port-description match identifies where a room/service is configured. A serving Nexus path is confirmed only when a current topology link connects that access switch to a core/distribution node; report timestamps and confidence separately.",
       },
     });
   }
 
   if (view === "nodes") {
-    const portCounts = new Map<string, { total: number; connected: number; macs: number; lldp: number }>();
+    const portCounts = new Map<
+      string,
+      { total: number; connected: number; macs: number; lldp: number }
+    >();
     for (const port of physicalPorts) {
-      const counts = portCounts.get(port.nodeId) ?? { total: 0, connected: 0, macs: 0, lldp: 0 };
+      const counts = portCounts.get(port.nodeId) ?? {
+        total: 0,
+        connected: 0,
+        macs: 0,
+        lldp: 0,
+      };
       counts.total += 1;
-      if (normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0) counts.connected += 1;
+      if (
+        normalizedText(port.operStatus) === "up" ||
+        (port.macCount ?? 0) > 0 ||
+        (port.lldpNeighborCount ?? 0) > 0
+      )
+        counts.connected += 1;
       counts.macs += port.macCount ?? 0;
       counts.lldp += port.lldpNeighborCount ?? 0;
       portCounts.set(port.nodeId, counts);
     }
     const filtered = nodes.filter((node) => {
-      const haystack = [node.hostname, node.displayName, node.mgmtIp, node.building, node.location, node.role, node.nodeKind, node.vendor, node.model].map(normalizedText).join(" ");
-      return (!query || haystack.includes(query))
-        && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building))
-        && (status === "all" || normalizedText(node.status || "unknown") === status);
+      const haystack = [
+        node.hostname,
+        node.displayName,
+        node.mgmtIp,
+        node.building,
+        node.location,
+        node.role,
+        node.nodeKind,
+        node.vendor,
+        node.model,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      return (
+        (!query || haystack.includes(query)) &&
+        (!building ||
+          normalizedText(getCanonicalBuildingName(node.building)).includes(
+            building,
+          )) &&
+        (status === "all" ||
+          normalizedText(node.status || "unknown") === status)
+      );
     });
     return boundedNetworkResult({
       source: "/network/map",
@@ -2354,35 +3166,46 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
         vendor: node.vendor,
         model: node.model,
         inventoryStatus: node.status || "unknown",
-        ports: portCounts.get(node.id) ?? { total: 0, connected: 0, macs: 0, lldp: 0 },
+        ports: portCounts.get(node.id) ?? {
+          total: 0,
+          connected: 0,
+          macs: 0,
+          lldp: 0,
+        },
         updatedAt: isoValue(node.updatedAt),
       })),
     });
   }
 
-  const detailedLinks = links.map((link) => {
-    const a = nodeById.get(link.aNodeId);
-    const b = nodeById.get(link.bNodeId);
-    return {
-      id: link.id,
-      aNode: a?.hostname ?? link.aNodeId,
-      aPort: link.aPort,
-      bNode: b?.hostname ?? link.bNodeId,
-      bPort: link.bPort,
-      aBuilding: a ? getCanonicalBuildingName(a.building) : null,
-      bBuilding: b ? getCanonicalBuildingName(b.building) : null,
-      kind: link.linkKind,
-      mode: link.portMode,
-      speedMbps: link.speedMbps,
-      confidence: link.confidence,
-      lastVerifiedAt: isoValue(link.lastVerifiedAt),
-      stale: link.lastVerifiedAt.getTime() < staleCutoff,
-    };
-  }).filter((link) => {
-    const haystack = Object.values(link).map(normalizedText).join(" ");
-    return (!query || haystack.includes(query))
-      && (!building || normalizedText(link.aBuilding).includes(building) || normalizedText(link.bBuilding).includes(building));
-  });
+  const detailedLinks = links
+    .map((link) => {
+      const a = nodeById.get(link.aNodeId);
+      const b = nodeById.get(link.bNodeId);
+      return {
+        id: link.id,
+        aNode: a?.hostname ?? link.aNodeId,
+        aPort: link.aPort,
+        bNode: b?.hostname ?? link.bNodeId,
+        bPort: link.bPort,
+        aBuilding: a ? getCanonicalBuildingName(a.building) : null,
+        bBuilding: b ? getCanonicalBuildingName(b.building) : null,
+        kind: link.linkKind,
+        mode: link.portMode,
+        speedMbps: link.speedMbps,
+        confidence: link.confidence,
+        lastVerifiedAt: isoValue(link.lastVerifiedAt),
+        stale: link.lastVerifiedAt.getTime() < staleCutoff,
+      };
+    })
+    .filter((link) => {
+      const haystack = Object.values(link).map(normalizedText).join(" ");
+      return (
+        (!query || haystack.includes(query)) &&
+        (!building ||
+          normalizedText(link.aBuilding).includes(building) ||
+          normalizedText(link.bBuilding).includes(building))
+      );
+    });
   return boundedNetworkResult({
     source: "/network/map",
     matched: detailedLinks.length,
@@ -2391,27 +3214,58 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
   });
 }
 
-export const QUERY_SWITCH_PORTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_switch_ports",
-    description: "Read current Port Map interface telemetry, including room/device descriptions, up/down state, learned endpoints, LLDP evidence, VLANs, errors, utilization, and optics. It can search across all switches for labels such as AA109. Use this for ports connected to phones/computers as well as switch links. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Optional free-text search across switch identity, building, port name/description, and known topology peers." },
-        switch: { type: "string", description: "Optional switch hostname, display name, or management IP." },
-        building: { type: "string", description: "Optional building filter." },
-        port: { type: "string", description: "Optional interface-name filter." },
-        connectedOnly: { type: "boolean", description: "Only return ports that are up or have learned MAC/LLDP evidence." },
-        issuesOnly: { type: "boolean", description: "Only return ports with state mismatch, errors, discards, high utilization, or optics alarms." },
-        limit: { type: "integer", minimum: 1, maximum: 250, description: "Maximum records; defaults to 100." },
+export const QUERY_SWITCH_PORTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_switch_ports",
+      description:
+        "Read current Port Map interface telemetry, including room/device descriptions, up/down state, learned endpoints, LLDP evidence, VLANs, errors, utilization, and optics. It can search across all switches for labels such as AA109. Use this for ports connected to phones/computers as well as switch links. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional free-text search across switch identity, building, port name/description, and known topology peers.",
+          },
+          switch: {
+            type: "string",
+            description:
+              "Optional switch hostname, display name, or management IP.",
+          },
+          building: {
+            type: "string",
+            description: "Optional building filter.",
+          },
+          port: {
+            type: "string",
+            description: "Optional interface-name filter.",
+          },
+          connectedOnly: {
+            type: "boolean",
+            description:
+              "Only return ports that are up or have learned MAC/LLDP evidence.",
+          },
+          issuesOnly: {
+            type: "boolean",
+            description:
+              "Only return ports with state mismatch, errors, discards, high utilization, or optics alarms.",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 250,
+            description: "Maximum records; defaults to 100.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
-export async function executeQuerySwitchPorts(rawArgs: string): Promise<string> {
+export async function executeQuerySwitchPorts(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const freeQuery = normalizedText(args.query);
   const switchQuery = normalizedText(args.switch);
@@ -2428,114 +3282,204 @@ export async function executeQuerySwitchPorts(rawArgs: string): Promise<string> 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const linkByPort = new Map<string, typeof links>();
   for (const link of links) {
-    for (const [nodeId, interfaceName] of [[link.aNodeId, link.aPort], [link.bNodeId, link.bPort]] as const) {
+    for (const [nodeId, interfaceName] of [
+      [link.aNodeId, link.aPort],
+      [link.bNodeId, link.bPort],
+    ] as const) {
       const key = `${nodeId}:${normalizedText(interfaceName)}`;
       const matches = linkByPort.get(key) ?? [];
       matches.push(link);
       linkByPort.set(key, matches);
     }
   }
-  const detailed = ports.filter((port) => {
-    if (port.isPhysical === false) return false;
-    const node = nodeById.get(port.nodeId);
-    if (!node) return false;
-    const nodeHaystack = [node.hostname, node.displayName, node.mgmtIp].map(normalizedText).join(" ");
-    const knownLinks = linkByPort.get(`${port.nodeId}:${normalizedText(port.interfaceName)}`) ?? [];
-    const peerHaystack = knownLinks.flatMap((link) => {
-      const peerId = link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
-      const peerPort = link.aNodeId === port.nodeId ? link.bPort : link.aPort;
-      const peer = nodeById.get(peerId);
-      return [peer?.hostname, peer?.displayName, peer?.building, peerPort, link.confidence, link.lldpPeerHostname, link.notes];
-    }).map(normalizedText).join(" ");
-    const allHaystack = [nodeHaystack, node.building, node.location, port.interfaceName, port.description, port.portMode, peerHaystack]
-      .map(normalizedText).join(" ");
-    const connected = normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0;
-    const hasIssue = (normalizedText(port.adminStatus) === "up" && normalizedText(port.operStatus) !== "up")
-      || (port.inErrors ?? 0) > 0 || (port.outErrors ?? 0) > 0
-      || (port.inDiscards ?? 0) > 0 || (port.outDiscards ?? 0) > 0
-      || (port.utilizationPct ?? 0) >= 80
-      || !["", "ok", "normal", "up"].includes(normalizedText(port.opticsStatus));
-    return (!freeQuery || allHaystack.includes(freeQuery))
-      && (!switchQuery || nodeHaystack.includes(switchQuery))
-      && (!building || normalizedText(getCanonicalBuildingName(node.building)).includes(building))
-      && (!portQuery || normalizedText(port.interfaceName).includes(portQuery))
-      && (!connectedOnly || connected)
-      && (!issuesOnly || hasIssue);
-  }).map((port) => {
-    const node = nodeById.get(port.nodeId)!;
-    const knownLinks = linkByPort.get(`${port.nodeId}:${normalizedText(port.interfaceName)}`) ?? [];
-    const peers = knownLinks.map((link) => {
-      const peerId = link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
-      const peerPort = link.aNodeId === port.nodeId ? link.bPort : link.aPort;
-      return { hostname: nodeById.get(peerId)?.hostname ?? peerId, port: peerPort, confidence: link.confidence };
-    });
-    return {
-      switch: node.hostname,
-      managementIp: node.mgmtIp,
-      building: getCanonicalBuildingName(node.building),
-      interface: port.interfaceName,
-      description: port.description,
-      adminStatus: port.adminStatus,
-      operStatus: port.operStatus,
-      connected: normalizedText(port.operStatus) === "up" || (port.macCount ?? 0) > 0 || (port.lldpNeighborCount ?? 0) > 0,
-      learnedMacCount: port.macCount ?? 0,
-      lldpNeighborCount: port.lldpNeighborCount ?? 0,
-      knownTopologyPeers: peers,
-      mode: port.portMode,
-      nativeVlan: port.nativeVlan,
-      allowedVlans: port.allowedVlans,
-      speedMbps: port.speedMbps,
-      duplex: port.duplex,
-      mediaType: port.mediaType,
-      portchannel: port.portchannel,
-      errors: { in: port.inErrors ?? 0, out: port.outErrors ?? 0 },
-      discards: { in: port.inDiscards ?? 0, out: port.outDiscards ?? 0 },
-      utilizationPct: port.utilizationPct,
-      optics: { status: port.opticsStatus, rxPowerDbm: port.rxPowerDbm, txPowerDbm: port.txPowerDbm, temperatureC: port.temperatureC },
-      configUpdatedAt: isoValue(port.configUpdatedAt),
-      telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
-    };
-  }).sort((a, b) => a.switch.localeCompare(b.switch, undefined, { numeric: true }) || a.interface.localeCompare(b.interface, undefined, { numeric: true }));
+  const detailed = ports
+    .filter((port) => {
+      if (port.isPhysical === false) return false;
+      const node = nodeById.get(port.nodeId);
+      if (!node) return false;
+      const nodeHaystack = [node.hostname, node.displayName, node.mgmtIp]
+        .map(normalizedText)
+        .join(" ");
+      const knownLinks =
+        linkByPort.get(
+          `${port.nodeId}:${normalizedText(port.interfaceName)}`,
+        ) ?? [];
+      const peerHaystack = knownLinks
+        .flatMap((link) => {
+          const peerId =
+            link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
+          const peerPort =
+            link.aNodeId === port.nodeId ? link.bPort : link.aPort;
+          const peer = nodeById.get(peerId);
+          return [
+            peer?.hostname,
+            peer?.displayName,
+            peer?.building,
+            peerPort,
+            link.confidence,
+            link.lldpPeerHostname,
+            link.notes,
+          ];
+        })
+        .map(normalizedText)
+        .join(" ");
+      const allHaystack = [
+        nodeHaystack,
+        node.building,
+        node.location,
+        port.interfaceName,
+        port.description,
+        port.portMode,
+        peerHaystack,
+      ]
+        .map(normalizedText)
+        .join(" ");
+      const connected =
+        normalizedText(port.operStatus) === "up" ||
+        (port.macCount ?? 0) > 0 ||
+        (port.lldpNeighborCount ?? 0) > 0;
+      const hasIssue =
+        (normalizedText(port.adminStatus) === "up" &&
+          normalizedText(port.operStatus) !== "up") ||
+        (port.inErrors ?? 0) > 0 ||
+        (port.outErrors ?? 0) > 0 ||
+        (port.inDiscards ?? 0) > 0 ||
+        (port.outDiscards ?? 0) > 0 ||
+        (port.utilizationPct ?? 0) >= 80 ||
+        !["", "ok", "normal", "up"].includes(normalizedText(port.opticsStatus));
+      return (
+        (!freeQuery || allHaystack.includes(freeQuery)) &&
+        (!switchQuery || nodeHaystack.includes(switchQuery)) &&
+        (!building ||
+          normalizedText(getCanonicalBuildingName(node.building)).includes(
+            building,
+          )) &&
+        (!portQuery ||
+          normalizedText(port.interfaceName).includes(portQuery)) &&
+        (!connectedOnly || connected) &&
+        (!issuesOnly || hasIssue)
+      );
+    })
+    .map((port) => {
+      const node = nodeById.get(port.nodeId)!;
+      const knownLinks =
+        linkByPort.get(
+          `${port.nodeId}:${normalizedText(port.interfaceName)}`,
+        ) ?? [];
+      const peers = knownLinks.map((link) => {
+        const peerId =
+          link.aNodeId === port.nodeId ? link.bNodeId : link.aNodeId;
+        const peerPort = link.aNodeId === port.nodeId ? link.bPort : link.aPort;
+        return {
+          hostname: nodeById.get(peerId)?.hostname ?? peerId,
+          port: peerPort,
+          confidence: link.confidence,
+        };
+      });
+      return {
+        switch: node.hostname,
+        managementIp: node.mgmtIp,
+        building: getCanonicalBuildingName(node.building),
+        interface: port.interfaceName,
+        description: port.description,
+        adminStatus: port.adminStatus,
+        operStatus: port.operStatus,
+        connected:
+          normalizedText(port.operStatus) === "up" ||
+          (port.macCount ?? 0) > 0 ||
+          (port.lldpNeighborCount ?? 0) > 0,
+        learnedMacCount: port.macCount ?? 0,
+        lldpNeighborCount: port.lldpNeighborCount ?? 0,
+        knownTopologyPeers: peers,
+        mode: port.portMode,
+        nativeVlan: port.nativeVlan,
+        allowedVlans: port.allowedVlans,
+        speedMbps: port.speedMbps,
+        duplex: port.duplex,
+        mediaType: port.mediaType,
+        portchannel: port.portchannel,
+        errors: { in: port.inErrors ?? 0, out: port.outErrors ?? 0 },
+        discards: { in: port.inDiscards ?? 0, out: port.outDiscards ?? 0 },
+        utilizationPct: port.utilizationPct,
+        optics: {
+          status: port.opticsStatus,
+          rxPowerDbm: port.rxPowerDbm,
+          txPowerDbm: port.txPowerDbm,
+          temperatureC: port.temperatureC,
+        },
+        configUpdatedAt: isoValue(port.configUpdatedAt),
+        telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.switch.localeCompare(b.switch, undefined, { numeric: true }) ||
+        a.interface.localeCompare(b.interface, undefined, { numeric: true }),
+    );
   return boundedNetworkResult({
     source: "/network/map (Port Map)",
     generatedAt: new Date().toISOString(),
     matched: detailed.length,
     returned: Math.min(detailed.length, limit),
-    definition: "connected = operStatus up OR learned MAC count > 0 OR LLDP neighbor count > 0",
+    definition:
+      "connected = operStatus up OR learned MAC count > 0 OR LLDP neighbor count > 0",
     ports: detailed.slice(0, limit),
   });
 }
 
-export const QUERY_BUILDING_NETWORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_building_network",
-    description: "Read the Buildings page's building list, current health, devices, VLANs, and relevant links. Use for building state and blast-radius questions. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        building: { type: "string", description: "Optional building name or partial name." },
-        includeDevices: { type: "boolean", description: "Include device and link detail; defaults to true for one building." },
-        limit: { type: "integer", minimum: 1, maximum: 100, description: "Maximum detail records per category; defaults to 50." },
+export const QUERY_BUILDING_NETWORK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_building_network",
+      description:
+        "Read the Buildings page's building list, current health, devices, VLANs, and relevant links. Use for building state and blast-radius questions. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          building: {
+            type: "string",
+            description: "Optional building name or partial name.",
+          },
+          includeDevices: {
+            type: "boolean",
+            description:
+              "Include device and link detail; defaults to true for one building.",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            description: "Maximum detail records per category; defaults to 50.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
-export async function executeQueryBuildingNetwork(rawArgs: string): Promise<string> {
+export async function executeQueryBuildingNetwork(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const query = normalizedText(args.building);
   const limit = Math.min(100, Math.max(1, Number(args.limit) || 50));
-  const includeDevices = args.includeDevices === true || (!!query && args.includeDevices !== false);
+  const includeDevices =
+    args.includeDevices === true || (!!query && args.includeDevices !== false);
   const [summaries, nodes, vlans, links] = await Promise.all([
     getBuildingSummaries(),
     db.select().from(netNodesTable),
     db.select().from(vlansTable),
     db.select().from(netLinksTable),
   ]);
-  const selected = summaries.filter((building) => !query || normalizedText(building.name).includes(query));
-  const selectedNames = new Set(selected.map((building) => normalizedText(building.name)));
-  const selectedNodes = nodes.filter((node) => selectedNames.has(normalizedText(getCanonicalBuildingName(node.building))));
+  const selected = summaries.filter(
+    (building) => !query || normalizedText(building.name).includes(query),
+  );
+  const selectedNames = new Set(
+    selected.map((building) => normalizedText(building.name)),
+  );
+  const selectedNodes = nodes.filter((node) =>
+    selectedNames.has(normalizedText(getCanonicalBuildingName(node.building))),
+  );
   const selectedNodeIds = new Set(selectedNodes.map((node) => node.id));
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const result: Record<string, unknown> = {
@@ -2549,11 +3493,16 @@ export async function executeQueryBuildingNetwork(rawArgs: string): Promise<stri
     const phonesProveService = calling.onlinePhoneOwners > 0;
     result.callingEvidence = calling;
     result.operationalAssessment = phonesProveService
-      ? (selected[0].healthColor === "green" ? "operational" : "operational_with_network_attention")
-      : (selected[0].healthColor === "red" ? "down_or_unverified" : "no_online_phone_evidence");
-    result.assessmentNote = phonesProveService && selected[0].healthColor !== "green"
-      ? "Online assigned phones prove the building service path is operating, while failed switch/heartbeat evidence still requires attention. Report the building as operational but degraded, not fully down."
-      : null;
+      ? selected[0].healthColor === "green"
+        ? "operational"
+        : "operational_with_network_attention"
+      : selected[0].healthColor === "red"
+        ? "down_or_unverified"
+        : "no_online_phone_evidence";
+    result.assessmentNote =
+      phonesProveService && selected[0].healthColor !== "green"
+        ? "Online assigned phones prove the building service path is operating, while failed switch/heartbeat evidence still requires attention. Report the building as operational but degraded, not fully down."
+        : null;
   }
   if (includeDevices) {
     result.devices = selectedNodes.slice(0, limit).map((node) => ({
@@ -2567,68 +3516,118 @@ export async function executeQueryBuildingNetwork(rawArgs: string): Promise<stri
       criticality: node.criticality,
       inventoryStatus: node.status || "unknown",
     }));
-    result.vlans = vlans.filter((vlan) => selectedNames.has(normalizedText(getCanonicalBuildingName(vlan.building)))).slice(0, limit);
-    result.links = links.filter((link) => selectedNodeIds.has(link.aNodeId) || selectedNodeIds.has(link.bNodeId)).slice(0, limit).map((link) => ({
-      aNode: nodeById.get(link.aNodeId)?.hostname ?? link.aNodeId,
-      aPort: link.aPort,
-      bNode: nodeById.get(link.bNodeId)?.hostname ?? link.bNodeId,
-      bPort: link.bPort,
-      confidence: link.confidence,
-      lastVerifiedAt: isoValue(link.lastVerifiedAt),
-    }));
+    result.vlans = vlans
+      .filter((vlan) =>
+        selectedNames.has(
+          normalizedText(getCanonicalBuildingName(vlan.building)),
+        ),
+      )
+      .slice(0, limit);
+    result.links = links
+      .filter(
+        (link) =>
+          selectedNodeIds.has(link.aNodeId) ||
+          selectedNodeIds.has(link.bNodeId),
+      )
+      .slice(0, limit)
+      .map((link) => ({
+        aNode: nodeById.get(link.aNodeId)?.hostname ?? link.aNodeId,
+        aPort: link.aPort,
+        bNode: nodeById.get(link.bNodeId)?.hostname ?? link.bNodeId,
+        bPort: link.bPort,
+        confidence: link.confidence,
+        lastVerifiedAt: isoValue(link.lastVerifiedAt),
+      }));
   }
   return boundedNetworkResult(result);
 }
 
-export const QUERY_NETWORK_MONITORING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_network_monitoring",
-    description: "Read the Monitoring page's current Influx reachability, device/building health, traffic, alerts, and recent trend. Use for 'right now', live state, outage, and last-seen questions. Read-only.",
-    parameters: {
-      type: "object",
-      properties: {
-        building: { type: "string", description: "Optional building filter for building state and alerts." },
-        includeTrend: { type: "boolean", description: "Include the recent monitoring trend; defaults to false." },
+export const QUERY_NETWORK_MONITORING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_network_monitoring",
+      description:
+        "Read the Monitoring page's current Influx reachability, device/building health, traffic, alerts, and recent trend. Use for 'right now', live state, outage, and last-seen questions. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          building: {
+            type: "string",
+            description:
+              "Optional building filter for building state and alerts.",
+          },
+          includeTrend: {
+            type: "boolean",
+            description:
+              "Include the recent monitoring trend; defaults to false.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
-export async function executeQueryNetworkMonitoring(rawArgs: string): Promise<string> {
+export async function executeQueryNetworkMonitoring(
+  rawArgs: string,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const building = normalizedText(args.building);
-  const snapshot = await getMonitoringSnapshot(false) as any;
+  const snapshot = (await getMonitoringSnapshot(false)) as any;
   if (building) {
-    snapshot.buildings = (snapshot.buildings ?? []).filter((item: any) => normalizedText(item.name).includes(building));
-    snapshot.alertingDevices = (snapshot.alertingDevices ?? []).filter((item: any) => normalizedText(item.building).includes(building));
+    snapshot.buildings = (snapshot.buildings ?? []).filter((item: any) =>
+      normalizedText(item.name).includes(building),
+    );
+    snapshot.alertingDevices = (snapshot.alertingDevices ?? []).filter(
+      (item: any) => normalizedText(item.building).includes(building),
+    );
   }
   if (args.includeTrend !== true) snapshot.trend = [];
-  return boundedNetworkResult({ source: "/monitoring", generatedAt: new Date().toISOString(), ...snapshot });
+  return boundedNetworkResult({
+    source: "/monitoring",
+    generatedAt: new Date().toISOString(),
+    ...snapshot,
+  });
 }
 
-export const SWITCH_TELEMETRY_FROM_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "switch_telemetry_from_noc",
-    description: "Check, audit, or explicitly start the approved switch-port telemetry collector on NOC host 10.0.0.22. This invokes only the fixed collector service; it cannot run arbitrary Python or shell commands.",
-    parameters: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["status", "audit", "start"], description: "Read status/audit, or start one collection run." },
-        confirmation: { type: "string", description: "For start only, the user must explicitly provide: COLLECT SWITCH TELEMETRY" },
+export const SWITCH_TELEMETRY_FROM_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "switch_telemetry_from_noc",
+      description:
+        "Check, audit, or explicitly start the approved switch-port telemetry collector on NOC host 10.0.0.22. This invokes only the fixed collector service; it cannot run arbitrary Python or shell commands.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["status", "audit", "start"],
+            description: "Read status/audit, or start one collection run.",
+          },
+          confirmation: {
+            type: "string",
+            description:
+              "For start only, the user must explicitly provide: COLLECT SWITCH TELEMETRY",
+          },
+        },
+        required: ["action"],
       },
-      required: ["action"],
     },
-  },
-};
+  };
 
-async function executeSwitchTelemetryFromNoc(rawArgs: string, userRole: string | null): Promise<string> {
+async function executeSwitchTelemetryFromNoc(
+  rawArgs: string,
+  userRole: string | null,
+): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
-  if (args.action === "status") return boundedNetworkResult(await getSwitchTelemetryStatusViaNoc());
-  if (args.action === "audit") return boundedNetworkResult(await getSwitchTelemetryAuditViaNoc());
-  if (args.action !== "start") return "Error: action must be status, audit, or start.";
-  if (!userRole || !NETWORK_ADMIN_ROLES.has(userRole)) return "Error: starting switch telemetry requires a network administrator role.";
+  if (args.action === "status")
+    return boundedNetworkResult(await getSwitchTelemetryStatusViaNoc());
+  if (args.action === "audit")
+    return boundedNetworkResult(await getSwitchTelemetryAuditViaNoc());
+  if (args.action !== "start")
+    return "Error: action must be status, audit, or start.";
+  if (!userRole || !NETWORK_ADMIN_ROLES.has(userRole))
+    return "Error: starting switch telemetry requires a network administrator role.";
   if (args.confirmation !== "COLLECT SWITCH TELEMETRY") {
     return "Collection not started. Ask the user to explicitly confirm: COLLECT SWITCH TELEMETRY";
   }
@@ -2639,120 +3638,306 @@ export const PROBE_VIA_NOC_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function",
   function: {
     name: "probe_via_noc",
-    description: "Run a restricted ping or TCP-connect check from the NOC probe at 10.0.0.22. Use this as a second network vantage point or when the user explicitly asks to test from 10.0.0.22. This is not general shell access.",
-    parameters: { type: "object", properties: {
-      operation: { type: "string", enum: ["ping", "tcp"] },
-      target: { type: "string", description: "Hostname or IP address to test." },
-      port: { type: "integer", minimum: 1, maximum: 65535, description: "Required only for a TCP check." },
-    }, required: ["operation", "target"] },
+    description:
+      "Run a restricted ping or TCP-connect check from the NOC probe at 10.0.0.22. Use this as a second network vantage point or when the user explicitly asks to test from 10.0.0.22. This is not general shell access.",
+    parameters: {
+      type: "object",
+      properties: {
+        operation: { type: "string", enum: ["ping", "tcp"] },
+        target: {
+          type: "string",
+          description: "Hostname or IP address to test.",
+        },
+        port: {
+          type: "integer",
+          minimum: 1,
+          maximum: 65535,
+          description: "Required only for a TCP check.",
+        },
+      },
+      required: ["operation", "target"],
+    },
   },
 };
 async function executeProbeViaNoc(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
-  const operation = args.operation === "tcp" ? "tcp" : args.operation === "ping" ? "ping" : "";
-  const target = String(args.target || "").trim(); const port = Number(args.port);
+  const operation =
+    args.operation === "tcp" ? "tcp" : args.operation === "ping" ? "ping" : "";
+  const target = String(args.target || "").trim();
+  const port = Number(args.port);
   if (!operation) return "Error: operation must be ping or tcp.";
-  if (!target || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/.test(target)) return "Error: a valid target is required.";
-  if (operation === "tcp" && (!Number.isInteger(port) || port < 1 || port > 65535)) return "Error: TCP port must be 1-65535.";
-  const base = process.env.NOC_PROBE_URL?.replace(/\/$/, ""); const token = process.env.NOC_PROBE_TOKEN;
+  if (!target || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/.test(target))
+    return "Error: a valid target is required.";
+  if (
+    operation === "tcp" &&
+    (!Number.isInteger(port) || port < 1 || port > 65535)
+  )
+    return "Error: TCP port must be 1-65535.";
+  const base = process.env.NOC_PROBE_URL?.replace(/\/$/, "");
+  const token = process.env.NOC_PROBE_TOKEN;
   if (!base || !token) return "The NOC probe is not configured on App-Server2.";
-  const response = await fetch(`${base}/v1/probe`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ operation, target, ...(operation === "tcp" ? { port } : {}) }), signal: AbortSignal.timeout(10000) });
+  const response = await fetch(`${base}/v1/probe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      operation,
+      target,
+      ...(operation === "tcp" ? { port } : {}),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
   if (!response.ok) return `NOC probe request failed (${response.status}).`;
-  const result = await response.json() as Record<string, unknown>;
-  if (operation === "ping") return `NOC probe 10.0.0.22 → ${target}: ${result.reachable ? "REACHABLE" : "NO ICMP REPLY"} (${result.elapsedMs ?? "?"} ms).\n${String(result.summary ?? "").slice(0, 1500)}`;
+  const result = (await response.json()) as Record<string, unknown>;
+  if (operation === "ping")
+    return `NOC probe 10.0.0.22 → ${target}: ${result.reachable ? "REACHABLE" : "NO ICMP REPLY"} (${result.elapsedMs ?? "?"} ms).\n${String(result.summary ?? "").slice(0, 1500)}`;
   return `NOC probe 10.0.0.22 → TCP ${target}:${port}: ${result.open ? "OPEN" : "CLOSED OR UNREACHABLE"} (${result.elapsedMs ?? "?"} ms)${result.error ? ` — ${result.error}` : ""}.`;
 }
-export const WEBEX_DEVICE_STATUS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "webex_device_status",
-    description: "Read Webex Control Hub device inventory and connection status. Use for Webex room-device outages, offline devices, and device-name lookups. Read-only; never changes a device.",
-    parameters: { type: "object", properties: {
-      query: { type: "string", description: "Optional device or room name filter." },
-      status: { type: "string", enum: ["all", "online", "offline"], description: "Connection-status filter; defaults to all." },
-    } },
-  },
-};
+export const WEBEX_DEVICE_STATUS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "webex_device_status",
+      description:
+        "Read Webex Control Hub device inventory and connection status. Use for Webex room-device outages, offline devices, and device-name lookups. Read-only; never changes a device.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Optional device or room name filter.",
+          },
+          status: {
+            type: "string",
+            enum: ["all", "online", "offline"],
+            description: "Connection-status filter; defaults to all.",
+          },
+        },
+      },
+    },
+  };
 let webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
 async function refreshWebexAccessToken(): Promise<boolean> {
-  const refreshToken = process.env.WEBEX_REFRESH_TOKEN; const clientId = process.env.WEBEX_CLIENT_ID; const clientSecret = process.env.WEBEX_CLIENT_SECRET;
+  const refreshToken = process.env.WEBEX_REFRESH_TOKEN;
+  const clientId = process.env.WEBEX_CLIENT_ID;
+  const clientSecret = process.env.WEBEX_CLIENT_SECRET;
   if (!refreshToken || !clientId || !clientSecret) return false;
-  const body = new URLSearchParams({ grant_type: "refresh_token", client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken });
-  const response = await fetch("https://webexapis.com/v1/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body, signal: AbortSignal.timeout(10000) });
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  });
+  const response = await fetch("https://webexapis.com/v1/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
   if (!response.ok) return false;
-  const tokens = await response.json() as { access_token?: string; refresh_token?: string };
+  const tokens = (await response.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+  };
   if (!tokens.access_token) return false;
   webexAccessToken = tokens.access_token;
-  if (tokens.refresh_token) process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
+  if (tokens.refresh_token)
+    process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
   return true;
 }
 async function webexFetch(path: string, retry = true): Promise<Response> {
-  if (!webexAccessToken) webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
-  if (!webexAccessToken && !(await refreshWebexAccessToken())) throw new Error("Webex is not configured");
-  const response = await fetch(`https://webexapis.com/v1${path}`, { headers: { Authorization: `Bearer ${webexAccessToken}`, Accept: "application/json" }, signal: AbortSignal.timeout(12000) });
-  if (response.status === 401 && retry && await refreshWebexAccessToken()) return webexFetch(path, false);
+  if (!webexAccessToken)
+    webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+  if (!webexAccessToken && !(await refreshWebexAccessToken()))
+    throw new Error("Webex is not configured");
+  const response = await fetch(`https://webexapis.com/v1${path}`, {
+    headers: {
+      Authorization: `Bearer ${webexAccessToken}`,
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (response.status === 401 && retry && (await refreshWebexAccessToken()))
+    return webexFetch(path, false);
   return response;
 }
 async function executeWebexDeviceStatus(rawArgs: string): Promise<string> {
-  const args = JSON.parse(rawArgs || "{}"); const query = String(args.query || "").trim().toLowerCase(); const wanted = ["online", "offline"].includes(args.status) ? args.status : "all";
+  const args = JSON.parse(rawArgs || "{}");
+  const query = String(args.query || "")
+    .trim()
+    .toLowerCase();
+  const wanted = ["online", "offline"].includes(args.status)
+    ? args.status
+    : "all";
   let response: Response;
-  try { response = await webexFetch("/devices?max=1000"); } catch { return "Webex device monitoring is not configured yet."; }
+  try {
+    response = await webexFetch("/devices?max=1000");
+  } catch {
+    return "Webex device monitoring is not configured yet.";
+  }
   if (!response.ok) return `Webex device query failed (${response.status}).`;
-  const data = await response.json() as { items?: Array<Record<string, unknown>> };
-  const devices = (data.items || []).map((device) => {
-    const rawStatus = String(device.connectionStatus || device.status || "unknown").toLowerCase();
-    const status = rawStatus === "connected" ? "online" : rawStatus === "disconnected" ? "offline" : rawStatus;
-    return {
-      name: String(device.displayName || device.name || "Unnamed device"),
-      product: String(device.product || device.type || "Unknown"),
-      status,
-    };
-  }).filter((device) => (!query || `${device.name} ${device.product}`.toLowerCase().includes(query)) && (wanted === "all" || device.status === wanted));
-  if (!devices.length) return query ? `No Webex devices match "${String(args.query)}".` : `No Webex devices match status ${wanted}.`;
-  const online = devices.filter((device) => device.status === "online").length; const offline = devices.filter((device) => device.status === "offline").length;
-  const lines = [`Webex Control Hub: ${devices.length} device(s) — ${online} online, ${offline} offline.`];
-  for (const device of devices.slice(0, 100)) lines.push(`- ${device.name} — ${device.product} — ${device.status.toUpperCase()}`);
+  const data = (await response.json()) as {
+    items?: Array<Record<string, unknown>>;
+  };
+  const devices = (data.items || [])
+    .map((device) => {
+      const rawStatus = String(
+        device.connectionStatus || device.status || "unknown",
+      ).toLowerCase();
+      const status =
+        rawStatus === "connected"
+          ? "online"
+          : rawStatus === "disconnected"
+            ? "offline"
+            : rawStatus;
+      return {
+        name: String(device.displayName || device.name || "Unnamed device"),
+        product: String(device.product || device.type || "Unknown"),
+        status,
+      };
+    })
+    .filter(
+      (device) =>
+        (!query ||
+          `${device.name} ${device.product}`.toLowerCase().includes(query)) &&
+        (wanted === "all" || device.status === wanted),
+    );
+  if (!devices.length)
+    return query
+      ? `No Webex devices match "${String(args.query)}".`
+      : `No Webex devices match status ${wanted}.`;
+  const online = devices.filter((device) => device.status === "online").length;
+  const offline = devices.filter(
+    (device) => device.status === "offline",
+  ).length;
+  const lines = [
+    `Webex Control Hub: ${devices.length} device(s) — ${online} online, ${offline} offline.`,
+  ];
+  for (const device of devices.slice(0, 100))
+    lines.push(
+      `- ${device.name} — ${device.product} — ${device.status.toUpperCase()}`,
+    );
   if (devices.length > 100) lines.push(`- … ${devices.length - 100} more`);
   return lines.join("\n").slice(0, 7000);
 }
-export const QUERY_INFLUX_LAST_SEEN_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function", function: { name: "query_influx_last_seen", description: "Read monitoring data to report when a host was last seen and its latest ping loss/latency. Read-only.", parameters: { type: "object", properties: { host: { type: "string" }, minutes: { type: "number", minimum: 5, maximum: 10080 } }, required: ["host"] } }
-};
-async function executeQueryInfluxLastSeen(rawArgs: string): Promise<string> {
-  const args = JSON.parse(rawArgs || "{}"); const host = String(args.host || "").trim();
-  if (!host || !/^[A-Za-z0-9._:-]+$/.test(host)) return "Error: a valid hostname or IP is required.";
-  const base = process.env.INFLUXDB_URL?.replace(/\/$/, ""); const token = process.env.INFLUXDB_TOKEN; const org = process.env.INFLUXDB_ORG || "SCCC"; const bucket = process.env.INFLUXDB_BUCKET || "telegraf";
-  if (!base || !token) return "InfluxDB is not configured; set INFLUXDB_URL and a read-only INFLUXDB_TOKEN.";
-  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60));
-  const flux = `from(bucket: "${bucket}") |> range(start: -${minutes}m) |> filter(fn: (r) => r.source == "${host}" or r.agent_host == "${host}" or r.host == "${host}") |> filter(fn: (r) => r._field == "percent_packet_loss" or r._field == "average_response_ms" or r._field == "rtt" or r._field == "uptime") |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "agent_host", "host"])`;
-  const res = await fetch(`${base}/api/v2/query?org=${encodeURIComponent(org)}`, { method: "POST", headers: { Authorization: `Token ${token}`, "Content-Type": "application/vnd.flux", Accept: "application/csv" }, body: flux, signal: AbortSignal.timeout(10000) });
-  if (!res.ok) return `InfluxDB query failed (${res.status}).`; const csv = await res.text(); return csv.trim() ? `Latest telemetry for ${host}:\n${csv.slice(0, 6000)}` : `No telemetry found for ${host} in the last ${minutes} minutes.`;
-}
-export const GRAFANA_PANEL_LINK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function", function: { name: "grafana_panel_link", description: "Create a read-only Grafana dashboard or panel link for an exact recent time window.", parameters: { type: "object", properties: { dashboardUid: { type: "string" }, panelId: { type: "number" }, minutes: { type: "number", minimum: 5, maximum: 10080 }, host: { type: "string" } } } }
-};
-
-export const QUERY_ARCHITECTURE_SNAPSHOT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "query_architecture_snapshot",
-    description: "Query Fred's normalized SCCC architecture database from the latest immutable snapshot, with current attributed chat corrections overlaid. Use it before answering architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions.",
-    parameters: {
-      type: "object",
-      properties: {
-        entityType: { type: "string", description: "Optional exact type: building, switch, network_node, port, vlan, network_link, routing_adjacency, phone_building, device_configuration, azure_resource, process, or project." },
-        building: { type: "string", description: "Optional exact building filter." },
-        query: { type: "string", description: "Optional case-insensitive search across key, name, building, and structured attributes." },
-        includeRelationships: { type: "boolean", description: "Include matching from/to relationships; defaults to true." },
-        maxChars: { type: "integer", minimum: 1000, maximum: 24000, description: "Maximum returned characters; defaults to 12000." },
+export const QUERY_INFLUX_LAST_SEEN_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_influx_last_seen",
+      description:
+        "Read monitoring data to report when a host was last seen and its latest ping loss/latency. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          host: { type: "string" },
+          minutes: { type: "number", minimum: 5, maximum: 10080 },
+        },
+        required: ["host"],
       },
     },
-  },
-};
-
-export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise<string> {
+  };
+async function executeQueryInfluxLastSeen(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
-  const maxChars = Math.min(24_000, Math.max(1_000, Number(args.maxChars) || 12_000));
+  const host = String(args.host || "").trim();
+  if (!host || !/^[A-Za-z0-9._:-]+$/.test(host))
+    return "Error: a valid hostname or IP is required.";
+  const base = process.env.INFLUXDB_URL?.replace(/\/$/, "");
+  const token = process.env.INFLUXDB_TOKEN;
+  const org = process.env.INFLUXDB_ORG || "SCCC";
+  const bucket = process.env.INFLUXDB_BUCKET || "telegraf";
+  if (!base || !token)
+    return "InfluxDB is not configured; set INFLUXDB_URL and a read-only INFLUXDB_TOKEN.";
+  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60));
+  const flux = `from(bucket: "${bucket}") |> range(start: -${minutes}m) |> filter(fn: (r) => r.source == "${host}" or r.agent_host == "${host}" or r.host == "${host}") |> filter(fn: (r) => r._field == "percent_packet_loss" or r._field == "average_response_ms" or r._field == "rtt" or r._field == "uptime") |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "agent_host", "host"])`;
+  const res = await fetch(
+    `${base}/api/v2/query?org=${encodeURIComponent(org)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "Content-Type": "application/vnd.flux",
+        Accept: "application/csv",
+      },
+      body: flux,
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+  if (!res.ok) return `InfluxDB query failed (${res.status}).`;
+  const csv = await res.text();
+  return csv.trim()
+    ? `Latest telemetry for ${host}:\n${csv.slice(0, 6000)}`
+    : `No telemetry found for ${host} in the last ${minutes} minutes.`;
+}
+export const GRAFANA_PANEL_LINK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "grafana_panel_link",
+      description:
+        "Create a read-only Grafana dashboard or panel link for an exact recent time window.",
+      parameters: {
+        type: "object",
+        properties: {
+          dashboardUid: { type: "string" },
+          panelId: { type: "number" },
+          minutes: { type: "number", minimum: 5, maximum: 10080 },
+          host: { type: "string" },
+        },
+      },
+    },
+  };
+
+export const QUERY_ARCHITECTURE_SNAPSHOT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_architecture_snapshot",
+      description:
+        "Query Fred's normalized SCCC architecture database from the latest immutable snapshot, with current attributed chat corrections overlaid. Use it before answering architecture, dependency, asset, building, switch, VLAN, port, Azure, identity, integration, ownership, continuity, or known-good-state questions.",
+      parameters: {
+        type: "object",
+        properties: {
+          entityType: {
+            type: "string",
+            description:
+              "Optional exact type: building, switch, network_node, port, vlan, network_link, routing_adjacency, phone_building, device_configuration, azure_resource, process, or project.",
+          },
+          building: {
+            type: "string",
+            description: "Optional exact building filter.",
+          },
+          query: {
+            type: "string",
+            description:
+              "Optional case-insensitive search across key, name, building, and structured attributes.",
+          },
+          includeRelationships: {
+            type: "boolean",
+            description:
+              "Include matching from/to relationships; defaults to true.",
+          },
+          maxChars: {
+            type: "integer",
+            minimum: 1000,
+            maximum: 24000,
+            description: "Maximum returned characters; defaults to 12000.",
+          },
+        },
+      },
+    },
+  };
+
+export async function executeQueryArchitectureSnapshot(
+  rawArgs: string,
+): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const maxChars = Math.min(
+    24_000,
+    Math.max(1_000, Number(args.maxChars) || 12_000),
+  );
   const entityType = String(args.entityType || "").trim();
   const building = String(args.building || "").trim();
   const query = String(args.query || "").trim();
@@ -2770,7 +3955,9 @@ export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise
       FROM latest
     `);
     const summary = summaryResult.rows?.[0];
-    return summary ? JSON.stringify(summary, null, 2) : "No durable enterprise-architecture snapshot has been generated yet.";
+    return summary
+      ? JSON.stringify(summary, null, 2)
+      : "No durable enterprise-architecture snapshot has been generated yet.";
   }
   const result: any = await db.execute(sql`
     WITH latest AS (SELECT id, generated_at, summary FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
@@ -2792,7 +3979,8 @@ export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise
     ORDER BY e.entity_type, e.name LIMIT 200
   `);
   const rows = result.rows ?? [];
-  if (!rows.length) return "No matching normalized architecture records were found. Generate an as-is snapshot if the database is empty, or broaden the filter.";
+  if (!rows.length)
+    return "No matching normalized architecture records were found. Generate an as-is snapshot if the database is empty, or broaden the filter.";
   let relationships: unknown[] = [];
   if (args.includeRelationships !== false) {
     const keys = rows.slice(0, 100).map((row: any) => row.naturalKey);
@@ -2810,47 +3998,258 @@ export async function executeQueryArchitectureSnapshot(rawArgs: string): Promise
     relationships = relResult.rows ?? [];
   }
   const first = rows[0];
-  let text = JSON.stringify({ snapshotId: first.snapshotId, generatedAt: first.generatedAt, summary: first.summary, filters: { entityType, building, query }, entities: rows.map(({ snapshotId, generatedAt, summary, ...row }: any) => row), relationships }, null, 2);
-  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n... narrow entityType, building, or query for the remaining structured evidence.`;
+  let text = JSON.stringify(
+    {
+      snapshotId: first.snapshotId,
+      generatedAt: first.generatedAt,
+      summary: first.summary,
+      filters: { entityType, building, query },
+      entities: rows.map(
+        ({ snapshotId, generatedAt, summary, ...row }: any) => row,
+      ),
+      relationships,
+    },
+    null,
+    2,
+  );
+  return text.length <= maxChars
+    ? text
+    : `${text.slice(0, maxChars)}\n... narrow entityType, building, or query for the remaining structured evidence.`;
 }
 
-export const UPDATE_ARCHITECTURE_ELEMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "update_architecture_element",
-    description: "Record a CIO-requested correction to one exact element in Fred's architecture working database. Use only when the user explicitly asks to update/correct a known element. This creates an attributed override and preserves history; it does not change the immutable source snapshot or a live device.",
-    parameters: { type: "object", properties: {
-      entityType: { type: "string" }, naturalKey: { type: "string" },
-      patch: { type: "object", description: "Only corrected fields and values." },
-      reason: { type: "string", description: "Why the correction is authoritative." },
-    }, required: ["entityType", "naturalKey", "patch", "reason"] },
-  },
-};
+export const QUERY_FORMAL_ARCHITECTURE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "query_formal_architecture",
+      description:
+        "Query the latest approved formal SCCC as-is enterprise-architecture document by section or normalized finding. This is the approved dated baseline after the live tools and latest normalized snapshot, not proof of current operating state.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional full-text search across headings and section content.",
+          },
+          sectionNumber: {
+            type: "string",
+            description: "Optional exact section number such as 9.2 or 10.1.",
+          },
+          findingType: {
+            type: "string",
+            enum: [
+              "evidence_claim",
+              "contradiction",
+              "quarantine",
+              "stale_evidence",
+              "evidence_gap",
+              "risk",
+              "single_point_of_failure",
+              "remediation",
+            ],
+          },
+          confidence: {
+            type: "string",
+            enum: [
+              "verified",
+              "computed",
+              "inferred",
+              "stale",
+              "contradicted",
+              "unknown",
+            ],
+          },
+          priority: {
+            type: "string",
+            description:
+              "Optional finding priority such as critical, high, medium, low, or p0-p3.",
+          },
+          maxChars: {
+            type: "integer",
+            minimum: 1000,
+            maximum: 24000,
+            description: "Maximum returned characters; defaults to 12000.",
+          },
+        },
+      },
+    },
+  };
 
-export async function executeUpdateArchitectureElement(rawArgs: string, actor: { id: number | null; name: string | null; role: string | null }): Promise<string> {
-  if (String(actor.role || "").toLowerCase() !== "cio") return "Error: only the CIO can update Fred's architecture working database.";
+export async function executeQueryFormalArchitecture(
+  rawArgs: string,
+): Promise<string> {
+  const args = JSON.parse(rawArgs || "{}");
+  const query = String(args.query || "").trim();
+  const sectionNumber = String(args.sectionNumber || "").trim();
+  const findingType = String(args.findingType || "").trim();
+  const confidence = String(args.confidence || "")
+    .trim()
+    .toLowerCase();
+  const priority = String(args.priority || "")
+    .trim()
+    .toLowerCase();
+  const maxChars = Math.min(
+    24_000,
+    Math.max(1_000, Number(args.maxChars) || 12_000),
+  );
+  const pattern = `%${query}%`;
+  const documentResult: any = await db.execute(sql`
+    SELECT d.id, d.title, d.version, d.architecture_state_date AS "architectureStateDate", d.effective_at AS "effectiveAt",
+      d.source_snapshot_id AS "sourceSnapshotId", d.source_snapshot_generated_at AS "sourceSnapshotGeneratedAt",
+      d.approval_status AS "approvalStatus", d.document_status AS "documentStatus", d.author, d.approved_by AS "approvedBy",
+      d.classification, d.content_sha256 AS "contentSha256", d.markdown_filename AS "markdownFilename", d.word_filename AS "wordFilename",
+      d.supersedes_document_id AS "supersedesDocumentId", d.created_at AS "importedAt",
+      (SELECT count(*)::int FROM formal_ea_sections s WHERE s.document_id = d.id) AS "sectionCount",
+      (SELECT count(*)::int FROM formal_ea_findings f WHERE f.document_id = d.id) AS "findingCount",
+      (SELECT count(*)::int FROM formal_ea_entity_links l WHERE l.document_id = d.id) AS "entityLinkCount"
+    FROM formal_ea_documents d WHERE d.approval_status = 'approved'
+    ORDER BY d.effective_at DESC, d.id DESC LIMIT 1
+  `);
+  const document = documentResult.rows?.[0];
+  if (!document)
+    return "No approved formal enterprise-architecture document has been imported yet.";
+  if (!query && !sectionNumber && !findingType && !confidence && !priority)
+    return JSON.stringify(
+      {
+        document,
+        evidenceOrder: [
+          "current live evidence",
+          "latest normalized snapshot",
+          "approved formal EA",
+          "governed memory",
+          "uploaded files and older evidence",
+        ],
+        warning:
+          "Dated approved baseline; reconcile with live evidence before asserting current state.",
+      },
+      null,
+      2,
+    );
+
+  const sectionResult: any = await db.execute(sql`
+    SELECT s.id, s.ordinal, s.level, s.section_number AS "sectionNumber", s.heading, s.heading_path AS "headingPath", s.content
+    FROM formal_ea_sections s WHERE s.document_id = ${document.id}
+      AND (${sectionNumber} = '' OR s.section_number = ${sectionNumber})
+      AND (${query} = '' OR s.heading ILIKE ${pattern} OR s.content ILIKE ${pattern}
+        OR to_tsvector('english', coalesce(s.heading, '') || ' ' || coalesce(s.content, '')) @@ plainto_tsquery('english', ${query}))
+    ORDER BY s.ordinal LIMIT 40
+  `);
+  const findingResult: any = await db.execute(sql`
+    SELECT f.id, f.finding_type AS "findingType", f.confidence, f.priority, f.title, f.content,
+      f.source_reference AS "sourceReference", s.section_number AS "sectionNumber", s.heading
+    FROM formal_ea_findings f JOIN formal_ea_sections s ON s.id = f.section_id
+    WHERE f.document_id = ${document.id}
+      AND (${findingType} = '' OR f.finding_type = ${findingType})
+      AND (${confidence} = '' OR lower(COALESCE(f.confidence, '')) = ${confidence})
+      AND (${priority} = '' OR lower(COALESCE(f.priority, '')) = ${priority})
+      AND (${sectionNumber} = '' OR s.section_number = ${sectionNumber})
+      AND (${query} = '' OR f.title ILIKE ${pattern} OR f.content ILIKE ${pattern})
+    ORDER BY s.ordinal, f.id LIMIT 100
+  `);
+  let text = JSON.stringify(
+    {
+      document,
+      filters: { query, sectionNumber, findingType, confidence, priority },
+      sections: sectionResult.rows ?? [],
+      findings: findingResult.rows ?? [],
+      warning:
+        "Formal baseline is subordinate to newer equivalent live evidence; report deltas explicitly.",
+    },
+    null,
+    2,
+  );
+  return text.length <= maxChars
+    ? text
+    : `${text.slice(0, maxChars)}\n... narrow query, sectionNumber, or finding filters for the remaining formal EA evidence.`;
+}
+
+export const UPDATE_ARCHITECTURE_ELEMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "update_architecture_element",
+      description:
+        "Record a CIO-requested correction to one exact element in Fred's architecture working database. Use only when the user explicitly asks to update/correct a known element. This creates an attributed override and preserves history; it does not change the immutable source snapshot or a live device.",
+      parameters: {
+        type: "object",
+        properties: {
+          entityType: { type: "string" },
+          naturalKey: { type: "string" },
+          patch: {
+            type: "object",
+            description: "Only corrected fields and values.",
+          },
+          reason: {
+            type: "string",
+            description: "Why the correction is authoritative.",
+          },
+        },
+        required: ["entityType", "naturalKey", "patch", "reason"],
+      },
+    },
+  };
+
+export async function executeUpdateArchitectureElement(
+  rawArgs: string,
+  actor: { id: number | null; name: string | null; role: string | null },
+): Promise<string> {
+  if (String(actor.role || "").toLowerCase() !== "cio")
+    return "Error: only the CIO can update Fred's architecture working database.";
   const args = JSON.parse(rawArgs || "{}");
   const entityType = String(args.entityType || "").trim();
   const naturalKey = String(args.naturalKey || "").trim();
   const reason = String(args.reason || "").trim();
-  const patch = args.patch && typeof args.patch === "object" && !Array.isArray(args.patch) ? args.patch : null;
-  if (!entityType || !naturalKey || !reason || !patch || !Object.keys(patch).length) return "Error: exact entityType, naturalKey, non-empty patch, and reason are required.";
+  const patch =
+    args.patch && typeof args.patch === "object" && !Array.isArray(args.patch)
+      ? args.patch
+      : null;
+  if (
+    !entityType ||
+    !naturalKey ||
+    !reason ||
+    !patch ||
+    !Object.keys(patch).length
+  )
+    return "Error: exact entityType, naturalKey, non-empty patch, and reason are required.";
   const scrubbed = redactSecretLike(JSON.stringify(patch));
-  if (scrubbed.redacted) return "Error: architecture corrections cannot contain credentials or secrets.";
-  const exists: any = await db.execute(sql`WITH latest AS (SELECT id FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
+  if (scrubbed.redacted)
+    return "Error: architecture corrections cannot contain credentials or secrets.";
+  const exists: any =
+    await db.execute(sql`WITH latest AS (SELECT id FROM fred_architecture_snapshots ORDER BY generated_at DESC LIMIT 1)
     SELECT 1 FROM fred_architecture_entities, latest WHERE snapshot_id = latest.id AND entity_type = ${entityType} AND natural_key = ${naturalKey} LIMIT 1`);
-  if (!exists.rows?.[0]) return "Error: exact architecture element not found. Query the architecture database first to obtain its naturalKey.";
+  if (!exists.rows?.[0])
+    return "Error: exact architecture element not found. Query the architecture database first to obtain its naturalKey.";
   const inserted: any = await db.transaction(async (tx) => {
-    await tx.execute(sql`UPDATE fred_architecture_overrides SET superseded_at = now() WHERE entity_type = ${entityType} AND natural_key = ${naturalKey} AND superseded_at IS NULL`);
+    await tx.execute(
+      sql`UPDATE fred_architecture_overrides SET superseded_at = now() WHERE entity_type = ${entityType} AND natural_key = ${naturalKey} AND superseded_at IS NULL`,
+    );
     return tx.execute(sql`INSERT INTO fred_architecture_overrides (entity_type, natural_key, patch, reason, created_by, created_by_name)
       VALUES (${entityType}, ${naturalKey}, ${JSON.stringify(patch)}::jsonb, ${reason}, ${actor.id}, ${actor.name}) RETURNING id, created_at AS "createdAt"`);
   });
-  return JSON.stringify({ updated: true, overrideId: inserted.rows?.[0]?.id, entityType, naturalKey, patch, reason, createdAt: inserted.rows?.[0]?.createdAt, note: "Immutable snapshot preserved; correction is overlaid in Fred queries until superseded or replaced by a newer authoritative source." });
+  return JSON.stringify({
+    updated: true,
+    overrideId: inserted.rows?.[0]?.id,
+    entityType,
+    naturalKey,
+    patch,
+    reason,
+    createdAt: inserted.rows?.[0]?.createdAt,
+    note: "Immutable snapshot preserved; correction is overlaid in Fred queries until superseded or replaced by a newer authoritative source.",
+  });
 }
 async function executeGrafanaPanelLink(rawArgs: string): Promise<string> {
-  const args = JSON.parse(rawArgs || "{}"); const base = process.env.GRAFANA_URL?.replace(/\/$/, ""); if (!base) return "Grafana linking is not configured; set GRAFANA_URL.";
-  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60)); const uid = String(args.dashboardUid || "").trim(); const path = uid ? `/d/${encodeURIComponent(uid)}` : "/dashboards"; const q = new URLSearchParams({ from: `now-${minutes}m`, to: "now" });
-  if (Number.isFinite(Number(args.panelId))) q.set("viewPanel", String(Number(args.panelId))); if (args.host) q.set("var-host", String(args.host)); return `Grafana read-only view (${minutes} minute window): ${base}${path}?${q.toString()}`;
+  const args = JSON.parse(rawArgs || "{}");
+  const base = process.env.GRAFANA_URL?.replace(/\/$/, "");
+  if (!base) return "Grafana linking is not configured; set GRAFANA_URL.";
+  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60));
+  const uid = String(args.dashboardUid || "").trim();
+  const path = uid ? `/d/${encodeURIComponent(uid)}` : "/dashboards";
+  const q = new URLSearchParams({ from: `now-${minutes}m`, to: "now" });
+  if (Number.isFinite(Number(args.panelId)))
+    q.set("viewPanel", String(Number(args.panelId)));
+  if (args.host) q.set("var-host", String(args.host));
+  return `Grafana read-only view (${minutes} minute window): ${base}${path}?${q.toString()}`;
 }
 export async function runChatWithMemory(
   openai: OpenAI,
@@ -2866,7 +4265,11 @@ export async function runChatWithMemory(
     /** When true, inventory upserts are staged as pending changes instead of applied. */
     previewInventory?: boolean;
     /** When present, operational questions must collect this evidence before answering. */
-    evidencePolicy?: { toolNames: string[]; minimumCalls: number; reason: string } | null;
+    evidencePolicy?: {
+      toolNames: string[];
+      minimumCalls: number;
+      reason: string;
+    } | null;
   },
 ): Promise<{
   reply: string;
@@ -2925,7 +4328,10 @@ export async function runChatWithMemory(
     QUERY_INFLUX_LAST_SEEN_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
     QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
-    ...(String(userRole || "").toLowerCase() === "cio" ? [UPDATE_ARCHITECTURE_ELEMENT_TOOL] : []),
+    QUERY_FORMAL_ARCHITECTURE_TOOL,
+    ...(String(userRole || "").toLowerCase() === "cio"
+      ? [UPDATE_ARCHITECTURE_ELEMENT_TOOL]
+      : []),
     QUERY_AZURE_VM_TOOL,
     QUERY_AZURE_SECURITY_TOOL,
     QUERY_AZURE_HEALTH_TOOL,
@@ -2940,12 +4346,14 @@ export async function runChatWithMemory(
     READ_ACCESSIBLE_FILE_TOOL,
     QUERY_DEVICE_CONFIG_TOOL,
     SEARCH_TEAM_WORK_TOOL,
-    ...(zdeskConfig() ? [
-      ZENDESK_GET_TICKET_TOOL,
-      ZENDESK_SEARCH_TICKETS_TOOL,
-      ZENDESK_ADD_COMMENT_TOOL,
-      ZENDESK_UPDATE_TICKET_TOOL,
-    ] : []),
+    ...(zdeskConfig()
+      ? [
+          ZENDESK_GET_TICKET_TOOL,
+          ZENDESK_SEARCH_TICKETS_TOOL,
+          ZENDESK_ADD_COMMENT_TOOL,
+          ZENDESK_UPDATE_TICKET_TOOL,
+        ]
+      : []),
   ];
 
   const done = (reply: string) => ({
@@ -2958,12 +4366,21 @@ export async function runChatWithMemory(
   });
 
   for (let round = 0; round < 5; round++) {
-    const evidenceOnlyTools = tools.filter((tool) => tool.type === "function" && evidenceToolNames.has(tool.function.name));
-    const mustGatherEvidence = Boolean(opts.evidencePolicy && evidenceCalls < opts.evidencePolicy.minimumCalls && evidenceOnlyTools.length > 0);
+    const evidenceOnlyTools = tools.filter(
+      (tool) =>
+        tool.type === "function" && evidenceToolNames.has(tool.function.name),
+    );
+    const mustGatherEvidence = Boolean(
+      opts.evidencePolicy &&
+      evidenceCalls < opts.evidencePolicy.minimumCalls &&
+      evidenceOnlyTools.length > 0,
+    );
     const completion = await openai.chat.completions.create({
       model: opts.model,
       max_completion_tokens: opts.maxCompletionTokens,
-      ...(opts.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
+      ...(opts.model.startsWith("gpt-5.6-")
+        ? { reasoning_effort: "none" as const }
+        : {}),
       messages,
       tools: mustGatherEvidence ? evidenceOnlyTools : tools,
       ...(mustGatherEvidence ? { tool_choice: "required" as const } : {}),
@@ -2981,18 +4398,25 @@ export async function runChatWithMemory(
 
     for (const call of toolCalls) {
       let resultText = "Unknown tool.";
-      if (call.type === "function" && evidenceToolNames.has(call.function.name)) evidenceCalls++;
+      if (call.type === "function" && evidenceToolNames.has(call.function.name))
+        evidenceCalls++;
 
       if (call.type === "function" && call.function.name === "save_memory") {
         try {
-          const outcome = await executeSaveMemory(call.function.arguments, opts.userId);
+          const outcome = await executeSaveMemory(
+            call.function.arguments,
+            opts.userId,
+          );
           if (outcome.saved) savedMemories.push(outcome.saved);
           resultText = outcome.result;
         } catch (err) {
           logger.error({ err }, "save_memory tool failed");
           resultText = "Error: memory save failed";
         }
-      } else if (call.type === "function" && call.function.name === "create_task") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "create_task"
+      ) {
         try {
           const outcome = await executeCreateTask(call.function.arguments, {
             id: opts.userId,
@@ -3005,18 +4429,31 @@ export async function runChatWithMemory(
           logger.error({ err }, "create_task tool failed");
           resultText = "Error: task creation failed";
         }
-      } else if (call.type === "function" && call.function.name === "save_shadow_note") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "save_shadow_note"
+      ) {
         try {
-          const outcome = await executeSaveShadowNote(call.function.arguments, opts.userId, userRole);
+          const outcome = await executeSaveShadowNote(
+            call.function.arguments,
+            opts.userId,
+            userRole,
+          );
           if (outcome.saved) savedShadowNotes.push(outcome.saved);
           resultText = outcome.result;
         } catch (err) {
           logger.error({ err }, "save_shadow_note tool failed");
           resultText = "Error: shadow note save failed";
         }
-      } else if (call.type === "function" && call.function.name === "upsert_switch") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "upsert_switch"
+      ) {
         try {
-          const result = await executeUpsertSwitch(call.function.arguments, inventoryCtx);
+          const result = await executeUpsertSwitch(
+            call.function.arguments,
+            inventoryCtx,
+          );
           if (result.pending) pendingNetworkChanges.push(result.pending);
           else if (result.updated) networkUpdates.push(result.updated);
           resultText = result.result;
@@ -3024,9 +4461,15 @@ export async function runChatWithMemory(
           logger.error({ err }, "upsert_switch tool failed");
           resultText = "Error: switch upsert failed";
         }
-      } else if (call.type === "function" && call.function.name === "upsert_vlan") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "upsert_vlan"
+      ) {
         try {
-          const result = await executeUpsertVlan(call.function.arguments, inventoryCtx);
+          const result = await executeUpsertVlan(
+            call.function.arguments,
+            inventoryCtx,
+          );
           if (result.pending) pendingNetworkChanges.push(result.pending);
           else if (result.updated) networkUpdates.push(result.updated);
           resultText = result.result;
@@ -3034,21 +4477,87 @@ export async function runChatWithMemory(
           logger.error({ err }, "upsert_vlan tool failed");
           resultText = "Error: VLAN upsert failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_network_map") {
-        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
-        else { networkDataCalls++; try { resultText = await executeQueryNetworkMap(call.function.arguments); } catch (err) { logger.error({ err }, "query_network_map tool failed"); resultText = "Error: network map query failed"; } }
-      } else if (call.type === "function" && call.function.name === "query_switch_ports") {
-        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
-        else { networkDataCalls++; try { resultText = await executeQuerySwitchPorts(call.function.arguments); } catch (err) { logger.error({ err }, "query_switch_ports tool failed"); resultText = "Error: switch port query failed"; } }
-      } else if (call.type === "function" && call.function.name === "query_building_network") {
-        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
-        else { networkDataCalls++; try { resultText = await executeQueryBuildingNetwork(call.function.arguments); } catch (err) { logger.error({ err }, "query_building_network tool failed"); resultText = "Error: building network query failed"; } }
-      } else if (call.type === "function" && call.function.name === "query_network_monitoring") {
-        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS) resultText = "Network data query budget exhausted for this turn.";
-        else { networkDataCalls++; try { resultText = await executeQueryNetworkMonitoring(call.function.arguments); } catch (err) { logger.error({ err }, "query_network_monitoring tool failed"); resultText = "Error: network monitoring query failed"; } }
-      } else if (call.type === "function" && call.function.name === "switch_telemetry_from_noc") {
-        try { resultText = await executeSwitchTelemetryFromNoc(call.function.arguments, userRole); } catch (err) { logger.error({ err }, "switch_telemetry_from_noc tool failed"); resultText = "Error: switch telemetry request failed"; }
-      } else if (call.type === "function" && call.function.name === "ping_host") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_network_map"
+      ) {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS)
+          resultText = "Network data query budget exhausted for this turn.";
+        else {
+          networkDataCalls++;
+          try {
+            resultText = await executeQueryNetworkMap(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "query_network_map tool failed");
+            resultText = "Error: network map query failed";
+          }
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_switch_ports"
+      ) {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS)
+          resultText = "Network data query budget exhausted for this turn.";
+        else {
+          networkDataCalls++;
+          try {
+            resultText = await executeQuerySwitchPorts(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "query_switch_ports tool failed");
+            resultText = "Error: switch port query failed";
+          }
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_building_network"
+      ) {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS)
+          resultText = "Network data query budget exhausted for this turn.";
+        else {
+          networkDataCalls++;
+          try {
+            resultText = await executeQueryBuildingNetwork(
+              call.function.arguments,
+            );
+          } catch (err) {
+            logger.error({ err }, "query_building_network tool failed");
+            resultText = "Error: building network query failed";
+          }
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_network_monitoring"
+      ) {
+        if (networkDataCalls >= MAX_NETWORK_DATA_CALLS)
+          resultText = "Network data query budget exhausted for this turn.";
+        else {
+          networkDataCalls++;
+          try {
+            resultText = await executeQueryNetworkMonitoring(
+              call.function.arguments,
+            );
+          } catch (err) {
+            logger.error({ err }, "query_network_monitoring tool failed");
+            resultText = "Error: network monitoring query failed";
+          }
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "switch_telemetry_from_noc"
+      ) {
+        try {
+          resultText = await executeSwitchTelemetryFromNoc(
+            call.function.arguments,
+            userRole,
+          );
+        } catch (err) {
+          logger.error({ err }, "switch_telemetry_from_noc tool failed");
+          resultText = "Error: switch telemetry request failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "ping_host"
+      ) {
         if (diagCalls >= MAX_DIAG_CALLS) {
           resultText = "Probe budget exhausted for this turn.";
         } else {
@@ -3060,19 +4569,27 @@ export async function runChatWithMemory(
             resultText = "Error: ping failed";
           }
         }
-      } else if (call.type === "function" && call.function.name === "test_net_connection") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "test_net_connection"
+      ) {
         if (diagCalls >= MAX_DIAG_CALLS) {
           resultText = "Probe budget exhausted for this turn.";
         } else {
           diagCalls++;
           try {
-            resultText = await executeTestNetConnection(call.function.arguments);
+            resultText = await executeTestNetConnection(
+              call.function.arguments,
+            );
           } catch (err) {
             logger.error({ err }, "test_net_connection tool failed");
             resultText = "Error: connectivity test failed";
           }
         }
-      } else if (call.type === "function" && call.function.name === "scan_network") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "scan_network"
+      ) {
         if (scanUsed) {
           resultText = "Only one network scan is allowed per turn.";
         } else {
@@ -3084,64 +4601,168 @@ export async function runChatWithMemory(
             resultText = "Error: network scan failed";
           }
         }
-      } else if (call.type === "function" && call.function.name === "probe_via_noc") {
-        if (diagCalls >= MAX_DIAG_CALLS) resultText = "Probe budget exhausted for this turn.";
-        else { diagCalls++; try { resultText = await executeProbeViaNoc(call.function.arguments); } catch (err) { logger.error({ err }, "probe_via_noc tool failed"); resultText = "Error: NOC probe failed"; } }
-      } else if (call.type === "function" && call.function.name === "webex_device_status") {
-        try { resultText = await executeWebexDeviceStatus(call.function.arguments); } catch (err) { logger.error({ err }, "webex_device_status tool failed"); resultText = "Error: Webex device query failed"; }
-      } else if (call.type === "function" && call.function.name === "cisco_calling_support") {
-        try { resultText = await executeCiscoCallingSupport(call.function.arguments); } catch (err) { logger.error({ err }, "cisco_calling_support tool failed"); resultText = "Error: Cisco Calling support query failed"; }
-      } else if (call.type === "function" && call.function.name === "query_influx_last_seen") {
-        try { resultText = await executeQueryInfluxLastSeen(call.function.arguments); } catch (err) { logger.error({ err }, "query_influx_last_seen failed"); resultText = "Error: InfluxDB query failed"; }
-      } else if (call.type === "function" && call.function.name === "grafana_panel_link") {
-        try { resultText = await executeGrafanaPanelLink(call.function.arguments); } catch (err) { logger.error({ err }, "grafana_panel_link failed"); resultText = "Error: Grafana link generation failed"; }
-      } else if (call.type === "function" && call.function.name === "query_architecture_snapshot") {
-        try { resultText = await executeQueryArchitectureSnapshot(call.function.arguments); } catch (err) { logger.error({ err }, "query_architecture_snapshot failed"); resultText = "Error: architecture snapshot query failed"; }
-      } else if (call.type === "function" && call.function.name === "update_architecture_element") {
-        try { resultText = await executeUpdateArchitectureElement(call.function.arguments, { id: opts.userId, name: opts.userName ?? null, role: userRole }); } catch (err) { logger.error({ err }, "update_architecture_element failed"); resultText = "Error: architecture element update failed"; }
-      } else if (call.type === "function" && call.function.name === "query_azure_vm") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "probe_via_noc"
+      ) {
+        if (diagCalls >= MAX_DIAG_CALLS)
+          resultText = "Probe budget exhausted for this turn.";
+        else {
+          diagCalls++;
+          try {
+            resultText = await executeProbeViaNoc(call.function.arguments);
+          } catch (err) {
+            logger.error({ err }, "probe_via_noc tool failed");
+            resultText = "Error: NOC probe failed";
+          }
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "webex_device_status"
+      ) {
+        try {
+          resultText = await executeWebexDeviceStatus(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "webex_device_status tool failed");
+          resultText = "Error: Webex device query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "cisco_calling_support"
+      ) {
+        try {
+          resultText = await executeCiscoCallingSupport(
+            call.function.arguments,
+          );
+        } catch (err) {
+          logger.error({ err }, "cisco_calling_support tool failed");
+          resultText = "Error: Cisco Calling support query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_influx_last_seen"
+      ) {
+        try {
+          resultText = await executeQueryInfluxLastSeen(
+            call.function.arguments,
+          );
+        } catch (err) {
+          logger.error({ err }, "query_influx_last_seen failed");
+          resultText = "Error: InfluxDB query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "grafana_panel_link"
+      ) {
+        try {
+          resultText = await executeGrafanaPanelLink(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "grafana_panel_link failed");
+          resultText = "Error: Grafana link generation failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_architecture_snapshot"
+      ) {
+        try {
+          resultText = await executeQueryArchitectureSnapshot(
+            call.function.arguments,
+          );
+        } catch (err) {
+          logger.error({ err }, "query_architecture_snapshot failed");
+          resultText = "Error: architecture snapshot query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_formal_architecture"
+      ) {
+        try {
+          resultText = await executeQueryFormalArchitecture(
+            call.function.arguments,
+          );
+        } catch (err) {
+          logger.error({ err }, "query_formal_architecture failed");
+          resultText = "Error: formal architecture query failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "update_architecture_element"
+      ) {
+        try {
+          resultText = await executeUpdateArchitectureElement(
+            call.function.arguments,
+            { id: opts.userId, name: opts.userName ?? null, role: userRole },
+          );
+        } catch (err) {
+          logger.error({ err }, "update_architecture_element failed");
+          resultText = "Error: architecture element update failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_azure_vm"
+      ) {
         try {
           resultText = await executeQueryAzureVm(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "query_azure_vm tool failed");
           resultText = "Error: Azure VM query failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_azure_security") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_azure_security"
+      ) {
         try {
           resultText = await executeQueryAzureSecurity(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "query_azure_security tool failed");
           resultText = "Error: Azure security alert query failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_azure_health") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_azure_health"
+      ) {
         try {
           resultText = await executeQueryAzureHealth(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "query_azure_health tool failed");
           resultText = "Error: Azure resource health query failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_azure_policy") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_azure_policy"
+      ) {
         try {
           resultText = await executeQueryAzurePolicy(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "query_azure_policy tool failed");
           resultText = "Error: Azure policy compliance query failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_azure_resources") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_azure_resources"
+      ) {
         try {
-          resultText = await executeQueryAzureResources(call.function.arguments);
+          resultText = await executeQueryAzureResources(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "query_azure_resources tool failed");
           resultText = "Error: Azure resource list query failed";
         }
-      } else if (call.type === "function" && call.function.name === "dns_lookup") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "dns_lookup"
+      ) {
         try {
           resultText = await executeDnsLookup(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "dns_lookup tool failed");
           resultText = "Error: DNS lookup failed";
         }
-      } else if (call.type === "function" && call.function.name === "traceroute") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "traceroute"
+      ) {
         if (diagCalls >= MAX_DIAG_CALLS) {
           resultText = "Probe budget exhausted for this turn.";
         } else {
@@ -3153,79 +4774,118 @@ export async function runChatWithMemory(
             resultText = "Error: traceroute failed";
           }
         }
-      } else if (call.type === "function" && call.function.name === "http_check") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "http_check"
+      ) {
         try {
           resultText = await executeHttpCheck(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "http_check tool failed");
           resultText = "Error: HTTP check failed";
         }
-      } else if (call.type === "function" && call.function.name === "ssl_check") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "ssl_check"
+      ) {
         try {
           resultText = await executeSslCheck(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "ssl_check tool failed");
           resultText = "Error: SSL check failed";
         }
-      } else if (call.type === "function" && call.function.name === "snmp_get") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "snmp_get"
+      ) {
         try {
           resultText = await executeSnmpGet(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "snmp_get tool failed");
           resultText = "Error: SNMP query failed";
         }
-      } else if (call.type === "function" && call.function.name === "list_accessible_files") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "list_accessible_files"
+      ) {
         try {
-          resultText = await executeListAccessibleFiles(call.function.arguments);
+          resultText = await executeListAccessibleFiles(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "list_accessible_files tool failed");
           resultText = "Error: accessible file catalog query failed";
         }
-      } else if (call.type === "function" && call.function.name === "read_accessible_file") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "read_accessible_file"
+      ) {
         try {
           resultText = await executeReadAccessibleFile(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "read_accessible_file tool failed");
           resultText = "Error: authorized file preview failed";
         }
-      } else if (call.type === "function" && call.function.name === "query_device_config") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_device_config"
+      ) {
         try {
           resultText = await executeQueryDeviceConfig(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "query_device_config tool failed");
           resultText = "Error: device config query failed";
         }
-      } else if (call.type === "function" && call.function.name === "search_team_work") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "search_team_work"
+      ) {
         try {
           resultText = await executeSearchTeamWork(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "search_team_work tool failed");
           resultText = "Error: team work search failed";
         }
-      } else if (call.type === "function" && call.function.name === "zendesk_get_ticket") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_get_ticket"
+      ) {
         try {
           resultText = await executeZendeskGetTicket(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "zendesk_get_ticket tool failed");
           resultText = "Error: Zendesk ticket fetch failed";
         }
-      } else if (call.type === "function" && call.function.name === "zendesk_search_tickets") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_search_tickets"
+      ) {
         try {
-          resultText = await executeZendeskSearchTickets(call.function.arguments);
+          resultText = await executeZendeskSearchTickets(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "zendesk_search_tickets tool failed");
           resultText = "Error: Zendesk search failed";
         }
-      } else if (call.type === "function" && call.function.name === "zendesk_add_comment") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_add_comment"
+      ) {
         try {
           resultText = await executeZendeskAddComment(call.function.arguments);
         } catch (err) {
           logger.error({ err }, "zendesk_add_comment tool failed");
           resultText = "Error: Zendesk comment failed";
         }
-      } else if (call.type === "function" && call.function.name === "zendesk_update_ticket") {
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_update_ticket"
+      ) {
         try {
-          resultText = await executeZendeskUpdateTicket(call.function.arguments);
+          resultText = await executeZendeskUpdateTicket(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "zendesk_update_ticket tool failed");
           resultText = "Error: Zendesk ticket update failed";
@@ -3243,8 +4903,20 @@ export async function runChatWithMemory(
   const final = await openai.chat.completions.create({
     model: opts.model,
     max_completion_tokens: opts.maxCompletionTokens,
-    ...(opts.model.startsWith("gpt-5.6-") ? { reasoning_effort: "none" as const } : {}),
-    messages: [...messages, { role: "system", content: "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools." }],
+    ...(opts.model.startsWith("gpt-5.6-")
+      ? { reasoning_effort: "none" as const }
+      : {}),
+    messages: [
+      ...messages,
+      {
+        role: "system",
+        content:
+          "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools.",
+      },
+    ],
   });
-  return done(final.choices[0]?.message?.content ?? "I could not complete the evidence synthesis.");
+  return done(
+    final.choices[0]?.message?.content ??
+      "I could not complete the evidence synthesis.",
+  );
 }

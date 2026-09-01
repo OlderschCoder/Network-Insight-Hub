@@ -28,6 +28,9 @@ flowchart LR
   CHATFIX[(Attributed CIO chat corrections)] --> ENT
   ENT -->|bounded record query| API
   REL -->|dependency traversal| API
+  FORMAL[(Immutable approved formal EA)] --> SECTIONS[(Searchable sections and findings)]
+  JSON --> FORMAL
+  SECTIONS -->|bounded approved baseline retrieval| API
   D --> JSON
   REVIEW --> JSON
   JSON -->|bounded domain/query retrieval| API

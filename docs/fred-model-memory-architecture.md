@@ -2,11 +2,11 @@
 
 Fred uses explicit workload profiles rather than one model for every request.
 
-| Profile | Default model | Purpose |
-| --- | --- | --- |
+| Profile | Default model   | Purpose                                                                      |
+| ------- | --------------- | ---------------------------------------------------------------------------- |
 | routine | `gpt-5.6-terra` | Concise staff chat, evidence tools, and memory capture through direct OpenAI |
-| deep | `gpt-5.6-sol` | Enterprise architecture and long-form synthesis through direct OpenAI |
-| verify | `gpt-5.6-terra` | Independent acceptance review through direct OpenAI |
+| deep    | `gpt-5.6-sol`   | Enterprise architecture and long-form synthesis through direct OpenAI        |
+| verify  | `gpt-5.6-terra` | Independent acceptance review through direct OpenAI                          |
 
 Claude Opus 5 remains the preferred cross-provider candidate for the deep profile,
 but it must not be enabled until OpenRouter reports a ZDR-compatible endpoint for
@@ -129,6 +129,15 @@ only for filtered record queries, using JSON-array membership rather than
 constructing an invalid PostgreSQL record cast.
 Snapshot evidence remains historical: Fred must compare its timestamp with
 live diagnostic tools before describing current operational state.
+
+An immutable formal EA publication layer sits beside the generated snapshot.
+The approved Markdown is parsed into searchable sections and normalized
+findings; the matching Word file is retained as the human publication artifact.
+Document metadata and hashes link the publication to its source snapshot.
+Entity links reference the existing normalized natural keys rather than copying
+the underlying inventories. Fred's evidence order is live tools, normalized
+snapshot, approved formal publication, governed memory, then uploaded/older
+evidence. See [formal EA integration](formal-ea-integration.md).
 
 The projection includes buildings, monitored switches, map nodes, every
 physical port, VLANs, topology links, routing adjacencies, phone-building

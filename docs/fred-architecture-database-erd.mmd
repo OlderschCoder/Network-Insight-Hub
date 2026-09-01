@@ -4,6 +4,12 @@ erDiagram
   FRED_ARCHITECTURE_SNAPSHOTS ||--o{ FRED_ARCHITECTURE_RELATIONSHIPS : projects
   USERS ||--o{ FRED_ARCHITECTURE_OVERRIDES : records
   FRED_ARCHITECTURE_ENTITIES ||--o{ FRED_ARCHITECTURE_OVERRIDES : "matched by type and natural key"
+  FRED_ARCHITECTURE_SNAPSHOTS ||--o{ FORMAL_EA_DOCUMENTS : "source baseline"
+  FORMAL_EA_DOCUMENTS ||--o{ FORMAL_EA_DOCUMENTS : supersedes
+  FORMAL_EA_DOCUMENTS ||--o{ FORMAL_EA_SECTIONS : contains
+  FORMAL_EA_SECTIONS ||--o{ FORMAL_EA_FINDINGS : normalizes
+  FORMAL_EA_SECTIONS ||--o{ FORMAL_EA_ENTITY_LINKS : references
+  FRED_ARCHITECTURE_ENTITIES ||--o{ FORMAL_EA_ENTITY_LINKS : "matched by snapshot and natural key"
 
   FRED_ARCHITECTURE_SNAPSHOTS {
     bigint id PK
@@ -50,4 +56,43 @@ erDiagram
     varchar created_by_name
     timestamptz created_at
     timestamptz superseded_at
+  }
+  FORMAL_EA_DOCUMENTS {
+    bigint id PK
+    bigint source_snapshot_id FK
+    bigint supersedes_document_id FK
+    date architecture_state_date
+    timestamptz effective_at
+    varchar approval_status
+    varchar content_sha256 UK
+    varchar word_sha256
+  }
+  FORMAL_EA_SECTIONS {
+    bigint id PK
+    bigint document_id FK
+    int ordinal
+    int level
+    varchar section_number
+    varchar heading
+    jsonb heading_path
+    text content
+    varchar content_sha256
+  }
+  FORMAL_EA_FINDINGS {
+    bigint id PK
+    bigint document_id FK
+    bigint section_id FK
+    varchar finding_type
+    varchar confidence
+    varchar priority
+    text content
+  }
+  FORMAL_EA_ENTITY_LINKS {
+    bigint id PK
+    bigint document_id FK
+    bigint section_id FK
+    bigint snapshot_id FK
+    varchar entity_type
+    varchar natural_key
+    varchar link_type
   }
