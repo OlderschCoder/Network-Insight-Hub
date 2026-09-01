@@ -34,6 +34,13 @@ The header also has **Quick Add** (fast new item) and **Ask AI** shortcuts.
 - The dashboard's **Zendesk Tickets Resolved** card is visible to every authenticated IT user. It always shows the same six-person roster—Tracy, Mark, Maria, Lucas, Illia, and Craig—including a zero when someone has no resolved tickets in the selected period.
 - **Cisco Webex Phones** is marked **New Feature** under **Systems & Tools → IT Apps**. Use it for the phone directory, live device status, building assignments, and E-911 health.
 
+### Building-first network support
+
+1. Open **Infrastructure → Buildings**. The status cards are the normal starting point and place buildings with outages or degraded service first.
+2. Select a building card—or its marker on the campus map—to open the building detail page.
+3. Review that building's live status, switches and monitored devices, then its VLANs. Select a switch to continue to its node details and physical port evidence.
+4. Use **Infrastructure → Network → Port Map** when detailed port-by-port work is required. The Port Map remains the expert view; it is not the expected starting point for routine support.
+
 ---
 
 ## 3. Your day-to-day: My Tasks

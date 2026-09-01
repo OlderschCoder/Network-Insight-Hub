@@ -65,6 +65,9 @@ as a parallel sign-in path.
 - Maintains switch and VLAN inventory, including hostname, management address,
   model, building, location, status, subnet, gateway, type, and notes.
 - Groups switches, VLANs, phones, links, and related evidence by building.
+- Uses building health cards as the primary support entry point, followed by a
+  clickable campus map and building detail drill-down; the full Port Map remains
+  available as the expert physical-interface view.
 - Presents a campus map, topology map, node details, reciprocal links, and a
   physical Port Map with interface descriptions and learned relationships.
 - Uses current monitoring and topology evidence to distinguish a physical

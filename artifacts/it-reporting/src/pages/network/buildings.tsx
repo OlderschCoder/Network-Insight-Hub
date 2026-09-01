@@ -884,6 +884,57 @@ function BuildingsGrid() {
           onChange={e => setSearch(e.target.value)} />
       </div>
 
+      {/* Building-first entry point: this is the normal support workflow. */}
+      <section aria-labelledby="building-status-heading" className="space-y-3">
+        <div>
+          <h2 id="building-status-heading" className="text-xl font-semibold">Start with a building</h2>
+          <p className="text-sm text-muted-foreground">
+            Select a status card to drill into that building's switches, monitored devices, VLANs, and live health.
+          </p>
+        </div>
+        {sorted.length === 0 ? (
+          <p className="text-muted-foreground text-center py-12">
+            {search ? "No buildings match your search." : "No buildings found. Add devices with a building name to see them here."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {sorted.map(b => {
+              const style = healthStyles[b.healthColor];
+              return (
+                <Link key={b.name} href={`/network/buildings/${encodeURIComponent(b.name)}`}>
+                  <div className={`
+                    group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
+                    ${style.bg} ${style.border}
+                    hover:shadow-md hover:scale-[1.02] focus-within:ring-2 ${style.ring}
+                  `}>
+                    <div className={`absolute top-2 right-2 h-2.5 w-2.5 rounded-full ${
+                      b.healthColor === "green" ? "bg-green-500 shadow-[0_0_6px_#22c55e]"
+                      : b.healthColor === "amber" ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
+                      : b.healthColor === "red" ? "bg-red-500 shadow-[0_0_6px_#ef4444]"
+                      : "bg-gray-300"
+                    }`} />
+                    <div className="flex h-full flex-col gap-2">
+                      <div className="text-muted-foreground">{style.icon}</div>
+                      <div>
+                        <p className="font-semibold text-sm leading-tight">{b.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
+                      </div>
+                      <div className="flex gap-2 mt-auto pt-1">
+                        <span className="text-xs text-muted-foreground">
+                          <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
+                        </span>
+                        <span className="text-xs text-muted-foreground">VLANs: {b.vlanCount}</span>
+                      </div>
+                      <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <CampusStatusMap buildings={buildings} />
 
       {callingSupport && (
@@ -1071,50 +1122,6 @@ function BuildingsGrid() {
         </Card>
       )}
 
-      {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-center py-16">
-          {search ? "No buildings match your search." : "No buildings found. Add devices with a building name to see them here."}
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {sorted.map(b => {
-            const style = healthStyles[b.healthColor];
-            return (
-              <Link key={b.name} href={`/network/buildings/${encodeURIComponent(b.name)}`}>
-                <div className={`
-                  relative rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
-                  ${style.bg} ${style.border}
-                  hover:shadow-md hover:scale-[1.02]
-                `}>
-                  {/* Health indicator dot */}
-                  <div className={`absolute top-2 right-2 h-2.5 w-2.5 rounded-full ${
-                    b.healthColor === "green" ? "bg-green-500 shadow-[0_0_6px_#22c55e]"
-                    : b.healthColor === "amber" ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
-                    : b.healthColor === "red" ? "bg-red-500 shadow-[0_0_6px_#ef4444]"
-                    : "bg-gray-300"
-                  }`} />
-
-                  <div className="flex flex-col gap-2">
-                    <div className="text-muted-foreground">{style.icon}</div>
-                    <div>
-                      <p className="font-semibold text-sm leading-tight">{b.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground">
-                        <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        VLANs: {b.vlanCount}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
