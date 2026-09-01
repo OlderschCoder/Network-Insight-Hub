@@ -1261,7 +1261,7 @@ router.post(
         ...evidence,
         inventory: { ...evidence.inventory, ports: physicalPorts },
       };
-      const architectureAI = getFredAI("deep");
+      const architectureAI = getFredAI("formal");
       const architectRules = `You are Fred acting as a principal enterprise and network architect. Write one complete chapter of SCCC's current AS-IS architecture using only supplied evidence. Label material claims VERIFIED, INFERRED, STALE, CONTRADICTED, or UNKNOWN. Never invent components, owners, protocols, controls, recovery objectives, or flows. Every major conclusion needs its source and timestamp/freshness. Resolve conflicts by timestamp and authority or expose them. Complete the assigned chapter within the response; do not trail off, promise later work, or say the data is too large. Use concise tables and valid editable Mermaid where requested.`;
       const chapterSpecs = [
         {

@@ -87,6 +87,17 @@ interface AttachedFile {
   dataUrl?: string;       // for images
 }
 
+function downloadFredResponse(content: string, title: string) {
+  const safeTitle = (title || "Fred-response").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 80);
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${safeTitle || "Fred-response"}-${new Date().toISOString().slice(0, 10)}.md`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 interface PersistedFredChat {
   version: 2 | 3;
   messages: ChatMessage[];
@@ -1486,7 +1497,7 @@ function ChatTab({
     <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : "h-full min-h-[32rem] w-full flex-1"}`}>
       <CardHeader className={`shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : ""}`}>
         <div className={`gap-3 ${mobileFieldMode ? "flex flex-col" : "flex items-center justify-between flex-wrap"}`}>
-          <div>
+          <div className="flex flex-col">
             <CardTitle className={mobileFieldMode ? "text-xl leading-tight" : undefined}>
               {mobileFieldMode ? "Fred" : "Ask Fred"}
             </CardTitle>
@@ -1495,37 +1506,37 @@ function ChatTab({
                 ? "Field support chat"
                 : "The AI has read access to entries, risks, after-action reports, and network inventory."}
             </CardDescription>
-            <div className={`mt-2 ${mobileFieldMode ? "w-full" : "w-full max-w-md"}`}>
+            <div className={`order-2 mt-2 ${mobileFieldMode ? "w-full" : "w-full max-w-xl"}`}>
               <Label htmlFor="fred-current-topic" className="text-xs font-bold uppercase tracking-wide text-foreground">
-                Current topic
+                Current thread
               </Label>
               <Input
                 id="fred-current-topic"
                 value={chat.title}
                 onChange={(event) => setChat((current) => ({ ...current, title: event.target.value.slice(0, 200), savedAt: new Date().toISOString() }))}
                 className={`mt-1 font-bold ${mobileFieldMode ? "h-9 text-sm" : "h-8"}`}
-                aria-label="Fred conversation topic"
-                placeholder="Conversation topic"
+                aria-label="Fred conversation thread"
+                placeholder="Conversation thread"
               />
             </div>
-            <div className={`mt-2 pl-4 ${mobileFieldMode ? "w-full" : "w-full max-w-md"}`}>
-              <Label className="mb-1 block text-xs font-medium text-muted-foreground">Switch topic</Label>
+            <div className={`order-1 mt-3 ${mobileFieldMode ? "w-full" : "w-full max-w-xl"}`}>
+              <Label className="mb-1 block text-base font-bold uppercase tracking-wide text-foreground">Threads</Label>
               <Select
                 value={chat.sessionId ?? undefined}
                 onOpenChange={(open) => { if (open) void loadTopics(); }}
                 onValueChange={(sessionId) => {
                   if (sessionId === chat.sessionId) return;
                   void openTopic(sessionId).catch((error) => toast({
-                    title: "Could not open topic",
+                    title: "Could not open thread",
                     description: error instanceof Error ? error.message : String(error),
                     variant: "destructive",
                   }));
                 }}
               >
-                <SelectTrigger className={mobileFieldMode ? "h-10" : "h-8"} aria-label="Open a saved Fred topic">
+                <SelectTrigger className={mobileFieldMode ? "h-11 text-base font-semibold" : "h-10 text-base font-semibold"} aria-label="Open a saved Fred thread">
                   <span className="mr-2 inline-flex items-center gap-1.5 truncate">
                     <History className="h-4 w-4 shrink-0" />
-                    <SelectValue placeholder={topicsLoading ? "Loading topics..." : "Open an old topic"} />
+                    <SelectValue placeholder={topicsLoading ? "Loading threads..." : "Open a thread"} />
                   </span>
                 </SelectTrigger>
                 <SelectContent className="max-h-[22rem]">
@@ -1536,7 +1547,7 @@ function ChatTab({
                     return (
                     <SelectItem key={topic.id} value={topic.id}>
                       <span className={`flex max-w-[32rem] items-center gap-2 ${isCurrent ? "font-bold" : "pl-3"}`}>
-                        <span className="truncate">{topic.title || "Untitled Fred topic"}</span>
+                        <span className="truncate">{topic.title || "Untitled Fred thread"}</span>
                         {isCurrent ? <span className="shrink-0 text-xs font-bold text-primary">Current</span> : null}
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {topic.messageCount} messages · {new Date(topic.updatedAt).toLocaleDateString()}
@@ -2054,9 +2065,9 @@ function ChatTab({
                   variant="ghost"
                   size="sm"
                   onClick={handleClear}
-                  title="Archive this topic and start another"
+                  title="Archive this thread and start another"
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> New topic
+                  <Trash2 className="h-4 w-4 mr-1" /> New thread
                 </Button>
                 <Label className="text-xs text-muted-foreground">Lookback days:</Label>
                 <Input
@@ -2120,15 +2131,26 @@ function ChatTab({
                 : <MarkdownMessage content={typeof m.content === "string" ? m.content : JSON.stringify(m.content)} />}
             </div>
             {!mobileFieldMode && m.role === "assistant" && m.content.trim() && (
+              <div className="mt-1 flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+                className="h-7 px-2 text-xs text-muted-foreground"
                 onClick={() => setCapture({ open: true, text: m.content })}
                 title="Capture this into a Task, Risk, or Post-Incident Review"
               >
                 <BookmarkPlus className="h-3.5 w-3.5 mr-1" /> Capture
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => downloadFredResponse(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2), chat.title)}
+                title="Download this response as a Markdown file"
+              >
+                <Download className="h-3.5 w-3.5 mr-1" /> Download
+              </Button>
+              </div>
             )}
           </div>
         ))}

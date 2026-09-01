@@ -11,7 +11,7 @@ export function isAIConfigured(): boolean {
 let cached: OpenAI | null = null;
 let cachedOpenRouter: OpenAI | null = null;
 
-export type FredModelProfile = "routine" | "deep" | "verify";
+export type FredModelProfile = "routine" | "deep" | "formal" | "verify";
 
 const FRED_MODELS: Record<FredModelProfile, string> = {
   routine: process.env.FRED_ROUTINE_MODEL || "gpt-5.6-terra",
@@ -19,6 +19,7 @@ const FRED_MODELS: Record<FredModelProfile, string> = {
   // currently exposes no ZDR-compatible endpoint for this account. Keep SCCC
   // data private by default; operators can switch once a ZDR endpoint exists.
   deep: process.env.FRED_DEEP_MODEL || "gpt-5.6-sol",
+  formal: process.env.FRED_FORMAL_MODEL || process.env.FRED_DEEP_MODEL || "gpt-5.6-sol",
   verify: process.env.FRED_VERIFY_MODEL || "gpt-5.6-terra",
 };
 

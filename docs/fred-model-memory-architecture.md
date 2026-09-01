@@ -1,5 +1,10 @@
 # Fred model routing, memory, and architecture generation
 
+Formal enterprise-architecture generation uses a separate `formal` model profile.
+Set `FRED_FORMAL_MODEL` to an approved OpenRouter identifier, such as an Anthropic
+Claude model, without rerouting Fred's routine OpenAI calls away from the direct
+OpenAI API token.
+
 Fred uses explicit workload profiles rather than one model for every request.
 
 | Profile | Default model   | Purpose                                                                      |

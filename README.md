@@ -181,6 +181,10 @@ source record was not updated.
 
 ### Enterprise architecture generation
 
+Formal architecture generation can use a dedicated model through
+`FRED_FORMAL_MODEL`. Non-OpenAI identifiers route through the guarded OpenRouter
+client; routine Fred requests continue to use the direct OpenAI integration.
+
 The CIO can generate a timestamped as-is enterprise architecture snapshot. The
 workflow gathers structured evidence for buildings, monitored objects,
 switches, ports, VLANs, topology links, routing adjacencies, phone-building
