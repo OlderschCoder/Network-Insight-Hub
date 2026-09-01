@@ -75,4 +75,3 @@ export async function storeArchitectureProjection(snapshotId: number, evidence: 
   });
   return { entities: projection.entities.length, relationships: projection.relationships.length };
 }
-
