@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +16,7 @@ import {
   Building2, Server, Wifi, WifiOff, AlertTriangle, Activity,
   ArrowLeft, ChevronRight, Loader2, RefreshCw, Search, Pencil, Save, X, PhoneCall, ExternalLink,
 } from "lucide-react";
+import { TelemetrySwitchPortMap } from "./switch-port-map";
 
 const API = "/api";
 const PUBLIC_BUILDINGS_API = `${API}/network/public/buildings`;
@@ -884,7 +886,9 @@ function BuildingsGrid() {
           onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {/* Building-first entry point: this is the normal support workflow. */}
+      <CampusStatusMap buildings={buildings} />
+
+      {/* Building cards immediately follow the campus map for drill-down. */}
       <section aria-labelledby="building-status-heading" className="space-y-3">
         <div>
           <h2 id="building-status-heading" className="text-xl font-semibold">Start with a building</h2>
@@ -934,8 +938,6 @@ function BuildingsGrid() {
           </div>
         )}
       </section>
-
-      <CampusStatusMap buildings={buildings} />
 
       {callingSupport && (
         <Card>
@@ -1137,6 +1139,16 @@ function BuildingDetailView({ name }: { name: string }) {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(name);
   const [savingName, setSavingName] = useState(false);
+  const { data: networkMapNodes = [] } = useQuery<any[]>({
+    queryKey: ["/api/network-map/nodes"],
+    queryFn: () => authFetch("/api/network-map/nodes").then((response) => response.json()),
+    refetchInterval: 60_000,
+  });
+  const { data: networkMapLinks = [] } = useQuery<any[]>({
+    queryKey: ["/api/network-map/links"],
+    queryFn: () => authFetch("/api/network-map/links").then((response) => response.json()),
+    refetchInterval: 60_000,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1209,6 +1221,9 @@ function BuildingDetailView({ name }: { name: string }) {
   const downCount = detail.nodes.filter(n => n.liveStatus === "down").length;
   const degradedCount = detail.nodes.filter(n => n.liveStatus === "degraded").length;
   const unknownCount = detail.nodes.filter(n => n.liveStatus === "unknown").length;
+  const buildingNodeIds = new Set(detail.nodes.map((node) => node.id));
+  const buildingPortMapNodes = networkMapNodes.filter((node) => buildingNodeIds.has(node.id));
+  const networkNodeById = new Map(networkMapNodes.map((node) => [node.id, node]));
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -1293,6 +1308,7 @@ function BuildingDetailView({ name }: { name: string }) {
         <TabsList>
           <TabsTrigger value="devices">Devices ({detail.nodes.length})</TabsTrigger>
           <TabsTrigger value="vlans">VLANs ({detail.vlans.length})</TabsTrigger>
+          <TabsTrigger value="portmap">Port Map</TabsTrigger>
         </TabsList>
 
         {/* Devices Tab */}
@@ -1398,6 +1414,29 @@ function BuildingDetailView({ name }: { name: string }) {
                     ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Physical switch-stack view scoped to this building. */}
+        <TabsContent value="portmap" className="mt-4">
+          {buildingPortMapNodes.length === 0 ? (
+            <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
+              No physical switch or router port inventory is mapped to this building yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold">{detail.name} physical switch view</h2>
+                <p className="text-sm text-muted-foreground">
+                  Select a switch or stack member to inspect its physical faceplate, operational ports, LLDP/CDP links, and connected endpoints.
+                </p>
+              </div>
+              <TelemetrySwitchPortMap
+                nodes={buildingPortMapNodes}
+                links={networkMapLinks}
+                nodeById={networkNodeById}
+              />
             </div>
           )}
         </TabsContent>

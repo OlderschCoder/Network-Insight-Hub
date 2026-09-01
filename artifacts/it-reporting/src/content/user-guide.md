@@ -36,10 +36,12 @@ The header also has **Quick Add** (fast new item) and **Ask AI** shortcuts.
 
 ### Building-first network support
 
-1. Open **Infrastructure → Buildings**. The status cards are the normal starting point and place buildings with outages or degraded service first.
+1. Open **Infrastructure → Buildings**. Start on the live campus map; select a building marker to drill in. The same health-sorted building cards appear immediately below the map.
 2. Select a building card—or its marker on the campus map—to open the building detail page.
-3. Review that building's live status, switches and monitored devices, then its VLANs. Select a switch to continue to its node details and physical port evidence.
-4. Use **Infrastructure → Network → Port Map** when detailed port-by-port work is required. The Port Map remains the expert view; it is not the expected starting point for routine support.
+3. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
+4. Use **Infrastructure → Network → Port Map** for the unfiltered, campus-wide engineering view.
+
+Long dropdown lists are height-limited and scrollable. Use the mouse wheel, the visible scrollbar, arrow keys, Page Up/Page Down, or type the first letters of a switch name to move through the list.
 
 ---
 
