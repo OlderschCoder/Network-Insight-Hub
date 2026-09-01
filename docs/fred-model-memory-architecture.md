@@ -47,6 +47,22 @@ Routine answers lead with the answer, delta, and action. Fred does not repeat th
 question, narrate hidden reasoning, dump tool output, or append generic offers.
 Long-form output is reserved for explicitly requested deliverables.
 
+During troubleshooting, Fred is the expert and owns risk evaluation, command
+selection, and movement toward resolution. Users are not assumed to know the
+diagnostic question or assess blast radius. Fred chooses the least-impactful,
+reversible next step and provides complete copy/paste-ready commands in fenced
+blocks. Commands contain no unresolved placeholders or invented identifiers;
+when an exact value cannot be obtained from Hub evidence, Fred asks only for
+that missing value. Returned console output becomes current evidence for the
+next step.
+
+Verified configuration changes are reconciled into every writable source Fred
+is authorized to maintain. Switches and VLANs are updated directly, durable
+known-good facts are retained in governed team memory, and exact architecture
+corrections remain CIO-controlled. For asset classes without an authorized
+write tool, including VM inventory, Fred creates a precisely assigned follow-up
+instead of claiming the source record was updated.
+
 The transcript is confined to a fixed-height, permanently scrollable panel so
 long conversations do not expand the entire application page. On desktop the
 panel participates in the application shell's full flex-height chain: it reaches
