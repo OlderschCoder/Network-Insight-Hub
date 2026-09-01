@@ -32,9 +32,10 @@ evidence gathering and tool loop remain enabled.
 - Durable conversations are stored per authenticated user in `fred_chat_sessions`.
 - Each conversation has an editable topic. A persistent topic dropdown in the
   Fred header lists the authenticated user's current and archived topics with
-  message count and update date. Selecting one reactivates it with its messages
-  and checkpoint intact. Starting a new topic archives the visible conversation;
-  it does not erase governed memory.
+  message count and update date. The bold current topic appears first; prior
+  topics are visually indented beneath it. Selecting one reactivates it with its
+  messages and checkpoint intact. Starting a new topic archives the visible
+  conversation; it does not erase governed memory.
 - Browser state is timestamped and reconciled with the server copy. Navigation
   performs a keepalive save so a stale server response cannot overwrite a newer
   local transcript.

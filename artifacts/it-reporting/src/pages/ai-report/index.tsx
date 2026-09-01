@@ -1495,14 +1495,21 @@ function ChatTab({
                 ? "Field support chat"
                 : "The AI has read access to entries, risks, after-action reports, and network inventory."}
             </CardDescription>
-            <Input
-              value={chat.title}
-              onChange={(event) => setChat((current) => ({ ...current, title: event.target.value.slice(0, 200), savedAt: new Date().toISOString() }))}
-              className={`mt-2 font-medium ${mobileFieldMode ? "h-9 text-sm" : "h-8 max-w-md"}`}
-              aria-label="Fred conversation topic"
-              placeholder="Conversation topic"
-            />
             <div className={`mt-2 ${mobileFieldMode ? "w-full" : "w-full max-w-md"}`}>
+              <Label htmlFor="fred-current-topic" className="text-xs font-bold uppercase tracking-wide text-foreground">
+                Current topic
+              </Label>
+              <Input
+                id="fred-current-topic"
+                value={chat.title}
+                onChange={(event) => setChat((current) => ({ ...current, title: event.target.value.slice(0, 200), savedAt: new Date().toISOString() }))}
+                className={`mt-1 font-bold ${mobileFieldMode ? "h-9 text-sm" : "h-8"}`}
+                aria-label="Fred conversation topic"
+                placeholder="Conversation topic"
+              />
+            </div>
+            <div className={`mt-2 pl-4 ${mobileFieldMode ? "w-full" : "w-full max-w-md"}`}>
+              <Label className="mb-1 block text-xs font-medium text-muted-foreground">Switch topic</Label>
               <Select
                 value={chat.sessionId ?? undefined}
                 onOpenChange={(open) => { if (open) void loadTopics(); }}
@@ -1522,16 +1529,22 @@ function ChatTab({
                   </span>
                 </SelectTrigger>
                 <SelectContent className="max-h-[22rem]">
-                  {topics.map((topic) => (
+                  {[...topics]
+                    .sort((left, right) => Number(right.id === chat.sessionId) - Number(left.id === chat.sessionId))
+                    .map((topic) => {
+                    const isCurrent = topic.id === chat.sessionId;
+                    return (
                     <SelectItem key={topic.id} value={topic.id}>
-                      <span className="flex max-w-[32rem] items-center gap-2">
-                        <span className="truncate font-medium">{topic.title || "Untitled Fred topic"}</span>
+                      <span className={`flex max-w-[32rem] items-center gap-2 ${isCurrent ? "font-bold" : "pl-3"}`}>
+                        <span className="truncate">{topic.title || "Untitled Fred topic"}</span>
+                        {isCurrent ? <span className="shrink-0 text-xs font-bold text-primary">Current</span> : null}
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {topic.messageCount} messages · {new Date(topic.updatedAt).toLocaleDateString()}
                         </span>
                       </span>
                     </SelectItem>
-                  ))}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
