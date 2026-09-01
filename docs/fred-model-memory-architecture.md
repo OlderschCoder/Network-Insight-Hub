@@ -116,6 +116,12 @@ The CIO Dashboard contains a direct **SCCC Enterprise Architecture** button.
 It opens the dedicated Architecture tab, not routine Fred chat, because report
 generation and durable evidence capture are one governed operation.
 
+The Architecture tab reloads the newest saved report, verification, snapshot
+ID, and normalized record counts whenever it opens. A browser navigation or a
+post-generation projection error therefore cannot hide a report whose immutable
+snapshot was already committed. Projection input is deduplicated by entity type
+and natural key before bulk insertion.
+
 ## Operations
 
 After changing model variables or credentials, restart `sccc-api.service`. Verify

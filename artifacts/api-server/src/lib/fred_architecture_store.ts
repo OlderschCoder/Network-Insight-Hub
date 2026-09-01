@@ -52,7 +52,12 @@ export function buildArchitectureProjection(evidence: any): { entities: Entity[]
   for (const row of evidence?.cloud?.azureResources ?? []) add("azure_resource", value(row.resourceId) || value(row.id) || key(row.type, row.name), value(row.name), row, "Azure ARM", null, row.updatedAt);
   for (const row of evidence?.operations?.processes ?? []) add("process", value(row.id) || value(row.name), value(row.name) || value(row.title), row, "Process Library", null, row.updatedAt);
   for (const row of evidence?.operations?.projects ?? []) add("project", value(row.id) || value(row.name), value(row.name) || value(row.title), row, "Projects", null, row.updatedAt);
-  return { entities, relationships };
+  const uniqueEntities = [...new Map(entities.map((row) => [`${row.entity_type}\u0000${row.natural_key}`, row])).values()];
+  const uniqueRelationships = [...new Map(relationships.map((row) => [
+    `${row.relationship_type}\u0000${row.from_type}\u0000${row.from_key}\u0000${row.to_type}\u0000${row.to_key}`,
+    row,
+  ])).values()];
+  return { entities: uniqueEntities, relationships: uniqueRelationships };
 }
 
 export async function storeArchitectureProjection(snapshotId: number, evidence: any): Promise<{ entities: number; relationships: number }> {

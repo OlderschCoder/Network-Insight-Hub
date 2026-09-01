@@ -2251,6 +2251,26 @@ function EnterpriseArchitectureTab() {
   const [verification, setVerification] = useState("");
   const [meta, setMeta] = useState<any>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadLatest = async () => {
+      const response = await fetch(`${API_BASE}/status-report/enterprise-architecture/latest`, { headers: authHeaders() });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (cancelled) return;
+      setReport(data.report || "");
+      setVerification(data.verification || "");
+      setMeta({
+        evidence: data.evidenceSummary,
+        models: data.models,
+        snapshotId: data.snapshotId,
+        normalized: { entities: data.entityCount, relationships: data.relationshipCount },
+      });
+    };
+    void loadLatest();
+    return () => { cancelled = true; };
+  }, []);
+
   const generate = async () => {
     setLoading(true);
     setReport("");

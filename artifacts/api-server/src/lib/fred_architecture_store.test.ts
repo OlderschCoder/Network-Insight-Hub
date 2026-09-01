@@ -25,4 +25,12 @@ describe("Fred normalized architecture projection", () => {
       expect.objectContaining({ relationship_type: "network_link", from_key: "node-1", to_key: "core-1" }),
     ]));
   });
+
+  it("deduplicates records that share the same type and natural key", () => {
+    const result = buildArchitectureProjection({
+      generatedAt: "2026-09-01T01:00:00.000Z",
+      inventory: { phoneAssignments: [{ building: "Hobble", count: 2 }, { building: "Hobble", count: 3 }] },
+    });
+    expect(result.entities.filter((row) => row.entity_type === "phone_building" && row.natural_key === "Hobble")).toHaveLength(1);
+  });
 });

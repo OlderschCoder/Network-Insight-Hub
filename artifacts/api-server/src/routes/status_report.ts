@@ -1156,6 +1156,19 @@ router.get("/enterprise-architecture/latest.json", requireAuth, requireCIO, asyn
   return res.json(snapshot);
 });
 
+router.get("/enterprise-architecture/latest", requireAuth, requireCIO, async (_req: Request, res: Response) => {
+  const result: any = await db.execute(sql`
+    SELECT s.id AS "snapshotId", s.generated_at AS "generatedAt", s.summary AS "evidenceSummary",
+      s.report, s.verification, s.models,
+      (SELECT count(*)::int FROM fred_architecture_entities e WHERE e.snapshot_id = s.id) AS "entityCount",
+      (SELECT count(*)::int FROM fred_architecture_relationships r WHERE r.snapshot_id = s.id) AS "relationshipCount"
+    FROM fred_architecture_snapshots s ORDER BY s.generated_at DESC LIMIT 1
+  `);
+  const snapshot = result.rows?.[0];
+  if (!snapshot) return res.status(404).json({ error: "No architecture snapshot has been generated yet." });
+  return res.json(snapshot);
+});
+
 // ---- AI Red Flags ----------------------------------------------------------
 // CIO-only. Scans a week's operational data and produces a structured list of
 // "red flags" plus three ready-to-use formats: a report narrative block, a
