@@ -30,7 +30,12 @@ evidence gathering and tool loop remain enabled.
 - Secrets are never written to AI memory or chat documentation.
 - Team and personal memories remain distinct.
 - Durable conversations are stored per authenticated user in `fred_chat_sessions`.
-- Starting a new chat archives the visible conversation; it does not erase governed memory.
+- Each conversation has an editable topic. Starting a new topic archives the
+  visible conversation, and the Topics browser can reactivate it later with its
+  messages and checkpoint intact; it does not erase governed memory.
+- Browser state is timestamped and reconciled with the server copy. Navigation
+  performs a keepalive save so a stale server response cannot overwrite a newer
+  local transcript.
 - Operational answers must prefer fresh application/tool evidence over stored narrative.
 
 ## Response behavior
@@ -38,6 +43,9 @@ evidence gathering and tool loop remain enabled.
 Routine answers lead with the answer, delta, and action. Fred does not repeat the
 question, narrate hidden reasoning, dump tool output, or append generic offers.
 Long-form output is reserved for explicitly requested deliverables.
+
+The transcript is confined to a fixed-height, permanently scrollable panel so
+long conversations do not expand the entire application page.
 
 Temporary incident topology is maintained separately from durable memory. Fred
 extracts user-reported bypasses, disconnected paths, direct connections, and

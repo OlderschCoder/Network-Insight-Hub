@@ -44,6 +44,7 @@ import {
   QrCode,
   Eye,
   RefreshCw,
+  History,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -80,9 +81,20 @@ interface AttachedFile {
 }
 
 interface PersistedFredChat {
-  version: 2;
+  version: 2 | 3;
   messages: ChatMessage[];
   checkpoint: string;
+  title?: string;
+  savedAt?: string;
+  sessionId?: string | null;
+}
+
+interface FredChatSessionSummary {
+  id: string;
+  title: string;
+  isActive: boolean;
+  messageCount: number;
+  updatedAt: string;
 }
 
 const FRED_RECENT_MESSAGE_LIMIT = 10;
@@ -526,11 +538,16 @@ function ChatTab({
   // switch (before the load effect re-runs) `messages` falls back to empty, so
   // the previous user's transcript is never rendered or persisted under the new
   // user's key.
-  const [chat, setChat] = useState<{ key: string | null; messages: ChatMessage[]; checkpoint: string }>({
+  const [chat, setChat] = useState<{ key: string | null; messages: ChatMessage[]; checkpoint: string; title: string; savedAt: string; sessionId: string | null }>({
     key: null,
     messages: [],
     checkpoint: "",
+    title: "New Fred topic",
+    savedAt: "",
+    sessionId: null,
   });
+  const chatRef = useRef(chat);
+  useEffect(() => { chatRef.current = chat; }, [chat]);
   const messages = chat.key === storageKey ? chat.messages : [];
   const setMessages = (
     updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
@@ -538,7 +555,7 @@ function ChatTab({
     setChat((prev) => {
       const base = prev.key === storageKey ? prev.messages : [];
       const next = typeof updater === "function" ? updater(base) : updater;
-      return { key: storageKey, messages: next, checkpoint: prev.key === storageKey ? prev.checkpoint : "" };
+      return { key: storageKey, messages: next, checkpoint: prev.key === storageKey ? prev.checkpoint : "", title: prev.key === storageKey ? prev.title : "New Fred topic", savedAt: new Date().toISOString(), sessionId: prev.key === storageKey ? prev.sessionId : null };
     });
   };
   const [input, setInput] = useState("");
@@ -570,6 +587,9 @@ function ChatTab({
   const [fredPreview, setFredPreview] = useState<FredLibraryPreview | null>(null);
   const [fredPreviewLoading, setFredPreviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [topics, setTopics] = useState<FredChatSessionSummary[]>([]);
+  const [topicsLoading, setTopicsLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
   const [pendingChanges, setPendingChanges] = useState<PendingNetworkChange[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -604,29 +624,45 @@ function ChatTab({
     let cancelled = false;
     let loaded: ChatMessage[] = [];
     let checkpoint = "";
+    let title = "New Fred topic";
+    let savedAt = "";
+    let sessionId: string | null = null;
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as ChatMessage[] | PersistedFredChat;
         if (Array.isArray(parsed)) loaded = parsed;
-        else if (parsed?.version === 2) {
+        else if (parsed?.version === 2 || parsed?.version === 3) {
           loaded = Array.isArray(parsed.messages) ? parsed.messages : [];
           checkpoint = typeof parsed.checkpoint === "string" ? parsed.checkpoint : "";
+          if (parsed.version === 3) {
+            title = typeof parsed.title === "string" ? parsed.title : title;
+            savedAt = typeof parsed.savedAt === "string" ? parsed.savedAt : "";
+            sessionId = typeof parsed.sessionId === "string" ? parsed.sessionId : null;
+          }
         }
       }
     } catch {
       loaded = [];
     }
-    setChat({ key: storageKey, messages: loaded, checkpoint });
+    setChat({ key: storageKey, messages: loaded, checkpoint, title, savedAt, sessionId });
     void fetch(`${API_BASE}/status-report/chat-session`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then((data) => {
         if (cancelled || !data?.session) return;
         const serverMessages = Array.isArray(data.session.messages) ? data.session.messages : [];
-        setChat({
-          key: storageKey,
-          messages: serverMessages,
-          checkpoint: typeof data.session.checkpoint === "string" ? data.session.checkpoint : "",
+        const serverUpdatedAt = String(data.session.updatedAt ?? "");
+        setChat((current) => {
+          if (current.key !== storageKey) return current;
+          if (current.savedAt && serverUpdatedAt && new Date(current.savedAt) > new Date(serverUpdatedAt)) return current;
+          return {
+            key: storageKey,
+            messages: serverMessages,
+            checkpoint: typeof data.session.checkpoint === "string" ? data.session.checkpoint : "",
+            title: typeof data.session.title === "string" ? data.session.title : "New Fred topic",
+            savedAt: serverUpdatedAt,
+            sessionId: String(data.session.id),
+          };
         });
       })
       .catch(() => { /* local cache remains the offline fallback */ });
@@ -639,23 +675,47 @@ function ChatTab({
     if (!storageKey || chat.key !== storageKey) return;
     try {
       if (chat.messages.length > 0 || chat.checkpoint) {
-        localStorage.setItem(storageKey, JSON.stringify({ version: 2, messages: chat.messages, checkpoint: chat.checkpoint } satisfies PersistedFredChat));
+        localStorage.setItem(storageKey, JSON.stringify({ version: 3, messages: chat.messages, checkpoint: chat.checkpoint, title: chat.title, savedAt: chat.savedAt || new Date().toISOString(), sessionId: chat.sessionId } satisfies PersistedFredChat));
       } else {
         localStorage.removeItem(storageKey);
       }
     } catch {
       /* ignore storage quota errors */
     }
-    const timer = window.setTimeout(() => {
+    const persistServer = (keepalive = false) => {
       const serverMessages = chat.messages.map((message) => ({ role: message.role, content: messageText(message) }));
       void fetch(`${API_BASE}/status-report/chat-session`, {
         method: "PUT",
         headers: authHeaders(),
-        body: JSON.stringify({ messages: serverMessages, checkpoint: chat.checkpoint }),
+        body: JSON.stringify({ messages: serverMessages, checkpoint: chat.checkpoint, title: chat.title, sessionId: chat.sessionId }),
+        keepalive,
       });
-    }, 700);
+    };
+    const timer = window.setTimeout(() => persistServer(), 250);
     return () => window.clearTimeout(timer);
   }, [chat, storageKey]);
+
+  // Page navigation can unmount Fred before the debounce fires. Persist the
+  // latest ref on pagehide/unmount without tying cleanup to every state change.
+  useEffect(() => {
+    if (!storageKey) return;
+    const persistLatest = () => {
+      const current = chatRef.current;
+      if (current.key !== storageKey) return;
+      const serverMessages = current.messages.map((message) => ({ role: message.role, content: messageText(message) }));
+      void fetch(`${API_BASE}/status-report/chat-session`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ messages: serverMessages, checkpoint: current.checkpoint, title: current.title, sessionId: current.sessionId }),
+        keepalive: true,
+      });
+    };
+    window.addEventListener("pagehide", persistLatest);
+    return () => {
+      window.removeEventListener("pagehide", persistLatest);
+      persistLatest();
+    };
+  }, [storageKey]);
 
   useEffect(() => {
     if (contextHint && !input && !mobileFieldMode) {
@@ -933,6 +993,9 @@ function ChatTab({
     if ((!draftInput.trim() && !file && selectedFredFiles.length === 0) || loading) return;
     const userContent = buildUserContent(draftInput, file, selectedFredFiles);
     const userMsg: ChatMessage = { role: "user", content: userContent };
+    if (chat.title === "New Fred topic" && draftInput.trim()) {
+      setChat((current) => ({ ...current, title: draftInput.replace(/\s+/g, " ").trim().slice(0, 80), savedAt: new Date().toISOString() }));
+    }
     setAttachedFile(null);
     const newMessages = [...messages, userMsg];
     const compacted = compactFredConversation(newMessages, chat.checkpoint);
@@ -1289,20 +1352,54 @@ function ChatTab({
   };
 
   const handleClear = async () => {
-    if (messages.length === 0) return;
     const checkpoint = checkpointAll(messages, chat.checkpoint);
     const serverMessages = messages.map((message) => ({ role: message.role, content: messageText(message) }));
     try {
-      await fetch(`${API_BASE}/status-report/chat-session/new`, {
+      const response = await fetch(`${API_BASE}/status-report/chat-session/new`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ messages: serverMessages, checkpoint }),
+        body: JSON.stringify({ messages: serverMessages, checkpoint, title: chat.title }),
       });
+      const data = response.ok ? await response.json() : null;
+      setChat({ key: storageKey, messages: [], checkpoint: "", title: "New Fred topic", savedAt: String(data?.session?.updatedAt ?? new Date().toISOString()), sessionId: data?.session?.id ? String(data.session.id) : null });
     } catch {
       // The local checkpoint still protects continuity when the server is temporarily unavailable.
+      setChat({ key: storageKey, messages: [], checkpoint: "", title: "New Fred topic", savedAt: new Date().toISOString(), sessionId: null });
     }
-    setChat({ key: storageKey, messages: [], checkpoint });
-    toast({ title: "New chat started", description: "The previous conversation was archived; Fred kept its operational memory." });
+    toast({ title: "New topic started", description: "The previous conversation was archived and remains available under Topics." });
+  };
+
+  const loadTopics = async () => {
+    setTopicsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/status-report/chat-sessions`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setTopics(Array.isArray(data.sessions) ? data.sessions : []);
+    } catch (error) {
+      toast({ title: "Could not load Fred topics", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+    } finally {
+      setTopicsLoading(false);
+    }
+  };
+
+  const openTopic = async (sessionId: string) => {
+    const response = await fetch(`${API_BASE}/status-report/chat-session/${encodeURIComponent(sessionId)}/activate`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const session = data.session;
+    setChat({
+      key: storageKey,
+      messages: Array.isArray(session?.messages) ? session.messages : [],
+      checkpoint: typeof session?.checkpoint === "string" ? session.checkpoint : "",
+      title: typeof session?.title === "string" ? session.title : "Fred topic",
+      savedAt: String(session?.updatedAt ?? new Date().toISOString()),
+      sessionId: session?.id ? String(session.id) : null,
+    });
+    setTopicsOpen(false);
   };
 
   const qrUrl = fredMobileUrl();
@@ -1347,6 +1444,13 @@ function ChatTab({
                 ? "Field support chat"
                 : "The AI has read access to entries, risks, after-action reports, and network inventory."}
             </CardDescription>
+            <Input
+              value={chat.title}
+              onChange={(event) => setChat((current) => ({ ...current, title: event.target.value.slice(0, 200), savedAt: new Date().toISOString() }))}
+              className={`mt-2 font-medium ${mobileFieldMode ? "h-9 text-sm" : "h-8 max-w-md"}`}
+              aria-label="Fred conversation topic"
+              placeholder="Conversation topic"
+            />
           </div>
           <div className={mobileFieldMode ? "grid grid-cols-2 gap-2" : "flex items-center gap-2 flex-wrap"}>
             {mobileFieldMode && (
@@ -1849,14 +1953,44 @@ function ChatTab({
                 >
                   <Copy className="h-4 w-4 mr-1" /> Copy
                 </Button>
+                <Dialog open={topicsOpen} onOpenChange={(open) => { setTopicsOpen(open); if (open) void loadTopics(); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" title="Open saved Fred topics">
+                      <History className="h-4 w-4 mr-1" /> Topics
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Fred topics</DialogTitle>
+                      <DialogDescription>Reopen an incident or reference conversation with its messages and working checkpoint intact.</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[55dvh] space-y-2 overflow-y-scroll pr-2 [scrollbar-gutter:stable]">
+                      {topicsLoading && <p className="text-sm text-muted-foreground">Loading topics...</p>}
+                      {!topicsLoading && topics.length === 0 && <p className="text-sm text-muted-foreground">No saved topics yet.</p>}
+                      {topics.map((topic) => (
+                        <button
+                          type="button"
+                          key={topic.id}
+                          className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-accent"
+                          onClick={() => void openTopic(topic.id).catch((error) => toast({ title: "Could not open topic", description: error instanceof Error ? error.message : String(error), variant: "destructive" }))}
+                        >
+                          <span>
+                            <span className="block font-medium">{topic.title || "Untitled Fred topic"}</span>
+                            <span className="block text-xs text-muted-foreground">{topic.messageCount} messages · {new Date(topic.updatedAt).toLocaleString()}</span>
+                          </span>
+                          {topic.isActive && <Badge variant="secondary">Current</Badge>}
+                        </button>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleClear}
-                  disabled={messages.length === 0}
-                  title="Clear chat"
+                  title="Archive this topic and start another"
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> Clear
+                  <Trash2 className="h-4 w-4 mr-1" /> New topic
                 </Button>
                 <Label className="text-xs text-muted-foreground">Lookback days:</Label>
                 <Input
@@ -1874,7 +2008,7 @@ function ChatTab({
       </CardHeader>
       <CardContent
         ref={scrollRef}
-        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 pr-2 space-y-3 [scrollbar-gutter:stable] [scrollbar-width:thin] ${mobileFieldMode ? "bg-[linear-gradient(180deg,#f9fcf9_0%,#f3f7f3_100%)] px-3" : ""}`}
+        className={`flex-1 min-h-0 overflow-y-scroll overscroll-contain py-4 pr-2 space-y-3 [scrollbar-gutter:stable] ${mobileFieldMode ? "bg-[linear-gradient(180deg,#f9fcf9_0%,#f3f7f3_100%)] px-3" : ""}`}
       >
         {messages.length === 0 && (
           <div className="space-y-3 py-6">

@@ -1,6 +1,8 @@
 flowchart LR
   U[Authenticated IT user] --> UI[Fixed-height Fred chat]
   UI --> S[(Durable per-user session)]
+  UI --> H[Topic browser and archive]
+  H --> S
   UI --> A[Protected active incident state]
   UI --> API[Fred API]
   A --> API

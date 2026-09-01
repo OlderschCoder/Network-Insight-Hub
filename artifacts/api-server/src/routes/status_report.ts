@@ -96,12 +96,56 @@ router.get("/chat-session", requireAuth, async (req: Request, res: Response) => 
   return res.json({ session });
 });
 
+router.get("/chat-sessions", requireAuth, async (req: Request, res: Response) => {
+  const userId = Number((req as any).user?.id);
+  const result: any = await db.execute(sql`
+    SELECT id, title, is_active AS "isActive", created_at AS "createdAt", updated_at AS "updatedAt",
+      jsonb_array_length(messages) AS "messageCount"
+    FROM fred_chat_sessions
+    WHERE user_id = ${userId}
+    ORDER BY is_active DESC, updated_at DESC LIMIT 50
+  `);
+  return res.json({ sessions: result.rows ?? [] });
+});
+
+router.post("/chat-session/:id/activate", requireAuth, async (req: Request, res: Response) => {
+  const userId = Number((req as any).user?.id);
+  const sessionId = String(req.params.id ?? "");
+  const session = await db.transaction(async (tx) => {
+    const found: any = await tx.execute(sql`
+      SELECT id FROM fred_chat_sessions WHERE id::text = ${sessionId} AND user_id = ${userId} LIMIT 1
+    `);
+    if (!found.rows?.[0]) return null;
+    await tx.execute(sql`UPDATE fred_chat_sessions SET is_active = false WHERE user_id = ${userId}`);
+    const activated: any = await tx.execute(sql`
+      UPDATE fred_chat_sessions SET is_active = true, updated_at = now()
+      WHERE id::text = ${sessionId} AND user_id = ${userId}
+      RETURNING id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
+    `);
+    return activated.rows?.[0] ?? null;
+  });
+  if (!session) return res.status(404).json({ error: "Fred topic not found" });
+  return res.json({ session });
+});
+
 router.put("/chat-session", requireAuth, async (req: Request, res: Response) => {
   const userId = Number((req as any).user?.id);
+  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : "";
   const messages = sanitizeStoredFredMessages(req.body?.messages);
   const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
   const titleSource = messages.find((message) => message.role === "user")?.content || "Fred conversation";
-  const title = titleSource.replace(/\s+/g, " ").trim().slice(0, 200) || "Fred conversation";
+  const requestedTitle = typeof req.body?.title === "string" ? req.body.title : "";
+  const title = (requestedTitle || titleSource).replace(/\s+/g, " ").trim().slice(0, 200) || "Fred conversation";
+  if (sessionId) {
+    const updated: any = await db.execute(sql`
+      UPDATE fred_chat_sessions SET title = ${title}, messages = ${JSON.stringify(messages)}::jsonb,
+        checkpoint = ${checkpoint}, updated_at = now()
+      WHERE id::text = ${sessionId} AND user_id = ${userId}
+      RETURNING id, updated_at AS "updatedAt"
+    `);
+    if (!updated.rows?.[0]) return res.status(404).json({ error: "Fred topic not found" });
+    return res.json({ saved: true, session: updated.rows[0] });
+  }
   const result: any = await db.execute(sql`
     INSERT INTO fred_chat_sessions (user_id, title, messages, checkpoint, is_active)
     VALUES (${userId}, ${title}, ${JSON.stringify(messages)}::jsonb, ${checkpoint}, true)
@@ -117,15 +161,20 @@ router.post("/chat-session/new", requireAuth, async (req: Request, res: Response
   const userId = Number((req as any).user?.id);
   const messages = sanitizeStoredFredMessages(req.body?.messages);
   const checkpoint = typeof req.body?.checkpoint === "string" ? req.body.checkpoint.slice(-FRED_MAX_CHECKPOINT_CHARS) : "";
-  await db.transaction(async (tx) => {
+  const requestedTitle = typeof req.body?.title === "string" ? req.body.title.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+  const session = await db.transaction(async (tx) => {
     await tx.execute(sql`
       UPDATE fred_chat_sessions SET is_active = false, messages = ${JSON.stringify(messages)}::jsonb,
         checkpoint = ${checkpoint}, updated_at = now()
       WHERE user_id = ${userId} AND is_active = true
     `);
-    await tx.execute(sql`INSERT INTO fred_chat_sessions (user_id) VALUES (${userId})`);
+    const inserted: any = await tx.execute(sql`
+      INSERT INTO fred_chat_sessions (user_id, title) VALUES (${userId}, ${requestedTitle || "New Fred topic"})
+      RETURNING id, title, messages, checkpoint, created_at AS "createdAt", updated_at AS "updatedAt"
+    `);
+    return inserted.rows?.[0] ?? null;
   });
-  return res.json({ created: true });
+  return res.json({ created: true, session });
 });
 
 router.post(
