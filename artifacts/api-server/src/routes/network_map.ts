@@ -537,13 +537,19 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
   const existingPorts = sourceNode
     ? await db.select().from(netPortsTable).where(eq(netPortsTable.nodeId, sourceNode.id))
     : [];
-  const delta = computeTelemetryPortDelta(existingPorts, physicalInterfaces.map((iface) => ({
+  const observedDelta = computeTelemetryPortDelta(existingPorts, physicalInterfaces.map((iface) => ({
     interfaceName: iface.port,
     operStatus: iface.oper_status ?? telemetryOperStatus(iface.status),
     adminStatus: iface.admin_status && iface.admin_status !== "unknown" ? iface.admin_status : null,
     nativeVlan: iface.native_vlan ?? telemetryInteger(iface.vlan),
     description: (iface.description ?? iface.name ?? "").trim() || null,
   })));
+  // The first collection establishes a baseline. With no preceding physical
+  // port observations, every port would otherwise be mislabeled as a change.
+  const isInitialBaseline = existingPorts.length === 0;
+  const delta = isInitialBaseline
+    ? { downToUp: 0, upToDown: 0, adminChanges: 0, vlanChanges: 0, descriptionChanges: 0, portsAdded: 0, portsMissing: 0, changes: [] }
+    : observedDelta;
   const preview = {
     dryRun,
     skipped: false,
@@ -555,6 +561,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     matchedNodeMgmtIp: sourceNode?.mgmtIp ?? inventory?.ipAddress ?? null,
     building: telemetry.building ?? sourceNode?.building ?? inventory?.building ?? null,
     nodeWillBeCreated: !sourceNode,
+    isInitialBaseline,
     physicalInterfaces: physicalInterfaces.length,
     logicalInterfacesIgnored: telemetry.interfaces.length - physicalInterfaces.length,
     lldpNeighborsSeen: telemetry.lldp_neighbors.length,

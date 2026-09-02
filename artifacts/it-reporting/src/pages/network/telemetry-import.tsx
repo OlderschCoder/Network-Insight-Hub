@@ -47,6 +47,7 @@ type TelemetryPreview = {
   matchedNodeMgmtIp: string | null;
   building: string | null;
   nodeWillBeCreated: boolean;
+  isInitialBaseline?: boolean;
   physicalInterfaces: number;
   logicalInterfacesIgnored: number;
   lldpNeighborsSeen: number;
@@ -343,6 +344,9 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
               <p className="mt-1 text-xs">
                 {totals.downToUp} down→up · {totals.upToDown} up→down · {totals.admin} administrative · {totals.vlan} native VLAN · {totals.added} newly observed · {totals.missing} missing from this snapshot
               </p>
+              {plan.some((entry) => entry.preview?.isInitialBaseline) && (
+                <p className="mt-2 text-xs font-semibold">New switches are being established as baselines; their first observed ports are not counted as changes.</p>
+              )}
               <p className="mt-1 text-[11px] text-blue-800">These are observed snapshot deltas, not automatic fault declarations. The full per-port change log is retained for Fred.</p>
             </div>
 

@@ -50,6 +50,10 @@ separate explicit authorized action. Fred may report a device's independently
 calculated evidence age, but must not describe it as a consequence of a scoped
 upload.
 
+For a switch with no preceding stored physical-port telemetry, the import is an
+initial baseline. Its ports are stored, but they are not reported as newly
+added or changed. Delta reporting begins with the next collection.
+
 The JSON import previews every physical interface against its preceding stored
 telemetry observation. Applying the import records the collector `run_id`,
 timestamps, failed targets, aggregate counts, affected devices, and individual
