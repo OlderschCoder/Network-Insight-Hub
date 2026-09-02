@@ -15,24 +15,24 @@ A step-by-step guide to using the platform. The IT team uses this app to record 
 
 ## 2. Getting around (navigation)
 
-There is **no fixed sidebar**. To move between pages:
+Use the fixed sidebar to move between the Hub's major work areas. You can also
+use Search in the top header when you know the destination by name.
 
-1. Click the **Menu** button ("search or jump to any page") in the top header, or press **⌘K / Ctrl+K**.
-2. Start typing a page name, or click one of the grouped items.
+The fixed sidebar begins with these groups:
 
-Pages are grouped as:
-
-- **My Work** — Home/Dashboard, My Tasks, Weekly Log
-- **Systems & Tools** — Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant, User Guide
-- **Reports & Records** — Risks & Issues, Post-Incident Reviews, Reports
-- **Leadership & Admin** (CIO only) — Projects, Department Goals, Usage Analytics, Admin
+- **Campus Operations** — Status, Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure
+- **My Work** — My Tasks and Weekly Log
+- **IT Apps** — App Directory, Banner, and High School Students
+- **Operations** — Incident Rooms, Risks & Issues, Post-Incident Reviews, Weekly Reports, and CIO management pages
+- **Infrastructure** — Process Library and role-restricted Network Tools
+- **Service** — Learn
 
 The header also has **Quick Add** (fast new item) and **Ask AI** shortcuts.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
 - The dashboard's **Zendesk Tickets Resolved** and **Team Submission Status** data use the same current six-person roster—Tracy, Mark, Maria, Lucas, Illia, and Craig—including a zero when someone has no activity in the selected period. Retired or former staff remain attached to historical records but are excluded from current-team status.
-- **Cisco Webex Phones** is marked **New Feature** under **Systems & Tools → IT Apps**. Use it for the phone directory, live device status, building assignments, and E-911 health.
+- **Cisco Webex Phones** is marked **New Feature** under **Campus Operations**. Use it for the phone directory, live device status, building assignments, and E-911 health.
 
 ### Building-first network support
 
@@ -67,6 +67,7 @@ At the end of the week, consolidate your work.
 3. Review, add accomplishments/challenges/support-needed, and **submit**.
 
 Notes:
+
 - There is **one weekly log per person per week**.
 - Once rolled in, past logs stay stable even if you edit the underlying items later.
 - To write a log directly, use **Weekly Log → New**.
@@ -102,22 +103,27 @@ These can be included in the relevant week's report so leadership sees lessons l
 ## 7. Systems & Tools
 
 ### Network
+
 - **Network** — searchable reference for **switches and VLANs** (hostname, building, IP, model; VLAN ID, subnet, gateway).
 - **Network → Visualize** — the topology **diagram**. Node positions are saved and shared across the team.
 
 ### Network Tools (network-admin roles only)
+
 - **FortiGate website whitelist** — add a URL to the FortiGate web-filter exemption list. Works only when the server can reach the FortiGate (on the SCCC network/VPN).
 - **PowerShell generators** — Install Printer, Add Laptop, Remove Equipment. These produce a **downloadable `.ps1` file** to run on the target Windows machine; nothing runs on the server.
 
 ### Azure
+
 - **Azure VMs** — cloud VM inventory. Everyone can view; only the CIO can add/edit/delete. Click **Sync from Azure** to pull the live list (preserves manual fields like purpose/notes/owner; flags removed VMs as deleted).
 - **Azure Inventory** — all Azure resources grouped by type.
 
 ### Monitoring & IT Apps
+
 - **Monitoring** — live Grafana dashboards embedded in the app.
-- **IT Apps** — unified view of the other apps built for IT.
+- **IT Apps** — the early sidebar group for the application directory, protected Banner/EUP operations, and High School Students access tools.
 
 ### Process Library
+
 - Runbooks and documented procedures. Browse, open a procedure, or click **New** to add one. Document recurring fixes here so knowledge isn't lost.
 
 ---
@@ -150,6 +156,7 @@ Open **AI Assistant**. It has these tabs:
 - **AI Memory** — the assistant's **persistent knowledge** about the SCCC environment. Every active entry is fed into the AI's context.
 
 Using AI Memory:
+
 1. **Search** or **filter by category** to find what the AI already knows.
 2. Click **Add memory** to teach it a new fact (device details, procedures, contacts, policies).
 3. **Edit** any entry, or use the **toggle** to activate/deactivate it (inactive = ignored by the AI).
@@ -169,15 +176,15 @@ The AI can also **save memories itself** — just tell it a durable fact or say 
 ## 12. A typical week at a glance
 
 **Staff member:**
+
 1. Add items to **My Tasks** as work happens.
 2. Log **Risks & Issues** and write **Post-Incident Reviews** for any incidents.
 3. End of week: open **Weekly Log**, generate/submit the entry (task items roll in automatically).
 
-**CIO:**
-4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
+**CIO:** 4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
 
 At any point, use the **AI Assistant** to draft summaries or answer questions about the data.
 
 ---
 
-*The embedded AI Assistant also knows all of the above — you can ask it "how do I file a post-incident review?" or "how do I finalize a report?" and it will walk you through it.*
+_The embedded AI Assistant also knows all of the above — you can ask it "how do I file a post-incident review?" or "how do I finalize a report?" and it will walk you through it._

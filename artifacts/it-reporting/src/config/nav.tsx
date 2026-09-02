@@ -34,9 +34,16 @@ export type NavItem = {
   newBadge?: boolean;
 };
 
-export type NavGroup = { label: string; items: NavItem[]; separator?: number[] };
+export type NavGroup = {
+  label: string;
+  items: NavItem[];
+  separator?: number[];
+};
 
-export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[] {
+export function getNavGroups(
+  isCIO: boolean,
+  canNetworkTools = false,
+): NavGroup[] {
   const campusOperations: NavGroup = {
     label: "Campus Operations",
     items: [
@@ -47,19 +54,61 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
         icon: LayoutDashboard,
         match: (l) => l === "/",
       },
-      { href: "/network/buildings", label: "Buildings", desc: "Campus building health and device map", icon: Building2, match: (l) => l === "/network/buildings" || l.startsWith("/network/buildings/") },
-      { href: "/network", label: "Network Map", desc: "Switches, VLANs, ports, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") || l.startsWith("/network/nodes") },
-      { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
-      { href: "/it-apps/cisco-calling", label: "Cisco Webex Phones", desc: "Phone directory, device status, buildings, and E-911", icon: PhoneCall, newBadge: true },
-      { href: "/azure-vms", label: "Azure", desc: "VMs and cloud resource inventory", icon: Cloud },
+      {
+        href: "/network/buildings",
+        label: "Buildings",
+        desc: "Campus building health and device map",
+        icon: Building2,
+        match: (l) =>
+          l === "/network/buildings" || l.startsWith("/network/buildings/"),
+      },
+      {
+        href: "/network",
+        label: "Network Map",
+        desc: "Switches, VLANs, ports, and topology",
+        icon: Network,
+        match: (l) =>
+          l === "/network" ||
+          l.startsWith("/network/visualize") ||
+          l.startsWith("/network/nodes"),
+      },
+      {
+        href: "/monitoring",
+        label: "Monitoring",
+        desc: "Live Grafana dashboards",
+        icon: Gauge,
+      },
+      {
+        href: "/it-apps/cisco-calling",
+        label: "Cisco Webex Phones",
+        desc: "Phone directory, device status, buildings, and E-911",
+        icon: PhoneCall,
+        newBadge: true,
+      },
+      {
+        href: "/azure-vms",
+        label: "Azure",
+        desc: "VMs and cloud resource inventory",
+        icon: Cloud,
+      },
     ],
   };
 
   const myWork: NavGroup = {
     label: "My Work",
     items: [
-      { href: "/items", label: "My Tasks", desc: "Track and update your action items", icon: ListChecks },
-      { href: "/entries", label: "Weekly Log", desc: "Record your weekly accomplishments", icon: FileText },
+      {
+        href: "/items",
+        label: "My Tasks",
+        desc: "Track and update your action items",
+        icon: ListChecks,
+      },
+      {
+        href: "/entries",
+        label: "Weekly Log",
+        desc: "Record your weekly accomplishments",
+        icon: FileText,
+      },
     ],
   };
 
@@ -67,15 +116,54 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     label: "Operations",
     separator: [3], // separator index before CIO-only items
     items: [
-      { href: "/incidents", label: "Incident Rooms", desc: "Live group chat for outage response", icon: Siren, match: (l) => l === "/incidents" || l.startsWith("/incidents/") },
-      { href: "/risks", label: "Risks & Issues", desc: "Open risks, issues, and design notes", icon: ShieldAlert },
-      { href: "/after-action", label: "Post-Incident Reviews", desc: "Document incidents and lessons", icon: Activity },
-      { href: "/reports", label: "Weekly Reports", desc: "Department weekly reports", icon: Files },
+      {
+        href: "/incidents",
+        label: "Incident Rooms",
+        desc: "Live group chat for outage response",
+        icon: Siren,
+        match: (l) => l === "/incidents" || l.startsWith("/incidents/"),
+      },
+      {
+        href: "/risks",
+        label: "Risks & Issues",
+        desc: "Open risks, issues, and design notes",
+        icon: ShieldAlert,
+      },
+      {
+        href: "/after-action",
+        label: "Post-Incident Reviews",
+        desc: "Document incidents and lessons",
+        icon: Activity,
+      },
+      {
+        href: "/reports",
+        label: "Weekly Reports",
+        desc: "Department weekly reports",
+        icon: Files,
+      },
       ...(isCIO
         ? [
-            { href: "/projects", label: "Projects", desc: "Initiatives and progress tracking", icon: Briefcase, cioBadge: true } as NavItem,
-            { href: "/strategic-objectives", label: "Department Goals", desc: "Strategic objectives and KPIs", icon: Target, cioBadge: true } as NavItem,
-            { href: "/admin", label: "Admin", desc: "Manage users and access", icon: Users, cioBadge: true } as NavItem,
+            {
+              href: "/projects",
+              label: "Projects",
+              desc: "Initiatives and progress tracking",
+              icon: Briefcase,
+              cioBadge: true,
+            } as NavItem,
+            {
+              href: "/strategic-objectives",
+              label: "Department Goals",
+              desc: "Strategic objectives and KPIs",
+              icon: Target,
+              cioBadge: true,
+            } as NavItem,
+            {
+              href: "/admin",
+              label: "Admin",
+              desc: "Manage users and access",
+              icon: Users,
+              cioBadge: true,
+            } as NavItem,
           ]
         : []),
     ],
@@ -84,9 +172,22 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
   const infrastructure: NavGroup = {
     label: "Infrastructure",
     items: [
-      { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
+      {
+        href: "/processes",
+        label: "Process Library",
+        desc: "Runbooks and documented procedures",
+        icon: BookOpen,
+      },
       ...(canNetworkTools
-        ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites and generate setup scripts", icon: ShieldCheck, netBadge: true } as NavItem]
+        ? [
+            {
+              href: "/network/tools",
+              label: "Network Tools",
+              desc: "Whitelist websites and generate setup scripts",
+              icon: ShieldCheck,
+              netBadge: true,
+            } as NavItem,
+          ]
         : []),
     ],
   };
@@ -107,6 +208,12 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
         desc: "EUP provisioning report, operating procedure, and change log",
         icon: GraduationCap,
       },
+      {
+        href: "/student-access",
+        label: "High School Students",
+        desc: "Student self-service and faculty access grants",
+        icon: KeyRound,
+      },
     ],
   };
 
@@ -119,16 +226,17 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
         desc: "Practice real IT situations with guided simulations",
         icon: BookOpenCheck,
       },
-      {
-        href: "/student-access",
-        label: "High School Student Access",
-        desc: "Student self-service and faculty access grants",
-        icon: KeyRound,
-      },
     ],
   };
 
-  return [campusOperations, myWork, operations, infrastructure, itApps, service];
+  return [
+    campusOperations,
+    myWork,
+    itApps,
+    operations,
+    infrastructure,
+    service,
+  ];
 }
 
 export function isNavItemActive(item: NavItem, location: string): boolean {
@@ -136,7 +244,10 @@ export function isNavItemActive(item: NavItem, location: string): boolean {
   return location.startsWith(item.href);
 }
 
-export function findActiveItem(groups: NavGroup[], location: string): NavItem | null {
+export function findActiveItem(
+  groups: NavGroup[],
+  location: string,
+): NavItem | null {
   let best: NavItem | null = null;
   for (const g of groups) {
     for (const it of g.items) {

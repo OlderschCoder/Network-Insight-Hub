@@ -111,6 +111,8 @@ as a parallel sign-in path.
 - Leads the sidebar with **Campus Operations** in the operational drill-down
   order: Status, Buildings, Network Map, Monitoring, Cisco Webex Phones, and
   Azure. Those destinations appear once rather than being duplicated below.
+- Places **IT Apps** immediately after **My Work**, with App Directory, Banner,
+  and High School Students grouped together as operational applications.
 
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.
