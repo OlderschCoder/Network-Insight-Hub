@@ -266,8 +266,6 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
     "softball": "Softball Field",
     "student union": "Student Union / Student Activities",
     "student union gym 208 sugymcam": "Student Union / Student Activities",
-    "student life ab": "Student Union / Student Activities",
-    "student life de": "Student Union / Student Activities",
     "student living center slc151": "Student Living Center",
     "student life ab": "Student Living Center",
     "student life de": "Student Living Center",
