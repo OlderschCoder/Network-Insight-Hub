@@ -16,6 +16,11 @@ Visualizer building containers are sized from their current children. Saved
 positions remain useful, but historical container dimensions are ignored so a
 new switch or VLAN cannot render outside its building boundary.
 
+Legacy Student Living labels such as `Student Life AB`, `Student Life DE`,
+`SWA-SLAB`, and `SWA-SLCDE` resolve to the canonical **Student Living Center**
+building. The original hostname and room/section remain on the device record;
+canonicalization changes grouping only.
+
 Fred receives freshness metadata whenever she queries the Network Map overview:
 
 ```mermaid
