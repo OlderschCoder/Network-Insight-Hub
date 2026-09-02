@@ -205,6 +205,11 @@ moves from diagnosis to a change-producing action. Logging is not an approval
 step and must never delay authorized work; Fred is the historian, not the
 gatekeeper.
 
+Each Fred response includes an **Unacceptable** control. Fred must review and
+replace rejected responses without defending them; the third rejection in the
+active thread rotates to the configured deep/alternate model while preserving
+the thread evidence.
+
 If confirmed, Fred keeps a concise rollback-oriented log in the durable topic:
 target and reason, before-state evidence, exact commands or actions, returned
 results, after state, validation, rollback, actor, and timestamps. This topic log

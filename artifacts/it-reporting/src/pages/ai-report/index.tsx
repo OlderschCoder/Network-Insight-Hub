@@ -622,6 +622,7 @@ function ChatTab({
   const [fredPreview, setFredPreview] = useState<FredLibraryPreview | null>(null);
   const [fredPreviewLoading, setFredPreviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unacceptableCount, setUnacceptableCount] = useState(0);
   const [topics, setTopics] = useState<FredChatSessionSummary[]>([]);
   const [topicsLoading, setTopicsLoading] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(90);
@@ -1143,6 +1144,43 @@ function ChatTab({
     }
   };
 
+  const handleUnacceptable = async (messageIndex: number) => {
+    if (loading || messages[messageIndex]?.role !== "assistant") return;
+    const nextCount = unacceptableCount + 1;
+    const rotateModel = nextCount % 3 === 0;
+    const context = messages.slice(0, messageIndex);
+    const compacted = compactFredConversation(context, chat.checkpoint);
+    setUnacceptableCount(nextCount);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/status-report/chat`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          messages: boundMessagesForAI(compacted.recentMessages),
+          conversationCheckpoint: compacted.checkpoint,
+          lookbackDays,
+          previewInventory: isNetworkAdmin,
+          uploadedFileIds: selectedFredFileIds,
+          unacceptableReview: true,
+          rotateModel,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message ?? `HTTP ${res.status}`);
+      const data = await res.json();
+      setMessages((current) => [
+        ...current.slice(0, messageIndex),
+        { role: "assistant", content: data.reply ?? "" },
+        ...current.slice(messageIndex + 1),
+      ]);
+      toast({ title: rotateModel ? `Response replaced using ${data.model}` : "Fred reviewed and replaced the response", description: `${nextCount} unacceptable response${nextCount === 1 ? "" : "s"} in this thread` });
+    } catch (error) {
+      toast({ title: "Could not replace response", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     await sendUserMessage(input, attachedFile);
   };
@@ -1407,6 +1445,7 @@ function ChatTab({
   };
 
   const handleClear = async () => {
+    setUnacceptableCount(0);
     const checkpoint = checkpointAll(messages, chat.checkpoint);
     const serverMessages = messages.map((message) => ({ role: message.role, content: messageText(message) }));
     try {
@@ -1440,6 +1479,7 @@ function ChatTab({
   };
 
   const openTopic = async (sessionId: string) => {
+    setUnacceptableCount(0);
     const response = await fetch(`${API_BASE}/status-report/chat-session/${encodeURIComponent(sessionId)}/activate`, {
       method: "POST",
       headers: authHeaders(),
@@ -2132,6 +2172,16 @@ function ChatTab({
             </div>
             {!mobileFieldMode && m.role === "assistant" && m.content.trim() && (
               <div className="mt-1 flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-red-700"
+                onClick={() => void handleUnacceptable(i)}
+                disabled={loading}
+                title="Reject this answer; every third rejection rotates the model"
+              >
+                <Flag className="h-3.5 w-3.5 mr-1" /> Unacceptable
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

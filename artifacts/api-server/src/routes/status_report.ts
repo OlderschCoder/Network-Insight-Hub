@@ -732,6 +732,8 @@ router.post("/chat", requireAuth, async (req: Request, res: Response) => {
       lookbackDays: rawLookback = 90,
       previewInventory = false,
       uploadedFileIds = [],
+      unacceptableReview = false,
+      rotateModel = false,
     } = req.body ?? {};
 
     if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
@@ -1129,7 +1131,10 @@ ${JSON.stringify(context, null, 2)}`;
     const authRole = (req as any).user?.role ?? null;
     const allowTaskCapture = true; // all roles — Fred captures work and delegates tasks for the whole team
 
-    const routineAI = getFredAI("routine");
+    const routineAI = getFredAI(rotateModel === true ? "deep" : "routine");
+    const correctionInstruction = unacceptableReview === true
+      ? `\n\n# Unacceptable-response correction\nThe user rejected the previous response. Review this thread, the available evidence, and your purpose. Determine whether you are helping reach resolution or creating delay through repetition, unsupported assumptions, unnecessary diagnostics, documentation demands, or refusal. Do not defend the rejected response. State the mistake in one sentence, then provide the shortest useful next action using evidence already available. Do not repeat completed checks or request information already supplied.${rotateModel === true ? " This is an independent replacement from a rotated model." : ""}`
+      : "";
     const {
       reply,
       savedMemories,
@@ -1141,7 +1146,7 @@ ${JSON.stringify(context, null, 2)}`;
       model: routineAI.model,
       maxCompletionTokens: 1400,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: systemPrompt + correctionInstruction },
         ...boundedChatMessages,
       ],
       userId: (req as any).user?.id ?? null,
