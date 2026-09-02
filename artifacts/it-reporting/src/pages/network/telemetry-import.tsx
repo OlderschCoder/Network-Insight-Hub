@@ -51,7 +51,7 @@ type TelemetryPreview = {
   infrastructureNeighborsResolved: number;
   endpointNeighborsIgnored: number;
   linksUpserted: number;
-  delta: TelemetryDelta;
+  delta?: TelemetryDelta;
 };
 type TelemetryPortChange = { port: string; kind: "oper" | "admin" | "native_vlan" | "description" | "added" | "missing"; before: string | number | null; after: string | number | null };
 type TelemetryDelta = {
@@ -143,7 +143,10 @@ async function postRun(aggregate: CollectorAggregate, applied: PlanEntry[], fail
       deviceDeltas: applied.map((entry) => ({
         hostname: entry.source.switch_name,
         managementIp: entry.source.switch_ip,
-        ...entry.preview!.delta,
+        ...(entry.preview!.delta ?? {
+          downToUp: 0, upToDown: 0, adminChanges: 0, vlanChanges: 0,
+          descriptionChanges: 0, portsAdded: 0, portsMissing: 0, changes: [],
+        }),
       })),
       failures: failures.map((failure) => {
         const source = aggregate.switches.find((item) => failure.startsWith(`${item.switch_name}:`));
@@ -288,12 +291,12 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
       logical: sum.logical + (entry.preview?.logicalInterfacesIgnored ?? 0),
       resolved: sum.resolved + (entry.preview?.infrastructureNeighborsResolved ?? 0),
       endpoints: sum.endpoints + (entry.preview?.endpointNeighborsIgnored ?? 0),
-      downToUp: sum.downToUp + (entry.preview?.delta.downToUp ?? 0),
-      upToDown: sum.upToDown + (entry.preview?.delta.upToDown ?? 0),
-      admin: sum.admin + (entry.preview?.delta.adminChanges ?? 0),
-      vlan: sum.vlan + (entry.preview?.delta.vlanChanges ?? 0),
-      added: sum.added + (entry.preview?.delta.portsAdded ?? 0),
-      missing: sum.missing + (entry.preview?.delta.portsMissing ?? 0),
+      downToUp: sum.downToUp + (entry.preview?.delta?.downToUp ?? 0),
+      upToDown: sum.upToDown + (entry.preview?.delta?.upToDown ?? 0),
+      admin: sum.admin + (entry.preview?.delta?.adminChanges ?? 0),
+      vlan: sum.vlan + (entry.preview?.delta?.vlanChanges ?? 0),
+      added: sum.added + (entry.preview?.delta?.portsAdded ?? 0),
+      missing: sum.missing + (entry.preview?.delta?.portsMissing ?? 0),
     }),
     { interfaces: 0, logical: 0, resolved: 0, endpoints: 0, downToUp: 0, upToDown: 0, admin: 0, vlan: 0, added: 0, missing: 0 },
   );
