@@ -31,6 +31,8 @@ type CollectorAggregate = {
   schema: string;
   run_id: string;
   generated_at: string;
+  collection_scope?: "full" | "partial";
+  target_ips?: string[];
   switches: CollectorSwitch[];
 };
 type TelemetryPreview = {
@@ -135,6 +137,8 @@ async function postRun(aggregate: CollectorAggregate, applied: PlanEntry[], fail
     body: JSON.stringify({
       runId: aggregate.run_id,
       generatedAt: aggregate.generated_at,
+      collectionScope: aggregate.collection_scope === "full" ? "full" : "partial",
+      targetIps: aggregate.target_ips ?? aggregate.switches.map((item) => item.switch_ip),
       sourceRecords: aggregate.switches.length,
       successfulRecords: aggregate.switches.filter((item) => item.ok === true).length,
       failedRecords: aggregate.switches.filter((item) => item.ok !== true).length,
@@ -321,6 +325,12 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
             <DialogTitle>Collector telemetry preview</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
+            <div className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-950">
+              <p className="font-bold">{aggregate?.collection_scope === "full" ? "FULL CAMPUS COLLECTION" : "PARTIAL / SCOPED COLLECTION"}</p>
+              <p className="mt-1 text-xs">
+                Only switches contained in this file can be updated. Switches absent from this upload remain unchanged and are not marked stale, down, bad, missing, or deleted.
+              </p>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div className="rounded border p-3"><p className="text-xs text-muted-foreground">Switches</p><p className="text-xl font-bold">{selected.length}</p></div>
               <div className="rounded border p-3"><p className="text-xs text-muted-foreground">Physical interfaces</p><p className="text-xl font-bold">{totals.interfaces.toLocaleString()}</p></div>

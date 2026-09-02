@@ -37,6 +37,19 @@ flowchart LR
 
 ## Telemetry run history and delta
 
+Every telemetry file declares its collection scope and exact target IPs. A
+targeted run is `partial`; an inventory-wide run is `full`. Files created by
+older collectors without an explicit scope are treated as `partial` because
+scope must never be guessed from the number of records.
+
+Import is strictly target-scoped. Only switches present in the file may have
+their telemetry updated. A switch omitted from either a partial or full run is
+not changed, marked stale/down/bad, retired, or deleted. Failed or omitted
+targets remain inventory records, and retirement/deletion always requires a
+separate explicit authorized action. Fred may report a device's independently
+calculated evidence age, but must not describe it as a consequence of a scoped
+upload.
+
 The JSON import previews every physical interface against its preceding stored
 telemetry observation. Applying the import records the collector `run_id`,
 timestamps, failed targets, aggregate counts, affected devices, and individual
@@ -45,7 +58,7 @@ missing-port changes.
 
 ```mermaid
 flowchart LR
-    C[Python SSH collector] --> J[Aggregate JSON with run ID]
+    C[Python SSH collector] --> J[Aggregate JSON with run ID, scope, and target IPs]
     J --> P[Network Map preview]
     P --> D[Compare with preceding port observations]
     D --> A[Apply successful switch records]

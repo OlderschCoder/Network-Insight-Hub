@@ -70,6 +70,7 @@ type NetLink = {
 
 type TelemetryRun = {
   runId: string; generatedAt: string; importedAt: string; sourceRecords: number;
+  collectionScope?: "full" | "partial"; targetIps?: string[];
   successfulRecords: number; failedRecords: number; appliedSwitches: number; physicalPorts: number;
   downToUp: number; upToDown: number; adminChanges: number; vlanChanges: number;
   descriptionChanges: number; portsAdded: number; portsMissing: number; changedDevices: number;
@@ -387,7 +388,10 @@ export default function NetworkMapPage() {
                 Collected {new Date(latestTelemetryRun.generatedAt).toLocaleString()} · run {latestTelemetryRun.runId} · {latestTelemetryRun.successfulRecords}/{latestTelemetryRun.sourceRecords} successful
               </p>
             </div>
-            <Badge variant="outline" className="border-blue-300 bg-white text-blue-900">{latestTelemetryRun.changedDevices} devices changed</Badge>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="border-blue-300 bg-white text-blue-900">{(latestTelemetryRun.collectionScope ?? "partial").toUpperCase()}</Badge>
+              <Badge variant="outline" className="border-blue-300 bg-white text-blue-900">{latestTelemetryRun.changedDevices} devices changed</Badge>
+            </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:grid-cols-8">
             <span><b>{latestTelemetryRun.physicalPorts.toLocaleString()}</b><br /><span className="text-xs">ports checked</span></span>
@@ -399,7 +403,7 @@ export default function NetworkMapPage() {
             <span><b>{latestTelemetryRun.portsAdded}</b><br /><span className="text-xs">new ports</span></span>
             <span><b>{latestTelemetryRun.portsMissing}</b><br /><span className="text-xs">not observed</span></span>
           </div>
-          <p className="mt-2 text-[11px] text-blue-800">Snapshot observations are retained for Fred and do not imply a current outage when campus monitoring is healthy.</p>
+          <p className="mt-2 text-[11px] text-blue-800">This run affects only its recorded targets. An absent switch is unchanged—not stale, down, bad, missing, or deleted. Snapshot observations do not imply a current outage when campus monitoring is healthy.</p>
         </div>
       )}
 

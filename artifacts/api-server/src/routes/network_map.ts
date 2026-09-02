@@ -284,6 +284,8 @@ const telemetryImportSchema = z.object({
   schema: z.literal("sccc.network.switchport_telemetry.v1"),
   runId: z.string().min(1).max(100),
   generatedAt: z.string().datetime({ offset: true }),
+  collectionScope: z.enum(["full", "partial"]).default("partial"),
+  targetIps: z.array(z.string().max(45)).max(500).default([]),
   dryRun: z.boolean().optional().default(true),
   switch: z.object({
     switch_name: z.string().min(1).max(160),
@@ -393,7 +395,8 @@ router.post("/telemetry-runs", requireAuth, requireNetworkAdmin, async (req: any
   const sum = (field: keyof (typeof data.deviceDeltas)[number]) => data.deviceDeltas.reduce((total, row) => total + Number(row[field] ?? 0), 0);
   const changedDevices = data.deviceDeltas.filter((row) => row.changes.length > 0).length;
   const values = {
-    runId: data.runId, generatedAt: new Date(data.generatedAt), sourceRecords: data.sourceRecords,
+    runId: data.runId, generatedAt: new Date(data.generatedAt), collectionScope: data.collectionScope,
+    targetIps: data.targetIps, sourceRecords: data.sourceRecords,
     successfulRecords: data.successfulRecords, failedRecords: data.failedRecords, appliedSwitches: data.appliedSwitches,
     physicalPorts: data.physicalPorts, downToUp: sum("downToUp"), upToDown: sum("upToDown"),
     adminChanges: sum("adminChanges"), vlanChanges: sum("vlanChanges"), descriptionChanges: sum("descriptionChanges"),

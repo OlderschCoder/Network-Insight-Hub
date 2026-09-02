@@ -588,6 +588,8 @@ export async function ensureSchema(): Promise<void> {
         "id" serial PRIMARY KEY,
         "run_id" varchar(100) NOT NULL,
         "generated_at" timestamptz NOT NULL,
+        "collection_scope" varchar(20) NOT NULL DEFAULT 'partial',
+        "target_ips" jsonb NOT NULL DEFAULT '[]'::jsonb,
         "source_records" integer NOT NULL DEFAULT 0,
         "successful_records" integer NOT NULL DEFAULT 0,
         "failed_records" integer NOT NULL DEFAULT 0,
@@ -608,6 +610,8 @@ export async function ensureSchema(): Promise<void> {
         "imported_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "collection_scope" varchar(20) NOT NULL DEFAULT 'partial'`);
+    await db.execute(sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "target_ips" jsonb NOT NULL DEFAULT '[]'::jsonb`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "network_telemetry_runs_run_id_uq" ON "network_telemetry_runs" ("run_id")`);
     logger.info("Ensured network_telemetry_runs table exists");
   } catch (err) {

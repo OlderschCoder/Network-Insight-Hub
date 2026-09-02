@@ -27,6 +27,8 @@ export const networkTelemetryRunsTable = pgTable(
     id: serial("id").primaryKey(),
     runId: varchar("run_id", { length: 100 }).notNull(),
     generatedAt: timestamp("generated_at", { withTimezone: true }).notNull(),
+    collectionScope: varchar("collection_scope", { length: 20 }).notNull().default("partial"),
+    targetIps: jsonb("target_ips").$type<string[]>().notNull().default([]),
     sourceRecords: integer("source_records").notNull().default(0),
     successfulRecords: integer("successful_records").notNull().default(0),
     failedRecords: integer("failed_records").notNull().default(0),

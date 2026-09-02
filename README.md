@@ -452,3 +452,8 @@ The Hub should make the IT team faster without pretending that visibility is
 control. It gathers evidence, remembers the environment, guides people to the
 least-impactful resolution, and writes back only where a narrow authorized path
 exists. When it cannot safely know or change something, it must say so plainly.
+
+Telemetry imports are scoped observations, never inventory reconciliation.
+Only explicitly targeted switches are updated; absence from an upload cannot
+mark another asset stale, down, bad, retired, or deleted. See
+[Network drill-down and evidence freshness](docs/network-drilldown-and-freshness.md).
