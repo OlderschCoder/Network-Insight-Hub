@@ -37,16 +37,27 @@ export type NavItem = {
 export type NavGroup = { label: string; items: NavItem[]; separator?: number[] };
 
 export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[] {
-  const myWork: NavGroup = {
-    label: "My Work",
+  const campusOperations: NavGroup = {
+    label: "Campus Operations",
     items: [
       {
         href: "/",
-        label: "Home",
-        desc: "Your overview and personal workspace",
+        label: "Status",
+        desc: "Current campus health and operational workload",
         icon: LayoutDashboard,
         match: (l) => l === "/",
       },
+      { href: "/network/buildings", label: "Buildings", desc: "Campus building health and device map", icon: Building2, match: (l) => l === "/network/buildings" || l.startsWith("/network/buildings/") },
+      { href: "/network", label: "Network Map", desc: "Switches, VLANs, ports, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") || l.startsWith("/network/nodes") },
+      { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
+      { href: "/it-apps/cisco-calling", label: "Cisco Webex Phones", desc: "Phone directory, device status, buildings, and E-911", icon: PhoneCall, newBadge: true },
+      { href: "/azure-vms", label: "Azure", desc: "VMs and cloud resource inventory", icon: Cloud },
+    ],
+  };
+
+  const myWork: NavGroup = {
+    label: "My Work",
+    items: [
       { href: "/items", label: "My Tasks", desc: "Track and update your action items", icon: ListChecks },
       { href: "/entries", label: "Weekly Log", desc: "Record your weekly accomplishments", icon: FileText },
     ],
@@ -73,10 +84,6 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
   const infrastructure: NavGroup = {
     label: "Infrastructure",
     items: [
-      { href: "/network", label: "Network", desc: "Switches, VLANs, and topology", icon: Network, match: (l) => l === "/network" || l.startsWith("/network/visualize") || l.startsWith("/network/nodes") },
-      { href: "/network/buildings", label: "Buildings", desc: "Campus building health and device map", icon: Building2, match: (l) => l === "/network/buildings" || l.startsWith("/network/buildings/") },
-      { href: "/azure-vms", label: "Azure", desc: "VMs and cloud resource inventory", icon: Cloud },
-      { href: "/monitoring", label: "Monitoring", desc: "Live Grafana dashboards", icon: Gauge },
       { href: "/processes", label: "Process Library", desc: "Runbooks and documented procedures", icon: BookOpen },
       ...(canNetworkTools
         ? [{ href: "/network/tools", label: "Network Tools", desc: "Whitelist websites and generate setup scripts", icon: ShieldCheck, netBadge: true } as NavItem]
@@ -93,13 +100,6 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
         desc: "IT applications, shared tools, and operational reports",
         icon: LayoutGrid,
         match: (l) => l === "/it-apps",
-      },
-      {
-        href: "/it-apps/cisco-calling",
-        label: "Cisco Webex Phones",
-        desc: "Phone directory, device status, buildings, and E-911",
-        icon: PhoneCall,
-        newBadge: true,
       },
       {
         href: "/banner",
@@ -128,7 +128,7 @@ export function getNavGroups(isCIO: boolean, canNetworkTools = false): NavGroup[
     ],
   };
 
-  return [myWork, operations, infrastructure, itApps, service];
+  return [campusOperations, myWork, operations, infrastructure, itApps, service];
 }
 
 export function isNavItemActive(item: NavItem, location: string): boolean {

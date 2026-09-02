@@ -108,6 +108,9 @@ as a parallel sign-in path.
 - Places the current operational pulse first: network availability, risks,
   incidents, calling, Zendesk performance, submissions, and recent activity
   precede learning guidance, personal work, and the Quote of the Day.
+- Leads the sidebar with **Campus Operations** in the operational drill-down
+  order: Status, Buildings, Network Map, Monitoring, Cisco Webex Phones, and
+  Azure. Those destinations appear once rather than being duplicated below.
 
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.
