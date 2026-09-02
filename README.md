@@ -200,8 +200,10 @@ stored even when only the checkpoint and recent turns are sent for inference.
 When diagnosis reaches the first change-producing recommendation, Fred asks
 once:
 
-> **Change Log Creation — User: _authenticated user_ | Date: _Central
-> timestamp_. Create a change log for this work?**
+Fred automatically begins an attributed, rollback-grade change log when work
+moves from diagnosis to a change-producing action. Logging is not an approval
+step and must never delay authorized work; Fred is the historian, not the
+gatekeeper.
 
 If confirmed, Fred keeps a concise rollback-oriented log in the durable topic:
 target and reason, before-state evidence, exact commands or actions, returned
