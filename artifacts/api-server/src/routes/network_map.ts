@@ -3,14 +3,15 @@
  * All writes gated to network admin / CIO roles.
  */
 import { Router } from "express";
-import { db, netNodesTable, netLinksTable, netRoutingAdjacenciesTable, networkSwitchesTable } from "@workspace/db";
+import { db, netNodesTable, netLinksTable, netRoutingAdjacenciesTable, networkSwitchesTable, networkTelemetryRunsTable } from "@workspace/db";
 import { netPortsTable } from "@workspace/db/net_ports";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { requireAuth, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
 import { isIP } from "node:net";
 import crypto from "node:crypto";
 import { normalizeNetworkIdentityData, saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
+import { computeTelemetryPortDelta } from "../lib/network_telemetry_delta";
 
 const router = Router();
 
@@ -361,6 +362,52 @@ function telemetryLinkKind(mediaType: string | null | undefined): "fiber" | "dac
   return "unknown";
 }
 
+const telemetryRunSchema = z.object({
+  runId: z.string().min(1).max(100),
+  generatedAt: z.string().datetime({ offset: true }),
+  sourceRecords: z.number().int().nonnegative(),
+  successfulRecords: z.number().int().nonnegative(),
+  failedRecords: z.number().int().nonnegative(),
+  appliedSwitches: z.number().int().nonnegative(),
+  physicalPorts: z.number().int().nonnegative(),
+  deviceDeltas: z.array(z.object({
+    hostname: z.string().max(160), managementIp: z.string().max(45),
+    downToUp: z.number().int().nonnegative(), upToDown: z.number().int().nonnegative(),
+    adminChanges: z.number().int().nonnegative(), vlanChanges: z.number().int().nonnegative(),
+    descriptionChanges: z.number().int().nonnegative(), portsAdded: z.number().int().nonnegative(),
+    portsMissing: z.number().int().nonnegative(),
+    changes: z.array(z.object({ port: z.string().max(80), kind: z.enum(["oper", "admin", "native_vlan", "description", "added", "missing"]), before: z.union([z.string(), z.number(), z.null()]), after: z.union([z.string(), z.number(), z.null()]) })).max(5000),
+  })).max(500),
+  failures: z.array(z.object({ hostname: z.string().max(160), managementIp: z.string().max(45), error: z.string().max(500) })).max(500),
+});
+
+router.get("/telemetry-runs/latest", requireAuth, async (_req, res) => {
+  const [latest] = await db.select().from(networkTelemetryRunsTable).orderBy(desc(networkTelemetryRunsTable.importedAt)).limit(1);
+  return res.json(latest ?? null);
+});
+
+router.post("/telemetry-runs", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const parsed = telemetryRunSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  const data = parsed.data;
+  const sum = (field: keyof (typeof data.deviceDeltas)[number]) => data.deviceDeltas.reduce((total, row) => total + Number(row[field] ?? 0), 0);
+  const changedDevices = data.deviceDeltas.filter((row) => row.changes.length > 0).length;
+  const values = {
+    runId: data.runId, generatedAt: new Date(data.generatedAt), sourceRecords: data.sourceRecords,
+    successfulRecords: data.successfulRecords, failedRecords: data.failedRecords, appliedSwitches: data.appliedSwitches,
+    physicalPorts: data.physicalPorts, downToUp: sum("downToUp"), upToDown: sum("upToDown"),
+    adminChanges: sum("adminChanges"), vlanChanges: sum("vlanChanges"), descriptionChanges: sum("descriptionChanges"),
+    portsAdded: sum("portsAdded"), portsMissing: sum("portsMissing"), changedDevices,
+    deviceDeltas: data.deviceDeltas, failures: data.failures,
+    actorId: req.user?.id ?? null, actorName: req.user?.name ?? req.user?.email ?? "Network administrator",
+    importedAt: new Date(),
+  };
+  const [row] = await db.insert(networkTelemetryRunsTable).values(values).onConflictDoUpdate({
+    target: networkTelemetryRunsTable.runId, set: values,
+  }).returning();
+  return res.json(row);
+});
+
 router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: any, res) => {
   const parsed = telemetryImportSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -484,6 +531,16 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     (neighbor) => neighbor.local_port && neighbor.port_id && resolveNeighbor(neighbor),
   );
 
+  const existingPorts = sourceNode
+    ? await db.select().from(netPortsTable).where(eq(netPortsTable.nodeId, sourceNode.id))
+    : [];
+  const delta = computeTelemetryPortDelta(existingPorts, physicalInterfaces.map((iface) => ({
+    interfaceName: iface.port,
+    operStatus: iface.oper_status ?? telemetryOperStatus(iface.status),
+    adminStatus: iface.admin_status && iface.admin_status !== "unknown" ? iface.admin_status : null,
+    nativeVlan: iface.native_vlan ?? telemetryInteger(iface.vlan),
+    description: (iface.description ?? iface.name ?? "").trim() || null,
+  })));
   const preview = {
     dryRun,
     skipped: false,
@@ -501,6 +558,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     infrastructureNeighborsResolved: resolvedNeighbors.length,
     endpointNeighborsIgnored: telemetry.lldp_neighbors.length - resolvedNeighbors.length,
     linksUpserted: 0,
+    delta,
   };
   if (dryRun) return res.json(preview);
 

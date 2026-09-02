@@ -98,6 +98,9 @@ as a parallel sign-in path.
 - Gives Fred inventory-freshness evidence: telemetry older than 36 hours or
   never collected, plus configuration evidence older than 90 days or missing.
   Fred reports the affected devices so collection/import work is actionable.
+- Persists every switch-telemetry import with its collector run ID, failures,
+  and per-port delta. Network Map shows the latest check to every user, and
+  Fred retains the change log without mistaking observations for outages.
 
 ### Monitoring, Azure, telephony, and IT applications
 

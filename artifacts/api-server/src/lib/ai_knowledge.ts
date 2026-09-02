@@ -9,6 +9,7 @@ import {
   deviceConfigsTable,
   netNodesTable,
   netLinksTable,
+  networkTelemetryRunsTable,
   vlansTable,
 } from "@workspace/db";
 import { netPortsTable } from "@workspace/db/net_ports";
@@ -2844,7 +2845,7 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
     ? args.status
     : "all";
   const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
-  const [nodes, links, ports, configImports] = await Promise.all([
+  const [nodes, links, ports, configImports, telemetryRuns] = await Promise.all([
     db.select().from(netNodesTable),
     db.select().from(netLinksTable),
     db.select().from(netPortsTable),
@@ -2856,6 +2857,7 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
       })
       .from(deviceConfigsTable)
       .orderBy(desc(deviceConfigsTable.createdAt)),
+    db.select().from(networkTelemetryRunsTable).orderBy(desc(networkTelemetryRunsTable.importedAt)).limit(2),
   ]);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const physicalPorts = ports.filter((port) => port.isPhysical !== false);
@@ -2911,6 +2913,28 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
     return boundedNetworkResult({
       source: "/network/map",
       generatedAt: new Date().toISOString(),
+      latestTelemetryRun: telemetryRuns[0] ? {
+        runId: telemetryRuns[0].runId,
+        generatedAt: isoValue(telemetryRuns[0].generatedAt),
+        importedAt: isoValue(telemetryRuns[0].importedAt),
+        sourceRecords: telemetryRuns[0].sourceRecords,
+        successfulRecords: telemetryRuns[0].successfulRecords,
+        failedRecords: telemetryRuns[0].failedRecords,
+        appliedSwitches: telemetryRuns[0].appliedSwitches,
+        physicalPorts: telemetryRuns[0].physicalPorts,
+        changes: {
+          changedDevices: telemetryRuns[0].changedDevices,
+          downToUp: telemetryRuns[0].downToUp,
+          upToDown: telemetryRuns[0].upToDown,
+          administrative: telemetryRuns[0].adminChanges,
+          nativeVlan: telemetryRuns[0].vlanChanges,
+          descriptions: telemetryRuns[0].descriptionChanges,
+          added: telemetryRuns[0].portsAdded,
+          missing: telemetryRuns[0].portsMissing,
+        },
+        deviceDeltas: telemetryRuns[0].deviceDeltas,
+        failures: telemetryRuns[0].failures,
+      } : null,
       counts: {
         nodes: nodes.length,
         links: links.length,

@@ -25,4 +25,5 @@ export * from "./net_nodes";
 export * from "./net_links";
 export * from "./net_ports";
 export * from "./net_routing_adjacencies";
+export * from "./network_telemetry_runs";
 export * from "./formal_ea";

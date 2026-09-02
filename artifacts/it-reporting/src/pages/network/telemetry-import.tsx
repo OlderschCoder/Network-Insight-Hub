@@ -51,6 +51,12 @@ type TelemetryPreview = {
   infrastructureNeighborsResolved: number;
   endpointNeighborsIgnored: number;
   linksUpserted: number;
+  delta: TelemetryDelta;
+};
+type TelemetryPortChange = { port: string; kind: "oper" | "admin" | "native_vlan" | "description" | "added" | "missing"; before: string | number | null; after: string | number | null };
+type TelemetryDelta = {
+  downToUp: number; upToDown: number; adminChanges: number; vlanChanges: number;
+  descriptionChanges: number; portsAdded: number; portsMissing: number; changes: TelemetryPortChange[];
 };
 type PlanEntry = {
   source: CollectorSwitch;
@@ -120,6 +126,34 @@ async function postSwitch(aggregate: CollectorAggregate, source: CollectorSwitch
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.message ?? body.error ?? `HTTP ${response.status}`);
   return body as TelemetryPreview;
+}
+
+async function postRun(aggregate: CollectorAggregate, applied: PlanEntry[], failures: string[], physicalPorts: number) {
+  const response = await authFetch("/api/network-map/telemetry-runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      runId: aggregate.run_id,
+      generatedAt: aggregate.generated_at,
+      sourceRecords: aggregate.switches.length,
+      successfulRecords: aggregate.switches.filter((item) => item.ok === true).length,
+      failedRecords: aggregate.switches.filter((item) => item.ok !== true).length,
+      appliedSwitches: applied.length,
+      physicalPorts,
+      deviceDeltas: applied.map((entry) => ({
+        hostname: entry.source.switch_name,
+        managementIp: entry.source.switch_ip,
+        ...entry.preview!.delta,
+      })),
+      failures: failures.map((failure) => {
+        const source = aggregate.switches.find((item) => failure.startsWith(`${item.switch_name}:`));
+        return { hostname: source?.switch_name ?? "Unknown", managementIp: source?.switch_ip ?? "unknown", error: failure.replace(/^[^:]+:\s*/, "") };
+      }),
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error ?? `Telemetry run history failed (${response.status})`);
+  return body;
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
@@ -202,6 +236,7 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
     setApplying(true);
     const selected = plan.filter((entry) => entry.selected && !entry.error && !entry.preview?.skipped);
     const failures: string[] = [];
+    const appliedEntries: PlanEntry[] = [];
     let applied = 0;
     let interfaces = 0;
     let links = 0;
@@ -211,12 +246,19 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
       try {
         const result = await postSwitch(aggregate, entry.source, false);
         applied++;
+        appliedEntries.push(entry);
         interfaces += result.physicalInterfaces;
         links += result.linksUpserted;
       } catch (error) {
         failures.push(`${entry.source.switch_name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     });
+    for (const entry of plan.filter((item) => item.error)) failures.push(`${entry.source.switch_name}: ${entry.error}`);
+    try {
+      await postRun(aggregate, appliedEntries, failures, interfaces);
+    } catch (error) {
+      toast({ title: "Telemetry imported, but run history failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+    }
     setApplying(false);
     if (failures.length) {
       setPlan((current) => current.map((entry) => {
@@ -246,8 +288,14 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
       logical: sum.logical + (entry.preview?.logicalInterfacesIgnored ?? 0),
       resolved: sum.resolved + (entry.preview?.infrastructureNeighborsResolved ?? 0),
       endpoints: sum.endpoints + (entry.preview?.endpointNeighborsIgnored ?? 0),
+      downToUp: sum.downToUp + (entry.preview?.delta.downToUp ?? 0),
+      upToDown: sum.upToDown + (entry.preview?.delta.upToDown ?? 0),
+      admin: sum.admin + (entry.preview?.delta.adminChanges ?? 0),
+      vlan: sum.vlan + (entry.preview?.delta.vlanChanges ?? 0),
+      added: sum.added + (entry.preview?.delta.portsAdded ?? 0),
+      missing: sum.missing + (entry.preview?.delta.portsMissing ?? 0),
     }),
-    { interfaces: 0, logical: 0, resolved: 0, endpoints: 0 },
+    { interfaces: 0, logical: 0, resolved: 0, endpoints: 0, downToUp: 0, upToDown: 0, admin: 0, vlan: 0, added: 0, missing: 0 },
   );
 
   return (
@@ -275,6 +323,14 @@ export function TelemetryImportButton({ onImported }: { onImported: () => void }
               <div className="rounded border p-3"><p className="text-xs text-muted-foreground">Physical interfaces</p><p className="text-xl font-bold">{totals.interfaces.toLocaleString()}</p></div>
               <div className="rounded border p-3"><p className="text-xs text-muted-foreground">Infrastructure LLDP</p><p className="text-xl font-bold">{totals.resolved.toLocaleString()}</p></div>
               <div className="rounded border p-3"><p className="text-xs text-muted-foreground">Endpoint port evidence</p><p className="text-xl font-bold">{totals.endpoints.toLocaleString()}</p></div>
+            </div>
+
+            <div className="rounded border bg-blue-50 p-3 text-blue-950">
+              <p className="font-semibold">Last-check changes that will be recorded</p>
+              <p className="mt-1 text-xs">
+                {totals.downToUp} down→up · {totals.upToDown} up→down · {totals.admin} administrative · {totals.vlan} native VLAN · {totals.added} newly observed · {totals.missing} missing from this snapshot
+              </p>
+              <p className="mt-1 text-[11px] text-blue-800">These are observed snapshot deltas, not automatic fault declarations. The full per-port change log is retained for Fred.</p>
             </div>
 
             <div className="rounded border bg-muted/30 p-3 space-y-1">

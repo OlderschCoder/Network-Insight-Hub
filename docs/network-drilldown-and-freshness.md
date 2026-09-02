@@ -34,3 +34,26 @@ flowchart LR
   refreshed immediately after an approved configuration change.
 - Missing evidence is reported as `never_collected` or `not_imported`; it is
   never interpreted as a healthy or known-good device.
+
+## Telemetry run history and delta
+
+The JSON import previews every physical interface against its preceding stored
+telemetry observation. Applying the import records the collector `run_id`,
+timestamps, failed targets, aggregate counts, affected devices, and individual
+operational, administrative, native-VLAN, description, newly observed, and
+missing-port changes.
+
+```mermaid
+flowchart LR
+    C[Python SSH collector] --> J[Aggregate JSON with run ID]
+    J --> P[Network Map preview]
+    P --> D[Compare with preceding port observations]
+    D --> A[Apply successful switch records]
+    A --> R[Persist telemetry run and per-port delta]
+    R --> U[Last Check Telemetry Changes]
+    R --> F[Fred Network Map evidence]
+```
+
+An observed up/down delta is historical evidence, not an outage declaration.
+Fred must cross-check Monitoring or an approved live probe when a user asks
+whether a service or port is currently operational.

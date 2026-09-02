@@ -68,6 +68,13 @@ type NetLink = {
   isStale?: boolean;
 };
 
+type TelemetryRun = {
+  runId: string; generatedAt: string; importedAt: string; sourceRecords: number;
+  successfulRecords: number; failedRecords: number; appliedSwitches: number; physicalPorts: number;
+  downToUp: number; upToDown: number; adminChanges: number; vlanChanges: number;
+  descriptionChanges: number; portsAdded: number; portsMissing: number; changedDevices: number;
+};
+
 // ──────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────
@@ -215,6 +222,12 @@ export default function NetworkMapPage() {
     onError: (e: Error) => toast({ title: "Seed failed", description: e.message, variant: "destructive" }),
   });
 
+  const { data: latestTelemetryRun = null } = useQuery<TelemetryRun | null>({
+    queryKey: ["/api/network-map/telemetry-runs/latest"],
+    queryFn: () => authFetch("/api/network-map/telemetry-runs/latest").then((r) => r.json()),
+    refetchInterval: 60000,
+  });
+
   const normalizeMutation = useMutation({
     mutationFn: () => apiReq("POST", "/api/network-map/normalize"),
     onSuccess: (data: { switchGroupsMerged: number; nodeGroupsMerged: number; linkRowsDeleted: number }) => {
@@ -312,6 +325,7 @@ export default function NetworkMapPage() {
               qc.invalidateQueries({ queryKey: ["/api/network-map/links"] });
               qc.invalidateQueries({ queryKey: ["/api/network-map/ports"] });
               qc.invalidateQueries({ queryKey: ["/api/network/switches"] });
+              qc.invalidateQueries({ queryKey: ["/api/network-map/telemetry-runs/latest"] });
             }} />
             <input
               ref={configImportInputRef}
@@ -363,6 +377,31 @@ export default function NetworkMapPage() {
           {links.filter((l) => l.isStale).length} stale links (&gt;90 days)
         </span>
       </div>
+
+      {latestTelemetryRun && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold">Last Check Telemetry Changes</p>
+              <p className="text-xs text-blue-800">
+                Collected {new Date(latestTelemetryRun.generatedAt).toLocaleString()} · run {latestTelemetryRun.runId} · {latestTelemetryRun.successfulRecords}/{latestTelemetryRun.sourceRecords} successful
+              </p>
+            </div>
+            <Badge variant="outline" className="border-blue-300 bg-white text-blue-900">{latestTelemetryRun.changedDevices} devices changed</Badge>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:grid-cols-8">
+            <span><b>{latestTelemetryRun.physicalPorts.toLocaleString()}</b><br /><span className="text-xs">ports checked</span></span>
+            <span><b>{latestTelemetryRun.downToUp}</b><br /><span className="text-xs">down → up</span></span>
+            <span><b>{latestTelemetryRun.upToDown}</b><br /><span className="text-xs">up → down</span></span>
+            <span><b>{latestTelemetryRun.adminChanges}</b><br /><span className="text-xs">administrative</span></span>
+            <span><b>{latestTelemetryRun.vlanChanges}</b><br /><span className="text-xs">native VLAN</span></span>
+            <span><b>{latestTelemetryRun.descriptionChanges}</b><br /><span className="text-xs">descriptions</span></span>
+            <span><b>{latestTelemetryRun.portsAdded}</b><br /><span className="text-xs">new ports</span></span>
+            <span><b>{latestTelemetryRun.portsMissing}</b><br /><span className="text-xs">not observed</span></span>
+          </div>
+          <p className="mt-2 text-[11px] text-blue-800">Snapshot observations are retained for Fred and do not imply a current outage when campus monitoring is healthy.</p>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>

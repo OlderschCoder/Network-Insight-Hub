@@ -584,6 +584,38 @@ export async function ensureSchema(): Promise<void> {
 
   try {
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "network_telemetry_runs" (
+        "id" serial PRIMARY KEY,
+        "run_id" varchar(100) NOT NULL,
+        "generated_at" timestamptz NOT NULL,
+        "source_records" integer NOT NULL DEFAULT 0,
+        "successful_records" integer NOT NULL DEFAULT 0,
+        "failed_records" integer NOT NULL DEFAULT 0,
+        "applied_switches" integer NOT NULL DEFAULT 0,
+        "physical_ports" integer NOT NULL DEFAULT 0,
+        "down_to_up" integer NOT NULL DEFAULT 0,
+        "up_to_down" integer NOT NULL DEFAULT 0,
+        "admin_changes" integer NOT NULL DEFAULT 0,
+        "vlan_changes" integer NOT NULL DEFAULT 0,
+        "description_changes" integer NOT NULL DEFAULT 0,
+        "ports_added" integer NOT NULL DEFAULT 0,
+        "ports_missing" integer NOT NULL DEFAULT 0,
+        "changed_devices" integer NOT NULL DEFAULT 0,
+        "device_deltas" jsonb NOT NULL DEFAULT '[]'::jsonb,
+        "failures" jsonb NOT NULL DEFAULT '[]'::jsonb,
+        "actor_id" integer REFERENCES "users"("id") ON DELETE SET NULL,
+        "actor_name" varchar(255),
+        "imported_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "network_telemetry_runs_run_id_uq" ON "network_telemetry_runs" ("run_id")`);
+    logger.info("Ensured network_telemetry_runs table exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure network_telemetry_runs table");
+  }
+
+  try {
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "net_routing_adjacencies" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
         "device_node_id" uuid NOT NULL REFERENCES "net_nodes"("id") ON DELETE CASCADE,
