@@ -94,7 +94,7 @@ const BUILDING_MONITOR_IPS: Record<string, string[]> = {
     "192.168.2.183",
     "192.168.2.184",
   ],
-  "Student Union / Student Activities": ["192.168.2.200", "192.168.252.46"],
+  "Student Union / Student Activities": ["192.168.2.194", "192.168.2.200", "192.168.252.46"],
   "West Campus": ["172.25.0.2", "172.25.0.3"],
 };
 const CAMPUS_BACKBONE_INTERFACES = [
@@ -302,10 +302,10 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
   if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
   if (key.includes("azure")) return "Azure (Hybrid-VNet)";
   if (key.includes("student health")) return "Student Health Center";
-  if (key.includes("student living") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) {
+  if (key.includes("student living") || key.includes("student life") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) {
     return "Student Living Center";
   }
-  if (key.includes("student union") || key.includes("student activities") || key.includes("student life")) {
+  if (key.includes("student union") || key.includes("student activities") || key.includes("sports & activities")) {
     return "Student Union / Student Activities";
   }
   if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) {
