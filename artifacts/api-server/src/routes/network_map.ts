@@ -284,8 +284,6 @@ const telemetryImportSchema = z.object({
   schema: z.literal("sccc.network.switchport_telemetry.v1"),
   runId: z.string().min(1).max(100),
   generatedAt: z.string().datetime({ offset: true }),
-  collectionScope: z.enum(["full", "partial"]).default("partial"),
-  targetIps: z.array(z.string().max(45)).max(500).default([]),
   dryRun: z.boolean().optional().default(true),
   switch: z.object({
     switch_name: z.string().min(1).max(160),
@@ -367,6 +365,8 @@ function telemetryLinkKind(mediaType: string | null | undefined): "fiber" | "dac
 const telemetryRunSchema = z.object({
   runId: z.string().min(1).max(100),
   generatedAt: z.string().datetime({ offset: true }),
+  collectionScope: z.enum(["full", "partial"]).default("partial"),
+  targetIps: z.array(z.string().max(45)).max(500).default([]),
   sourceRecords: z.number().int().nonnegative(),
   successfulRecords: z.number().int().nonnegative(),
   failedRecords: z.number().int().nonnegative(),
