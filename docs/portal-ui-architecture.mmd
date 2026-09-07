@@ -1,0 +1,16 @@
+flowchart LR
+  U[Authenticated IT user] --> H[Home command center]
+  H --> S[Status and Reporting]
+  H --> N[IT Tools and Network]
+  H --> T[Troubleshooting]
+  S --> API[Existing generated API client]
+  N --> API
+  T --> Z[Existing Zendesk activity endpoint]
+  T --> N
+  H --> F[Fred]
+  S --> F
+  N --> F
+  T --> F
+  API --> DB[(Existing operational data)]
+  Z --> ZE[Zendesk]
+  F --> FM[(Existing Fred topics and memory)]

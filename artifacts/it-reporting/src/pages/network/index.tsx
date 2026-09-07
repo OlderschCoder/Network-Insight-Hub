@@ -12,7 +12,11 @@ import {
   getListSwitchesQueryKey,
   getListVlansQueryKey,
 } from "@workspace/api-client-react";
-import type { NetworkSwitch, Vlan, MaintenanceLogEntry } from "@workspace/api-client-react";
+import type {
+  NetworkSwitch,
+  Vlan,
+  MaintenanceLogEntry,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/lib/authFetch";
@@ -33,23 +37,57 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Search, Server, Network as NetworkIcon, Workflow, Building2,
-  Sparkles, Send, Map as MapIcon, Loader2, Cloud, Radio,
-  Activity, Wrench, Save, Pencil, Trash2, X, History, Download, FileDown, ShieldCheck,
+  Search,
+  Server,
+  Network as NetworkIcon,
+  Workflow,
+  Building2,
+  Sparkles,
+  Send,
+  Map as MapIcon,
+  Loader2,
+  Cloud,
+  Radio,
+  Activity,
+  Wrench,
+  Save,
+  Pencil,
+  Trash2,
+  X,
+  History,
+  Download,
+  FileDown,
+  ShieldCheck,
 } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InventoryHistory } from "./inventory-history";
@@ -58,6 +96,7 @@ import {
   PendingInventoryChanges,
   type PendingNetworkChange,
 } from "@/components/network/pending-inventory-changes";
+import { SectionEyebrow } from "@/components/portal-ui";
 
 const statusColor: Record<string, string> = {
   online: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -103,10 +142,15 @@ const matchVlan = (v: Vlan, q: string) =>
   (v.subnet ?? "").toLowerCase().includes(q);
 
 function normalizeBuildingName(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
-function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
+function getCanonicalBuildingName(
+  rawBuilding: string | null | undefined,
+): string {
   const original = rawBuilding?.trim();
   if (!original) return "Unknown Building";
 
@@ -156,10 +200,26 @@ function getCanonicalBuildingName(rawBuilding: string | null | undefined): strin
   if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
   if (key.includes("azure")) return "Azure (Hybrid-VNet)";
   if (key.includes("student health")) return "Student Health Center";
-  if (key.includes("student living") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) return "Student Living Center";
-  if (key.includes("student union") || key.includes("student activities") || key.includes("student life")) return "Student Union / Student Activities";
-  if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) return "Sharp Champion Center";
-  if (key.includes("allied health") || key.includes("colvin family center")) return "Allied Health";
+  if (
+    key.includes("student living") ||
+    key.includes("tech dorm") ||
+    /^sl[ghjrst]\b/.test(key)
+  )
+    return "Student Living Center";
+  if (
+    key.includes("student union") ||
+    key.includes("student activities") ||
+    key.includes("student life")
+  )
+    return "Student Union / Student Activities";
+  if (
+    key.includes("sharp champion") ||
+    key.includes("sharp family champion") ||
+    key.includes("sharp center")
+  )
+    return "Sharp Champion Center";
+  if (key.includes("allied health") || key.includes("colvin family center"))
+    return "Allied Health";
   if (key.includes("agriculture")) return "Agriculture";
   if (key.includes("cosmetology")) return "Cosmetology";
   if (key.includes("humanities")) return "Humanities";
@@ -182,19 +242,38 @@ function getCanonicalBuildingName(rawBuilding: string | null | undefined): strin
   ) {
     return "Hobble";
   }
-  if (key.includes("industrial tech") || key.includes("industrial technology campus") || key.startsWith("tech ")) {
+  if (
+    key.includes("industrial tech") ||
+    key.includes("industrial technology campus") ||
+    key.startsWith("tech ")
+  ) {
     return "Industrial Technology Campus";
   }
 
   return original;
 }
 
-function matchesBuildingSearch(summary: MasterBuildingSummary, q: string, switches: NetworkSwitch[], vlans: Vlan[]): boolean {
+function matchesBuildingSearch(
+  summary: MasterBuildingSummary,
+  q: string,
+  switches: NetworkSwitch[],
+  vlans: Vlan[],
+): boolean {
   if (!q) return true;
   if (summary.name.toLowerCase().includes(q)) return true;
 
-  return switches.some((sw) => getCanonicalBuildingName(sw.building) === summary.name && matchSwitch(sw, q)) ||
-    vlans.some((vlan) => getCanonicalBuildingName(vlan.building) === summary.name && matchVlan(vlan, q));
+  return (
+    switches.some(
+      (sw) =>
+        getCanonicalBuildingName(sw.building) === summary.name &&
+        matchSwitch(sw, q),
+    ) ||
+    vlans.some(
+      (vlan) =>
+        getCanonicalBuildingName(vlan.building) === summary.name &&
+        matchVlan(vlan, q),
+    )
+  );
 }
 
 function switchPostIncidentHref(sw: NetworkSwitch): string {
@@ -206,7 +285,9 @@ function switchPostIncidentHref(sw: NetworkSwitch): string {
     sw.building && `Building: ${sw.building}`,
     sw.location && `Location: ${sw.location}`,
     sw.notes && `Existing notes: ${sw.notes}`,
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
   const params = new URLSearchParams({
     title,
     summary,
@@ -225,10 +306,13 @@ function vlanPostIncidentHref(vlan: Vlan): string {
     `VLAN: ${vlan.vlanId} (${vlan.name})`,
     `Type: ${vlan.type}`,
     vlan.building && `Building: ${vlan.building}`,
-    vlan.subnet && `Subnet: ${vlan.subnet}${vlan.gateway ? ` via ${vlan.gateway}` : ""}`,
+    vlan.subnet &&
+      `Subnet: ${vlan.subnet}${vlan.gateway ? ` via ${vlan.gateway}` : ""}`,
     vlan.description && `Description: ${vlan.description}`,
     vlan.notes && `Existing notes: ${vlan.notes}`,
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
   const params = new URLSearchParams({
     title,
     summary,
@@ -241,13 +325,17 @@ function vlanPostIncidentHref(vlan: Vlan): string {
 }
 
 function buildSwitchAIPrompt(sw: NetworkSwitch): string {
-  return `Tell me about switch ${sw.hostname} (${sw.ipAddress})${sw.building ? ` in ${sw.building}` : ""}. ` +
-    `What does it serve, what is its uplink path, and what should I check first if a user on it reports an issue?`;
+  return (
+    `Tell me about switch ${sw.hostname} (${sw.ipAddress})${sw.building ? ` in ${sw.building}` : ""}. ` +
+    `What does it serve, what is its uplink path, and what should I check first if a user on it reports an issue?`
+  );
 }
 
 function buildVlanAIPrompt(vlan: Vlan): string {
-  return `Tell me about VLAN ${vlan.vlanId} (${vlan.name})${vlan.building ? ` in ${vlan.building}` : ""}. ` +
-    `What is it used for, which switches and buildings rely on it, and what should I check first if users on it report issues?`;
+  return (
+    `Tell me about VLAN ${vlan.vlanId} (${vlan.name})${vlan.building ? ` in ${vlan.building}` : ""}. ` +
+    `What is it used for, which switches and buildings rely on it, and what should I check first if users on it report issues?`
+  );
 }
 
 function formatLogTimestamp(iso: string | null | undefined): string {
@@ -261,7 +349,10 @@ function formatLogTimestamp(iso: string | null | undefined): string {
 
 const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
 
-function canManageEntry(user: { id?: number; role?: string } | null, entry: MaintenanceLogEntry) {
+function canManageEntry(
+  user: { id?: number; role?: string } | null,
+  entry: MaintenanceLogEntry,
+) {
   if (!user) return false;
   if (entry.authorId != null && entry.authorId === user.id) return true;
   return !!user.role && MAINTENANCE_EDIT_ROLES.has(user.role);
@@ -284,7 +375,8 @@ function switchOwner(sw: NetworkSwitch): MaintenanceOwner {
     id: sw.id,
     displayName: sw.hostname,
     fileSlug: sw.hostname.replace(/[^a-z0-9._-]+/gi, "_"),
-    subtitle: [sw.ipAddress, sw.building].filter(Boolean).join(" · ") || undefined,
+    subtitle:
+      [sw.ipAddress, sw.building].filter(Boolean).join(" · ") || undefined,
   };
 }
 
@@ -294,8 +386,12 @@ function vlanOwner(vlan: Vlan): MaintenanceOwner {
     kind: "vlan",
     id: vlan.id,
     displayName: display,
-    fileSlug: `vlan-${vlan.vlanId}-${vlan.name}`.replace(/[^a-z0-9._-]+/gi, "_"),
-    subtitle: [vlan.subnet, vlan.building].filter(Boolean).join(" · ") || undefined,
+    fileSlug: `vlan-${vlan.vlanId}-${vlan.name}`.replace(
+      /[^a-z0-9._-]+/gi,
+      "_",
+    ),
+    subtitle:
+      [vlan.subnet, vlan.building].filter(Boolean).join(" · ") || undefined,
   };
 }
 
@@ -328,7 +424,8 @@ function MaintenanceLogEntryRow({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { update: updateEntry, remove: deleteEntry } = useOwnerMaintenanceMutations(owner.kind);
+  const { update: updateEntry, remove: deleteEntry } =
+    useOwnerMaintenanceMutations(owner.kind);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const toLocalInput = (iso: string | null | undefined) => {
@@ -339,7 +436,9 @@ function MaintenanceLogEntryRow({
     return new Date(d.getTime() - tzMs).toISOString().slice(0, 16);
   };
   const [body, setBody] = useState(entry.body);
-  const [windowStart, setWindowStart] = useState(toLocalInput(entry.windowStart));
+  const [windowStart, setWindowStart] = useState(
+    toLocalInput(entry.windowStart),
+  );
   const [windowEnd, setWindowEnd] = useState(toLocalInput(entry.windowEnd));
 
   const allowed = canManageEntry(user, entry);
@@ -368,7 +467,10 @@ function MaintenanceLogEntryRow({
         },
       });
       await refreshOwners();
-      toast({ title: "Maintenance note updated", description: owner.displayName });
+      toast({
+        title: "Maintenance note updated",
+        description: owner.displayName,
+      });
       setEditing(false);
     } catch (e: any) {
       toast({
@@ -383,7 +485,10 @@ function MaintenanceLogEntryRow({
     try {
       await deleteEntry.mutateAsync({ id: owner.id, entryId: entry.id });
       await refreshOwners();
-      toast({ title: "Maintenance note deleted", description: owner.displayName });
+      toast({
+        title: "Maintenance note deleted",
+        description: owner.displayName,
+      });
       setConfirmDelete(false);
     } catch (e: any) {
       toast({
@@ -486,7 +591,9 @@ function MaintenanceLogEntryRow({
           </div>
         </div>
       ) : (
-        <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+        <p className="whitespace-pre-wrap text-xs text-muted-foreground mt-0.5">
+          {entry.body}
+        </p>
       )}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
@@ -495,11 +602,14 @@ function MaintenanceLogEntryRow({
             <AlertDialogTitle>Delete this maintenance note?</AlertDialogTitle>
             <AlertDialogDescription>
               The note will be hidden from the maintenance log on{" "}
-              <span className="font-mono">{owner.displayName}</span>. This can't be undone from the UI.
+              <span className="font-mono">{owner.displayName}</span>. This can't
+              be undone from the UI.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteEntry.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteEntry.isPending}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -535,8 +645,19 @@ function csvEscape(value: string | null | undefined): string {
   return s;
 }
 
-function entriesToCsv(owner: MaintenanceOwner, entries: MaintenanceLogEntry[]): string {
-  const header = [owner.kind, "author", "created_at", "edited_at", "window_start", "window_end", "body"];
+function entriesToCsv(
+  owner: MaintenanceOwner,
+  entries: MaintenanceLogEntry[],
+): string {
+  const header = [
+    owner.kind,
+    "author",
+    "created_at",
+    "edited_at",
+    "window_start",
+    "window_end",
+    "body",
+  ];
   const rows = entries.map((e) =>
     [
       owner.displayName,
@@ -546,12 +667,17 @@ function entriesToCsv(owner: MaintenanceOwner, entries: MaintenanceLogEntry[]): 
       e.windowStart ?? "",
       e.windowEnd ?? "",
       e.body,
-    ].map((v) => csvEscape(String(v ?? ""))).join(","),
+    ]
+      .map((v) => csvEscape(String(v ?? "")))
+      .join(","),
   );
   return [header.join(","), ...rows].join("\n");
 }
 
-function entriesToMarkdown(owner: MaintenanceOwner, entries: MaintenanceLogEntry[]): string {
+function entriesToMarkdown(
+  owner: MaintenanceOwner,
+  entries: MaintenanceLogEntry[],
+): string {
   const lines: string[] = [];
   lines.push(`# Maintenance log — ${owner.displayName}`);
   if (owner.subtitle) lines.push(`*${owner.subtitle}*`);
@@ -655,7 +781,9 @@ function combinedRowsToCsv(rows: CombinedMaintenanceRow[]): string {
 function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
   const lines: string[] = [];
   lines.push(`# Maintenance log — switches & VLANs`);
-  lines.push(`*${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${new Date().toLocaleString()}*`);
+  lines.push(
+    `*${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${new Date().toLocaleString()}*`,
+  );
   lines.push("");
   if (!rows.length) {
     lines.push("_No entries match the current filters._");
@@ -676,7 +804,9 @@ function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
     for (const name of names) {
       const group = grouped.get(name)!;
       const first = group[0];
-      const subtitle = [first.address, first.building].filter(Boolean).join(" · ");
+      const subtitle = [first.address, first.building]
+        .filter(Boolean)
+        .join(" · ");
       lines.push(`## ${name}`);
       if (subtitle) lines.push(`*${subtitle}*`);
       lines.push("");
@@ -687,7 +817,8 @@ function combinedRowsToMarkdown(rows: CombinedMaintenanceRow[]): string {
             `*Window: ${formatLogTimestamp(e.windowStart)}${e.windowEnd ? ` → ${formatLogTimestamp(e.windowEnd)}` : ""}*`,
           );
         }
-        if (e.editedAt) lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
+        if (e.editedAt)
+          lines.push(`*Edited ${formatLogTimestamp(e.editedAt)}*`);
         lines.push("");
         lines.push(e.body);
         lines.push("");
@@ -720,7 +851,10 @@ function ExportAllMaintenanceDialog({
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
 
-  const allRows = useMemo(() => collectCombinedEntries(switches, vlans), [switches, vlans]);
+  const allRows = useMemo(
+    () => collectCombinedEntries(switches, vlans),
+    [switches, vlans],
+  );
 
   const authors = useMemo(() => {
     const seen = new Set<string>();
@@ -743,7 +877,8 @@ function ExportAllMaintenanceDialog({
     return allRows.filter((r) => {
       const e = r.entry;
       if (kind !== "__all__" && r.kind !== kind) return false;
-      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
+      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author)
+        return false;
       if (building !== "__all__") {
         if (r.building !== building) return false;
       }
@@ -796,9 +931,11 @@ function ExportAllMaintenanceDialog({
         <DialogHeader>
           <DialogTitle>Export maintenance log — switches & VLANs</DialogTitle>
           <DialogDescription>
-            {allRows.length} total {allRows.length === 1 ? "entry" : "entries"} across{" "}
-            {switches.length} {switches.length === 1 ? "switch" : "switches"} and {vlans.length}{" "}
-            {vlans.length === 1 ? "VLAN" : "VLANs"}. Filter, then export CSV or Markdown.
+            {allRows.length} total {allRows.length === 1 ? "entry" : "entries"}{" "}
+            across {switches.length}{" "}
+            {switches.length === 1 ? "switch" : "switches"} and {vlans.length}{" "}
+            {vlans.length === 1 ? "VLAN" : "VLANs"}. Filter, then export CSV or
+            Markdown.
           </DialogDescription>
         </DialogHeader>
 
@@ -880,10 +1017,17 @@ function ExportAllMaintenanceDialog({
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {filtered.length} of {allRows.length} {allRows.length === 1 ? "entry" : "entries"}
-            {filtered.length > 0 && ` · ${devicesWithEntries} ${devicesWithEntries === 1 ? "device" : "devices"}`}
+            {filtered.length} of {allRows.length}{" "}
+            {allRows.length === 1 ? "entry" : "entries"}
+            {filtered.length > 0 &&
+              ` · ${devicesWithEntries} ${devicesWithEntries === 1 ? "device" : "devices"}`}
           </span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={reset}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={reset}
+          >
             <X className="h-3 w-3 mr-1" /> Reset filters
           </Button>
         </div>
@@ -896,16 +1040,24 @@ function ExportAllMaintenanceDialog({
           ) : (
             <div className="divide-y">
               {filtered.slice(0, 50).map((r) => (
-                <div key={`${r.kind}-${r.name}-${r.entry.id}`} className="px-2 py-1.5">
+                <div
+                  key={`${r.kind}-${r.name}-${r.entry.id}`}
+                  className="px-2 py-1.5"
+                >
                   <div className="flex flex-wrap items-center gap-x-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <Badge variant="outline" className="h-4 px-1 text-[9px] uppercase">
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[9px] uppercase"
+                    >
                       {r.kind}
                     </Badge>
                     <span className="font-mono normal-case tracking-normal text-xs text-foreground/90">
                       {r.name}
                     </span>
                     {r.building && (
-                      <span className="normal-case tracking-normal">{r.building}</span>
+                      <span className="normal-case tracking-normal">
+                        {r.building}
+                      </span>
                     )}
                     <span className="font-semibold normal-case tracking-normal text-foreground/80">
                       {r.entry.authorName}
@@ -981,12 +1133,16 @@ function MaintenanceHistoryDialog({
     const toTs = to ? new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
     const q = search.trim().toLowerCase();
     return entries.filter((e) => {
-      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author) return false;
+      if (author !== "__all__" && (e.authorName ?? "Unknown") !== author)
+        return false;
       const created = e.createdAt ? new Date(e.createdAt).getTime() : null;
       if (fromTs != null && (created == null || created < fromTs)) return false;
       if (toTs != null && (created == null || created > toTs)) return false;
       if (q) {
-        const hay = [e.body, e.authorName].filter(Boolean).join(" ").toLowerCase();
+        const hay = [e.body, e.authorName]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -1001,17 +1157,28 @@ function MaintenanceHistoryDialog({
   };
 
   const exportCsv = () =>
-    downloadBlob(`${owner.fileSlug}-maintenance.csv`, "text/csv;charset=utf-8", entriesToCsv(owner, filtered));
+    downloadBlob(
+      `${owner.fileSlug}-maintenance.csv`,
+      "text/csv;charset=utf-8",
+      entriesToCsv(owner, filtered),
+    );
   const exportMd = () =>
-    downloadBlob(`${owner.fileSlug}-maintenance.md`, "text/markdown;charset=utf-8", entriesToMarkdown(owner, filtered));
+    downloadBlob(
+      `${owner.fileSlug}-maintenance.md`,
+      "text/markdown;charset=utf-8",
+      entriesToMarkdown(owner, filtered),
+    );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="font-mono">{owner.displayName} — maintenance history</DialogTitle>
+          <DialogTitle className="font-mono">
+            {owner.displayName} — maintenance history
+          </DialogTitle>
           <DialogDescription>
-            {entries.length} total {entries.length === 1 ? "entry" : "entries"}. Filter, search, or export the log.
+            {entries.length} total {entries.length === 1 ? "entry" : "entries"}.
+            Filter, search, or export the log.
           </DialogDescription>
         </DialogHeader>
 
@@ -1034,11 +1201,21 @@ function MaintenanceHistoryDialog({
           </label>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
             From
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 text-xs mt-1" />
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-8 text-xs mt-1"
+            />
           </label>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
             To
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 text-xs mt-1" />
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-8 text-xs mt-1"
+            />
           </label>
           <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Search body
@@ -1056,7 +1233,12 @@ function MaintenanceHistoryDialog({
           <span>
             Showing {filtered.length} of {entries.length}
           </span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={reset}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={reset}
+          >
             <X className="h-3 w-3 mr-1" /> Reset filters
           </Button>
         </div>
@@ -1076,10 +1258,22 @@ function MaintenanceHistoryDialog({
         </ScrollArea>
 
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={exportCsv} disabled={!filtered.length}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={exportCsv}
+            disabled={!filtered.length}
+          >
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={exportMd} disabled={!filtered.length}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={exportMd}
+            disabled={!filtered.length}
+          >
             <FileDown className="h-3 w-3 mr-1" /> Export Markdown
           </Button>
         </DialogFooter>
@@ -1160,7 +1354,10 @@ function MaintenanceNotesEditor({
       await queryClient.invalidateQueries({
         queryKey: ownerListQueryKey(owner.kind),
       });
-      toast({ title: "Maintenance note added", description: owner.displayName });
+      toast({
+        title: "Maintenance note added",
+        description: owner.displayName,
+      });
       reset();
       setEditing(false);
     } catch (e: any) {
@@ -1241,16 +1438,29 @@ function MaintenanceNotesEditor({
   );
 }
 
-function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: string) => void }) {
+function SwitchRow({
+  sw,
+  onAskAI,
+}: {
+  sw: NetworkSwitch;
+  onAskAI?: (prompt: string) => void;
+}) {
   const owner = switchOwner(sw);
   const log = sw.maintenanceLog ?? [];
   const { user } = useAuth();
-  const canEdit = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const canEdit = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
   const [editOpen, setEditOpen] = useState(false);
   const [fields, setFields] = useState({
-    hostname: sw.hostname ?? "", building: sw.building ?? "", ipAddress: sw.ipAddress ?? "",
-    model: sw.model ?? "", location: sw.location ?? "", status: sw.status ?? "unknown",
-    notes: sw.notes ?? "", configFile: sw.configFile ?? "",
+    hostname: sw.hostname ?? "",
+    building: sw.building ?? "",
+    ipAddress: sw.ipAddress ?? "",
+    model: sw.model ?? "",
+    location: sw.location ?? "",
+    status: sw.status ?? "unknown",
+    notes: sw.notes ?? "",
+    configFile: sw.configFile ?? "",
   });
   const updateSwitch = useUpdateSwitch();
   const queryClient = useQueryClient();
@@ -1258,11 +1468,17 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
   const save = async () => {
     try {
       await updateSwitch.mutateAsync({ id: sw.id, data: fields as any });
-      await queryClient.invalidateQueries({ queryKey: getListSwitchesQueryKey() });
+      await queryClient.invalidateQueries({
+        queryKey: getListSwitchesQueryKey(),
+      });
       toast({ title: "Switch updated", description: fields.hostname });
       setEditOpen(false);
     } catch (e: any) {
-      toast({ title: "Couldn't update switch", description: e?.message ?? "Check the values and try again.", variant: "destructive" });
+      toast({
+        title: "Couldn't update switch",
+        description: e?.message ?? "Check the values and try again.",
+        variant: "destructive",
+      });
     }
   };
   return (
@@ -1270,19 +1486,39 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono font-medium text-sm">{sw.hostname}</p>
-          <p className="font-mono text-xs text-primary mt-0.5">{sw.ipAddress}</p>
-          {sw.model && <p className="text-xs text-muted-foreground mt-0.5">{sw.model}</p>}
-          {sw.location && <p className="text-xs text-muted-foreground/80 mt-0.5">{sw.location}</p>}
-          {sw.notes && <p className="text-xs italic text-muted-foreground/70 mt-1">{sw.notes}</p>}
+          <p className="font-mono text-xs text-primary mt-0.5">
+            {sw.ipAddress}
+          </p>
+          {sw.model && (
+            <p className="text-xs text-muted-foreground mt-0.5">{sw.model}</p>
+          )}
+          {sw.location && (
+            <p className="text-xs text-muted-foreground/80 mt-0.5">
+              {sw.location}
+            </p>
+          )}
+          {sw.notes && (
+            <p className="text-xs italic text-muted-foreground/70 mt-1">
+              {sw.notes}
+            </p>
+          )}
         </div>
-        <Badge variant="outline" className={`shrink-0 ${statusColor[sw.status ?? "unknown"] ?? ""}`}>
+        <Badge
+          variant="outline"
+          className={`shrink-0 ${statusColor[sw.status ?? "unknown"] ?? ""}`}
+        >
           {sw.status ?? "unknown"}
         </Badge>
       </div>
       <MaintenanceLogList owner={owner} entries={log} />
       <div className="flex flex-wrap gap-2 mt-2">
         {canEdit && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setEditOpen(true)}
+          >
             <Pencil className="h-3 w-3 mr-1" /> Edit switch
           </Button>
         )}
@@ -1301,7 +1537,7 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
             onClick={() => onAskAI(buildSwitchAIPrompt(sw))}
           >
             <Sparkles className="h-3 w-3 mr-1" />
-            Ask AI about this switch
+            Ask Fred about this switch
           </Button>
         )}
       </div>
@@ -1309,32 +1545,79 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit switch</DialogTitle>
-            <DialogDescription>Update the inventory record. The internal record ID and collected telemetry remain protected.</DialogDescription>
+            <DialogDescription>
+              Update the inventory record. The internal record ID and collected
+              telemetry remain protected.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
-            {([
-              ["Hostname", "hostname", "SW-BUILDING-ROOM"], ["Building", "building", "Building name"],
-              ["Management IP", "ipAddress", "192.168.2.x"], ["Model", "model", "Vendor and model"],
-              ["Location", "location", "Room, closet, or rack"], ["Configuration reference", "configFile", "File or reference"],
-            ] as const).map(([label, key, placeholder]) => (
-              <label key={key} className="text-sm font-medium space-y-1.5">{label}
-                <Input value={fields[key]} placeholder={placeholder} onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))} />
+            {(
+              [
+                ["Hostname", "hostname", "SW-BUILDING-ROOM"],
+                ["Building", "building", "Building name"],
+                ["Management IP", "ipAddress", "192.168.2.x"],
+                ["Model", "model", "Vendor and model"],
+                ["Location", "location", "Room, closet, or rack"],
+                ["Configuration reference", "configFile", "File or reference"],
+              ] as const
+            ).map(([label, key, placeholder]) => (
+              <label key={key} className="text-sm font-medium space-y-1.5">
+                {label}
+                <Input
+                  value={fields[key]}
+                  placeholder={placeholder}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, [key]: e.target.value }))
+                  }
+                />
               </label>
             ))}
-            <label className="text-sm font-medium space-y-1.5">Status
-              <Select value={fields.status} onValueChange={(status) => setFields((f) => ({ ...f, status }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="online">Online</SelectItem><SelectItem value="offline">Offline</SelectItem><SelectItem value="unknown">Unknown</SelectItem></SelectContent>
+            <label className="text-sm font-medium space-y-1.5">
+              Status
+              <Select
+                value={fields.status}
+                onValueChange={(status) => setFields((f) => ({ ...f, status }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
               </Select>
             </label>
-            <label className="text-sm font-medium space-y-1.5 sm:col-span-2">Notes
-              <Textarea rows={5} value={fields.notes} onChange={(e) => setFields((f) => ({ ...f, notes: e.target.value }))} />
+            <label className="text-sm font-medium space-y-1.5 sm:col-span-2">
+              Notes
+              <Textarea
+                rows={5}
+                value={fields.notes}
+                onChange={(e) =>
+                  setFields((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={updateSwitch.isPending || !fields.hostname.trim() || !fields.building.trim() || !fields.ipAddress.trim()}>
-              {updateSwitch.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save switch
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={save}
+              disabled={
+                updateSwitch.isPending ||
+                !fields.hostname.trim() ||
+                !fields.building.trim() ||
+                !fields.ipAddress.trim()
+              }
+            >
+              {updateSwitch.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}{" "}
+              Save switch
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1343,7 +1626,13 @@ function SwitchRow({ sw, onAskAI }: { sw: NetworkSwitch; onAskAI?: (prompt: stri
   );
 }
 
-function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => void }) {
+function VlanRow({
+  vlan,
+  onAskAI,
+}: {
+  vlan: Vlan;
+  onAskAI?: (prompt: string) => void;
+}) {
   const owner = vlanOwner(vlan);
   const log = vlan.maintenanceLog ?? [];
   return (
@@ -1351,17 +1640,27 @@ function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono font-bold text-primary text-sm">VLAN {vlan.vlanId}</span>
+            <span className="font-mono font-bold text-primary text-sm">
+              VLAN {vlan.vlanId}
+            </span>
             <span className="font-medium text-sm truncate">{vlan.name}</span>
           </div>
-          {vlan.description && <p className="text-xs text-muted-foreground mt-0.5">{vlan.description}</p>}
+          {vlan.description && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {vlan.description}
+            </p>
+          )}
           {vlan.subnet && (
             <p className="font-mono text-xs text-emerald-700 mt-0.5">
-              {vlan.subnet}{vlan.gateway && ` via ${vlan.gateway}`}
+              {vlan.subnet}
+              {vlan.gateway && ` via ${vlan.gateway}`}
             </p>
           )}
         </div>
-        <Badge variant="outline" className={`shrink-0 ${vlanTypeColor[vlan.type ?? "other"] ?? ""}`}>
+        <Badge
+          variant="outline"
+          className={`shrink-0 ${vlanTypeColor[vlan.type ?? "other"] ?? ""}`}
+        >
           {vlan.type ?? "other"}
         </Badge>
       </div>
@@ -1382,7 +1681,7 @@ function VlanRow({ vlan, onAskAI }: { vlan: Vlan; onAskAI?: (prompt: string) => 
             onClick={() => onAskAI(buildVlanAIPrompt(vlan))}
           >
             <Sparkles className="h-3 w-3 mr-1" />
-            Ask AI about this VLAN
+            Ask Fred about this VLAN
           </Button>
         )}
       </div>
@@ -1397,25 +1696,34 @@ function AskAIPanel({
   onOpenChange,
   pendingPrompt,
   onPromptConsumed,
+  hideTrigger = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pendingPrompt: string | null;
   onPromptConsumed: () => void;
+  hideTrigger?: boolean;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingChanges, setPendingChanges] = useState<PendingNetworkChange[]>([]);
+  const [pendingChanges, setPendingChanges] = useState<PendingNetworkChange[]>(
+    [],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, busy]);
 
   useEffect(() => {
@@ -1435,23 +1743,38 @@ function AskAIPanel({
     setError(null);
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`${import.meta.env.BASE_URL}api/network/ai-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const res = await fetch(
+        `${import.meta.env.BASE_URL}api/network/ai-chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            messages: next,
+            previewInventory: isNetworkAdmin,
+          }),
         },
-        credentials: "include",
-        body: JSON.stringify({ messages: next, previewInventory: isNetworkAdmin }),
-      });
+      );
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Request failed (${res.status})`);
       }
       const data = await res.json();
-      setMessages([...next, { role: "assistant", content: data.reply || "(empty response)" }]);
-      if (Array.isArray(data.pendingNetworkChanges) && data.pendingNetworkChanges.length > 0) {
-        setPendingChanges((prev) => [...prev, ...(data.pendingNetworkChanges as PendingNetworkChange[])]);
+      setMessages([
+        ...next,
+        { role: "assistant", content: data.reply || "(empty response)" },
+      ]);
+      if (
+        Array.isArray(data.pendingNetworkChanges) &&
+        data.pendingNetworkChanges.length > 0
+      ) {
+        setPendingChanges((prev) => [
+          ...prev,
+          ...(data.pendingNetworkChanges as PendingNetworkChange[]),
+        ]);
       }
     } catch (e: any) {
       setError(e?.message || "AI request failed");
@@ -1469,16 +1792,21 @@ function AskAIPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>
-        <Button size="sm">
-          <Sparkles className="h-4 w-4 mr-2" /> Ask AI
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0">
+      {!hideTrigger && (
+        <SheetTrigger asChild>
+          <Button size="sm">
+            <Sparkles className="h-4 w-4 mr-2" /> Ask Fred
+          </Button>
+        </SheetTrigger>
+      )}
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-xl flex flex-col p-0"
+      >
         <SheetHeader className="px-5 pt-5 pb-3 border-b">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            Network Engineer Assistant
+            Fred · Network Engineer
           </SheetTitle>
           <p className="text-xs text-muted-foreground">
             Knows the SCCC campus map and your live switch / VLAN inventory.
@@ -1489,7 +1817,9 @@ function AskAIPanel({
           <div ref={scrollRef} className="px-5 py-4 space-y-4">
             {messages.length === 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Try one of these:</p>
+                <p className="text-xs text-muted-foreground">
+                  Try one of these:
+                </p>
                 {suggestions.map((s) => (
                   <button
                     key={s}
@@ -1502,7 +1832,12 @@ function AskAIPanel({
               </div>
             )}
             {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+              <div
+                key={i}
+                className={
+                  m.role === "user" ? "flex justify-end" : "flex justify-start"
+                }
+              >
                 <div
                   className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
                     m.role === "user"
@@ -1531,7 +1866,9 @@ function AskAIPanel({
                 changes={pendingChanges}
                 onApplied={(change, message) => {
                   setPendingChanges((prev) => prev.filter((c) => c !== change));
-                  toast({ title: message ?? `Applied ${change.kind} ${change.label}` });
+                  toast({
+                    title: message ?? `Applied ${change.kind} ${change.label}`,
+                  });
                   queryClient.invalidateQueries({ queryKey: ["network"] });
                 }}
                 onFailed={(change, err) => {
@@ -1586,116 +1923,305 @@ function CloudRemotePanel() {
       </CardHeader>
       <CardContent className="pt-0">
         <Accordion type="multiple" className="space-y-2">
-          <AccordionItem value="azure" className="border rounded-md px-3 bg-card">
+          <AccordionItem
+            value="azure"
+            className="border rounded-md px-3 bg-card"
+          >
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
                 <Cloud className="h-4 w-4 text-sky-700" />
-                <span className="font-medium">Microsoft Azure — Hybrid-VNet (Central US)</span>
-                <Badge variant="outline" className="ml-auto text-xs">RG-Prod-CentralUS</Badge>
+                <span className="font-medium">
+                  Microsoft Azure — Hybrid-VNet (Central US)
+                </span>
+                <Badge variant="outline" className="ml-auto text-xs">
+                  RG-Prod-CentralUS
+                </Badge>
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-3 pt-2">
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VNet</p>
-                  <p><span className="text-muted-foreground">Name:</span> <span className="font-mono">Hybrid-VNet</span></p>
-                  <p><span className="text-muted-foreground">Region:</span> centralus</p>
-                  <p><span className="text-muted-foreground">Address space:</span> <span className="font-mono text-emerald-700">10.0.0.0/24, 10.3.0.0/27</span></p>
-                  <p><span className="text-muted-foreground">Peering:</span> none configured</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    VNet
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Name:</span>{" "}
+                    <span className="font-mono">Hybrid-VNet</span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Region:</span>{" "}
+                    centralus
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">
+                      Address space:
+                    </span>{" "}
+                    <span className="font-mono text-emerald-700">
+                      10.0.0.0/24, 10.3.0.0/27
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Peering:</span> none
+                    configured
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key subnets</p>
-                  <p><span className="font-mono">GatewaySubnet</span> — <span className="font-mono text-emerald-700">10.0.0.224/27</span> (Hybrid-VPNGateway)</p>
-                  <p><span className="font-mono">Hybrid_default</span> — <span className="font-mono text-emerald-700">10.0.0.0/25</span> (workloads, NAT, PEs)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Key subnets
+                  </p>
+                  <p>
+                    <span className="font-mono">GatewaySubnet</span> —{" "}
+                    <span className="font-mono text-emerald-700">
+                      10.0.0.224/27
+                    </span>{" "}
+                    (Hybrid-VPNGateway)
+                  </p>
+                  <p>
+                    <span className="font-mono">Hybrid_default</span> —{" "}
+                    <span className="font-mono text-emerald-700">
+                      10.0.0.0/25
+                    </span>{" "}
+                    (workloads, NAT, PEs)
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">VPN</p>
-                  <p><span className="font-mono">Hybrid-VPNGateway</span> — RouteBased, Gen2, Active/Active (VpnGw2AZ)</p>
-                  <p><span className="font-mono">S2S-OnPrem</span> — Connected → <span className="font-mono">OnPrem-LNG</span></p>
-                  <p><span className="font-mono">OnPrem-SNAT</span>: 10.1.0.0/24 → 172.20.1.0/26 (egress)</p>
-                  <p className="text-xs text-amber-700"><span className="font-mono">Azure_Ipsec</span> on VNG_NEW — <strong>NotConnected</strong> (separate path)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    VPN
+                  </p>
+                  <p>
+                    <span className="font-mono">Hybrid-VPNGateway</span> —
+                    RouteBased, Gen2, Active/Active (VpnGw2AZ)
+                  </p>
+                  <p>
+                    <span className="font-mono">S2S-OnPrem</span> — Connected →{" "}
+                    <span className="font-mono">OnPrem-LNG</span>
+                  </p>
+                  <p>
+                    <span className="font-mono">OnPrem-SNAT</span>: 10.1.0.0/24
+                    → 172.20.1.0/26 (egress)
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    <span className="font-mono">Azure_Ipsec</span> on VNG_NEW —{" "}
+                    <strong>NotConnected</strong> (separate path)
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Routes (RT-To-Onprem)</p>
-                  <p><span className="font-mono">192.168.0.0/16</span> → VirtualNetworkGateway</p>
-                  <p><span className="font-mono">10.70.0.0/16</span> → VirtualNetworkGateway</p>
-                  <p><span className="font-mono">10.0.0.192/26</span> → VnetLocal (bastion)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Routes (RT-To-Onprem)
+                  </p>
+                  <p>
+                    <span className="font-mono">192.168.0.0/16</span> →
+                    VirtualNetworkGateway
+                  </p>
+                  <p>
+                    <span className="font-mono">10.70.0.0/16</span> →
+                    VirtualNetworkGateway
+                  </p>
+                  <p>
+                    <span className="font-mono">10.0.0.192/26</span> → VnetLocal
+                    (bastion)
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Local Network Gateway (OnPrem-LNG)</p>
-                  <p><span className="text-muted-foreground">Public IP:</span> <span className="font-mono">207.178.111.98</span></p>
-                  <p className="text-xs text-muted-foreground">Address prefixes include 172.25.0.0/21, 172.25.0.0/24…172.25.6.0/24, plus extensive 10.x, 172.16/18/20/23 and 192.168.0.0/16. Confirm in portal before edits.</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Local Network Gateway (OnPrem-LNG)
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Public IP:</span>{" "}
+                    <span className="font-mono">207.178.111.98</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Address prefixes include 172.25.0.0/21,
+                    172.25.0.0/24…172.25.6.0/24, plus extensive 10.x,
+                    172.16/18/20/23 and 192.168.0.0/16. Confirm in portal before
+                    edits.
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">DNS (VNet)</p>
-                  <p className="font-mono text-xs">10.40.1.80, 10.40.1.82, 10.0.0.34, 10.40.1.77, 10.40.1.68 — on-prem / hybrid mix</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    DNS (VNet)
+                  </p>
+                  <p className="font-mono text-xs">
+                    10.40.1.80, 10.40.1.82, 10.0.0.34, 10.40.1.77, 10.40.1.68 —
+                    on-prem / hybrid mix
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Other VNets in subscription</p>
-                  <p className="text-xs font-mono">Hybrid-TEST01-vnet · 104_VNET · vnet-prod-web · vnet_NEW · aadds-vnet (SCCC_DOMAIN_SERVICES) · test-gateway-vnet · TestVM01-vnet · test-wsus-vnet</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Other VNets in subscription
+                  </p>
+                  <p className="text-xs font-mono">
+                    Hybrid-TEST01-vnet · 104_VNET · vnet-prod-web · vnet_NEW ·
+                    aadds-vnet (SCCC_DOMAIN_SERVICES) · test-gateway-vnet ·
+                    TestVM01-vnet · test-wsus-vnet
+                  </p>
                 </div>
               </div>
               <div className="rounded border border-amber-200 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-                Snapshot is point-in-time from the last <span className="font-mono">azure_visualizer.ps1</span> export.
-                Re-run that script (PowerShell, requires <span className="font-mono">az login</span> and the
-                <span className="font-mono"> resource-graph</span> extension) to refresh.
+                Snapshot is point-in-time from the last{" "}
+                <span className="font-mono">azure_visualizer.ps1</span> export.
+                Re-run that script (PowerShell, requires{" "}
+                <span className="font-mono">az login</span> and the
+                <span className="font-mono"> resource-graph</span> extension) to
+                refresh.
               </div>
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="west" className="border rounded-md px-3 bg-card">
+          <AccordionItem
+            value="west"
+            className="border rounded-md px-3 bg-card"
+          >
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
                 <Radio className="h-4 w-4 text-amber-700" />
-                <span className="font-medium">West Campus — IPsec site (172.25.0.0/21)</span>
-                <Badge variant="outline" className="ml-auto text-xs">VPN-only</Badge>
+                <span className="font-medium">
+                  West Campus — IPsec site (172.25.0.0/21)
+                </span>
+                <Badge variant="outline" className="ml-auto text-xs">
+                  VPN-only
+                </Badge>
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-3 pt-2">
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Addressing</p>
-                  <p><span className="font-mono text-emerald-700">172.25.0.0/21</span> — West aggregate (FortiGate Phase 2 Vlan_910_915, Azure OnPrem-LNG)</p>
-                  <p><span className="font-mono">VLAN 910</span> — <span className="font-mono text-emerald-700">172.25.1.0/24</span> (West_17225_to_Azure)</p>
-                  <p><span className="font-mono">West_Wired</span> — <span className="font-mono text-emerald-700">172.25.0.0/24</span></p>
-                  <p><span className="font-mono">West_Wireless</span> — <span className="font-mono text-emerald-700">10.11.16.0/24</span></p>
-                  <p className="text-xs text-amber-700">FortiGate <span className="font-mono">West_All</span> may exclude 172.25.1.0/24 — Vlan_910 sources can miss policies that use it.</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Addressing
+                  </p>
+                  <p>
+                    <span className="font-mono text-emerald-700">
+                      172.25.0.0/21
+                    </span>{" "}
+                    — West aggregate (FortiGate Phase 2 Vlan_910_915, Azure
+                    OnPrem-LNG)
+                  </p>
+                  <p>
+                    <span className="font-mono">VLAN 910</span> —{" "}
+                    <span className="font-mono text-emerald-700">
+                      172.25.1.0/24
+                    </span>{" "}
+                    (West_17225_to_Azure)
+                  </p>
+                  <p>
+                    <span className="font-mono">West_Wired</span> —{" "}
+                    <span className="font-mono text-emerald-700">
+                      172.25.0.0/24
+                    </span>
+                  </p>
+                  <p>
+                    <span className="font-mono">West_Wireless</span> —{" "}
+                    <span className="font-mono text-emerald-700">
+                      10.11.16.0/24
+                    </span>
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    FortiGate <span className="font-mono">West_All</span> may
+                    exclude 172.25.1.0/24 — Vlan_910 sources can miss policies
+                    that use it.
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Connectivity</p>
-                  <p>Reaches main campus / Azure via <strong>IPsec</strong> through <span className="font-mono">West_FGT</span> ↔ <span className="font-mono">Fortigate1-Sccc</span>.</p>
-                  <p className="text-xs text-muted-foreground">Static route <span className="font-mono">172.25.0.0/21 → West_FGT</span> on the HQ side.</p>
-                  <p className="text-xs text-muted-foreground">Not extended as a campus L2 VLAN like Epworth — design is VPN-only.</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Connectivity
+                  </p>
+                  <p>
+                    Reaches main campus / Azure via <strong>IPsec</strong>{" "}
+                    through <span className="font-mono">West_FGT</span> ↔{" "}
+                    <span className="font-mono">Fortigate1-Sccc</span>.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Static route{" "}
+                    <span className="font-mono">172.25.0.0/21 → West_FGT</span>{" "}
+                    on the HQ side.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Not extended as a campus L2 VLAN like Epworth — design is
+                    VPN-only.
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tunnel runtime (last reviewed)</p>
-                  <p><span className="font-mono">West_FGT</span>: ~28 Phase 2 selectors, 14 up; <span className="text-amber-700">~240k TX errors flagged</span> — investigate MTU / path.</p>
-                  <p><span className="font-mono">Azure-SCCC2</span>: 56 selectors, 33 up (not all SAs up at once is normal).</p>
-                  <p>Phase 2 names: <span className="font-mono">West_17225_to_Azure</span> (172.25.1.0/24 → Azure), <span className="font-mono">Vlan_910_915</span> (172.25.0.0/21 → Azure).</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Tunnel runtime (last reviewed)
+                  </p>
+                  <p>
+                    <span className="font-mono">West_FGT</span>: ~28 Phase 2
+                    selectors, 14 up;{" "}
+                    <span className="text-amber-700">
+                      ~240k TX errors flagged
+                    </span>{" "}
+                    — investigate MTU / path.
+                  </p>
+                  <p>
+                    <span className="font-mono">Azure-SCCC2</span>: 56
+                    selectors, 33 up (not all SAs up at once is normal).
+                  </p>
+                  <p>
+                    Phase 2 names:{" "}
+                    <span className="font-mono">West_17225_to_Azure</span>{" "}
+                    (172.25.1.0/24 → Azure),{" "}
+                    <span className="font-mono">Vlan_910_915</span>{" "}
+                    (172.25.0.0/21 → Azure).
+                  </p>
                 </div>
                 <div className="rounded border bg-background/40 p-3 space-y-1 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Relevant FortiGate policies (Fortigate1-Sccc)</p>
-                  <p className="text-xs">222/223 — West ↔ campus &nbsp;·&nbsp; 229 — campus → Azure &nbsp;·&nbsp; 244/245/246/248 — West ↔ Azure</p>
-                  <p className="text-xs"><span className="font-mono">SCCC_To_WestsideFGT</span>: port3 → West_FGT (src WestFGT_Outgoing, dst WestFGT_Incoming)</p>
-                  <p className="text-xs"><span className="font-mono">WestFGT_To_SCCC</span>: West_FGT → port3 (mirror direction)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Relevant FortiGate policies (Fortigate1-Sccc)
+                  </p>
+                  <p className="text-xs">
+                    222/223 — West ↔ campus &nbsp;·&nbsp; 229 — campus → Azure
+                    &nbsp;·&nbsp; 244/245/246/248 — West ↔ Azure
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-mono">SCCC_To_WestsideFGT</span>:
+                    port3 → West_FGT (src WestFGT_Outgoing, dst
+                    WestFGT_Incoming)
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-mono">WestFGT_To_SCCC</span>: West_FGT
+                    → port3 (mirror direction)
+                  </p>
                 </div>
               </div>
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="epworth" className="border rounded-md px-3 bg-card">
+          <AccordionItem
+            value="epworth"
+            className="border rounded-md px-3 bg-card"
+          >
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2 flex-1">
                 <Radio className="h-4 w-4 text-emerald-700" />
-                <span className="font-medium">Epworth — dark fiber / OSPF site</span>
-                <Badge variant="outline" className="ml-auto text-xs">L2/L3 extended</Badge>
+                <span className="font-medium">
+                  Epworth — dark fiber / OSPF site
+                </span>
+                <Badge variant="outline" className="ml-auto text-xs">
+                  L2/L3 extended
+                </Badge>
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-2 pt-2">
-              <p>Connected to the core via <strong>dark fiber</strong> with OSPF, in contrast to West's IPsec design.</p>
-              <p><span className="font-mono">VLAN 773</span> — <span className="font-mono">EpworthBuilding</span> (named on the aa144 Nexus pair).</p>
-              <p><span className="font-mono">VLAN 616</span> — <span className="font-mono">OSPF10-Epworth</span> (transit /30, e.g. interface description <span className="font-mono">OSPF10-Epworth-To-Cisco9k-A48</span>).</p>
-              <p><span className="font-mono">E117-E213-EpworthLabs</span> for lab segments.</p>
+              <p>
+                Connected to the core via <strong>dark fiber</strong> with OSPF,
+                in contrast to West's IPsec design.
+              </p>
+              <p>
+                <span className="font-mono">VLAN 773</span> —{" "}
+                <span className="font-mono">EpworthBuilding</span> (named on the
+                aa144 Nexus pair).
+              </p>
+              <p>
+                <span className="font-mono">VLAN 616</span> —{" "}
+                <span className="font-mono">OSPF10-Epworth</span> (transit /30,
+                e.g. interface description{" "}
+                <span className="font-mono">OSPF10-Epworth-To-Cisco9k-A48</span>
+                ).
+              </p>
+              <p>
+                <span className="font-mono">E117-E213-EpworthLabs</span> for lab
+                segments.
+              </p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -1731,7 +2257,11 @@ function CampusMapPanel() {
   );
 }
 
-function BuildingHealthBadge({ healthColor }: { healthColor: MasterBuildingSummary["healthColor"] }) {
+function BuildingHealthBadge({
+  healthColor,
+}: {
+  healthColor: MasterBuildingSummary["healthColor"];
+}) {
   const tone = {
     green: "bg-green-100 text-green-700 border-green-300",
     amber: "bg-amber-100 text-amber-700 border-amber-300",
@@ -1744,10 +2274,18 @@ function BuildingHealthBadge({ healthColor }: { healthColor: MasterBuildingSumma
     red: "One or more down",
     unknown: "No live data",
   }[healthColor];
-  return <Badge variant="outline" className={tone}>{label}</Badge>;
+  return (
+    <Badge variant="outline" className={tone}>
+      {label}
+    </Badge>
+  );
 }
 
-function BuildingCategoryLabel({ summary }: { summary: MasterBuildingSummary }) {
+function BuildingCategoryLabel({
+  summary,
+}: {
+  summary: MasterBuildingSummary;
+}) {
   const label = {
     "campus-building": "Campus building",
     "remote-site": "Remote site",
@@ -1760,7 +2298,9 @@ function BuildingCategoryLabel({ summary }: { summary: MasterBuildingSummary }) 
 export default function Network() {
   const searchString = useSearch();
   const { user } = useAuth();
-  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const isNetworkAdmin = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("buildings");
   const [aiOpen, setAiOpen] = useState(false);
@@ -1770,7 +2310,8 @@ export default function Network() {
     const q = params.get("q");
     const t = params.get("tab");
     if (q !== null) setSearch(q);
-    if (t && ["buildings", "switches", "vlans", "history"].includes(t)) setTab(t);
+    if (t && ["buildings", "switches", "vlans", "history"].includes(t))
+      setTab(t);
   }, [searchString]);
 
   const [exportAllOpen, setExportAllOpen] = useState(false);
@@ -1781,7 +2322,9 @@ export default function Network() {
   };
   const { data: switches, isLoading: switchesLoading } = useListSwitches({});
   const { data: vlans, isLoading: vlansLoading } = useListVlans({});
-  const [buildingSummaries, setBuildingSummaries] = useState<MasterBuildingSummary[]>([]);
+  const [buildingSummaries, setBuildingSummaries] = useState<
+    MasterBuildingSummary[]
+  >([]);
   const [buildingsLoading, setBuildingsLoading] = useState(true);
 
   useEffect(() => {
@@ -1815,7 +2358,10 @@ export default function Network() {
   const filteredVlans = allVlans.filter((v) => matchVlan(v, q));
 
   const buildings = useMemo(
-    () => buildingSummaries.filter((summary) => matchesBuildingSearch(summary, q, allSwitches, allVlans)),
+    () =>
+      buildingSummaries.filter((summary) =>
+        matchesBuildingSearch(summary, q, allSwitches, allVlans),
+      ),
     [allSwitches, allVlans, buildingSummaries, q],
   );
 
@@ -1823,43 +2369,61 @@ export default function Network() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Network Reference</h1>
-        <div className="flex gap-2 flex-wrap">
-          <CampusMapPanel />
-          <Link href="/network/visualize">
-            <Button variant="outline" size="sm">
-              <Workflow className="h-4 w-4 mr-2" /> Visualizer
-            </Button>
-          </Link>
-          <Link href="/network/map">
-            <Button variant="outline" size="sm">
-              <NetworkIcon className="h-4 w-4 mr-2" /> Network Map
-            </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setExportAllOpen(true)}
-            disabled={isLoading}
-          >
-            <FileDown className="h-4 w-4 mr-2" /> Export maintenance log
-          </Button>
-          <ExportAllMaintenanceDialog
-            switches={allSwitches}
-            vlans={allVlans}
-            buildingSummaries={buildingSummaries}
-            open={exportAllOpen}
-            onOpenChange={setExportAllOpen}
-          />
-          <AskAIPanel
-            open={aiOpen}
-            onOpenChange={setAiOpen}
-            pendingPrompt={pendingPrompt}
-            onPromptConsumed={() => setPendingPrompt(null)}
-          />
+      <div className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <SectionEyebrow>IT tools & network</SectionEyebrow>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
+            Network reference
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Live building, device, VLAN, topology, and maintenance evidence.
+          </p>
         </div>
       </div>
+
+      <div className="sticky top-[52px] z-20 flex flex-wrap gap-1 rounded-lg border bg-card/95 p-1.5 shadow-sm backdrop-blur">
+        <CampusMapPanel />
+        <Link href="/network/visualize">
+          <Button variant="ghost" size="sm">
+            <Workflow className="h-4 w-4 mr-2" /> Visualizer
+          </Button>
+        </Link>
+        <Link href="/network/map">
+          <Button variant="ghost" size="sm">
+            <NetworkIcon className="h-4 w-4 mr-2" /> Network Map
+          </Button>
+        </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setExportAllOpen(true)}
+          disabled={isLoading}
+        >
+          <FileDown className="h-4 w-4 mr-2" /> Export maintenance log
+        </Button>
+        <ExportAllMaintenanceDialog
+          switches={allSwitches}
+          vlans={allVlans}
+          buildingSummaries={buildingSummaries}
+          open={exportAllOpen}
+          onOpenChange={setExportAllOpen}
+        />
+        <button
+          type="button"
+          onClick={() => setAiOpen(true)}
+          className="ml-auto inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-[var(--primary-hover)]"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Ask Fred
+        </button>
+      </div>
+      <AskAIPanel
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+        pendingPrompt={pendingPrompt}
+        onPromptConsumed={() => setPendingPrompt(null)}
+        hideTrigger
+      />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1873,46 +2437,69 @@ export default function Network() {
 
       <CloudRemotePanel />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="buildings">
-            <Building2 className="h-4 w-4 mr-2" /> Buildings ({buildings.length})
-          </TabsTrigger>
-          <TabsTrigger value="switches">
-            <Server className="h-4 w-4 mr-2" /> Switches ({allSwitches.length})
-          </TabsTrigger>
-          <TabsTrigger value="vlans">
-            <NetworkIcon className="h-4 w-4 mr-2" /> VLANs ({allVlans.length})
-          </TabsTrigger>
-          {isNetworkAdmin && (
-            <TabsTrigger value="health">
-              <ShieldCheck className="h-4 w-4 mr-2" /> Health
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        className="rounded-xl border bg-card p-4 shadow-[var(--portal-card-shadow)]"
+      >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          <div>
+            <SectionEyebrow>Campus inventory</SectionEyebrow>
+            <h2 className="mt-1 text-base font-bold">
+              Buildings, switches, VLANs, and health
+            </h2>
+          </div>
+          <TabsList className="h-auto flex-wrap justify-start">
+            <TabsTrigger value="buildings">
+              <Building2 className="h-4 w-4 mr-2" /> Buildings (
+              {buildings.length})
             </TabsTrigger>
-          )}
-          {isNetworkAdmin && (
-            <TabsTrigger value="history">
-              <History className="h-4 w-4 mr-2" /> History
+            <TabsTrigger value="switches">
+              <Server className="h-4 w-4 mr-2" /> Switches ({allSwitches.length}
+              )
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="vlans">
+              <NetworkIcon className="h-4 w-4 mr-2" /> VLANs ({allVlans.length})
+            </TabsTrigger>
+            {isNetworkAdmin && (
+              <TabsTrigger value="health">
+                <ShieldCheck className="h-4 w-4 mr-2" /> Health
+              </TabsTrigger>
+            )}
+            {isNetworkAdmin && (
+              <TabsTrigger value="history">
+                <History className="h-4 w-4 mr-2" /> History
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="buildings" className="mt-4">
           {isLoading ? (
-            <div className="text-center text-muted-foreground py-8">Loading…</div>
+            <div className="text-center text-muted-foreground py-8">
+              Loading…
+            </div>
           ) : buildings.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              {q ? "No buildings match your search." : "No buildings yet — add switches or VLANs to get started."}
+              {q
+                ? "No buildings match your search."
+                : "No buildings yet — add switches or VLANs to get started."}
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {buildings.map((building) => (
-                <Card key={building.name} className="hover:border-primary/30 transition-colors">
+                <Card
+                  key={building.name}
+                  className={`transition-colors hover:border-primary/30 ${building.healthColor === "red" ? "border-red-500" : ""}`}
+                >
                   <CardContent className="py-4 px-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-primary shrink-0" />
-                          <p className="font-medium leading-tight">{building.name}</p>
+                          <p className="font-medium leading-tight">
+                            {building.name}
+                          </p>
                         </div>
                         <div className="mt-1">
                           <BuildingCategoryLabel summary={building} />
@@ -1921,17 +2508,34 @@ export default function Network() {
                       <BuildingHealthBadge healthColor={building.healthColor} />
                     </div>
                     <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-                      <span>{building.nodeCount} node{building.nodeCount === 1 ? "" : "s"}</span>
-                      <span>{building.vlanCount} VLAN{building.vlanCount === 1 ? "" : "s"}</span>
-                      {typeof building.deviceCount === "number" && typeof building.connectivityObjectCount === "number" && (
-                        <span>{building.deviceCount} device{building.deviceCount === 1 ? "" : "s"} + {building.connectivityObjectCount} object{building.connectivityObjectCount === 1 ? "" : "s"}</span>
-                      )}
+                      <span>
+                        {building.nodeCount} node
+                        {building.nodeCount === 1 ? "" : "s"}
+                      </span>
+                      <span>
+                        {building.vlanCount} VLAN
+                        {building.vlanCount === 1 ? "" : "s"}
+                      </span>
+                      {typeof building.deviceCount === "number" &&
+                        typeof building.connectivityObjectCount ===
+                          "number" && (
+                          <span>
+                            {building.deviceCount} device
+                            {building.deviceCount === 1 ? "" : "s"} +{" "}
+                            {building.connectivityObjectCount} object
+                            {building.connectivityObjectCount === 1 ? "" : "s"}
+                          </span>
+                        )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This building list is sourced from the canonical Buildings inventory so the main Network view stays aligned with the live campus map and health model.
+                      This building list is sourced from the canonical Buildings
+                      inventory so the main Network view stays aligned with the
+                      live campus map and health model.
                     </p>
                     <div className="flex gap-2 flex-wrap">
-                      <Link href={`/network/buildings/${encodeURIComponent(building.name)}`}>
+                      <Link
+                        href={`/network/buildings/${encodeURIComponent(building.name)}`}
+                      >
                         <Button variant="outline" size="sm">
                           Open building details
                         </Button>
@@ -1946,15 +2550,24 @@ export default function Network() {
 
         <TabsContent value="switches" className="mt-4">
           {switchesLoading ? (
-            <div className="text-center text-muted-foreground py-8">Loading…</div>
+            <div className="text-center text-muted-foreground py-8">
+              Loading…
+            </div>
           ) : filteredSwitches.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">No switches found.</div>
+            <div className="text-center text-muted-foreground py-8">
+              No switches found.
+            </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {filteredSwitches.map((sw) => (
-                <Card key={sw.id} className="hover:border-primary/30 transition-colors">
+                <Card
+                  key={sw.id}
+                  className="hover:border-primary/30 transition-colors"
+                >
                   <CardContent className="py-3 px-4">
-                    <p className="text-xs text-muted-foreground mb-1">{sw.building}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {sw.building}
+                    </p>
                     <SwitchRow sw={sw} onAskAI={askAI} />
                   </CardContent>
                 </Card>
@@ -1965,15 +2578,24 @@ export default function Network() {
 
         <TabsContent value="vlans" className="mt-4">
           {vlansLoading ? (
-            <div className="text-center text-muted-foreground py-8">Loading…</div>
+            <div className="text-center text-muted-foreground py-8">
+              Loading…
+            </div>
           ) : filteredVlans.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">No VLANs found.</div>
+            <div className="text-center text-muted-foreground py-8">
+              No VLANs found.
+            </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {filteredVlans.map((vlan) => (
-                <Card key={vlan.id} className="hover:border-primary/30 transition-colors">
+                <Card
+                  key={vlan.id}
+                  className="hover:border-primary/30 transition-colors"
+                >
                   <CardContent className="py-3 px-4">
-                    <p className="text-xs text-muted-foreground mb-1">{vlan.building}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {vlan.building}
+                    </p>
                     <VlanRow vlan={vlan} onAskAI={askAI} />
                   </CardContent>
                 </Card>

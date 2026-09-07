@@ -142,7 +142,7 @@ export function MemoryTab() {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" /> AI Memory
+                <Brain className="h-5 w-5" /> Fred Memory
               </CardTitle>
               <CardDescription>
                 Persistent knowledge about the SCCC environment. Every active entry is loaded into

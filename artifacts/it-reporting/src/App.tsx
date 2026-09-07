@@ -12,6 +12,8 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 import Dashboard from "@/pages/dashboard";
+import HomeHub from "@/pages/home-hub";
+import SupportCenter from "@/pages/support-center";
 import Entries from "@/pages/entries/index";
 import NewEntry from "@/pages/entries/new";
 import EntryDetail from "@/pages/entries/[id]";
@@ -137,7 +139,9 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       
-      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/" component={() => <ProtectedRoute component={HomeHub} />} />
+      <Route path="/status" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/support" component={() => <ProtectedRoute component={SupportCenter} />} />
       
       <Route path="/items" component={() => <ProtectedRoute component={Items} />} />
       <Route path="/entries" component={() => <ProtectedRoute component={Entries} />} />

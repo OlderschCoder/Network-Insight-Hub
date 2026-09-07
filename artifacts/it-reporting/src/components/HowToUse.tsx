@@ -102,7 +102,7 @@ const CIO_STEPS: Step[] = [
       <>
         The <Link href="/reports" className="underline">Reports</Link> hub
         rolls up Individual, Team, Monthly Achievements and Open Items views.{" "}
-        Use <Link href="/ai-report" className="underline">AI Assistant</Link> to
+        Use <Link href="/ai-report" className="underline">Fred</Link> to
         generate a finished status report from the week's data, or export any
         log as DOCX / XLSX from its detail page.
       </>

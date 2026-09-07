@@ -1,6 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
-import { useLogout, useListSwitches, useAddSwitchMaintenanceLogEntry } from "@workspace/api-client-react";
+import {
+  useLogout,
+  useListSwitches,
+  useAddSwitchMaintenanceLogEntry,
+} from "@workspace/api-client-react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Signature } from "@/components/system";
+import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { AppLauncher } from "@/components/AppLauncher";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -31,15 +35,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   ListChecks as ListChecksIcon,
   ShieldAlert as ShieldAlertIcon,
   Activity as ActivityIcon,
   Network as NetworkIcon,
 } from "lucide-react";
-import { LogOut, Zap, Sparkles, Search } from "lucide-react";
+import { LogOut, Zap, Sparkles, Search, Moon, Sun } from "lucide-react";
 import { trackProductUsage } from "@/lib/usage-tracking";
+import {
+  Breadcrumb,
+  FredChip,
+  portalModeForPath,
+} from "@/components/portal-ui";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -78,7 +87,10 @@ function QuickAddMaintenanceDialog({
 
   const submit = async () => {
     if (!switchId || !body.trim()) {
-      toast({ title: "Pick a switch and enter a note", variant: "destructive" });
+      toast({
+        title: "Pick a switch and enter a note",
+        variant: "destructive",
+      });
       return;
     }
     try {
@@ -96,7 +108,11 @@ function QuickAddMaintenanceDialog({
       onOpenChange(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to add note";
-      toast({ title: "Could not save note", description: msg, variant: "destructive" });
+      toast({
+        title: "Could not save note",
+        description: msg,
+        variant: "destructive",
+      });
     }
   };
 
@@ -125,7 +141,9 @@ function QuickAddMaintenanceDialog({
             />
             <div className="border rounded mt-1 max-h-40 overflow-auto">
               {filtered.length === 0 ? (
-                <p className="text-xs text-muted-foreground p-2">No matching switches.</p>
+                <p className="text-xs text-muted-foreground p-2">
+                  No matching switches.
+                </p>
               ) : (
                 filtered.slice(0, 50).map((s) => (
                   <button
@@ -176,7 +194,10 @@ function QuickAddMaintenanceDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={!switchId || !body.trim() || createMutation.isPending}>
+          <Button
+            onClick={submit}
+            disabled={!switchId || !body.trim() || createMutation.isPending}
+          >
             {createMutation.isPending ? "Saving…" : "Add note"}
           </Button>
         </DialogFooter>
@@ -192,7 +213,11 @@ function QuickAddMenu({ iconOnly = false }: { iconOnly?: boolean }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size={iconOnly ? "icon" : "sm"} title="Quick Add">
+          <Button
+            variant="outline"
+            size={iconOnly ? "icon" : "sm"}
+            title="Quick Add"
+          >
             <Zap className="h-4 w-4" />
             {!iconOnly && <span className="ml-2">Quick Add</span>}
           </Button>
@@ -259,9 +284,13 @@ function AccountMenu({
         <DropdownMenuLabel className="flex flex-col">
           <span className="truncate">{name}</span>
           {jobTitle && (
-            <span className="truncate text-xs font-normal text-muted-foreground">{jobTitle}</span>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {jobTitle}
+            </span>
           )}
-          <span className="text-xs font-normal capitalize text-muted-foreground">{role}</span>
+          <span className="text-xs font-normal capitalize text-muted-foreground">
+            {role}
+          </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>
@@ -278,18 +307,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const logoutMutation = useLogout();
   const [launcherOpen, setLauncherOpen] = useState(false);
-  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const stored = window.localStorage.getItem("it_hub_theme");
+    return stored
+      ? stored === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
   const navGroups = getNavGroups(isCIO, canNetworkTools);
   const activeItem = findActiveItem(navGroups, location);
   const activeGroup = navGroups.find((group) =>
     group.items.some((item) => activeItem?.href === item.href),
   );
+  const portalMode = portalModeForPath(location);
+  const appLabel =
+    portalMode === "network"
+      ? "IT Tools & Network"
+      : portalMode === "support"
+        ? "Troubleshooting"
+        : "Status & Reporting";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    window.localStorage.setItem("it_hub_theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   useEffect(() => {
     if (!user || !location) return;
     trackProductUsage("page_view", location);
     const heartbeat = window.setInterval(() => {
-      if (document.visibilityState === "visible") trackProductUsage("heartbeat", location, 60);
+      if (document.visibilityState === "visible")
+        trackProductUsage("heartbeat", location, 60);
     }, 60_000);
     return () => window.clearInterval(heartbeat);
   }, [location, user?.id]);
@@ -313,28 +364,76 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  if (location === "/") {
+    return (
+      <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+        <header className="flex h-[60px] shrink-0 items-center gap-4 bg-[var(--portal-sidebar-bg)] px-5 text-white lg:px-10">
+          <Link href="/" className="flex items-center gap-3">
+            <Logo
+              variant="white"
+              className="h-7 w-24 object-contain object-left"
+            />
+            <span className="border-l border-white/15 pl-3 text-[10px] font-bold uppercase tracking-[0.12em] text-white/60">
+              IT Department Portal
+            </span>
+          </Link>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="hidden text-xs text-white/55 sm:inline">
+              {new Date().toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDarkMode((value) => !value)}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
+              aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+            >
+              {darkMode ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+            <ZendeskAlerts />
+            <AccountMenu
+              name={user?.name}
+              role={user?.role}
+              jobTitle={user?.jobTitle}
+              onLogout={handleLogout}
+            />
+          </div>
+        </header>
+        <ZendeskChatWidget />
+        <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider defaultOpen>
       <AppSidebar />
       <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
+        <header className="sticky top-0 z-30 flex h-[52px] shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
           <div className="flex min-w-0 items-center gap-3">
-            <SidebarTrigger className="h-9 w-9 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white" />
-            <div className="min-w-0">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
-                {activeGroup?.label ?? "Workspace"}
-              </p>
-              <p className="truncate text-sm font-semibold text-white md:text-base">
-                {activeItem?.label ?? "Insights"}
-              </p>
-            </div>
+            <Breadcrumb
+              app={appLabel}
+              page={
+                activeItem?.label ??
+                (location === "/support"
+                  ? "Support Center"
+                  : (activeGroup?.label ?? "Workspace"))
+              }
+            />
           </div>
 
           <div className="ml-auto flex min-w-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setLauncherOpen(true)}
-              className="hidden h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-white/70 transition-colors hover:bg-white/15 sm:flex"
+              className="hidden h-8 items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 text-xs text-white/70 transition-colors hover:bg-white/15 sm:flex"
               aria-label="Search pages"
             >
               <Search className="h-4 w-4" />
@@ -353,20 +452,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Search className="h-4 w-4" />
             </button>
 
-            <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button:hover]:bg-white/20">
-              <QuickAddMenu iconOnly />
-            </div>
+            <button
+              type="button"
+              onClick={() => setDarkMode((value) => !value)}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
+              aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+            >
+              {darkMode ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
 
-            <Link href={location === "/ai-report" ? "/ai-report" : `/ai-report?from=${encodeURIComponent(location)}`}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-violet-400/30 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30 hover:text-white"
-              >
-                <Sparkles className="mr-1.5 h-4 w-4" />
-                Fred
-              </Button>
-            </Link>
+            <FredChip from={location} />
 
             <ZendeskAlerts />
 
@@ -382,7 +481,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ZendeskChatWidget />
 
         <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:p-6">{children}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:px-6 md:py-5">
+            {children}
+          </div>
           <footer className="border-t border-border px-6 py-4">
             <Signature />
           </footer>

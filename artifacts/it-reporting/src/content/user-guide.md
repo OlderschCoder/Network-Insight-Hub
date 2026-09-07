@@ -27,7 +27,7 @@ The fixed sidebar begins with these groups:
 - **Infrastructure** — Process Library and role-restricted Network Tools
 - **Service** — Learn
 
-The header also has **Quick Add** (fast new item) and **Ask AI** shortcuts.
+The header also has a persistent **Fred** shortcut. Dashboard actions live together in the Quick Actions card.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
@@ -147,15 +147,15 @@ Reports aggregate everyone's weekly logs into one department report per week.
 
 ---
 
-## 10. AI Assistant & AI Memory
+## 10. Fred & Fred Memory
 
-Open **AI Assistant**. It has these tabs:
+Open **Fred**. It has these tabs:
 
-- **Ask AI** — chat with read access to your entries, risks, post-incident reviews, and network inventory. Great for summaries and questions ("Summarize the top 3 risks right now").
+- **Ask Fred** — chat with read access to your entries, risks, post-incident reviews, and network inventory. Great for summaries and questions ("Summarize the top 3 risks right now").
 - **Status Report** (CIO only) — generate an executive status report.
-- **AI Memory** — the assistant's **persistent knowledge** about the SCCC environment. Every active entry is fed into the AI's context.
+- **Fred Memory** — Fred's **persistent knowledge** about the SCCC environment. Every active entry is fed into Fred's context.
 
-Using AI Memory:
+Using Fred Memory:
 
 1. **Search** or **filter by category** to find what the AI already knows.
 2. Click **Add memory** to teach it a new fact (device details, procedures, contacts, policies).
@@ -183,8 +183,8 @@ The AI can also **save memories itself** — just tell it a durable fact or say 
 
 **CIO:** 4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
 
-At any point, use the **AI Assistant** to draft summaries or answer questions about the data.
+At any point, use **Fred** to draft summaries or answer questions about the data.
 
 ---
 
-_The embedded AI Assistant also knows all of the above — you can ask it "how do I file a post-incident review?" or "how do I finalize a report?" and it will walk you through it._
+_Fred also knows all of the above — you can ask "how do I file a post-incident review?" or "how do I finalize a report?" and Fred will walk you through it._

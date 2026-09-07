@@ -48,11 +48,11 @@ export function getNavGroups(
     label: "Campus Operations",
     items: [
       {
-        href: "/",
+        href: "/status",
         label: "Status",
         desc: "Current campus health and operational workload",
         icon: LayoutDashboard,
-        match: (l) => l === "/",
+        match: (l) => l === "/status",
       },
       {
         href: "/network/buildings",

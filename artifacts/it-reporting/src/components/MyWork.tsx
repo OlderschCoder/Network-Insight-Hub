@@ -338,10 +338,10 @@ export default function MyWork() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              AI Assistant
+              Fred
             </CardTitle>
             <CardDescription>
-              Ask the AI about entries, risks, post-incident reviews, or your
+              Ask Fred about entries, risks, post-incident reviews, or your
               network inventory.
             </CardDescription>
           </CardHeader>
@@ -353,7 +353,7 @@ export default function MyWork() {
             </ul>
             <Link href="/ai-report">
               <Button size="sm">
-                Open AI Assistant
+                Open Fred
                 <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </Link>

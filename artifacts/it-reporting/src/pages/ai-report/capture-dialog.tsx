@@ -48,7 +48,7 @@ export function CaptureDialog({
   sourceText,
   authorName,
   sourceHref = "/ai-report",
-  sourceLabel = "AI Assistant",
+  sourceLabel = "Fred",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;

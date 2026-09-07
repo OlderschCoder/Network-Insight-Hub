@@ -1,11 +1,13 @@
 # Campus Operations navigation
 
-The sidebar leads with the systems staff use to understand and narrow an active
-campus issue. `Status` is the shared IT Home at `/`.
+The persistent app switcher leads to Home (`/`), Status & Reporting
+(`/status`), IT Tools & Network (`/network`), and Troubleshooting
+(`/support`). The role-aware sidebar remains the detailed navigation layer.
 
 ```mermaid
 flowchart TD
-    S[Status] --> B[Buildings]
+    H[Home] --> S[Status]
+    S --> B[Buildings]
     B --> N[Network Map]
     N --> M[Monitoring]
     M --> P[Cisco Webex Phones]

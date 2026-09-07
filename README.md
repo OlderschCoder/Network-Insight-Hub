@@ -464,3 +464,13 @@ Telemetry imports are scoped observations, never inventory reconciliation.
 Only explicitly targeted switches are updated; absence from an upload cannot
 mark another asset stale, down, bad, retired, or deleted. See
 [Network drill-down and evidence freshness](docs/network-drilldown-and-freshness.md).
+
+## Portal navigation
+
+Insights opens on a cross-app command center at `/`. The existing operational
+dashboard is available at `/status`, network tooling remains rooted at
+`/network`, and the troubleshooting launchpad is at `/support`. These
+surfaces reuse the established API hooks, authenticated integrations, Fred
+chat, and role checks; the redesign changes presentation and navigation rather
+than replacing operational logic. See
+[Insights portal UI architecture](docs/portal-ui-redesign.md).

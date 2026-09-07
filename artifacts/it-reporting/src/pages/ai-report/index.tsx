@@ -2466,19 +2466,20 @@ export default function AIReport() {
   const search = useSearch();
   const searchParams = new URLSearchParams(search);
   const fromPath = searchParams.get("from") ?? "";
+  const prompt = searchParams.get("prompt") ?? "";
   const requestedTab = searchParams.get("tab");
   const defaultTab = isCIO && requestedTab === "architecture" ? "architecture" : "chat";
-  const contextHint = pageHintFromPath(fromPath);
+  const contextHint = prompt || pageHintFromPath(fromPath);
 
   return (
     <div className="flex h-full min-h-[calc(100svh-11rem)] min-w-0 flex-1 flex-col gap-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Sparkles className="h-7 w-7" />
-          AI Assistant
+          Fred
         </h1>
         <p className="text-muted-foreground mt-1">
-          Ask questions about IT data, or (for the CIO) generate executive status reports.
+          Ask Fred about IT data, or (for the CIO) generate executive status reports.
         </p>
       </div>
 
@@ -2486,13 +2487,13 @@ export default function AIReport() {
         <TabsList>
           {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
           {isCIO && <TabsTrigger value="architecture">Architecture</TabsTrigger>}
-          <TabsTrigger value="chat">Ask AI</TabsTrigger>
+          <TabsTrigger value="chat">Ask Fred</TabsTrigger>
           {isCIO && (
             <TabsTrigger value="insights">
               <Flag className="h-4 w-4 mr-1.5" /> CIO Insights
             </TabsTrigger>
           )}
-          <TabsTrigger value="memory">AI Memory</TabsTrigger>
+          <TabsTrigger value="memory">Fred Memory</TabsTrigger>
         </TabsList>
         {isCIO && (
           <TabsContent value="status" className="mt-6">

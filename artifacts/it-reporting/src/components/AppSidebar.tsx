@@ -2,7 +2,11 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -14,16 +18,18 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/system";
 import { useAuth } from "@/context/AuthContext";
 import { getNavGroups, isNavItemActive } from "@/config/nav";
+import { AppModeSwitcher, UserAvatar } from "@/components/portal-ui";
 
 export function AppSidebar() {
   const { isCIO, user } = useAuth();
   const [location] = useLocation();
-  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
   const groups = getNavGroups(isCIO, canNetworkTools);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
@@ -37,7 +43,10 @@ export function AppSidebar() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("it_hub_sidebar_groups", JSON.stringify(openGroups));
+      window.localStorage.setItem(
+        "it_hub_sidebar_groups",
+        JSON.stringify(openGroups),
+      );
     } catch {
       /* ignore storage failures */
     }
@@ -45,12 +54,11 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      collapsible="icon"
+      collapsible="none"
       className="border-r border-sidebar-border/70"
       style={
         {
-          "--sidebar-width": "14.5rem",
-          "--sidebar-width-icon": "3.4rem",
+          "--sidebar-width": "16rem",
         } as CSSProperties
       }
     >
@@ -59,16 +67,20 @@ export function AppSidebar() {
           href="/"
           className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10"
         >
-          <Logo variant="white" className="h-7 shrink-0" />
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-semibold text-sidebar-foreground">
-              Insights
+          <Logo
+            variant="white"
+            className="h-7 w-20 shrink-0 object-contain object-left"
+          />
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-sidebar-foreground">
+              SCCC IT
             </p>
-            <p className="truncate text-xs text-sidebar-foreground/70">
-              Campus operations, monitoring, and reporting
+            <p className="text-[9px] uppercase tracking-[0.12em] text-sidebar-foreground/45">
+              Department Portal
             </p>
           </div>
         </Link>
+        <AppModeSwitcher pathname={location} />
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3">
@@ -89,10 +101,14 @@ export function AppSidebar() {
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="group flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-xs font-medium uppercase tracking-[0.18em] text-sidebar-foreground/70 transition-colors hover:bg-white/5 hover:text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+                    className="group flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-foreground/35 transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
                   >
-                    <SidebarGroupLabel className="p-0 text-inherit">{group.label}</SidebarGroupLabel>
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                    <SidebarGroupLabel className="p-0 text-inherit">
+                      {group.label}
+                    </SidebarGroupLabel>
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                    />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="overflow-hidden">
@@ -110,7 +126,15 @@ export function AppSidebar() {
                             icon={<Icon className="mt-0.5 h-4 w-4 shrink-0" />}
                             label={item.label}
                             desc={item.desc}
-                            badge={item.newBadge ? "NEW" : item.cioBadge ? "CIO" : item.netBadge ? "NET" : null}
+                            badge={
+                              item.newBadge
+                                ? "NEW"
+                                : item.cioBadge
+                                  ? "CIO"
+                                  : item.netBadge
+                                    ? "NET"
+                                    : null
+                            }
                             showSeparator={showSeparator}
                           />
                         );
@@ -124,20 +148,19 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border/70 px-3 py-3 group-data-[collapsible=icon]:hidden">
-        <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
-            Signed In
-          </p>
-          <p className="mt-1 truncate text-sm font-medium text-sidebar-foreground">
-            {user?.name ?? "Team Member"}
-          </p>
-          <p className="truncate text-xs text-sidebar-foreground/70">
-            {user?.jobTitle || user?.role || "Authenticated user"}
-          </p>
+      <SidebarFooter className="border-t border-sidebar-border/70 px-3 py-3">
+        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+          <UserAvatar name={user?.name} />
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-sidebar-foreground">
+              {user?.name ?? "Team Member"}
+            </p>
+            <p className="truncate text-[10px] text-sidebar-foreground/40">
+              {user?.jobTitle || user?.role || "Authenticated user"}
+            </p>
+          </div>
         </div>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }
@@ -162,20 +185,25 @@ function LinkRow({
   return (
     <>
       {showSeparator ? (
-        <li aria-hidden="true" className="my-1 border-t border-sidebar-border/70" />
+        <li
+          aria-hidden="true"
+          className="my-1 border-t border-sidebar-border/70"
+        />
       ) : null}
       <SidebarMenuItem>
         <SidebarMenuButton
           asChild
           isActive={active}
           tooltip={label}
-          className="h-auto min-h-11 items-start rounded-xl px-2.5 py-2.5"
+          className="h-auto min-h-11 items-start rounded-lg px-3 py-2"
         >
           <Link href={href}>
             {icon}
-            <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <span className="min-w-0 flex-1 !overflow-visible !text-clip !whitespace-normal">
               <span className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium">{label}</span>
+                <span className="text-[13px] font-medium leading-4">
+                  {label}
+                </span>
                 {badge ? (
                   <Badge
                     variant="outline"
@@ -185,7 +213,7 @@ function LinkRow({
                   </Badge>
                 ) : null}
               </span>
-              <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-sidebar-foreground/65">
+              <span className="mt-0.5 block !overflow-visible !text-clip !whitespace-normal text-[11px] leading-4 text-sidebar-foreground/35">
                 {desc}
               </span>
             </span>

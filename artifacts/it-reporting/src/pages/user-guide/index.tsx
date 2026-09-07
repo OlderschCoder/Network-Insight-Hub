@@ -12,7 +12,7 @@ export default function UserGuide() {
           User Guide
         </h1>
         <p className="text-muted-foreground mt-1">
-          Step-by-step help for every part of the platform. Ask the AI Assistant
+          Step-by-step help for every part of the platform. Ask Fred
           anything covered here — it knows this guide too.
         </p>
       </div>
