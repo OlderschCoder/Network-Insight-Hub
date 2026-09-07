@@ -27,5 +27,8 @@ while its separate chevron opens the destination list.
 ## Visual system
 
 Portal color and status roles are defined as CSS custom properties in the frontend theme. The global top menu remains dark in both themes; the content theme can be switched from the top bar and is stored locally. Status indicators always pair color with a text label.
+Light building cards and campus-map callouts use explicit dark foregrounds in
+both themes; health color is carried by borders, icons, and status dots rather
+than low-contrast text.
 
 See [portal-ui-architecture.mmd](portal-ui-architecture.mmd) for the editable route and data-flow diagram.
