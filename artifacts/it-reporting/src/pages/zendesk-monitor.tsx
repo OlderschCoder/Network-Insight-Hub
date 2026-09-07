@@ -3,6 +3,7 @@ import {
   Bot,
   ClipboardCopy,
   ExternalLink,
+  ListChecks,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -26,6 +27,11 @@ import { SectionEyebrow } from "@/components/portal-ui";
 import { useToast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/authFetch";
 import { cn } from "@/lib/utils";
+import {
+  assessZendeskTicketForDraft,
+  cleanFredDraft,
+  parseFredDraftDecision,
+} from "@/lib/zendesk_batch_drafting";
 
 type ZendeskTicketSummary = {
   id: number;
@@ -94,19 +100,12 @@ function formatTimestamp(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function cleanFredDraft(value: string) {
-  return value
-    .replace(/^\*\*?Draft public reply[^\n]*\*\*?:?\s*/i, "")
-    .replace(/^Draft public reply[^\n]*:?\s*/i, "")
-    .replace(/\n+No (comments|reply|changes)[\s\S]*$/i, "")
-    .trim();
-}
-
 export default function ZendeskMonitor() {
   const [, navigate] = useLocation();
   const confirm = useConfirm();
   const { toast } = useToast();
   const replyRef = useRef<HTMLTextAreaElement | null>(null);
+  const stopBatchDraftingRef = useRef(false);
   const initialTicketId = Number.parseInt(
     new URLSearchParams(window.location.search).get("ticket") ?? "",
     10,
@@ -120,6 +119,16 @@ export default function ZendeskMonitor() {
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [drafting, setDrafting] = useState(false);
+  const [batchDrafting, setBatchDrafting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({
+    processed: 0,
+    total: 0,
+    saved: 0,
+    skipped: 0,
+    failed: 0,
+    currentTicketId: null as number | null,
+    lastResult: "",
+  });
   const [sending, setSending] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [reply, setReply] = useState("");
@@ -371,11 +380,25 @@ export default function ZendeskMonitor() {
     }
   };
 
-  const draftWithFred = async () => {
-    if (!detail || drafting || !controls.fredEnabled) return;
-    setDrafting(true);
-    try {
-      const monitoredTranscript = detail.comments
+  const fetchTicketDetail = async (ticketId: number) => {
+    const response = await authFetch(
+      `${import.meta.env.BASE_URL}api/zendesk/ticket/${ticketId}`,
+    );
+    const body = (await response.json().catch(() => null)) as
+      | ZendeskTicketDetail
+      | { error?: string; message?: string }
+      | null;
+    if (!response.ok || !body || !("id" in body)) {
+      const errorBody = body as { error?: string; message?: string } | null;
+      throw new Error(
+        errorBody?.message || errorBody?.error || "Unable to load conversation.",
+      );
+    }
+    return body;
+  };
+
+  const askFredForDraft = async (ticketDetail: ZendeskTicketDetail) => {
+    const monitoredTranscript = ticketDetail.comments
         .slice(-30)
         .map(
           (comment) =>
@@ -383,35 +406,74 @@ export default function ZendeskMonitor() {
         )
         .join("\n\n")
         .slice(-12_000);
-      const response = await authFetch(
-        `${import.meta.env.BASE_URL}api/status-report/chat`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: "user",
-                content:
-                  `Draft a concise, friendly response for Zendesk ticket #${detail.id}, “${detail.subject}”. ` +
-                  "Use the monitored Conversation Log below as the current source of truth. Use only supported facts, ask for missing safe details when needed, never request a password, and return only the reply body with no heading or commentary. Do not post or change anything.\n\n" +
-                  `CURRENT CONVERSATION LOG:\n${monitoredTranscript || "No readable messages yet."}`,
-              },
-            ],
-            lookbackDays: 90,
-            previewInventory: false,
-            observationOnly: true,
-          }),
-        },
+    const response = await authFetch(
+      `${import.meta.env.BASE_URL}api/status-report/chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                `Draft a concise, friendly response for Zendesk ticket #${ticketDetail.id}, “${ticketDetail.subject}”. ` +
+                "Use the monitored Conversation Log below as the current source of truth. Use only supported facts, ask for missing safe details when needed, and never request a password. If a public reply would be unsafe, unnecessary, or the ticket instead needs a staff/security escalation, return exactly NO_DRAFT: followed by a brief reason. Otherwise return only the reply body with no heading or commentary. Do not post or change anything.\n\n" +
+                `CURRENT CONVERSATION LOG:\n${monitoredTranscript || "No readable messages yet."}`,
+            },
+          ],
+          lookbackDays: 90,
+          previewInventory: false,
+          observationOnly: true,
+        }),
+      },
+    );
+    const body = (await response.json().catch(() => null)) as {
+      reply?: string;
+      message?: string;
+    } | null;
+    if (!response.ok || !body?.reply) {
+      throw new Error(body?.message || "Fred could not prepare a reply.");
+    }
+    return parseFredDraftDecision(body.reply);
+  };
+
+  const saveDraftForTicket = async (
+    ticketId: number,
+    body: string,
+    source: "fred" | "operator",
+  ) => {
+    const exactBody = body.trim();
+    if (!exactBody) throw new Error("Write a reply before saving the draft.");
+    const response = await authFetch(
+      `${import.meta.env.BASE_URL}api/zendesk/ticket/${ticketId}/draft`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: exactBody, source }),
+      },
+    );
+    const result = (await response.json().catch(() => null)) as {
+      draft?: ZendeskReplyDraft;
+      error?: string;
+      message?: string;
+    } | null;
+    if (!response.ok || !result?.draft) {
+      throw new Error(
+        result?.message || result?.error || "Unable to save the draft.",
       );
-      const body = (await response.json().catch(() => null)) as {
-        reply?: string;
-        message?: string;
-      } | null;
-      if (!response.ok || !body?.reply) {
-        throw new Error(body?.message || "Fred could not prepare a reply.");
+    }
+    return result.draft;
+  };
+
+  const draftWithFred = async () => {
+    if (!detail || drafting || batchDrafting || !controls.fredEnabled) return;
+    setDrafting(true);
+    try {
+      const decision = await askFredForDraft(detail);
+      if (!decision.body) {
+        throw new Error(decision.reason || "Fred found no safe reply to prepare.");
       }
-      const exactDraft = cleanFredDraft(body.reply);
+      const exactDraft = cleanFredDraft(decision.body);
       const saved = await persistDraft(exactDraft, "fred", true);
       setReply(exactDraft);
       setCurrentDraft(saved);
@@ -439,30 +501,11 @@ export default function ZendeskMonitor() {
     quiet = false,
   ) => {
     if (!detail) throw new Error("Select a Zendesk ticket first.");
-    const exactBody = body.trim();
-    if (!exactBody) throw new Error("Write a reply before saving the draft.");
     setSavingDraft(true);
     try {
-      const response = await authFetch(
-        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/draft`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: exactBody, source }),
-        },
-      );
-      const result = (await response.json().catch(() => null)) as {
-        draft?: ZendeskReplyDraft;
-        error?: string;
-        message?: string;
-      } | null;
-      if (!response.ok || !result?.draft) {
-        throw new Error(
-          result?.message || result?.error || "Unable to save the draft.",
-        );
-      }
-      setCurrentDraft(result.draft);
-      setReply(result.draft.body);
+      const savedDraft = await saveDraftForTicket(detail.id, body, source);
+      setCurrentDraft(savedDraft);
+      setReply(savedDraft.body);
       await loadDrafts(true);
       if (!quiet) {
         toast({
@@ -470,9 +513,108 @@ export default function ZendeskMonitor() {
           description: "It is now visible in the shared approval queue.",
         });
       }
-      return result.draft;
+      return savedDraft;
     } finally {
       setSavingDraft(false);
+    }
+  };
+
+  const prepareOpenDrafts = async () => {
+    if (batchDrafting || drafting || !controls.fredEnabled) return;
+    const pendingTicketIds = new Set(drafts.map((draft) => draft.ticketId));
+    const candidates = tickets
+      .filter((ticket) => !pendingTicketIds.has(ticket.id))
+      .slice(0, 25);
+    if (candidates.length === 0) {
+      toast({
+        title: "Draft queue is already covered",
+        description: "Every loaded open ticket already has a pending draft.",
+      });
+      return;
+    }
+
+    const approved = await confirm({
+      title: `Let Fred review ${candidates.length} open ticket${candidates.length === 1 ? "" : "s"}?`,
+      description:
+        "Fred will inspect them one at a time and save only safe, necessary replies. Pending tickets, staff-last replies, internal-only activity, and escalation-only cases are skipped. Nothing is sent.",
+      confirmText: "Prepare drafts",
+    });
+    if (!approved) return;
+
+    stopBatchDraftingRef.current = false;
+    setBatchDrafting(true);
+    let processed = 0;
+    let saved = 0;
+    let skipped = 0;
+    let failed = 0;
+    setBatchProgress({
+      processed,
+      total: candidates.length,
+      saved,
+      skipped,
+      failed,
+      currentTicketId: candidates[0]?.id ?? null,
+      lastResult: "Starting supervised review…",
+    });
+
+    try {
+      for (const ticket of candidates) {
+        if (stopBatchDraftingRef.current) break;
+        setBatchProgress((current) => ({
+          ...current,
+          currentTicketId: ticket.id,
+          lastResult: `Reading ticket #${ticket.id}…`,
+        }));
+        let lastResult = "";
+        try {
+          const ticketDetail = await fetchTicketDetail(ticket.id);
+          const assessment = assessZendeskTicketForDraft(ticketDetail);
+          if (!assessment.shouldDraft) {
+            skipped += 1;
+            lastResult = `Skipped #${ticket.id}: ${assessment.reason}.`;
+          } else {
+            const decision = await askFredForDraft(ticketDetail);
+            if (!decision.body) {
+              skipped += 1;
+              lastResult = `Skipped #${ticket.id}: ${decision.reason}.`;
+            } else {
+              await saveDraftForTicket(ticket.id, decision.body, "fred");
+              saved += 1;
+              lastResult = `Saved draft for #${ticket.id}.`;
+            }
+          }
+        } catch (error) {
+          failed += 1;
+          lastResult = `Could not draft #${ticket.id}: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`;
+        }
+        processed += 1;
+        setBatchProgress({
+          processed,
+          total: candidates.length,
+          saved,
+          skipped,
+          failed,
+          currentTicketId: ticket.id,
+          lastResult,
+        });
+      }
+      await loadDrafts(true);
+      if (selectedId) await loadDraft(selectedId);
+      toast({
+        title: stopBatchDraftingRef.current
+          ? "Fred stopped after the current ticket"
+          : "Fred finished the open-ticket review",
+        description: `${saved} draft${saved === 1 ? "" : "s"} saved, ${skipped} skipped, ${failed} failed. Nothing was sent.`,
+        variant: failed > 0 ? "destructive" : "default",
+      });
+    } finally {
+      setBatchDrafting(false);
+      setBatchProgress((current) => ({
+        ...current,
+        currentTicketId: null,
+      }));
     }
   };
 
@@ -718,13 +860,41 @@ export default function ZendeskMonitor() {
                 size="icon"
                 aria-label="Refresh Zendesk conversations"
                 onClick={() => void Promise.all([loadTickets(), loadDrafts()])}
-                disabled={loadingTickets}
+                disabled={loadingTickets || batchDrafting}
               >
                 <RefreshCw
                   className={cn("h-4 w-4", loadingTickets && "animate-spin")}
                 />
               </Button>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-center"
+              onClick={() => {
+                if (batchDrafting) {
+                  stopBatchDraftingRef.current = true;
+                  setBatchProgress((current) => ({
+                    ...current,
+                    lastResult: "Stopping after the current ticket…",
+                  }));
+                  return;
+                }
+                void prepareOpenDrafts();
+              }}
+              disabled={
+                drafting ||
+                !controls.fredEnabled ||
+                (!batchDrafting && tickets.length === 0)
+              }
+            >
+              {batchDrafting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ListChecks className="mr-2 h-4 w-4" />
+              )}
+              {batchDrafting ? "Stop after current" : "Prepare open drafts"}
+            </Button>
             <label className="relative block">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -739,6 +909,34 @@ export default function ZendeskMonitor() {
                 ? `Last checked ${lastRefreshedAt.toLocaleTimeString()}`
                 : "Connecting to Zendesk…"}
             </p>
+            {batchProgress.total > 0 ? (
+              <div
+                className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-muted-foreground"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="space-y-1 font-semibold text-foreground">
+                  <span>
+                    Fred reviewed {batchProgress.processed} of {batchProgress.total}
+                  </span>
+                  <span>
+                    {batchProgress.saved} saved · {batchProgress.skipped} skipped ·{" "}
+                    {batchProgress.failed} failed
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-[width]"
+                    style={{
+                      width: `${Math.round(
+                        (batchProgress.processed / batchProgress.total) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 line-clamp-2">{batchProgress.lastResult}</p>
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent className="max-h-[650px] overflow-y-auto p-0">
             {loadingTickets && tickets.length === 0 ? (
@@ -889,7 +1087,7 @@ export default function ZendeskMonitor() {
                       variant="outline"
                       size="sm"
                       onClick={() => void draftWithFred()}
-                      disabled={drafting || !controls.fredEnabled}
+                      disabled={drafting || batchDrafting || !controls.fredEnabled}
                     >
                       {drafting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

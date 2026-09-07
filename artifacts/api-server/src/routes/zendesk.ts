@@ -33,6 +33,7 @@ interface ZendeskUser {
   id: number;
   name: string;
   email: string;
+  role?: string;
 }
 
 interface ZendeskTicket {
@@ -723,7 +724,11 @@ router.get("/ticket/:id", requireAuth, async (req: any, res) => {
       enriched = comments.slice(-20).map(c => ({
         id: c.id,
         author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
-        authorType: "user",
+        authorType: ["agent", "admin"].includes(
+          String(userMap.get(c.author_id)?.role ?? "").toLowerCase(),
+        )
+          ? "agent"
+          : "user",
         public: c.public,
         body: truncate((c.plain_body || c.body || "").trim(), 600),
         createdAt: c.created_at,

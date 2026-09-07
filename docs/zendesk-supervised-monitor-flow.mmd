@@ -16,6 +16,24 @@ sequenceDiagram
         API-->>Monitor: Queue and thread
     end
 
+    opt Operator prepares the open-ticket queue
+        Operator->>Monitor: Confirm Prepare open drafts
+        loop Each ticket without a pending draft
+            Monitor->>API: Read current ticket and Conversation Log
+            API->>Zendesk: Fetch current conversation evidence
+            Zendesk-->>API: Ticket and thread
+            API-->>Monitor: Current status, authors, and messages
+            alt Requester is waiting and a public reply is safe
+                Monitor->>Fred: Observation-only draft request
+                Fred-->>Monitor: Reply body only
+                Monitor->>API: Save shared pending draft
+            else Pending, staff-last, internal-only, or escalation-only
+                Monitor-->>Operator: Skip with reason
+            end
+        end
+        Monitor-->>Operator: Saved, skipped, and failed totals; nothing sent
+    end
+
     Operator->>Monitor: Request Fred draft
     Monitor->>API: Check Fred drafting control
     Monitor->>Fred: Observation-only request plus current Conversation Log

@@ -46,7 +46,8 @@ as a parallel sign-in path.
 - Shows the authenticated team a shared Zendesk resolved-ticket scorecard limited
   to Tracy, Mark, Maria, Lucas, Illia, and Craig, including zero-count rows.
 - Provides a supervised Zendesk approval queue: Fred reads the Conversation Log,
-  saves a shared draft, and a staff member edits and approves it. Standard
+  saves one shared draft or works through up to 25 loaded open tickets, and a
+  staff member edits and approves every response. Standard
   Support-channel replies can be sent from Insights; Messaging drafts open in
   Zendesk Agent Workspace for the final send on Suite Growth.
 - Applies that same current-team roster to weekly submission status. Retired and

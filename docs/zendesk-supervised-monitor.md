@@ -8,6 +8,13 @@ recent thread, and manage shared reply drafts.
 
 Fred may prepare a reply, but drafting is always an observation-only AI call.
 It cannot post, edit, solve, or reassign a Zendesk ticket during that step.
+**Prepare open drafts** lets an operator ask Fred to walk the loaded open queue
+one ticket at a time. Existing pending drafts are not replaced. Pending tickets,
+internal-only activity, tickets whose latest public response is from staff, and
+cases Fred identifies as escalation-only are skipped. Progress and counts remain
+visible in the queue while the batch is running, and the operator can stop after
+the current ticket.
+
 The operator can edit the draft, replace it completely, clear the local editor,
 or save it to the shared approval queue. Fred-generated drafts are persisted in
 `data/zendesk-reply-drafts.json`, so another signed-in team member can review
@@ -28,14 +35,17 @@ users can see the current control state but cannot change it.
 ## Sending a response
 
 1. Open **Troubleshooting → Zendesk Monitor**.
-2. Select a conversation from the live queue.
-3. Read the recent public and internal conversation entries.
-4. Select **Draft with Fred**, or type your own public reply. Fred saves her
+2. To prepare the queue, select **Prepare open drafts** and confirm the ticket
+   count. Fred saves only reviewable drafts and reports saved, skipped, and
+   failed counts. Nothing is sent.
+3. Select a conversation from the live queue.
+4. Read the recent public and internal conversation entries.
+5. Select **Draft with Fred**, or type your own public reply. Fred saves her
    response to the shared approval queue automatically.
-5. Edit or replace the response as needed, then select **Save for approval**.
-6. For email, web form, and other Support tickets, select **Approve & send** and
+6. Edit or replace the response as needed, then select **Save for approval**.
+7. For email, web form, and other Support tickets, select **Approve & send** and
    approve the exact text in the confirmation dialog.
-7. For a Messaging ticket, select **Copy & open Zendesk**. Review the copied
+8. For a Messaging ticket, select **Copy & open Zendesk**. Review the copied
    text in Zendesk Agent Workspace and send it from the Messaging composer.
    Insights does not claim that a Messaging draft was delivered.
 
@@ -63,6 +73,8 @@ that operation to the live conversation.
   which includes live messages from end users, agents, and bots. Ticket
   comments remain a compatibility fallback.
 - Auto-send is disabled. Fred cannot silently answer a requester.
+- Batch review is explicitly started by a person, processes at most the 25
+  tickets loaded in the recent-activity queue, and never calls a send endpoint.
 - Pending drafts show directly in the queue and remain available across users,
   browsers, and API-server restarts.
 - Supervisor switches can pause Fred Zendesk actions or all public replies

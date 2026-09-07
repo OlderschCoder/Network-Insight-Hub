@@ -113,12 +113,13 @@ These can be included in the relevant week's report so leadership sees lessons l
 
 1. Open **Troubleshooting → Zendesk Monitor** to watch the open conversation queue and select a ticket.
 2. Mark, Tracy, or the CIO can use the two supervisor switches to turn **Fred drafting** and **Zendesk replies** on or off for everyone. Each change requires confirmation and records who changed it.
-3. Read the live Conversation Log, then select **Draft with Fred**. Fred saves the suggested response in the shared approval queue; she does not send it.
-4. Edit Fred's draft, replace it with your own response, or select **Save for approval** so another signed-in team member can review it.
-5. For email, web form, and other Support tickets, select **Approve & send** and approve the exact saved draft.
-6. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
-7. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
-8. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
+3. Select **Prepare open drafts** to let Fred review up to 25 loaded open tickets one at a time. She skips existing drafts, pending tickets, staff-last replies, internal-only activity, and escalation-only cases. The progress panel shows saved, skipped, and failed totals; nothing sends.
+4. Read the live Conversation Log, then select **Draft with Fred** for a single ticket. Fred saves the suggested response in the shared approval queue; she does not send it.
+5. Edit Fred's draft, replace it with your own response, or select **Save for approval** so another signed-in team member can review it.
+6. For email, web form, and other Support tickets, select **Approve & send** and approve the exact saved draft.
+7. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
+8. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
+9. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
 
 The queue and shared drafts refresh every 15 seconds; the selected Conversation
 Log refreshes every 5 seconds. Every public reply is confirmation-gated in both
