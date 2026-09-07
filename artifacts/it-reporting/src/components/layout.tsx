@@ -47,7 +47,6 @@ import { trackProductUsage } from "@/lib/usage-tracking";
 import {
   Breadcrumb,
   FredChip,
-  portalModeForPath,
 } from "@/components/portal-ui";
 
 function QuickAddMaintenanceDialog({
@@ -322,13 +321,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const activeGroup = navGroups.find((group) =>
     group.items.some((item) => activeItem?.href === item.href),
   );
-  const portalMode = portalModeForPath(location);
-  const appLabel =
-    portalMode === "network"
-      ? "IT Tools & Network"
-      : portalMode === "support"
-        ? "Troubleshooting"
-        : "Status & Reporting";
+  const appLabel = activeGroup?.label ?? "Status & Reporting";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
