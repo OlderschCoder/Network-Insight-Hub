@@ -15,6 +15,15 @@ import {
 import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, asc, gte, and, or, sql, desc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
+import {
+  executeApplicationGuidance,
+  executeManageAfterAction,
+  executeManageWeeklyLog,
+  executeManageWeeklyReport,
+  executeZendeskCreateTicket,
+  executeZendeskSolveTickets,
+  fredApplicationToolsForRole,
+} from "./fred_application_actions";
 import { pingHost, testNetConnection, pingHosts } from "./net_diag";
 import {
   getBuildingSummaries,
@@ -2413,8 +2422,13 @@ export const ZENDESK_ADD_COMMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionToo
             description:
               "True = reply visible to requester. False = internal agent note.",
           },
+          confirmed: {
+            type: "boolean",
+            description:
+              "Must be true only after the user explicitly confirms this exact reply or note.",
+          },
         },
-        required: ["ticket_id", "body", "public"],
+        required: ["ticket_id", "body", "public", "confirmed"],
       },
     },
   };
@@ -2425,11 +2439,12 @@ export const ZENDESK_UPDATE_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionT
     function: {
       name: "zendesk_update_ticket",
       description:
-        "Update a Zendesk ticket: change status, reassign to an agent, or change priority. ONLY call this after the team has explicitly confirmed the action.",
+        "Update a Zendesk ticket: change subject, status, assignment, or priority. Use status solved when the user says close; Zendesk performs final irreversible closure later. ONLY call this after the team has explicitly confirmed the exact action.",
       parameters: {
         type: "object",
         properties: {
           ticket_id: { type: "number", description: "Ticket ID." },
+          subject: { type: "string", description: "New ticket subject." },
           status: {
             type: "string",
             enum: ["open", "pending", "hold", "solved"],
@@ -2444,8 +2459,13 @@ export const ZENDESK_UPDATE_TICKET_TOOL: OpenAI.Chat.Completions.ChatCompletionT
             enum: ["urgent", "high", "normal", "low"],
             description: "New priority.",
           },
+          confirmed: {
+            type: "boolean",
+            description:
+              "Must be true only after the user explicitly confirms this exact ticket change.",
+          },
         },
-        required: ["ticket_id"],
+        required: ["ticket_id", "confirmed"],
       },
     },
   };
@@ -2543,7 +2563,9 @@ async function executeZendeskSearchTickets(argsJson: string): Promise<string> {
 async function executeZendeskAddComment(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
   if (!cfg) return "Zendesk is not configured on this server.";
-  const { ticket_id, body, public: isPublic } = JSON.parse(argsJson);
+  const { ticket_id, body, public: isPublic, confirmed } = JSON.parse(argsJson);
+  if (confirmed !== true)
+    return "Confirmation required. Show the exact reply or internal note, then ask the user to confirm before posting it.";
   if (!body?.trim()) return "Error: comment body is required.";
   try {
     await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
@@ -2558,8 +2580,12 @@ async function executeZendeskAddComment(argsJson: string): Promise<string> {
 async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
   if (!cfg) return "Zendesk is not configured on this server.";
-  const { ticket_id, status, assignee_email, priority } = JSON.parse(argsJson);
+  const { ticket_id, subject, status, assignee_email, priority, confirmed } =
+    JSON.parse(argsJson);
+  if (confirmed !== true)
+    return "Confirmation required. Show the exact ticket fields and values, then ask the user to confirm before updating them.";
   const update: Record<string, unknown> = {};
+  if (subject?.trim()) update.subject = subject.trim();
   if (status) update.status = status;
   if (priority) update.priority = priority;
   if (assignee_email) {
@@ -2578,12 +2604,13 @@ async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
     }
   }
   if (Object.keys(update).length === 0)
-    return "Error: no fields to update (provide status, assignee_email, or priority).";
+    return "Error: no fields to update (provide subject, status, assignee_email, or priority).";
   try {
     await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
       ticket: update,
     });
     const parts = [];
+    if (subject?.trim()) parts.push(`subject → ${subject.trim()}`);
     if (status) parts.push(`status → ${status}`);
     if (priority) parts.push(`priority → ${priority}`);
     if (assignee_email) parts.push(`assigned → ${assignee_email}`);
@@ -4490,6 +4517,7 @@ export async function runChatWithMemory(
     READ_ACCESSIBLE_FILE_TOOL,
     QUERY_DEVICE_CONFIG_TOOL,
     SEARCH_TEAM_WORK_TOOL,
+    ...fredApplicationToolsForRole(userRole, Boolean(zdeskConfig())),
     ...(zdeskConfig()
       ? [
           ZENDESK_GET_TICKET_TOOL,
@@ -5046,6 +5074,78 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "zendesk_update_ticket tool failed");
           resultText = "Error: Zendesk ticket update failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_create_ticket"
+      ) {
+        try {
+          resultText = await executeZendeskCreateTicket(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_create_ticket tool failed");
+          resultText = "Error: Zendesk ticket creation failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "zendesk_solve_tickets"
+      ) {
+        try {
+          resultText = await executeZendeskSolveTickets(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "zendesk_solve_tickets tool failed");
+          resultText = "Error: Zendesk ticket solve failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "manage_post_incident_review"
+      ) {
+        try {
+          resultText = await executeManageAfterAction(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName,
+            role: userRole,
+          });
+        } catch (err) {
+          logger.error({ err }, "manage_post_incident_review tool failed");
+          resultText = "Error: Post-Incident Review write failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "manage_weekly_log"
+      ) {
+        try {
+          resultText = await executeManageWeeklyLog(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName,
+            role: userRole,
+          });
+        } catch (err) {
+          logger.error({ err }, "manage_weekly_log tool failed");
+          resultText = "Error: weekly log write failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "manage_weekly_status_report"
+      ) {
+        try {
+          resultText = await executeManageWeeklyReport(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName,
+            role: userRole,
+          });
+        } catch (err) {
+          logger.error({ err }, "manage_weekly_status_report tool failed");
+          resultText = "Error: weekly status report write failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "get_application_guidance"
+      ) {
+        try {
+          resultText = await executeApplicationGuidance(call.function.arguments);
+        } catch (err) {
+          logger.error({ err }, "get_application_guidance tool failed");
+          resultText = "Error: application guidance lookup failed";
         }
       }
 

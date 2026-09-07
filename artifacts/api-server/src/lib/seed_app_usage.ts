@@ -17,13 +17,13 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: What this app is",
     content:
-      "This is the SCCC IT Department Reporting platform. The IT team uses it to record daily/weekly work, track tasks and projects, log risks and incidents, keep network and Azure inventory, and roll everything up into weekly executive reports for the CIO. Roles: the CIO has full access (all reports, finalization, user management, projects, goals, analytics); other staff (help desk, network engineer, security engineer, staff) see their own work plus shared systems and records. When a user asks how to do something, point them to the correct page by name and give click-by-click steps.",
+      "This is the SCCC IT Department Portal, also called Insights. The Home command center at / is the shared starting point for reporting, campus technology, and troubleshooting. The IT team uses the portal to record weekly work, track tasks and projects, log risks and incidents, maintain network and Azure evidence, work Zendesk tickets, and prepare weekly executive reports. Roles: the CIO has full access (all reports, finalization, user management, projects, goals, analytics); other staff see their own work plus shared systems and records. When a user asks how to do something, use the current application guidance, point to the correct page by name, and give click-by-click steps.",
   },
   {
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "There is no fixed sidebar. Navigation is a command palette: click the 'Menu — search or jump to any page' button in the top header, or press Cmd/Ctrl+K, then type or click a destination. Pages are grouped into 'My Work' (Home/Dashboard, My Tasks, Weekly Log), 'Systems & Tools' (Network, Network Tools, Azure VMs, Azure Inventory, Monitoring, IT Apps, Process Library, AI Assistant, User Guide), 'Reports & Records' (Risks & Issues, Post-Incident Reviews, Reports), and a CIO-only 'Leadership & Admin' group (Projects, Department Goals, Usage Analytics, Admin). IT Apps is Fred's operational launcher: it contains Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics Dashboard, and Continuity LMS. The header also has 'Quick Add' and 'Ask AI' shortcuts.",
+      "Start at Home (/), then choose Status & Reporting (/status), IT Tools & Network (/network), or Troubleshooting (/support). Inside those apps, the fixed left sidebar groups pages under Campus Operations, My Work, IT Apps, Operations, Infrastructure, and Service, while the top bar provides breadcrumbs, search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. Status contains the operational dashboard and Quick Actions. Network contains building, switch, VLAN, health, and history views. Troubleshooting combines Fred, Zendesk activity, diagnostic launchers, common workflows, guides, and the network map. IT Apps (/it-apps) launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
   },
   {
     category: "general",
@@ -41,7 +41,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Weekly Reports (CIO)",
     content:
-      "Reports (/reports) aggregate everyone's weekly logs into one department report per week. Open a report (/reports/:id) to review it, then use the report editor to include extras for that week — Post-Incident Reviews, network maintenance windows, goal-progress snapshot, and open risks — via the selection cards. The CIO can Finalize a report (locks it), Delete it, and Export it as DOCX, XLSX, or PDF. 'Email Report' sends the PDF or DOCX to recipients over SMTP (needs SMTP settings configured). Resolved Zendesk tickets for the report's week are pulled in automatically.",
+      "Reports (/reports) aggregate everyone's weekly logs into one department report per week. Open /reports/:id to edit the title, summary, accomplishments, challenges, strategic progress, next-week plans, selected work items, custom tasks, projects, Post-Incident Reviews, maintenance, risks, cloud/goal inclusion, and email recipients. The CIO can create, edit, finalize, delete, export, or email a report. Fred can create, edit, or finalize these reports only for the CIO and only after showing the exact change and receiving confirmation. Resolved Zendesk tickets for the report's week are pulled in automatically.",
   },
   {
     category: "general",
@@ -53,7 +53,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Post-Incident Reviews",
     content:
-      "Post-Incident Reviews (/after-action, also called after-action reports) document incidents after they're resolved. Create one at /after-action/new: title, incident date, outcome, summary, timeline, what went well, what went poorly, and action items. These can be selected into the relevant week's report so leadership sees lessons learned.",
+      "Post-Incident Reviews (/after-action, also called after-action reports) document incidents after they're resolved. Create or edit title, incident description/date, building, device type, affected systems, timeline, root cause, resolution, lessons learned, prevention measures, severity, status, and linked Zendesk ticket. Staff may manage their own reviews; the CIO may manage any. Fred can create or edit a PIR after showing the exact change and receiving explicit confirmation. PIRs can be selected into the relevant weekly report so leadership sees the lessons learned.",
   },
   {
     category: "general",
@@ -93,15 +93,21 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
   },
   {
     category: "general",
-    title: "Using the Platform: AI Assistant and AI Memory",
+    title: "Using the Platform: Zendesk tickets with Fred",
     content:
-      "AI Assistant (/ai-report) has tabs: 'Ask AI' (chat with read access to entries, risks, post-incident reviews, and network inventory — good for summaries and questions), 'Status Report' (CIO-only executive report generation), and 'AI Memory'. AI Memory is the assistant's persistent knowledge about the SCCC environment; every active entry is loaded into the AI's context. Users can search, filter by category, add, edit, and toggle memories on/off; only the CIO can delete. The AI can also save a memory itself when a user states a durable environment fact or says 'remember this' — a toast confirms what was saved. Never store passwords or secrets in AI Memory; the system blocks credential-like content.",
+      "Troubleshooting (/support) shows recent Zendesk activity and opens diagnostic workflows. Fred can search and read tickets, create a ticket, edit its subject/status/priority/assignment, and add public replies or internal notes. Fred can also solve a specific confirmed list of tickets. In Zendesk, 'close' should be treated as 'solve'; Zendesk automation applies the final irreversible Closed state later. Before any ticket write, Fred must show the exact ticket or ticket IDs and proposed change and receive explicit confirmation. An unbounded request such as 'close all tickets' is not enough—Fred must search, present the exact set, and ask for confirmation.",
+  },
+  {
+    category: "general",
+    title: "Using the Platform: Fred and Fred Memory",
+    content:
+      "Fred (/ai-report) can answer operational questions, guide users through the whole portal, create tasks, work with confirmed Zendesk tickets, manage confirmed Post-Incident Reviews and weekly logs within the user's permissions, and let the CIO create, edit, or finalize confirmed weekly status reports. Fred Memory is persistent knowledge about the SCCC environment; every active entry is loaded into Fred's context. Users can search, filter, add, edit, and toggle memories; only the CIO can delete. Never store passwords or secrets in Fred Memory; the system blocks credential-like content.",
   },
   {
     category: "general",
     title: "Using the Platform: User Guide page",
     content:
-      "There is a built-in User Guide page at /user-guide, in the 'Systems & Tools' menu group (labeled 'User Guide'). It contains the full written, step-by-step guide to the platform: signing in, My Tasks, Weekly Log, Risks & Issues, Post-Incident Reviews, Systems & Tools, Weekly Reports, Projects & Department Goals, AI Assistant, and Admin. When a user wants a detailed walkthrough or how-to instructions, point them to this User Guide page by name in addition to giving the quick steps.",
+      "The built-in User Guide at /user-guide contains the full written, step-by-step guide to signing in, Home, Status, My Tasks, Weekly Log, Risks & Issues, Post-Incident Reviews, Network and IT Tools, Troubleshooting, Weekly Reports, Projects, Department Goals, Fred, and Admin. When a user wants a detailed walkthrough, give the immediate click-by-click steps and link to the User Guide for the longer reference.",
   },
   {
     category: "general",
@@ -113,7 +119,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Typical weekly workflow",
     content:
-      "Recommended rhythm for a staff member: (1) add action items to My Tasks as work happens during the week; (2) log risks/issues and write Post-Incident Reviews for any incidents; (3) near end of week, open Weekly Log and generate/submit the week's entry (task items roll in automatically). For the CIO: (4) open the week's Report, select the extras to include (post-incident reviews, maintenance, goal progress, open risks), review, then Finalize and Export or Email it. Use the AI Assistant to draft summaries or answer questions about the data at any point.",
+      "Recommended rhythm: (1) start at Home and use Status for current workload; (2) add action items to My Tasks as work happens; (3) log risks/issues and write Post-Incident Reviews for incidents; (4) near week-end, generate, review, and submit the Weekly Log; (5) the CIO opens the weekly Report, selects PIRs, maintenance, goal progress, open risks, and other extras, then finalizes and exports or emails it. Fred can guide each step and, after showing the exact change and receiving confirmation, can create or edit the relevant records within the signed-in user's permissions.",
   },
 ];
 

@@ -1,0 +1,16 @@
+flowchart LR
+  U[Authenticated IT user] --> F[Fred interactive chat]
+  F --> G[Current application guidance]
+  F --> C{Exact change confirmed?}
+  C -- No --> P[Preview target and proposed values]
+  P --> U
+  C -- Yes --> R{Role and ownership check}
+  R -- Denied --> D[Explain permission boundary]
+  R -- Allowed --> Z[Zendesk ticket API]
+  R -- Allowed --> A[(Post-Incident Reviews)]
+  R -- Allowed --> L[(Weekly logs)]
+  R -- CIO only --> W[(Weekly status reports)]
+  Z --> S[Solved tickets]
+  S --> X[Zendesk automation closes later]
+  B[Observation-only Fred] --> G
+  B -. write tools withheld .-> D
