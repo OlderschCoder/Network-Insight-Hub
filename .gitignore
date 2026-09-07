@@ -30,6 +30,7 @@ node_modules
 # misc
 /.sass-cache
 /connect.lock
+/data/zendesk-supervision.json
 /coverage
 /libpeerconnection.log
 npm-debug.log

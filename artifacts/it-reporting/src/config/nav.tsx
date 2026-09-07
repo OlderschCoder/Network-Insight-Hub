@@ -22,6 +22,7 @@ import {
   PhoneCall,
   BookOpenCheck,
   ClipboardList,
+  MessagesSquare,
 } from "lucide-react";
 
 export type NavItem = {
@@ -156,6 +157,13 @@ export function getNavGroups(
         desc: "Zendesk activity and diagnostic shortcuts",
         icon: ShieldCheck,
         match: (l) => l === "/support",
+      },
+      {
+        href: "/support/zendesk",
+        label: "Zendesk Monitor",
+        desc: "Supervise Fred drafts and reply to conversations",
+        icon: MessagesSquare,
+        newBadge: true,
       },
       {
         href: "/incidents",

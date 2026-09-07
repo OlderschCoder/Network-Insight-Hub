@@ -1,0 +1,38 @@
+sequenceDiagram
+    actor Operator
+    participant Monitor as Insights Zendesk Monitor
+    participant Fred
+    participant API as Insights API
+    participant Zendesk
+
+    Operator->>Monitor: Confirm Fred or reply switch change
+    Monitor->>API: Persist global supervision control
+    API-->>Monitor: Current state, actor, and timestamp
+
+    loop Every 15 seconds
+        Monitor->>API: Read open queue and selected ticket
+        API->>Zendesk: Read tickets and comments
+        Zendesk-->>API: Current conversation state
+        API-->>Monitor: Queue and thread
+    end
+
+    Operator->>Monitor: Request Fred draft
+    Monitor->>API: Check Fred drafting control
+    Monitor->>Fred: Observation-only draft request
+    Fred->>Zendesk: Read ticket context
+    Zendesk-->>Fred: Ticket and recent comments
+    Fred-->>Monitor: Draft text only
+    Operator->>Monitor: Edit, replace, or clear draft
+    Operator->>Monitor: Review and confirm exact reply
+    Monitor->>API: Post confirmed public reply
+    API->>API: Enforce confirmation and reply-enabled policies
+    API->>Zendesk: Add public ticket comment
+    Zendesk-->>Monitor: Updated conversation
+
+    alt Operator escalates
+        Operator->>Monitor: Choose teammate and optional private note
+        Operator->>Monitor: Confirm exact handoff
+        Monitor->>API: Submit confirmed escalation
+        API->>Zendesk: Reassign ticket and add internal note
+        Zendesk-->>Monitor: Updated owner and conversation
+    end

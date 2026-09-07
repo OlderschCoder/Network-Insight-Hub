@@ -15,6 +15,7 @@ import {
 import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, asc, gte, and, or, sql, desc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
+import { readZendeskSupervisionConfig } from "./zendesk_supervision";
 import {
   executeApplicationGuidance,
   executeManageAfterAction,
@@ -2569,6 +2570,11 @@ async function executeZendeskAddComment(argsJson: string): Promise<string> {
   if (confirmed !== true)
     return "Confirmation required. Show the exact reply or internal note, then ask the user to confirm before posting it.";
   if (!body?.trim()) return "Error: comment body is required.";
+  const controls = await readZendeskSupervisionConfig();
+  if (!controls.fredEnabled)
+    return "Fred's Zendesk actions are turned off by a supervisor.";
+  if (isPublic && !controls.repliesEnabled)
+    return "Zendesk public replies are turned off by a supervisor.";
   try {
     await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
       ticket: { comment: { body: body.trim(), public: !!isPublic } },
@@ -2586,6 +2592,8 @@ async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
     JSON.parse(argsJson);
   if (confirmed !== true)
     return "Confirmation required. Show the exact ticket fields and values, then ask the user to confirm before updating them.";
+  if (!(await readZendeskSupervisionConfig()).fredEnabled)
+    return "Fred's Zendesk actions are turned off by a supervisor.";
   const update: Record<string, unknown> = {};
   if (subject?.trim()) update.subject = subject.trim();
   if (status) update.status = status;
@@ -5082,7 +5090,9 @@ export async function runChatWithMemory(
         call.function.name === "zendesk_create_ticket"
       ) {
         try {
-          resultText = await executeZendeskCreateTicket(call.function.arguments);
+          resultText = (await readZendeskSupervisionConfig()).fredEnabled
+            ? await executeZendeskCreateTicket(call.function.arguments)
+            : "Fred's Zendesk actions are turned off by a supervisor.";
         } catch (err) {
           logger.error({ err }, "zendesk_create_ticket tool failed");
           resultText = "Error: Zendesk ticket creation failed";
@@ -5092,7 +5102,9 @@ export async function runChatWithMemory(
         call.function.name === "zendesk_solve_tickets"
       ) {
         try {
-          resultText = await executeZendeskSolveTickets(call.function.arguments);
+          resultText = (await readZendeskSupervisionConfig()).fredEnabled
+            ? await executeZendeskSolveTickets(call.function.arguments)
+            : "Fred's Zendesk actions are turned off by a supervisor.";
         } catch (err) {
           logger.error({ err }, "zendesk_solve_tickets tool failed");
           resultText = "Error: Zendesk ticket solve failed";

@@ -14,6 +14,7 @@ import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 import Dashboard from "@/pages/dashboard";
 import HomeHub from "@/pages/home-hub";
 import SupportCenter from "@/pages/support-center";
+import ZendeskMonitor from "@/pages/zendesk-monitor";
 import Entries from "@/pages/entries/index";
 import NewEntry from "@/pages/entries/new";
 import EntryDetail from "@/pages/entries/[id]";
@@ -177,6 +178,10 @@ function Router() {
       <Route
         path="/status"
         component={() => <ProtectedRoute component={Dashboard} />}
+      />
+      <Route
+        path="/support/zendesk"
+        component={() => <ProtectedRoute component={ZendeskMonitor} />}
       />
       <Route
         path="/support"

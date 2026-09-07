@@ -1,0 +1,830 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bot,
+  ExternalLink,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldCheck,
+  Ticket,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
+import { useLocation } from "wouter";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { SectionEyebrow } from "@/components/portal-ui";
+import { useToast } from "@/hooks/use-toast";
+import { authFetch } from "@/lib/authFetch";
+import { cn } from "@/lib/utils";
+
+type ZendeskTicketSummary = {
+  id: number;
+  subject: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  channel?: string;
+  url: string;
+};
+
+type ZendeskComment = {
+  id: number;
+  author: string;
+  public: boolean;
+  body: string;
+  createdAt: string;
+};
+
+type ZendeskTicketDetail = ZendeskTicketSummary & {
+  description?: string;
+  priority?: string | null;
+  requesterName?: string | null;
+  assigneeName?: string | null;
+  comments: ZendeskComment[];
+};
+
+type ZendeskAgent = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+};
+
+type ZendeskControls = {
+  fredEnabled: boolean;
+  repliesEnabled: boolean;
+  canManage: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function cleanFredDraft(value: string) {
+  return value
+    .replace(/^\*\*?Draft public reply[^\n]*\*\*?:?\s*/i, "")
+    .replace(/^Draft public reply[^\n]*:?\s*/i, "")
+    .replace(/\n+No (comments|reply|changes)[\s\S]*$/i, "")
+    .trim();
+}
+
+export default function ZendeskMonitor() {
+  const [, navigate] = useLocation();
+  const confirm = useConfirm();
+  const { toast } = useToast();
+  const replyRef = useRef<HTMLTextAreaElement | null>(null);
+  const initialTicketId = Number.parseInt(
+    new URLSearchParams(window.location.search).get("ticket") ?? "",
+    10,
+  );
+  const [tickets, setTickets] = useState<ZendeskTicketSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(
+    Number.isFinite(initialTicketId) ? initialTicketId : null,
+  );
+  const [detail, setDetail] = useState<ZendeskTicketDetail | null>(null);
+  const [filter, setFilter] = useState("");
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [reply, setReply] = useState("");
+  const [agents, setAgents] = useState<ZendeskAgent[]>([]);
+  const [escalationEmail, setEscalationEmail] = useState("");
+  const [escalationNote, setEscalationNote] = useState("");
+  const [escalating, setEscalating] = useState(false);
+  const [controls, setControls] = useState<ZendeskControls>({
+    fredEnabled: true,
+    repliesEnabled: true,
+    canManage: false,
+    updatedAt: null,
+    updatedBy: null,
+  });
+  const [updatingControl, setUpdatingControl] = useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const loadTickets = async (quiet = false) => {
+    if (!quiet) setLoadingTickets(true);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/recent-activity`,
+      );
+      const body = (await response.json().catch(() => null)) as {
+        configured?: boolean;
+        items?: ZendeskTicketSummary[];
+        error?: string;
+      } | null;
+      if (!response.ok || !body?.configured) {
+        throw new Error(body?.error || "Zendesk activity is unavailable.");
+      }
+      const open = (body.items ?? []).filter(
+        (ticket) => !["solved", "closed"].includes(ticket.status.toLowerCase()),
+      );
+      setTickets(open);
+      setSelectedId((current) => current ?? open[0]?.id ?? null);
+      setLastRefreshedAt(new Date());
+    } catch (error) {
+      if (!quiet) {
+        toast({
+          title: "Zendesk monitor unavailable",
+          description:
+            error instanceof Error ? error.message : "Unable to load tickets.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      if (!quiet) setLoadingTickets(false);
+    }
+  };
+
+  const loadDetail = async (ticketId: number, quiet = false) => {
+    if (!quiet) setLoadingDetail(true);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${ticketId}`,
+      );
+      const body = (await response.json().catch(() => null)) as
+        | ZendeskTicketDetail
+        | { error?: string; message?: string }
+        | null;
+      if (!response.ok || !body || !("id" in body)) {
+        const errorBody = body as { error?: string; message?: string } | null;
+        throw new Error(
+          errorBody?.message ||
+            errorBody?.error ||
+            "Unable to load conversation.",
+        );
+      }
+      setDetail(body);
+    } catch (error) {
+      if (!quiet) {
+        toast({
+          title: "Conversation unavailable",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Unable to load this ticket.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      if (!quiet) setLoadingDetail(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTickets();
+    void authFetch(`${import.meta.env.BASE_URL}api/zendesk/controls`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load controls.");
+        return response.json() as Promise<ZendeskControls>;
+      })
+      .then(setControls)
+      .catch(() => undefined);
+    void authFetch(`${import.meta.env.BASE_URL}api/zendesk/agents`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((body: ZendeskAgent[]) =>
+        setAgents(Array.isArray(body) ? body : []),
+      )
+      .catch(() => setAgents([]));
+    const timer = window.setInterval(() => void loadTickets(true), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null);
+      return;
+    }
+    setReply("");
+    setEscalationEmail("");
+    setEscalationNote("");
+    void loadDetail(selectedId);
+    const timer = window.setInterval(
+      () => void loadDetail(selectedId, true),
+      15_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [selectedId]);
+
+  const visibleTickets = useMemo(() => {
+    const query = filter.trim().toLowerCase();
+    if (!query) return tickets;
+    return tickets.filter(
+      (ticket) =>
+        String(ticket.id).includes(query) ||
+        ticket.subject.toLowerCase().includes(query) ||
+        ticket.status.toLowerCase().includes(query),
+    );
+  }, [filter, tickets]);
+
+  const selectTicket = (ticketId: number) => {
+    setSelectedId(ticketId);
+    navigate(`/support/zendesk?ticket=${ticketId}`, { replace: true });
+  };
+
+  const updateControl = async (
+    key: "fredEnabled" | "repliesEnabled",
+    nextValue: boolean,
+  ) => {
+    if (!controls.canManage || updatingControl) return;
+    const name = key === "fredEnabled" ? "Fred drafting" : "Zendesk replies";
+    const approved = await confirm({
+      title: `Turn ${name} ${nextValue ? "on" : "off"}?`,
+      description:
+        key === "fredEnabled"
+          ? nextValue
+            ? "Fred will be allowed to prepare Zendesk drafts and perform confirmed Zendesk actions again."
+            : "Fred will stop preparing drafts and all of his Zendesk write actions will be blocked."
+          : nextValue
+            ? "Supervisors will be able to post confirmed public replies from this monitor again."
+            : "All public replies from this monitor and Fred will be blocked at the API. Escalation remains available.",
+      confirmText: `Turn ${nextValue ? "on" : "off"}`,
+      destructive: !nextValue,
+    });
+    if (!approved) return;
+
+    setUpdatingControl(key);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/controls`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [key]: nextValue }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as
+        | ZendeskControls
+        | { error?: string }
+        | null;
+      if (!response.ok || !body || !("fredEnabled" in body)) {
+        throw new Error(
+          (body as { error?: string } | null)?.error ||
+            "Unable to update Zendesk controls.",
+        );
+      }
+      setControls(body);
+      toast({
+        title: `${name} turned ${nextValue ? "on" : "off"}`,
+        description: "The global supervisor control is active now.",
+      });
+    } catch (error) {
+      toast({
+        title: "Control was not changed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to save the control.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingControl(null);
+    }
+  };
+
+  const draftWithFred = async () => {
+    if (!detail || drafting || !controls.fredEnabled) return;
+    setDrafting(true);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/status-report/chat`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content:
+                  `Read Zendesk ticket #${detail.id} and draft a concise, friendly public response. ` +
+                  "Use only facts supported by the ticket and SCCC application evidence. Ask for missing safe details when needed, never request a password, and return only the reply body with no heading or commentary. Do not post or change anything.",
+              },
+            ],
+            lookbackDays: 90,
+            previewInventory: false,
+            observationOnly: true,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        reply?: string;
+        message?: string;
+      } | null;
+      if (!response.ok || !body?.reply) {
+        throw new Error(body?.message || "Fred could not prepare a reply.");
+      }
+      setReply(cleanFredDraft(body.reply));
+      window.setTimeout(() => replyRef.current?.focus(), 0);
+      toast({
+        title: "Fred prepared a draft",
+        description:
+          "Review or replace it before sending. Nothing has been posted.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fred draft failed",
+        description:
+          error instanceof Error ? error.message : "Unable to create a draft.",
+        variant: "destructive",
+      });
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!detail || !reply.trim() || sending || !controls.repliesEnabled) return;
+    const exactReply = reply.trim();
+    const approved = await confirm({
+      title: `Send public reply to ticket #${detail.id}?`,
+      description: `This posts to Zendesk immediately and is visible to the requester. Exact reply: “${exactReply.slice(0, 320)}${exactReply.length > 320 ? "…" : ""}”`,
+      confirmText: "Send reply",
+    });
+    if (!approved) return;
+
+    setSending(true);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/comment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            body: exactReply,
+            public: true,
+            confirmed: true,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(
+          body?.message || body?.error || "Zendesk rejected the reply.",
+        );
+      }
+      setReply("");
+      await Promise.all([loadDetail(detail.id, true), loadTickets(true)]);
+      toast({
+        title: `Reply sent to Zendesk #${detail.id}`,
+        description: "The conversation monitor has been refreshed.",
+      });
+    } catch (error) {
+      toast({
+        title: "Reply was not sent",
+        description:
+          error instanceof Error ? error.message : "Unable to post to Zendesk.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const escalateTicket = async () => {
+    if (!detail || !escalationEmail || escalating) return;
+    const agent = agents.find(
+      (candidate) => candidate.email === escalationEmail,
+    );
+    const note = escalationNote.trim();
+    const approved = await confirm({
+      title: `Escalate ticket #${detail.id} to ${agent?.name ?? escalationEmail}?`,
+      description: note
+        ? `Zendesk will reassign the ticket and add this internal handoff note: “${note.slice(0, 320)}${note.length > 320 ? "…" : ""}”`
+        : "Zendesk will reassign the ticket. No internal handoff note will be added.",
+      confirmText: "Escalate ticket",
+    });
+    if (!approved) return;
+
+    setEscalating(true);
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/escalate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assigneeEmail: escalationEmail,
+            note: note || null,
+            confirmed: true,
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        assigneeName?: string;
+        error?: string;
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(
+          body?.message || body?.error || "Zendesk rejected the escalation.",
+        );
+      }
+      setEscalationEmail("");
+      setEscalationNote("");
+      await Promise.all([loadDetail(detail.id, true), loadTickets(true)]);
+      toast({
+        title: `Ticket #${detail.id} escalated`,
+        description: `Assigned to ${body?.assigneeName ?? agent?.name ?? escalationEmail}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Ticket was not escalated",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to reassign the ticket.",
+        variant: "destructive",
+      });
+    } finally {
+      setEscalating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-xl bg-[linear-gradient(135deg,var(--portal-sidebar-bg),var(--portal-primary))] px-5 py-6 text-white shadow-lg">
+        <SectionEyebrow>
+          <span className="text-emerald-300">Troubleshooting</span>
+        </SectionEyebrow>
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold">
+              Zendesk Conversation Monitor
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm text-white/70">
+              Watch incoming ticket conversations, let Fred prepare a response,
+              then review, edit, replace, or stop it before anything reaches the
+              requester.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+            <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-emerald-200">
+              15-second refresh
+            </span>
+            <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-amber-100">
+              Explicit send only
+            </span>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-white/15 bg-black/15 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Fred drafting</p>
+              <p className="text-[11px] text-white/65">
+                {controls.fredEnabled
+                  ? "Available for supervised drafts"
+                  : "Blocked from Zendesk actions"}
+              </p>
+            </div>
+            <Switch
+              checked={controls.fredEnabled}
+              onCheckedChange={(checked) =>
+                void updateControl("fredEnabled", checked)
+              }
+              disabled={!controls.canManage || updatingControl !== null}
+              aria-label="Toggle Fred Zendesk drafting"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-white/15 bg-black/15 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Zendesk replies</p>
+              <p className="text-[11px] text-white/65">
+                {controls.repliesEnabled
+                  ? "Confirmed public replies allowed"
+                  : "Public replies blocked"}
+              </p>
+            </div>
+            <Switch
+              checked={controls.repliesEnabled}
+              onCheckedChange={(checked) =>
+                void updateControl("repliesEnabled", checked)
+              }
+              disabled={!controls.canManage || updatingControl !== null}
+              aria-label="Toggle Zendesk public replies"
+            />
+          </div>
+        </div>
+        {controls.updatedBy ? (
+          <p className="mt-2 text-right text-[10px] text-white/50">
+            Last changed by {controls.updatedBy}
+            {controls.updatedAt
+              ? ` · ${formatTimestamp(controls.updatedAt)}`
+              : ""}
+          </p>
+        ) : null}
+      </section>
+
+      <div className="grid min-h-[650px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <Card className="overflow-hidden">
+          <CardHeader className="space-y-3 border-b pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <SectionEyebrow>Live queue</SectionEyebrow>
+                <CardTitle className="mt-1 flex items-center gap-2 text-base">
+                  <Ticket className="h-4 w-4 text-primary" /> Open conversations
+                </CardTitle>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Refresh Zendesk conversations"
+                onClick={() => void loadTickets()}
+                disabled={loadingTickets}
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", loadingTickets && "animate-spin")}
+                />
+              </Button>
+            </div>
+            <label className="relative block">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder="Filter subject or ticket ID"
+                className="pl-9"
+              />
+            </label>
+            <p className="text-[10px] text-muted-foreground">
+              {lastRefreshedAt
+                ? `Last checked ${lastRefreshedAt.toLocaleTimeString()}`
+                : "Connecting to Zendesk…"}
+            </p>
+          </CardHeader>
+          <CardContent className="max-h-[650px] overflow-y-auto p-0">
+            {loadingTickets && tickets.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                conversations…
+              </div>
+            ) : null}
+            {!loadingTickets && visibleTickets.length === 0 ? (
+              <p className="p-8 text-center text-sm text-muted-foreground">
+                No open conversations match this filter.
+              </p>
+            ) : null}
+            {visibleTickets.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                onClick={() => selectTicket(ticket.id)}
+                className={cn(
+                  "w-full border-b px-4 py-3 text-left transition-colors hover:bg-muted/50",
+                  selectedId === ticket.id && "bg-primary/10",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug">
+                    {ticket.subject || `Ticket #${ticket.id}`}
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-[9px] uppercase"
+                  >
+                    {ticket.status}
+                  </Badge>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                  <span className="font-mono">ZD-{ticket.id}</span>
+                  <span>
+                    {ticket.channel ?? "ticket"} ·{" "}
+                    {formatTimestamp(ticket.updatedAt)}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="flex min-w-0 flex-col overflow-hidden">
+          {!selectedId ? (
+            <div className="flex flex-1 flex-col items-center justify-center p-10 text-center">
+              <MessageSquare className="h-10 w-10 text-muted-foreground/40" />
+              <p className="mt-4 font-semibold">
+                Select a Zendesk conversation
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The full monitored thread and supervised reply controls will
+                appear here.
+              </p>
+            </div>
+          ) : loadingDetail && !detail ? (
+            <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" /> Loading conversation…
+            </div>
+          ) : detail ? (
+            <>
+              <CardHeader className="border-b pb-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <SectionEyebrow>Ticket #{detail.id}</SectionEyebrow>
+                    <CardTitle className="mt-1 text-lg leading-snug">
+                      {detail.subject}
+                    </CardTitle>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{detail.requesterName || "Requester"}</span>
+                      <span>·</span>
+                      <span>
+                        {detail.assigneeName
+                          ? `Assigned to ${detail.assigneeName}`
+                          : "Unassigned"}
+                      </span>
+                      <span>·</span>
+                      <span>{detail.channel ?? "ticket"}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="uppercase">
+                      {detail.status}
+                    </Badge>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={detail.url} target="_blank" rel="noreferrer">
+                        Zendesk <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="flex flex-1 flex-col gap-4 p-4">
+                <div className="max-h-[390px] space-y-3 overflow-y-auto rounded-xl border bg-muted/20 p-4">
+                  {detail.comments.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      No comments are available for this ticket yet.
+                    </p>
+                  ) : (
+                    detail.comments.map((comment) => (
+                      <article
+                        key={comment.id}
+                        className="rounded-lg border bg-background p-3 shadow-sm"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-xs font-semibold">
+                            <UserRound className="h-3.5 w-3.5 text-primary" />
+                            {comment.author}
+                            {!comment.public && (
+                              <Badge variant="secondary" className="text-[9px]">
+                                Internal note
+                              </Badge>
+                            )}
+                          </div>
+                          <time className="text-[10px] text-muted-foreground">
+                            {formatTimestamp(comment.createdAt)}
+                          </time>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                          {comment.body}
+                        </p>
+                      </article>
+                    ))
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-bold">
+                        <Bot className="h-4 w-4 text-emerald-600" /> Supervised
+                        response
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Fred may draft; you remain the final editor and sender.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void draftWithFred()}
+                      disabled={drafting || !controls.fredEnabled}
+                    >
+                      {drafting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bot className="mr-2 h-4 w-4" />
+                      )}
+                      {drafting
+                        ? "Fred is drafting…"
+                        : controls.fredEnabled
+                          ? "Draft with Fred"
+                          : "Fred is off"}
+                    </Button>
+                  </div>
+                  <Textarea
+                    ref={replyRef}
+                    value={reply}
+                    onChange={(event) => setReply(event.target.value)}
+                    rows={6}
+                    placeholder="Use Fred’s draft or write your own reply…"
+                    className="mt-3 bg-background"
+                    aria-label="Zendesk public reply"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      Nothing sends until you confirm the exact reply.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setReply("");
+                          replyRef.current?.focus();
+                        }}
+                        disabled={!reply || sending}
+                      >
+                        Override / clear
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => void sendReply()}
+                        disabled={
+                          !reply.trim() || sending || !controls.repliesEnabled
+                        }
+                      >
+                        {sending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="mr-2 h-4 w-4" />
+                        )}
+                        {sending
+                          ? "Sending…"
+                          : controls.repliesEnabled
+                            ? "Review & send"
+                            : "Replies are off"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-bold">
+                      <UserPlus className="h-4 w-4 text-amber-600" /> Escalate
+                      to a team member
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Reassign the Zendesk ticket and optionally leave a private
+                      handoff note.
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-[220px_minmax(0,1fr)_auto]">
+                    <select
+                      value={escalationEmail}
+                      onChange={(event) =>
+                        setEscalationEmail(event.target.value)
+                      }
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      aria-label="Escalation assignee"
+                    >
+                      <option value="">Choose team member…</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.email}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      value={escalationNote}
+                      onChange={(event) =>
+                        setEscalationNote(event.target.value)
+                      }
+                      placeholder="Private handoff note (optional)"
+                      aria-label="Escalation handoff note"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => void escalateTicket()}
+                      disabled={!escalationEmail || escalating}
+                    >
+                      {escalating ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="mr-2 h-4 w-4" />
+                      )}
+                      {escalating ? "Escalating…" : "Review escalation"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </>
+          ) : null}
+        </Card>
+      </div>
+    </div>
+  );
+}
