@@ -9,25 +9,33 @@ sequenceDiagram
     Monitor->>API: Persist global supervision control
     API-->>Monitor: Current state, actor, and timestamp
 
-    loop Every 15 seconds
-        Monitor->>API: Read open queue and selected ticket
-        API->>Zendesk: Read tickets and comments
-        Zendesk-->>API: Current conversation state
+    loop Queue 15 seconds; selected thread 5 seconds
+        Monitor->>API: Read open queue, drafts, and selected ticket
+        API->>Zendesk: Read ticket and Conversation Log
+        Zendesk-->>API: Live user, agent, and bot messages
         API-->>Monitor: Queue and thread
     end
 
     Operator->>Monitor: Request Fred draft
     Monitor->>API: Check Fred drafting control
-    Monitor->>Fred: Observation-only draft request
-    Fred->>Zendesk: Read ticket context
-    Zendesk-->>Fred: Ticket and recent comments
+    Monitor->>Fred: Observation-only request plus current Conversation Log
     Fred-->>Monitor: Draft text only
+    Monitor->>API: Save shared pending draft
+    API-->>Monitor: Draft ID and audit metadata
     Operator->>Monitor: Edit, replace, or clear draft
-    Operator->>Monitor: Review and confirm exact reply
-    Monitor->>API: Post confirmed public reply
-    API->>API: Enforce confirmation and reply-enabled policies
-    API->>Zendesk: Add public ticket comment
-    Zendesk-->>Monitor: Updated conversation
+    Operator->>API: Save edited draft for approval
+    alt Email, web form, or other Support ticket
+        Operator->>Monitor: Approve exact saved draft
+        Monitor->>API: Send with confirmed draft ID
+        API->>API: Reject stale draft; enforce reply control
+        API->>Zendesk: Add public ticket reply
+        Zendesk-->>Monitor: Updated conversation
+    else Messaging ticket on Suite Growth
+        Operator->>Monitor: Copy draft and open Zendesk
+        Monitor-->>Operator: Draft copied; nothing sent yet
+        Operator->>Zendesk: Review and send in Messaging composer
+        Zendesk-->>Monitor: Conversation Log shows sent message
+    end
 
     alt Operator escalates
         Operator->>Monitor: Choose teammate and optional private note

@@ -17,6 +17,11 @@ import { eq, asc, gte, and, or, sql, desc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
 import { readZendeskSupervisionConfig } from "./zendesk_supervision";
 import {
+  isZendeskMessagingChannel,
+  normalizeZendeskConversationLog,
+  type ZendeskConversationLogEvent,
+} from "./zendesk_conversation_log";
+import {
   executeApplicationGuidance,
   executeManageAfterAction,
   executeManageTeamTodo,
@@ -2490,6 +2495,7 @@ async function executeZendeskGetTicket(argsJson: string): Promise<string> {
       assignee_id: number | null;
       created_at: string;
       updated_at: string;
+      via?: { channel?: string };
     };
     type Comment = {
       id: number;
@@ -2520,14 +2526,32 @@ async function executeZendeskGetTicket(argsJson: string): Promise<string> {
       );
       for (const u of users) userMap.set(u.id, u.name);
     }
-    const recent = comments
+    let recent = comments
       .slice(-15)
       .map(
         (c) =>
           `[${c.created_at.slice(0, 10)} ${c.public ? "PUBLIC" : "INTERNAL"}] ${userMap.get(c.author_id) ?? c.author_id}:\n${(c.plain_body || c.body || "").trim().slice(0, 500)}`,
       )
       .join("\n\n");
-    return `Ticket #${ticket.id}: ${ticket.subject}\nStatus: ${ticket.status} | Priority: ${ticket.priority ?? "normal"} | Assignee ID: ${ticket.assignee_id ?? "unassigned"}\nCreated: ${ticket.created_at.slice(0, 10)} | Updated: ${ticket.updated_at.slice(0, 10)}\n\n--- Comments (last ${comments.slice(-15).length} of ${comments.length}) ---\n${recent}`;
+    let threadLabel = `Comments (last ${comments.slice(-15).length} of ${comments.length})`;
+    try {
+      const log = await zdeskFetch<{ events: ZendeskConversationLogEvent[] }>(
+        cfg,
+        "GET",
+        `tickets/${ticket_id}/conversation_log?sort=created_at&page%5Bsize%5D=100`,
+      );
+      const entries = normalizeZendeskConversationLog(log.events || []).slice(-25);
+      recent = entries
+        .map(
+          (entry) =>
+            `[${entry.createdAt} ${entry.authorType.toUpperCase()}] ${entry.author}:\n${entry.body.slice(0, 800)}`,
+        )
+        .join("\n\n");
+      threadLabel = `Conversation Log (latest ${entries.length})`;
+    } catch {
+      // Older/non-messaging tickets can still use the comments fallback.
+    }
+    return `Ticket #${ticket.id}: ${ticket.subject}\nStatus: ${ticket.status} | Priority: ${ticket.priority ?? "normal"} | Assignee ID: ${ticket.assignee_id ?? "unassigned"}\nChannel: ${ticket.via?.channel ?? "ticket"}\nCreated: ${ticket.created_at.slice(0, 10)} | Updated: ${ticket.updated_at.slice(0, 10)}\n\n--- ${threadLabel} ---\n${recent}`;
   } catch (e: any) {
     return `Error fetching ticket: ${e.message}`;
   }
@@ -2576,6 +2600,14 @@ async function executeZendeskAddComment(argsJson: string): Promise<string> {
   if (isPublic && !controls.repliesEnabled)
     return "Zendesk public replies are turned off by a supervisor.";
   try {
+    if (isPublic) {
+      const { ticket } = await zdeskFetch<{
+        ticket: { via?: { channel?: string } };
+      }>(cfg, "GET", `tickets/${ticket_id}.json`);
+      if (isZendeskMessagingChannel(ticket.via?.channel)) {
+        return `Messaging reply not sent. Ticket #${ticket_id} requires a shared Fred draft and human approval in Zendesk Agent Workspace on the current Zendesk plan.`;
+      }
+    }
     await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
       ticket: { comment: { body: body.trim(), public: !!isPublic } },
     });

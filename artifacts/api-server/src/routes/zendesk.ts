@@ -15,6 +15,17 @@ import {
   readZendeskSupervisionConfig,
   updateZendeskSupervisionConfig,
 } from "../lib/zendesk_supervision";
+import {
+  isZendeskMessagingChannel,
+  normalizeZendeskConversationLog,
+  type ZendeskConversationLogEvent,
+} from "../lib/zendesk_conversation_log";
+import {
+  getPendingZendeskReplyDraft,
+  listZendeskReplyDrafts,
+  markZendeskReplyDraftSent,
+  saveZendeskReplyDraft,
+} from "../lib/zendesk_reply_drafts";
 
 const router = Router();
 
@@ -180,6 +191,26 @@ interface ZendeskComment {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max).trimEnd() + "…";
+}
+
+function draftActor(req: any) {
+  return {
+    id: req.user?.id ?? null,
+    name: req.user?.name ?? null,
+    email: req.user?.email ?? null,
+  };
+}
+
+async function resolveZendeskActor(cfg: ReturnType<typeof zendeskConfig>, req: any) {
+  const actorEmail = (req.user?.zendeskEmail || req.user?.email || "").trim();
+  return actorEmail
+    ? zget<{ users: ZendeskUser[] }>(
+        cfg,
+        `users/search.json?query=${encodeURIComponent(`email:${actorEmail}`)}`,
+      )
+        .then((result) => result.users?.[0] ?? null)
+        .catch(() => null)
+    : null;
 }
 
 router.get("/ticket/:id/timeline", requireAuth, async (req: any, res) => {
@@ -657,7 +688,8 @@ router.get("/ticket/:id", requireAuth, async (req: any, res) => {
     const { comments } = await zget<{ comments: ZendeskComment[] }>(
       cfg, `tickets/${ticketId}/comments.json?sort_order=asc`
     );
-    // Resolve author names
+    // Resolve ticket participants even when the visible thread comes from the
+    // Conversation Log. The log is what includes live Messaging events.
     const ids = Array.from(new Set([
       ...comments.map(c => c.author_id),
       ticket.requester_id,
@@ -668,13 +700,36 @@ router.get("/ticket/:id", requireAuth, async (req: any, res) => {
       const { users } = await zget<{ users: ZendeskUser[] }>(cfg, `users/show_many.json?ids=${ids.join(",")}`);
       for (const u of users) userMap.set(u.id, u);
     }
-    const enriched = comments.slice(-20).map(c => ({
-      id: c.id,
-      author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
-      public: c.public,
-      body: truncate((c.plain_body || c.body || "").trim(), 600),
-      createdAt: c.created_at,
-    }));
+    let enriched: Array<{
+      id: string | number;
+      author: string;
+      authorType: string;
+      public: boolean;
+      body: string;
+      createdAt: string;
+      eventType: string;
+    }>;
+    let threadSource: "conversation_log" | "ticket_comments" = "ticket_comments";
+    try {
+      const log = await zget<{ events: ZendeskConversationLogEvent[] }>(
+        cfg,
+        `tickets/${ticketId}/conversation_log?sort=created_at&page%5Bsize%5D=100`,
+      );
+      enriched = normalizeZendeskConversationLog(log.events || [])
+        .slice(-60)
+        .map((entry) => ({ ...entry, body: truncate(entry.body, 1_500) }));
+      threadSource = "conversation_log";
+    } catch {
+      enriched = comments.slice(-20).map(c => ({
+        id: c.id,
+        author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
+        authorType: "user",
+        public: c.public,
+        body: truncate((c.plain_body || c.body || "").trim(), 600),
+        createdAt: c.created_at,
+        eventType: "Comment",
+      }));
+    }
     return res.json({
       id: ticket.id, subject: ticket.subject, description: ticket.description,
       status: ticket.status, priority: ticket.priority,
@@ -685,7 +740,106 @@ router.get("/ticket/:id", requireAuth, async (req: any, res) => {
       channel: ticket.via?.channel ?? "ticket",
       createdAt: ticket.created_at, updatedAt: ticket.updated_at,
       url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticket.id}`,
+      threadSource,
+      isMessaging: isZendeskMessagingChannel(ticket.via?.channel),
       comments: enriched,
+    });
+  } catch (e: any) {
+    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// ── Shared Fred reply drafts ─────────────────────────────────────────────────
+// Drafts are stored in Insights so one staff member can ask Fred to prepare a
+// response and another can review it. Nothing is written to Zendesk here.
+router.get("/drafts", requireAuth, async (_req, res) => {
+  return res.json({ drafts: await listZendeskReplyDrafts("pending") });
+});
+
+router.get("/ticket/:id/draft", requireAuth, async (req: any, res) => {
+  const ticketId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+  return res.json({ draft: await getPendingZendeskReplyDraft(ticketId) });
+});
+
+router.put("/ticket/:id/draft", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const ticketId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+  const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  const source = req.body?.source === "fred" ? "fred" : "operator";
+  if (!body) return res.status(400).json({ error: "Draft body is required." });
+  if (body.length > 10_000) {
+    return res.status(400).json({ error: "Draft body must be 10,000 characters or fewer." });
+  }
+  const controls = await readZendeskSupervisionConfig();
+  if (source === "fred" && !controls.fredEnabled) {
+    return res.status(423).json({ error: "Fred drafting is turned off by a supervisor." });
+  }
+  try {
+    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
+    const draft = await saveZendeskReplyDraft({
+      ticketId,
+      ticketSubject: ticket.subject,
+      ticketUrl: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticketId}`,
+      channel: ticket.via?.channel ?? "ticket",
+      body,
+      source,
+      actor: draftActor(req),
+    });
+    return res.json({ draft });
+  } catch (e: any) {
+    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
+    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  }
+});
+
+// Human approval is the only route that sends a saved draft. Messaging is
+// deliberately rejected here on Suite Growth: its supported send surface is
+// the Agent Workspace composer, not the Support ticket-comment API.
+router.post("/ticket/:id/draft/approve-send", requireAuth, async (req: any, res) => {
+  const cfg = zendeskConfig();
+  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
+  const ticketId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
+  if (req.body?.confirmed !== true) {
+    return res.status(409).json({ error: "Explicit approval is required before sending the draft." });
+  }
+  const draft = await getPendingZendeskReplyDraft(ticketId);
+  if (!draft || draft.id !== req.body?.draftId) {
+    return res.status(409).json({ error: "The pending draft changed. Reload it before approval." });
+  }
+  const controls = await readZendeskSupervisionConfig();
+  if (!controls.repliesEnabled) {
+    return res.status(423).json({ error: "Zendesk replies are turned off by a supervisor." });
+  }
+  try {
+    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
+    if (isZendeskMessagingChannel(ticket.via?.channel)) {
+      return res.status(409).json({
+        error: "Messaging drafts must be sent from Zendesk Agent Workspace on the current Zendesk plan.",
+        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
+        ticketUrl: draft.ticketUrl,
+      });
+    }
+    const actor = await resolveZendeskActor(cfg, req);
+    await zput(cfg, `tickets/${ticketId}.json`, {
+      ticket: {
+        comment: {
+          body: draft.body,
+          public: true,
+          ...(actor ? { author_id: actor.id } : {}),
+        },
+      },
+    });
+    const sent = await markZendeskReplyDraftSent(ticketId, draft.id, draftActor(req));
+    return res.json({
+      ok: true,
+      ticketId,
+      delivery: "support_ticket",
+      sentBy: sent?.sentBy ?? actor?.name ?? "configured Zendesk service account",
     });
   } catch (e: any) {
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
@@ -739,13 +893,15 @@ router.post("/ticket/:id/comment", requireAuth, async (req: any, res) => {
     });
   }
   try {
-    const actorEmail = (req.user?.zendeskEmail || req.user?.email || "").trim();
-    const actor = actorEmail
-      ? await zget<{ users: ZendeskUser[] }>(
-          cfg,
-          `users/search.json?query=${encodeURIComponent(`email:${actorEmail}`)}`,
-        ).then((result) => result.users?.[0] ?? null).catch(() => null)
-      : null;
+    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
+    if (isPublic && isZendeskMessagingChannel(ticket.via?.channel)) {
+      return res.status(409).json({
+        error:
+          "This is a Zendesk Messaging ticket. Save the response for approval and send it from Zendesk Agent Workspace.",
+        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
+      });
+    }
+    const actor = await resolveZendeskActor(cfg, req);
     await zput(cfg, `tickets/${ticketId}.json`, {
       ticket: { comment: { body, public: isPublic, ...(actor ? { author_id: actor.id } : {}) } }
     });

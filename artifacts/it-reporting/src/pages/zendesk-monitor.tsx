@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
+  ClipboardCopy,
   ExternalLink,
   Loader2,
   MessageSquare,
   RefreshCw,
+  Save,
   Search,
   Send,
   ShieldCheck,
@@ -36,11 +38,13 @@ type ZendeskTicketSummary = {
 };
 
 type ZendeskComment = {
-  id: number;
+  id: number | string;
   author: string;
+  authorType?: string;
   public: boolean;
   body: string;
   createdAt: string;
+  eventType?: string;
 };
 
 type ZendeskTicketDetail = ZendeskTicketSummary & {
@@ -48,7 +52,26 @@ type ZendeskTicketDetail = ZendeskTicketSummary & {
   priority?: string | null;
   requesterName?: string | null;
   assigneeName?: string | null;
+  isMessaging?: boolean;
+  threadSource?: "conversation_log" | "ticket_comments";
   comments: ZendeskComment[];
+};
+
+type ZendeskReplyDraft = {
+  id: string;
+  ticketId: number;
+  ticketSubject: string;
+  ticketUrl: string;
+  channel: string;
+  body: string;
+  source: "fred" | "operator";
+  status: "pending" | "sent";
+  createdAt: string;
+  createdBy: string;
+  requestedBy: string;
+  updatedAt: string;
+  sentAt: string | null;
+  sentBy: string | null;
 };
 
 type ZendeskAgent = {
@@ -98,7 +121,11 @@ export default function ZendeskMonitor() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [reply, setReply] = useState("");
+  const [drafts, setDrafts] = useState<ZendeskReplyDraft[]>([]);
+  const [currentDraft, setCurrentDraft] =
+    useState<ZendeskReplyDraft | null>(null);
   const [agents, setAgents] = useState<ZendeskAgent[]>([]);
   const [escalationEmail, setEscalationEmail] = useState("");
   const [escalationNote, setEscalationNote] = useState("");
@@ -182,8 +209,50 @@ export default function ZendeskMonitor() {
     }
   };
 
+  const loadDrafts = async (quiet = false) => {
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/drafts`,
+      );
+      const body = (await response.json().catch(() => null)) as {
+        drafts?: ZendeskReplyDraft[];
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(body?.error || "Unable to load drafts.");
+      setDrafts(Array.isArray(body?.drafts) ? body.drafts : []);
+    } catch (error) {
+      if (!quiet) {
+        toast({
+          title: "Draft queue unavailable",
+          description:
+            error instanceof Error ? error.message : "Unable to load drafts.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const loadDraft = async (ticketId: number) => {
+    try {
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${ticketId}/draft`,
+      );
+      const body = (await response.json().catch(() => null)) as {
+        draft?: ZendeskReplyDraft | null;
+      } | null;
+      if (!response.ok) throw new Error("Unable to load this ticket's draft.");
+      const draft = body?.draft ?? null;
+      setCurrentDraft(draft);
+      setReply(draft?.body ?? "");
+    } catch {
+      setCurrentDraft(null);
+      setReply("");
+    }
+  };
+
   useEffect(() => {
     void loadTickets();
+    void loadDrafts();
     void authFetch(`${import.meta.env.BASE_URL}api/zendesk/controls`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load controls.");
@@ -197,7 +266,10 @@ export default function ZendeskMonitor() {
         setAgents(Array.isArray(body) ? body : []),
       )
       .catch(() => setAgents([]));
-    const timer = window.setInterval(() => void loadTickets(true), 15_000);
+    const timer = window.setInterval(() => {
+      void loadTickets(true);
+      void loadDrafts(true);
+    }, 15_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -207,12 +279,13 @@ export default function ZendeskMonitor() {
       return;
     }
     setReply("");
+    setCurrentDraft(null);
     setEscalationEmail("");
     setEscalationNote("");
-    void loadDetail(selectedId);
+    void Promise.all([loadDetail(selectedId), loadDraft(selectedId)]);
     const timer = window.setInterval(
       () => void loadDetail(selectedId, true),
-      15_000,
+      5_000,
     );
     return () => window.clearInterval(timer);
   }, [selectedId]);
@@ -227,6 +300,11 @@ export default function ZendeskMonitor() {
         ticket.status.toLowerCase().includes(query),
     );
   }, [filter, tickets]);
+
+  const draftsByTicket = useMemo(
+    () => new Map(drafts.map((draft) => [draft.ticketId, draft])),
+    [drafts],
+  );
 
   const selectTicket = (ticketId: number) => {
     setSelectedId(ticketId);
@@ -297,6 +375,14 @@ export default function ZendeskMonitor() {
     if (!detail || drafting || !controls.fredEnabled) return;
     setDrafting(true);
     try {
+      const monitoredTranscript = detail.comments
+        .slice(-30)
+        .map(
+          (comment) =>
+            `[${comment.createdAt}] ${comment.author} (${comment.authorType ?? "participant"}):\n${comment.body}`,
+        )
+        .join("\n\n")
+        .slice(-12_000);
       const response = await authFetch(
         `${import.meta.env.BASE_URL}api/status-report/chat`,
         {
@@ -307,8 +393,9 @@ export default function ZendeskMonitor() {
               {
                 role: "user",
                 content:
-                  `Read Zendesk ticket #${detail.id} and draft a concise, friendly public response. ` +
-                  "Use only facts supported by the ticket and SCCC application evidence. Ask for missing safe details when needed, never request a password, and return only the reply body with no heading or commentary. Do not post or change anything.",
+                  `Draft a concise, friendly response for Zendesk ticket #${detail.id}, “${detail.subject}”. ` +
+                  "Use the monitored Conversation Log below as the current source of truth. Use only supported facts, ask for missing safe details when needed, never request a password, and return only the reply body with no heading or commentary. Do not post or change anything.\n\n" +
+                  `CURRENT CONVERSATION LOG:\n${monitoredTranscript || "No readable messages yet."}`,
               },
             ],
             lookbackDays: 90,
@@ -324,12 +411,15 @@ export default function ZendeskMonitor() {
       if (!response.ok || !body?.reply) {
         throw new Error(body?.message || "Fred could not prepare a reply.");
       }
-      setReply(cleanFredDraft(body.reply));
+      const exactDraft = cleanFredDraft(body.reply);
+      const saved = await persistDraft(exactDraft, "fred", true);
+      setReply(exactDraft);
+      setCurrentDraft(saved);
       window.setTimeout(() => replyRef.current?.focus(), 0);
       toast({
-        title: "Fred prepared a draft",
+        title: "Fred saved a draft for approval",
         description:
-          "Review or replace it before sending. Nothing has been posted.",
+          "Other signed-in staff can review or replace it. Nothing was sent.",
       });
     } catch (error) {
       toast({
@@ -343,26 +433,71 @@ export default function ZendeskMonitor() {
     }
   };
 
-  const sendReply = async () => {
-    if (!detail || !reply.trim() || sending || !controls.repliesEnabled) return;
-    const exactReply = reply.trim();
-    const approved = await confirm({
-      title: `Send public reply to ticket #${detail.id}?`,
-      description: `This posts to Zendesk immediately and is visible to the requester. Exact reply: “${exactReply.slice(0, 320)}${exactReply.length > 320 ? "…" : ""}”`,
-      confirmText: "Send reply",
-    });
-    if (!approved) return;
-
-    setSending(true);
+  const persistDraft = async (
+    body: string,
+    source: "fred" | "operator",
+    quiet = false,
+  ) => {
+    if (!detail) throw new Error("Select a Zendesk ticket first.");
+    const exactBody = body.trim();
+    if (!exactBody) throw new Error("Write a reply before saving the draft.");
+    setSavingDraft(true);
     try {
       const response = await authFetch(
-        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/comment`,
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/draft`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: exactBody, source }),
+        },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        draft?: ZendeskReplyDraft;
+        error?: string;
+        message?: string;
+      } | null;
+      if (!response.ok || !result?.draft) {
+        throw new Error(
+          result?.message || result?.error || "Unable to save the draft.",
+        );
+      }
+      setCurrentDraft(result.draft);
+      setReply(result.draft.body);
+      await loadDrafts(true);
+      if (!quiet) {
+        toast({
+          title: `Draft saved for ticket #${detail.id}`,
+          description: "It is now visible in the shared approval queue.",
+        });
+      }
+      return result.draft;
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!detail || !reply.trim() || sending || !controls.repliesEnabled) return;
+    setSending(true);
+    try {
+      const exactReply = reply.trim();
+      let draft = currentDraft;
+      if (!draft || draft.body !== exactReply) {
+        draft = await persistDraft(exactReply, "operator", true);
+      }
+      const approved = await confirm({
+        title: `Approve and send draft for ticket #${detail.id}?`,
+        description: `This sends the saved draft to the requester. Exact reply: “${exactReply.slice(0, 320)}${exactReply.length > 320 ? "…" : ""}”`,
+        confirmText: "Approve & send",
+      });
+      if (!approved) return;
+      const response = await authFetch(
+        `${import.meta.env.BASE_URL}api/zendesk/ticket/${detail.id}/draft/approve-send`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            body: exactReply,
-            public: true,
+            draftId: draft.id,
             confirmed: true,
           }),
         },
@@ -377,7 +512,12 @@ export default function ZendeskMonitor() {
         );
       }
       setReply("");
-      await Promise.all([loadDetail(detail.id, true), loadTickets(true)]);
+      setCurrentDraft(null);
+      await Promise.all([
+        loadDetail(detail.id, true),
+        loadTickets(true),
+        loadDrafts(true),
+      ]);
       toast({
         title: `Reply sent to Zendesk #${detail.id}`,
         description: "The conversation monitor has been refreshed.",
@@ -387,6 +527,41 @@ export default function ZendeskMonitor() {
         title: "Reply was not sent",
         description:
           error instanceof Error ? error.message : "Unable to post to Zendesk.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const openMessagingDraft = async () => {
+    if (!detail || !reply.trim() || sending) return;
+    setSending(true);
+    try {
+      const exactReply = reply.trim();
+      if (!currentDraft || currentDraft.body !== exactReply) {
+        await persistDraft(exactReply, "operator", true);
+      }
+      const approved = await confirm({
+        title: `Open ticket #${detail.id} for Messaging approval?`,
+        description:
+          "The exact draft will be copied. Zendesk Agent Workspace is the supported place to review and send this live-message reply; nothing sends automatically.",
+        confirmText: "Copy & open Zendesk",
+      });
+      if (!approved) return;
+      await navigator.clipboard.writeText(exactReply);
+      const opened = window.open(detail.url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.assign(detail.url);
+      toast({
+        title: "Draft copied; Zendesk opened",
+        description:
+          "Paste it into the Messaging composer, review it, and use Zendesk's Send confirmation.",
+      });
+    } catch (error) {
+      toast({
+        title: "Draft handoff failed",
+        description:
+          error instanceof Error ? error.message : "Unable to open the draft.",
         variant: "destructive",
       });
     } finally {
@@ -473,10 +648,10 @@ export default function ZendeskMonitor() {
           </div>
           <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
             <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-emerald-200">
-              15-second refresh
+              Live thread · 5-second refresh
             </span>
             <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-amber-100">
-              Explicit send only
+              {drafts.length} pending draft{drafts.length === 1 ? "" : "s"}
             </span>
           </div>
         </div>
@@ -542,7 +717,7 @@ export default function ZendeskMonitor() {
                 variant="outline"
                 size="icon"
                 aria-label="Refresh Zendesk conversations"
-                onClick={() => void loadTickets()}
+                onClick={() => void Promise.all([loadTickets(), loadDrafts()])}
                 disabled={loadingTickets}
               >
                 <RefreshCw
@@ -598,6 +773,11 @@ export default function ZendeskMonitor() {
                     {ticket.status}
                   </Badge>
                 </div>
+                {draftsByTicket.has(ticket.id) ? (
+                  <Badge className="mt-2 bg-amber-500/15 text-[9px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-300">
+                    Draft awaiting approval
+                  </Badge>
+                ) : null}
                 <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
                   <span className="font-mono">ZD-{ticket.id}</span>
                   <span>
@@ -702,7 +882,7 @@ export default function ZendeskMonitor() {
                         response
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Fred may draft; you remain the final editor and sender.
+                        Fred saves a shared draft; a person remains the final editor and sender.
                       </p>
                     </div>
                     <Button
@@ -733,11 +913,22 @@ export default function ZendeskMonitor() {
                     aria-label="Zendesk public reply"
                   />
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                      Nothing sends until you confirm the exact reply.
-                    </p>
-                    <div className="flex gap-2">
+                    <div className="text-[11px] text-muted-foreground">
+                      <p className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        Nothing sends until a person approves the exact reply.
+                      </p>
+                      {currentDraft ? (
+                        <p className="mt-1">
+                          Saved by {currentDraft.createdBy}
+                          {currentDraft.requestedBy !== currentDraft.createdBy
+                            ? ` for ${currentDraft.requestedBy}`
+                            : ""}
+                          {` · ${formatTimestamp(currentDraft.updatedAt)}`}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -745,26 +936,60 @@ export default function ZendeskMonitor() {
                           setReply("");
                           replyRef.current?.focus();
                         }}
-                        disabled={!reply || sending}
+                        disabled={!reply || sending || savingDraft}
                       >
                         Override / clear
                       </Button>
                       <Button
+                        variant="outline"
                         size="sm"
-                        onClick={() => void sendReply()}
+                        onClick={() =>
+                          void persistDraft(reply, "operator").catch((error) =>
+                            toast({
+                              title: "Draft was not saved",
+                              description:
+                                error instanceof Error
+                                  ? error.message
+                                  : "Unable to save the draft.",
+                              variant: "destructive",
+                            }),
+                          )
+                        }
+                        disabled={!reply.trim() || sending || savingDraft}
+                      >
+                        {savingDraft ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 h-4 w-4" />
+                        )}
+                        Save for approval
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          void (detail.isMessaging
+                            ? openMessagingDraft()
+                            : sendReply())
+                        }
                         disabled={
                           !reply.trim() || sending || !controls.repliesEnabled
                         }
                       >
                         {sending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : detail.isMessaging ? (
+                          <ClipboardCopy className="mr-2 h-4 w-4" />
                         ) : (
                           <Send className="mr-2 h-4 w-4" />
                         )}
                         {sending
-                          ? "Sending…"
+                          ? detail.isMessaging
+                            ? "Opening…"
+                            : "Sending…"
                           : controls.repliesEnabled
-                            ? "Review & send"
+                            ? detail.isMessaging
+                              ? "Copy & open Zendesk"
+                              : "Approve & send"
                             : "Replies are off"}
                       </Button>
                     </div>

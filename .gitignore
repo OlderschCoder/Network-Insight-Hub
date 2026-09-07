@@ -31,6 +31,7 @@ node_modules
 /.sass-cache
 /connect.lock
 /data/zendesk-supervision.json
+/data/zendesk-reply-drafts.json
 /coverage
 /libpeerconnection.log
 npm-debug.log

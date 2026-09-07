@@ -113,15 +113,17 @@ These can be included in the relevant week's report so leadership sees lessons l
 
 1. Open **Troubleshooting → Zendesk Monitor** to watch the open conversation queue and select a ticket.
 2. Mark, Tracy, or the CIO can use the two supervisor switches to turn **Fred drafting** and **Zendesk replies** on or off for everyone. Each change requires confirmation and records who changed it.
-3. Read the recent conversation, then select **Draft with Fred** for a read-only suggested response.
-4. Edit Fred's draft, replace it with your own response, or clear it. Fred never sends the draft automatically.
-5. Select **Review & send** and approve the exact public reply before it is posted to Zendesk.
-6. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
-7. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
+3. Read the live Conversation Log, then select **Draft with Fred**. Fred saves the suggested response in the shared approval queue; she does not send it.
+4. Edit Fred's draft, replace it with your own response, or select **Save for approval** so another signed-in team member can review it.
+5. For email, web form, and other Support tickets, select **Approve & send** and approve the exact saved draft.
+6. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
+7. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
+8. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
 
-The queue and selected thread refresh every 15 seconds. Every public reply is
-confirmation-gated in both the interface and the server API, so the operator
-can always stop or override Fred.
+The queue and shared drafts refresh every 15 seconds; the selected Conversation
+Log refreshes every 5 seconds. Every public reply is confirmation-gated in both
+the interface and the server API, so the operator can always stop or override
+Fred.
 Fred can also recommend an escalation in chat and, after you approve the exact
 assignee, reassign the Zendesk ticket to that team member.
 Turning **Zendesk replies** off blocks public comments at the server even if a
