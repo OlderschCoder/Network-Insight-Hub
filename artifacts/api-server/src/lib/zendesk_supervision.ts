@@ -8,6 +8,19 @@ export type ZendeskSupervisionConfig = {
   updatedBy: string | null;
 };
 
+type ZendeskSupervisorActor = {
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  canManageTodos?: boolean | null;
+};
+
+export function canManageZendeskControls(actor: ZendeskSupervisorActor) {
+  if (actor.role === "cio" || actor.canManageTodos === true) return true;
+  const identity = `${actor.name ?? ""} ${actor.email ?? ""}`.toLowerCase();
+  return /\b(mark|tracy)\b/.test(identity);
+}
+
 const DEFAULT_CONFIG: ZendeskSupervisionConfig = {
   fredEnabled: true,
   repliesEnabled: true,

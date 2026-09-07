@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  canManageZendeskControls,
   readZendeskSupervisionConfig,
   updateZendeskSupervisionConfig,
 } from "./zendesk_supervision";
@@ -29,6 +30,12 @@ async function useTemporaryConfig() {
 }
 
 describe("Zendesk supervision controls", () => {
+  it("allows Mark and Tracy to manage the global controls", () => {
+    expect(canManageZendeskControls({ name: "Mark Bojeun" })).toBe(true);
+    expect(canManageZendeskControls({ email: "tracy@sccc.edu" })).toBe(true);
+    expect(canManageZendeskControls({ name: "Other User" })).toBe(false);
+  });
+
   it("defaults Fred and Zendesk replies to enabled", async () => {
     await useTemporaryConfig();
     await expect(readZendeskSupervisionConfig()).resolves.toMatchObject({

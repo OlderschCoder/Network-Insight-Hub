@@ -11,10 +11,10 @@ import {
   validateZendeskReplyRequest,
 } from "../lib/zendesk_reply_policy";
 import {
+  canManageZendeskControls,
   readZendeskSupervisionConfig,
   updateZendeskSupervisionConfig,
 } from "../lib/zendesk_supervision";
-import { canManageTeamTodos } from "../lib/team_todo_policy";
 
 const router = Router();
 
@@ -376,12 +376,12 @@ router.get("/controls", requireAuth, async (req: any, res) => {
   const controls = await readZendeskSupervisionConfig();
   return res.json({
     ...controls,
-    canManage: canManageTeamTodos(req.user),
+    canManage: canManageZendeskControls(req.user),
   });
 });
 
 router.put("/controls", requireAuth, async (req: any, res) => {
-  if (!canManageTeamTodos(req.user)) {
+  if (!canManageZendeskControls(req.user)) {
     return res.status(403).json({
       error: "Only a Zendesk supervisor may change these controls.",
     });
