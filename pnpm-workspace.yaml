@@ -4,6 +4,10 @@ packages:
   - lib/integrations/*
   - scripts
 
+allowBuilds:
+  bcrypt: true
+  esbuild: true
+
 autoInstallPeers: false
 
 catalog:

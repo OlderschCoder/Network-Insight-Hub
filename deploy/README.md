@@ -41,6 +41,13 @@ sudo systemctl restart sccc-api
 SRC=~/Network-Insight-Hub ./deploy/deploy.sh
 ```
 
+The workspace explicitly permits install scripts only for `bcrypt` and
+`esbuild`, the two native build/runtime dependencies used by this application.
+If `pnpm install --frozen-lockfile` reports `ERR_PNPM_IGNORED_BUILDS`, verify
+that these exact packages remain set to `true` under `allowBuilds` in
+`pnpm-workspace.yaml`; do not approve an unreviewed dependency just to make a
+deployment continue.
+
 ## Login fails right after "Sign in with Microsoft" (`relation "sessions" does not exist`)
 
 The production database is missing schema changes that exist in the code
