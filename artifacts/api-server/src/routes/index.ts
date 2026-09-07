@@ -31,6 +31,7 @@ import passwordResetActivityRouter from "./password_reset_activity";
 import bannerDocumentsRouter from "./banner_documents";
 import mfaTapActivityRouter from "./mfa_tap_activity";
 import learnRouter from "./learn";
+import teamTodosRouter from "./team_todos";
 
 const router: IRouter = Router();
 
@@ -66,5 +67,6 @@ router.use("/password-reset-activity", passwordResetActivityRouter);
 router.use("/banner", bannerDocumentsRouter);
 router.use("/mfa-tap-activity", mfaTapActivityRouter);
 router.use("/learn", learnRouter);
+router.use("/todos", teamTodosRouter);
 
 export default router;

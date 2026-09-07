@@ -12,7 +12,11 @@ const SEED_LOCK_KEY = 748213001;
 // the production database, which is provisioned fresh (schema only) on publish.
 const TITLE_PREFIX = "Using the Platform:";
 
-const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] = [
+const APP_USAGE_ENTRIES: {
+  category: string;
+  title: string;
+  content: string;
+}[] = [
   {
     category: "general",
     title: "Using the Platform: What this app is",
@@ -23,7 +27,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "Start at Home (/), then choose Status & Reporting (/status), IT Tools & Network (/network), or Troubleshooting (/support). Inside those apps, the fixed left sidebar groups pages under Campus Operations, My Work, IT Apps, Operations, Infrastructure, and Service, while the top bar provides breadcrumbs, search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. Status contains the operational dashboard and Quick Actions. Network contains building, switch, VLAN, health, and history views. Troubleshooting combines Fred, Zendesk activity, diagnostic launchers, common workflows, guides, and the network map. IT Apps (/it-apps) launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
+      "Start at Home (/), then choose Status & Reporting (/status), Campus Technology (/network/buildings), or Troubleshooting (/support). The fixed left sidebar is organized into clickable category headings with separate dropdown chevrons: Status & Reporting, Campus Technology, Troubleshooting, My Work, IT Apps, and CIO-only Administration. Clicking a category title opens its landing page; clicking its chevron expands or collapses its pages. The top bar provides breadcrumbs, search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. IT Apps (/it-apps) launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
   },
   {
     category: "general",
@@ -33,9 +37,9 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
   },
   {
     category: "general",
-    title: "Using the Platform: My Tasks and the Weekly Log",
+    title: "Using the Platform: To-dos, completed work, and the Weekly Log",
     content:
-      "Throughout the week, staff add standalone action items on 'My Tasks' (/items) — quick title, date, category, and notes. When it's time to report, go to 'Weekly Log' (/entries) and create/generate the week's log entry; all of that week's task items are rolled into it and stamped to that weekly entry so past logs stay stable even if items are edited later. There is one weekly log per user per week. Use /entries/new to write it directly, or open a week to edit. Submitting the weekly log is what feeds the department's weekly report.",
+      "Use To-do List (/todos) for outstanding assignments, priorities, due dates, and completion status. Mark and Tracy can create, view, edit, reassign, complete, or delete any team member's to-do; everyone else can create and manage only their own. Completed Work (/items) is separate: staff record finished tickets, installs, research, and project work there so it rolls into the Weekly Log. When it's time to report, go to Weekly Log (/entries) and generate the week's entry. There is one weekly log per user per week, and submitting it feeds the department weekly report.",
   },
   {
     category: "general",
@@ -107,7 +111,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: User Guide page",
     content:
-      "The built-in User Guide at /user-guide contains the full written, step-by-step guide to signing in, Home, Status, My Tasks, Weekly Log, Risks & Issues, Post-Incident Reviews, Network and IT Tools, Troubleshooting, Weekly Reports, Projects, Department Goals, Fred, and Admin. When a user wants a detailed walkthrough, give the immediate click-by-click steps and link to the User Guide for the longer reference.",
+      "The built-in User Guide at /user-guide contains the full written, step-by-step guide to signing in, Home, Status, To-do List, Completed Work, Weekly Log, Risks & Issues, Post-Incident Reviews, Network and IT Tools, Troubleshooting, Weekly Reports, Projects, Department Goals, Fred, and Admin. When a user wants a detailed walkthrough, give the immediate click-by-click steps and link to the User Guide for the longer reference.",
   },
   {
     category: "general",
@@ -119,7 +123,7 @@ const APP_USAGE_ENTRIES: { category: string; title: string; content: string }[] 
     category: "general",
     title: "Using the Platform: Typical weekly workflow",
     content:
-      "Recommended rhythm: (1) start at Home and use Status for current workload; (2) add action items to My Tasks as work happens; (3) log risks/issues and write Post-Incident Reviews for incidents; (4) near week-end, generate, review, and submit the Weekly Log; (5) the CIO opens the weekly Report, selects PIRs, maintenance, goal progress, open risks, and other extras, then finalizes and exports or emails it. Fred can guide each step and, after showing the exact change and receiving confirmation, can create or edit the relevant records within the signed-in user's permissions.",
+      "Recommended rhythm: (1) start at Home and use Status for current workload; (2) track outstanding assignments in To-do List, then record finished work under Completed Work; (3) log risks/issues and write Post-Incident Reviews for incidents; (4) near week-end, generate, review, and submit the Weekly Log; (5) the CIO opens the weekly Report, selects PIRs, maintenance, goal progress, open risks, and other extras, then finalizes and exports or emails it. Fred can guide each step and, after showing the exact change and receiving confirmation, can create or edit the relevant supported records within the signed-in user's permissions.",
   },
 ];
 

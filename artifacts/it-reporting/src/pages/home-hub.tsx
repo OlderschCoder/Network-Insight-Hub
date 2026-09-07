@@ -286,7 +286,14 @@ function HomeAppCard({
         </div>
         <div>
           <SectionEyebrow>{eyebrow}</SectionEyebrow>
-          <h3 className="mt-1 text-lg font-extrabold">{title}</h3>
+          <h3 className="mt-1 text-lg font-extrabold">
+            <Link
+              href={href}
+              className="rounded-sm hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {title}
+            </Link>
+          </h3>
         </div>
       </div>
       <p className="mt-3 min-h-10 text-xs leading-5 text-muted-foreground">

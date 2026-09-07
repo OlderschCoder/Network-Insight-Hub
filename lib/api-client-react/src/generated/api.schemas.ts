@@ -55,6 +55,7 @@ export interface User {
   role: UserRole;
   department?: string;
   jobTitle?: string | null;
+  canManageTodos?: boolean;
   isActive?: boolean;
   createdAt?: string;
 }
@@ -656,6 +657,101 @@ export interface UpdateLogItemBody {
   category?: string;
   notes?: string | null;
   itemDate?: string;
+}
+
+export interface TodoAssignee {
+  id: number;
+  name: string;
+  role: string;
+}
+
+export type TeamTodoPriority =
+  (typeof TeamTodoPriority)[keyof typeof TeamTodoPriority];
+
+export const TeamTodoPriority = {
+  low: "low",
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export type TeamTodoStatus =
+  (typeof TeamTodoStatus)[keyof typeof TeamTodoStatus];
+
+export const TeamTodoStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  completed: "completed",
+} as const;
+
+export interface TeamTodo {
+  id: number;
+  assigneeId: number;
+  assigneeName: string;
+  createdById: number;
+  createdByName: string;
+  title: string;
+  details?: string | null;
+  dueDate?: string | null;
+  priority: TeamTodoPriority;
+  status: TeamTodoStatus;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateTeamTodoBodyPriority =
+  (typeof CreateTeamTodoBodyPriority)[keyof typeof CreateTeamTodoBodyPriority];
+
+export const CreateTeamTodoBodyPriority = {
+  low: "low",
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export interface CreateTeamTodoBody {
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  title: string;
+  details?: string | null;
+  assigneeId?: number;
+  dueDate?: string | null;
+  priority?: CreateTeamTodoBodyPriority;
+}
+
+export type UpdateTeamTodoBodyPriority =
+  (typeof UpdateTeamTodoBodyPriority)[keyof typeof UpdateTeamTodoBodyPriority];
+
+export const UpdateTeamTodoBodyPriority = {
+  low: "low",
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export type UpdateTeamTodoBodyStatus =
+  (typeof UpdateTeamTodoBodyStatus)[keyof typeof UpdateTeamTodoBodyStatus];
+
+export const UpdateTeamTodoBodyStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  completed: "completed",
+} as const;
+
+export interface UpdateTeamTodoBody {
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  title?: string;
+  details?: string | null;
+  assigneeId?: number;
+  dueDate?: string | null;
+  priority?: UpdateTeamTodoBodyPriority;
+  status?: UpdateTeamTodoBodyStatus;
 }
 
 export interface FortiGateWhitelistEntry {
@@ -1444,6 +1540,20 @@ export type ListLogItemsParams = {
   from?: string;
   to?: string;
 };
+
+export type ListTeamTodosParams = {
+  assigneeId?: number;
+  status?: ListTeamTodosStatus;
+};
+
+export type ListTeamTodosStatus =
+  (typeof ListTeamTodosStatus)[keyof typeof ListTeamTodosStatus];
+
+export const ListTeamTodosStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  completed: "completed",
+} as const;
 
 export type ListSwitchesParams = {
   /**

@@ -18,43 +18,47 @@ A step-by-step guide to using the platform. The IT team uses this app to record 
 Use the fixed sidebar to move between the Hub's major work areas. You can also
 use Search in the top header when you know the destination by name.
 
-The fixed sidebar begins with these groups:
+The fixed sidebar is organized into category dropdowns. Click a **category title**
+to open its landing page; click the separate chevron to expand or collapse its
+options:
 
-- **Campus Operations** — Status, Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure
-- **My Work** — My Tasks and Weekly Log
+- **Status & Reporting** — Status Dashboard and Weekly Reports
+- **Campus Technology** — Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure, and role-restricted Network Tools
+- **Troubleshooting** — Support Center, Incident Rooms, Risks & Issues, Post-Incident Reviews, Process Library, and Learn
+- **My Work** — To-do List, Completed Work, and Weekly Log
 - **IT Apps** — App Directory, Banner, and High School Students
-- **Operations** — Incident Rooms, Risks & Issues, Post-Incident Reviews, Weekly Reports, and CIO management pages
-- **Infrastructure** — Process Library and role-restricted Network Tools
-- **Service** — Learn
+- **Administration** (CIO) — Projects, Department Goals, Usage Analytics, and Admin
 
 The header also has a persistent **Fred** shortcut. Dashboard actions live together in the Quick Actions card.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
 - The dashboard's **Zendesk Tickets Resolved** and **Team Submission Status** data use the same current six-person roster—Tracy, Mark, Maria, Lucas, Illia, and Craig—including a zero when someone has no activity in the selected period. Retired or former staff remain attached to historical records but are excluded from current-team status.
-- **Cisco Webex Phones** is marked **New Feature** under **Campus Operations**. Use it for the phone directory, live device status, building assignments, and E-911 health.
+- **Cisco Webex Phones** is marked **New Feature** under **Campus Technology**. Use it for the phone directory, live device status, building assignments, and E-911 health.
 
 ### Building-first network support
 
-1. Open **Infrastructure → Buildings**. Start on the live campus map; select a building marker to drill in. The same health-sorted building cards appear immediately below the map.
+1. Open **Campus Technology → Buildings**. Start on the live campus map; select a building marker to drill in. The same health-sorted building cards appear immediately below the map.
 2. Select a building card—or its marker on the campus map—to open the building detail page.
 3. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
-4. Use **Infrastructure → Network → Port Map** for the unfiltered, campus-wide engineering view.
+4. Use **Campus Technology → Network Map → Port Map** for the unfiltered, campus-wide engineering view.
 
 Long dropdown lists are height-limited and scrollable. Use the mouse wheel, the visible scrollbar, arrow keys, Page Up/Page Down, or type the first letters of a switch name to move through the list.
 
 ---
 
-## 3. Your day-to-day: My Tasks
+## 3. Your day-to-day: To-dos and Completed Work
 
-Use **My Tasks** to capture work as it happens.
+Use **To-do List** for work that still needs to happen:
 
-1. Open **My Tasks** from the menu.
-2. Click **Add** (or **Quick Add** in the header).
-3. Enter a **title**, **date**, **category**, and any **notes**.
-4. Save. Repeat throughout the week.
+1. Open **My Work → To-do List**.
+2. Click **New to-do**, then add a title, details, due date, and priority.
+3. Mark the item complete when the work is finished; click its title to edit it.
+4. Mark and Tracy can view the whole team and assign or reassign work. Other users can create, view, edit, complete, and delete only their own items.
 
-These items are the raw material for your weekly log — you don't have to remember everything at week's end.
+Use **Completed Work** to record finished tickets, installs, research, and project
+work. Those completed-work records—not outstanding to-dos—are the raw material
+for the weekly log.
 
 ---
 
@@ -63,7 +67,7 @@ These items are the raw material for your weekly log — you don't have to remem
 At the end of the week, consolidate your work.
 
 1. Open **Weekly Log**.
-2. Create or **generate** the current week's entry — all of that week's **My Tasks items are rolled in automatically**.
+2. Create or **generate** the current week's entry — all of that week's **Completed Work items are rolled in automatically**.
 3. Review, add accomplishments/challenges/support-needed, and **submit**.
 
 Notes:
@@ -177,9 +181,9 @@ The AI can also **save memories itself** — just tell it a durable fact or say 
 
 **Staff member:**
 
-1. Add items to **My Tasks** as work happens.
+1. Track outstanding assignments in **To-do List**, then record finished work under **Completed Work**.
 2. Log **Risks & Issues** and write **Post-Incident Reviews** for any incidents.
-3. End of week: open **Weekly Log**, generate/submit the entry (task items roll in automatically).
+3. End of week: open **Weekly Log**, generate/submit the entry (completed-work items roll in automatically).
 
 **CIO:** 4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
 

@@ -17,3 +17,4 @@ export * from "./schema";
 // Keep this explicit so workspace consumers resolve the new table even when
 // their TypeScript project caches the schema barrel during an incremental build.
 export * from "./schema/net_ports";
+export * from "./schema/team_todos";

@@ -36,6 +36,7 @@ import type {
   CreateReportBody,
   CreateRiskBody,
   CreateSwitchBody,
+  CreateTeamTodoBody,
   CreateVlanBody,
   DashboardSummary,
   DeleteAiKnowledge200,
@@ -68,6 +69,7 @@ import type {
   ListReportsParams,
   ListRisksParams,
   ListSwitchesParams,
+  ListTeamTodosParams,
   ListVlansParams,
   LogItem,
   LoginBody,
@@ -88,12 +90,15 @@ import type {
   StrategicObjectiveBody,
   SyncAzureResources200,
   SyncAzureVms200,
+  TeamTodo,
+  TodoAssignee,
   UpdateAiKnowledgeBody,
   UpdateLogItemBody,
   UpdateMaintenanceLogEntryBody,
   UpdateProcessBody,
   UpdateReportBody,
   UpdateRiskBody,
+  UpdateTeamTodoBody,
   UpdateUserBody,
   UsageAnalytics,
   User,
@@ -5237,6 +5242,420 @@ export const useDeleteLogItem = <
   TContext
 > => {
   return useMutation(getDeleteLogItemMutationOptions(options));
+};
+
+/**
+ * @summary List visible to-dos (Mark/Tracy see all; others see their own)
+ */
+export const getListTeamTodosUrl = (params?: ListTeamTodosParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/todos?${stringifiedParams}`
+    : `/api/todos`;
+};
+
+export const listTeamTodos = async (
+  params?: ListTeamTodosParams,
+  options?: RequestInit,
+): Promise<TeamTodo[]> => {
+  return customFetch<TeamTodo[]>(getListTeamTodosUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTeamTodosQueryKey = (params?: ListTeamTodosParams) => {
+  return [`/api/todos`, ...(params ? [params] : [])] as const;
+};
+
+export const getListTeamTodosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTeamTodos>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListTeamTodosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTeamTodos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTeamTodosQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeamTodos>>> = ({
+    signal,
+  }) => listTeamTodos(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTeamTodos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTeamTodosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTeamTodos>>
+>;
+export type ListTeamTodosQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List visible to-dos (Mark/Tracy see all; others see their own)
+ */
+
+export function useListTeamTodos<
+  TData = Awaited<ReturnType<typeof listTeamTodos>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListTeamTodosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTeamTodos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTeamTodosQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a to-do for self or, for Mark/Tracy, any active user
+ */
+export const getCreateTeamTodoUrl = () => {
+  return `/api/todos`;
+};
+
+export const createTeamTodo = async (
+  createTeamTodoBody: CreateTeamTodoBody,
+  options?: RequestInit,
+): Promise<TeamTodo> => {
+  return customFetch<TeamTodo>(getCreateTeamTodoUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createTeamTodoBody),
+  });
+};
+
+export const getCreateTeamTodoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTeamTodo>>,
+    TError,
+    { data: BodyType<CreateTeamTodoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTeamTodo>>,
+  TError,
+  { data: BodyType<CreateTeamTodoBody> },
+  TContext
+> => {
+  const mutationKey = ["createTeamTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTeamTodo>>,
+    { data: BodyType<CreateTeamTodoBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createTeamTodo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTeamTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTeamTodo>>
+>;
+export type CreateTeamTodoMutationBody = BodyType<CreateTeamTodoBody>;
+export type CreateTeamTodoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a to-do for self or, for Mark/Tracy, any active user
+ */
+export const useCreateTeamTodo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTeamTodo>>,
+    TError,
+    { data: BodyType<CreateTeamTodoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTeamTodo>>,
+  TError,
+  { data: BodyType<CreateTeamTodoBody> },
+  TContext
+> => {
+  return useMutation(getCreateTeamTodoMutationOptions(options));
+};
+
+/**
+ * @summary List assignable users (team for managers; self for other users)
+ */
+export const getListTodoAssigneesUrl = () => {
+  return `/api/todos/assignees`;
+};
+
+export const listTodoAssignees = async (
+  options?: RequestInit,
+): Promise<TodoAssignee[]> => {
+  return customFetch<TodoAssignee[]>(getListTodoAssigneesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTodoAssigneesQueryKey = () => {
+  return [`/api/todos/assignees`] as const;
+};
+
+export const getListTodoAssigneesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTodoAssignees>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTodoAssignees>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTodoAssigneesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTodoAssignees>>
+  > = ({ signal }) => listTodoAssignees({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTodoAssignees>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTodoAssigneesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTodoAssignees>>
+>;
+export type ListTodoAssigneesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List assignable users (team for managers; self for other users)
+ */
+
+export function useListTodoAssignees<
+  TData = Awaited<ReturnType<typeof listTodoAssignees>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTodoAssignees>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTodoAssigneesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getUpdateTeamTodoUrl = (id: number) => {
+  return `/api/todos/${id}`;
+};
+
+export const updateTeamTodo = async (
+  id: number,
+  updateTeamTodoBody: UpdateTeamTodoBody,
+  options?: RequestInit,
+): Promise<TeamTodo> => {
+  return customFetch<TeamTodo>(getUpdateTeamTodoUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateTeamTodoBody),
+  });
+};
+
+export const getUpdateTeamTodoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamTodo>>,
+    TError,
+    { id: number; data: BodyType<UpdateTeamTodoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTeamTodo>>,
+  TError,
+  { id: number; data: BodyType<UpdateTeamTodoBody> },
+  TContext
+> => {
+  const mutationKey = ["updateTeamTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTeamTodo>>,
+    { id: number; data: BodyType<UpdateTeamTodoBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateTeamTodo(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTeamTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTeamTodo>>
+>;
+export type UpdateTeamTodoMutationBody = BodyType<UpdateTeamTodoBody>;
+export type UpdateTeamTodoMutationError = ErrorType<unknown>;
+
+export const useUpdateTeamTodo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamTodo>>,
+    TError,
+    { id: number; data: BodyType<UpdateTeamTodoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTeamTodo>>,
+  TError,
+  { id: number; data: BodyType<UpdateTeamTodoBody> },
+  TContext
+> => {
+  return useMutation(getUpdateTeamTodoMutationOptions(options));
+};
+
+export const getDeleteTeamTodoUrl = (id: number) => {
+  return `/api/todos/${id}`;
+};
+
+export const deleteTeamTodo = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteTeamTodoUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteTeamTodoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTeamTodo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteTeamTodo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteTeamTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteTeamTodo>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteTeamTodo(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteTeamTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteTeamTodo>>
+>;
+
+export type DeleteTeamTodoMutationError = ErrorType<unknown>;
+
+export const useDeleteTeamTodo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTeamTodo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteTeamTodo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteTeamTodoMutationOptions(options));
 };
 
 /**

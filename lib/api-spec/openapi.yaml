@@ -1313,6 +1313,98 @@ paths:
         "204":
           description: Deleted
 
+  # TEAM TO-DOS (outstanding assignments; separate from completed log items)
+  /todos:
+    get:
+      operationId: listTeamTodos
+      tags: [todos]
+      summary: List visible to-dos (Mark/Tracy see all; others see their own)
+      parameters:
+        - name: assigneeId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, completed]
+      responses:
+        "200":
+          description: Visible to-dos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamTodo"
+    post:
+      operationId: createTeamTodo
+      tags: [todos]
+      summary: Create a to-do for self or, for Mark/Tracy, any active user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamTodoBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamTodo"
+  /todos/assignees:
+    get:
+      operationId: listTodoAssignees
+      tags: [todos]
+      summary: List assignable users (team for managers; self for other users)
+      responses:
+        "200":
+          description: Assignable active users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoAssignee"
+  /todos/{id}:
+    patch:
+      operationId: updateTeamTodo
+      tags: [todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamTodoBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamTodo"
+    delete:
+      operationId: deleteTeamTodo
+      tags: [todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # NETWORK REFERENCE
   /network/switches:
     get:
@@ -2203,12 +2295,23 @@ components:
           type: string
         role:
           type: string
-          enum: [cio, helpdesk, network, security, network_engineer, security_engineer, staff]
+          enum:
+            [
+              cio,
+              helpdesk,
+              network,
+              security,
+              network_engineer,
+              security_engineer,
+              staff,
+            ]
         department:
           type: string
         jobTitle:
           type: string
           nullable: true
+        canManageTodos:
+          type: boolean
         isActive:
           type: boolean
         createdAt:
@@ -2255,7 +2358,16 @@ components:
           type: string
         role:
           type: string
-          enum: [cio, helpdesk, network, security, network_engineer, security_engineer, staff]
+          enum:
+            [
+              cio,
+              helpdesk,
+              network,
+              security,
+              network_engineer,
+              security_engineer,
+              staff,
+            ]
         department:
           type: string
         isActive:
@@ -2305,7 +2417,17 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, userId, category, title, description, weekOf, isSubmitted, createdAt]
+      required:
+        [
+          id,
+          userId,
+          category,
+          title,
+          description,
+          weekOf,
+          isSubmitted,
+          createdAt,
+        ]
 
     CreateEntryBody:
       type: object
@@ -2664,7 +2786,8 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, userId, type, severity, status, title, description, createdAt]
+      required:
+        [id, userId, type, severity, status, title, description, createdAt]
 
     CreateRiskBody:
       type: object
@@ -2769,7 +2892,8 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, title, slug, category, content, createdBy, createdAt, updatedAt]
+      required:
+        [id, title, slug, category, content, createdBy, createdAt, updatedAt]
 
     CreateProcessBody:
       type: object
@@ -3023,6 +3147,110 @@ components:
           nullable: true
         itemDate:
           type: string
+
+    TodoAssignee:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+      required: [id, name, role]
+
+    TeamTodo:
+      type: object
+      properties:
+        id:
+          type: integer
+        assigneeId:
+          type: integer
+        assigneeName:
+          type: string
+        createdById:
+          type: integer
+        createdByName:
+          type: string
+        title:
+          type: string
+        details:
+          type: string
+          nullable: true
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [open, in_progress, completed]
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          assigneeId,
+          assigneeName,
+          createdById,
+          createdByName,
+          title,
+          priority,
+          status,
+          createdAt,
+          updatedAt,
+        ]
+
+    CreateTeamTodoBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        details:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+      required: [title]
+
+    UpdateTeamTodoBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        details:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [open, in_progress, completed]
 
     FortiGateWhitelistEntry:
       type: object
@@ -3412,7 +3640,8 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, azureResourceId, name, type, status, source, createdAt, updatedAt]
+      required:
+        [id, azureResourceId, name, type, status, source, createdAt, updatedAt]
 
     AzureSyncFieldChange:
       type: object
@@ -3562,7 +3791,8 @@ components:
           type: integer
         low:
           type: integer
-      required: [publicIp, unhealthy, retiringSize, flaggedVms, high, medium, low]
+      required:
+        [publicIp, unhealthy, retiringSize, flaggedVms, high, medium, low]
 
     CloudInventorySnapshot:
       type: object
@@ -3804,7 +4034,8 @@ components:
           type: integer
         totalTickets:
           type: integer
-      required: [thisWeekEntries, thisWeekContributors, openRisks, totalSwitches]
+      required:
+        [thisWeekEntries, thisWeekContributors, openRisks, totalSwitches]
 
     ActivityItem:
       type: object
@@ -3879,7 +4110,17 @@ components:
         objectives:
           type: integer
       required:
-        [entries, risks, processes, projects, reports, afterActions, items, azureVms, objectives]
+        [
+          entries,
+          risks,
+          processes,
+          projects,
+          reports,
+          afterActions,
+          items,
+          azureVms,
+          objectives,
+        ]
 
     UsagePerUser:
       type: object
@@ -3959,7 +4200,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UsageDailyPoint"
-      required: [range, summary, perUser, featureTotals, roleBreakdown, dailyActivity]
+      required:
+        [range, summary, perUser, featureTotals, roleBreakdown, dailyActivity]
 
     AiKnowledge:
       type: object
@@ -3996,7 +4238,21 @@ components:
       properties:
         category:
           type: string
-          enum: [organization, environment, network, wireless, azure, identity, applications, endpoints, monitoring, security, helpdesk, general]
+          enum:
+            [
+              organization,
+              environment,
+              network,
+              wireless,
+              azure,
+              identity,
+              applications,
+              endpoints,
+              monitoring,
+              security,
+              helpdesk,
+              general,
+            ]
         title:
           type: string
           minLength: 1
@@ -4012,7 +4268,21 @@ components:
       properties:
         category:
           type: string
-          enum: [organization, environment, network, wireless, azure, identity, applications, endpoints, monitoring, security, helpdesk, general]
+          enum:
+            [
+              organization,
+              environment,
+              network,
+              wireless,
+              azure,
+              identity,
+              applications,
+              endpoints,
+              monitoring,
+              security,
+              helpdesk,
+              general,
+            ]
         title:
           type: string
           minLength: 1

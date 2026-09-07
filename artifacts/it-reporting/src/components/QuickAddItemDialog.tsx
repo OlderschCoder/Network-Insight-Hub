@@ -100,7 +100,7 @@ export default function QuickAddItemDialog({ trigger, open: openProp, onOpenChan
         {trigger ?? (
           <Button variant="outline" size="sm">
             <Zap className="h-4 w-4 mr-2" />
-            Quick Add Item
+            Log Completed Work
           </Button>
         )}
       </DialogTrigger>

@@ -19,6 +19,7 @@ import NewEntry from "@/pages/entries/new";
 import EntryDetail from "@/pages/entries/[id]";
 import EditEntry from "@/pages/entries/edit";
 import Items from "@/pages/items/index";
+import Todos from "@/pages/todos/index";
 import Reports from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/[id]";
 import Risks from "@/pages/risks/index";
@@ -74,16 +75,28 @@ const POST_LOGIN_REDIRECT_KEY = "post_login_redirect";
 
 function rememberPostLoginRedirect() {
   if (typeof window === "undefined") return;
-  const target = `${window.location.pathname}${window.location.search}${window.location.hash}` || "/";
+  const target =
+    `${window.location.pathname}${window.location.search}${window.location.hash}` ||
+    "/";
   sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, target);
 }
 
-function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
+function ProtectedRoute({
+  component: Component,
+  adminOnly = false,
+}: {
+  component: React.ComponentType;
+  adminOnly?: boolean;
+}) {
   const { isAuthenticated, isLoading, isCIO } = useAuth();
   const [, setLocation] = useLocation();
 
   if (isLoading) {
-    return <div className="h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -93,10 +106,14 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
   }
 
   if (adminOnly && !isCIO) {
-    return <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
-      <h2 className="text-2xl font-bold">Access Denied</h2>
-      <p className="text-muted-foreground mt-2">You need CIO privileges to view this page.</p>
-    </div>;
+    return (
+      <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">
+          You need CIO privileges to view this page.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -106,12 +123,22 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
   );
 }
 
-function ProtectedBareRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
+function ProtectedBareRoute({
+  component: Component,
+  adminOnly = false,
+}: {
+  component: React.ComponentType;
+  adminOnly?: boolean;
+}) {
   const { isAuthenticated, isLoading, isCIO } = useAuth();
   const [, setLocation] = useLocation();
 
   if (isLoading) {
-    return <div className="h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -121,10 +148,14 @@ function ProtectedBareRoute({ component: Component, adminOnly = false }: { compo
   }
 
   if (adminOnly && !isCIO) {
-    return <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
-      <h2 className="text-2xl font-bold">Access Denied</h2>
-      <p className="text-muted-foreground mt-2">You need CIO privileges to view this page.</p>
-    </div>;
+    return (
+      <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">
+          You need CIO privileges to view this page.
+        </p>
+      </div>
+    );
   }
 
   return <Component />;
@@ -138,69 +169,224 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      
-      <Route path="/" component={() => <ProtectedRoute component={HomeHub} />} />
-      <Route path="/status" component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/support" component={() => <ProtectedRoute component={SupportCenter} />} />
-      
-      <Route path="/items" component={() => <ProtectedRoute component={Items} />} />
-      <Route path="/entries" component={() => <ProtectedRoute component={Entries} />} />
-      <Route path="/entries/new" component={() => <ProtectedRoute component={NewEntry} />} />
-      <Route path="/entries/:id/edit" component={() => <ProtectedRoute component={EditEntry} />} />
-      <Route path="/entries/:id" component={() => <ProtectedRoute component={EntryDetail} />} />
-      
-      <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
-      <Route path="/reports/:id" component={() => <ProtectedRoute component={ReportDetail} />} />
-      
-      <Route path="/projects" component={() => <ProtectedRoute component={ProjectsIndex} />} />
-      <Route path="/projects/new" component={() => <ProtectedRoute component={NewProject} />} />
-      <Route path="/projects/:id" component={() => <ProtectedRoute component={ProjectDetail} />} />
 
-      <Route path="/strategic-objectives" component={() => <ProtectedRoute component={StrategicObjectivesIndex} />} />
+      <Route
+        path="/"
+        component={() => <ProtectedRoute component={HomeHub} />}
+      />
+      <Route
+        path="/status"
+        component={() => <ProtectedRoute component={Dashboard} />}
+      />
+      <Route
+        path="/support"
+        component={() => <ProtectedRoute component={SupportCenter} />}
+      />
 
-      <Route path="/risks" component={() => <ProtectedRoute component={Risks} />} />
-      <Route path="/risks/new" component={() => <ProtectedRoute component={NewRisk} />} />
-      <Route path="/risks/:id/edit" component={() => <ProtectedRoute component={EditRisk} />} />
-      <Route path="/risks/:id" component={() => <ProtectedRoute component={RiskDetail} />} />
-      
+      <Route
+        path="/items"
+        component={() => <ProtectedRoute component={Items} />}
+      />
+      <Route
+        path="/todos"
+        component={() => <ProtectedRoute component={Todos} />}
+      />
+      <Route
+        path="/entries"
+        component={() => <ProtectedRoute component={Entries} />}
+      />
+      <Route
+        path="/entries/new"
+        component={() => <ProtectedRoute component={NewEntry} />}
+      />
+      <Route
+        path="/entries/:id/edit"
+        component={() => <ProtectedRoute component={EditEntry} />}
+      />
+      <Route
+        path="/entries/:id"
+        component={() => <ProtectedRoute component={EntryDetail} />}
+      />
+
+      <Route
+        path="/reports"
+        component={() => <ProtectedRoute component={Reports} />}
+      />
+      <Route
+        path="/reports/:id"
+        component={() => <ProtectedRoute component={ReportDetail} />}
+      />
+
+      <Route
+        path="/projects"
+        component={() => <ProtectedRoute component={ProjectsIndex} />}
+      />
+      <Route
+        path="/projects/new"
+        component={() => <ProtectedRoute component={NewProject} />}
+      />
+      <Route
+        path="/projects/:id"
+        component={() => <ProtectedRoute component={ProjectDetail} />}
+      />
+
+      <Route
+        path="/strategic-objectives"
+        component={() => (
+          <ProtectedRoute component={StrategicObjectivesIndex} />
+        )}
+      />
+
+      <Route
+        path="/risks"
+        component={() => <ProtectedRoute component={Risks} />}
+      />
+      <Route
+        path="/risks/new"
+        component={() => <ProtectedRoute component={NewRisk} />}
+      />
+      <Route
+        path="/risks/:id/edit"
+        component={() => <ProtectedRoute component={EditRisk} />}
+      />
+      <Route
+        path="/risks/:id"
+        component={() => <ProtectedRoute component={RiskDetail} />}
+      />
+
       <Route path="/network/buildings/embed" component={BuildingsEmbedPage} />
       <Route path="/monitoring/embed" component={MonitoringEmbedPage} />
-      <Route path="/network/nodes/:id" component={() => <ProtectedRoute component={NodeDetail} />} />
-      <Route path="/network/buildings/:name" component={() => <ProtectedRoute component={Buildings} />} />
-      <Route path="/network/buildings" component={() => <ProtectedRoute component={Buildings} />} />
-      <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
-      <Route path="/network/visualize" component={() => <ProtectedRoute component={NetworkVisualize} />} />
-      <Route path="/network/tools" component={() => <ProtectedRoute component={NetworkTools} />} />
-      <Route path="/network/map" component={() => <ProtectedRoute component={NetworkMap} />} />
-      <Route path="/azure-vms" component={() => <ProtectedRoute component={AzureVms} />} />
-      <Route path="/azure-inventory" component={() => <ProtectedRoute component={AzureInventory} />} />
-      <Route path="/monitoring" component={() => <ProtectedRoute component={Monitoring} />} />
-      <Route path="/it-apps" component={() => <ProtectedRoute component={ITApps} />} />
-      <Route path="/it-apps/webex-calling" component={() => <ProtectedRoute component={WebexCallingReport} />} />
-      <Route path="/it-apps/cisco-calling" component={() => <ProtectedRoute component={CiscoCalling} />} />
-      <Route path="/banner" component={() => <ProtectedRoute component={Banner} />} />
-      <Route path="/password-reset-activity" component={() => <ProtectedRoute component={PasswordResetActivity} />} />
-      <Route path="/mfa-tap-activity" component={() => <ProtectedRoute component={MfaTapActivity} />} />
-      <Route path="/student-access" component={() => <ProtectedRoute component={StudentAccess} />} />
-      
-      <Route path="/incidents" component={() => <ProtectedRoute component={Incidents} />} />
-      <Route path="/incidents/:id" component={() => <ProtectedRoute component={IncidentRoom} />} />
-      <Route path="/after-action" component={() => <ProtectedRoute component={AfterAction} />} />
-      <Route path="/after-action/new" component={() => <ProtectedRoute component={NewAfterAction} />} />
-      <Route path="/after-action/:id" component={() => <ProtectedRoute component={AfterActionDetail} />} />
-      
-      <Route path="/fred/mobile" component={() => <ProtectedBareRoute component={FredMobilePage} />} />
-      <Route path="/ai-report" component={() => <ProtectedRoute component={AIReport} />} />
+      <Route
+        path="/network/nodes/:id"
+        component={() => <ProtectedRoute component={NodeDetail} />}
+      />
+      <Route
+        path="/network/buildings/:name"
+        component={() => <ProtectedRoute component={Buildings} />}
+      />
+      <Route
+        path="/network/buildings"
+        component={() => <ProtectedRoute component={Buildings} />}
+      />
+      <Route
+        path="/network"
+        component={() => <ProtectedRoute component={Network} />}
+      />
+      <Route
+        path="/network/visualize"
+        component={() => <ProtectedRoute component={NetworkVisualize} />}
+      />
+      <Route
+        path="/network/tools"
+        component={() => <ProtectedRoute component={NetworkTools} />}
+      />
+      <Route
+        path="/network/map"
+        component={() => <ProtectedRoute component={NetworkMap} />}
+      />
+      <Route
+        path="/azure-vms"
+        component={() => <ProtectedRoute component={AzureVms} />}
+      />
+      <Route
+        path="/azure-inventory"
+        component={() => <ProtectedRoute component={AzureInventory} />}
+      />
+      <Route
+        path="/monitoring"
+        component={() => <ProtectedRoute component={Monitoring} />}
+      />
+      <Route
+        path="/it-apps"
+        component={() => <ProtectedRoute component={ITApps} />}
+      />
+      <Route
+        path="/it-apps/webex-calling"
+        component={() => <ProtectedRoute component={WebexCallingReport} />}
+      />
+      <Route
+        path="/it-apps/cisco-calling"
+        component={() => <ProtectedRoute component={CiscoCalling} />}
+      />
+      <Route
+        path="/banner"
+        component={() => <ProtectedRoute component={Banner} />}
+      />
+      <Route
+        path="/password-reset-activity"
+        component={() => <ProtectedRoute component={PasswordResetActivity} />}
+      />
+      <Route
+        path="/mfa-tap-activity"
+        component={() => <ProtectedRoute component={MfaTapActivity} />}
+      />
+      <Route
+        path="/student-access"
+        component={() => <ProtectedRoute component={StudentAccess} />}
+      />
 
-      <Route path="/user-guide" component={() => <ProtectedRoute component={UserGuide} />} />
-      <Route path="/learn" component={() => <ProtectedRoute component={LearnPage} />} />
+      <Route
+        path="/incidents"
+        component={() => <ProtectedRoute component={Incidents} />}
+      />
+      <Route
+        path="/incidents/:id"
+        component={() => <ProtectedRoute component={IncidentRoom} />}
+      />
+      <Route
+        path="/after-action"
+        component={() => <ProtectedRoute component={AfterAction} />}
+      />
+      <Route
+        path="/after-action/new"
+        component={() => <ProtectedRoute component={NewAfterAction} />}
+      />
+      <Route
+        path="/after-action/:id"
+        component={() => <ProtectedRoute component={AfterActionDetail} />}
+      />
 
-      <Route path="/processes" component={() => <ProtectedRoute component={ProcessesIndex} />} />
-      <Route path="/processes/new" component={() => <ProtectedRoute component={NewProcess} />} />
-      <Route path="/processes/:id" component={() => <ProtectedRoute component={ProcessDetail} />} />
+      <Route
+        path="/fred/mobile"
+        component={() => <ProtectedBareRoute component={FredMobilePage} />}
+      />
+      <Route
+        path="/ai-report"
+        component={() => <ProtectedRoute component={AIReport} />}
+      />
 
-      <Route path="/admin" component={() => <ProtectedRoute component={Admin} adminOnly={true} />} />
-      <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} adminOnly={true} />} />
+      <Route
+        path="/user-guide"
+        component={() => <ProtectedRoute component={UserGuide} />}
+      />
+      <Route
+        path="/learn"
+        component={() => <ProtectedRoute component={LearnPage} />}
+      />
+
+      <Route
+        path="/processes"
+        component={() => <ProtectedRoute component={ProcessesIndex} />}
+      />
+      <Route
+        path="/processes/new"
+        component={() => <ProtectedRoute component={NewProcess} />}
+      />
+      <Route
+        path="/processes/:id"
+        component={() => <ProtectedRoute component={ProcessDetail} />}
+      />
+
+      <Route
+        path="/admin"
+        component={() => <ProtectedRoute component={Admin} adminOnly={true} />}
+      />
+      <Route
+        path="/analytics"
+        component={() => (
+          <ProtectedRoute component={AnalyticsPage} adminOnly={true} />
+        )}
+      />
 
       <Route component={NotFound} />
     </Switch>

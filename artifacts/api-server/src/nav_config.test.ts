@@ -2,16 +2,23 @@ import { describe, expect, it } from "vitest";
 import { getNavGroups } from "../../it-reporting/src/config/nav";
 
 describe("primary navigation", () => {
-  it("puts the campus operational journey first and in the approved order", () => {
+  it("organizes the sidebar into linked category dropdowns", () => {
     const groups = getNavGroups(true, true);
-    expect(groups[0].label).toBe("Campus Operations");
-    expect(groups[0].items.map((item) => item.label)).toEqual([
-      "Status",
+    expect(groups.map((group) => [group.label, group.href])).toEqual([
+      ["Status & Reporting", "/status"],
+      ["Campus Technology", "/network/buildings"],
+      ["Troubleshooting", "/support"],
+      ["My Work", "/todos"],
+      ["IT Apps", "/it-apps"],
+      ["Administration", "/projects"],
+    ]);
+    expect(groups[1].items.map((item) => item.label)).toEqual([
       "Buildings",
       "Network Map",
       "Monitoring",
       "Cisco Webex Phones",
       "Azure",
+      "Network Tools",
     ]);
   });
 
@@ -23,14 +30,14 @@ describe("primary navigation", () => {
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 
-  it("places IT Apps immediately after My Work and groups student and Banner tools", () => {
+  it("separates outstanding to-dos from completed weekly-log work", () => {
     const groups = getNavGroups(true, true);
-    expect(groups.map((group) => group.label).slice(0, 3)).toEqual([
-      "Campus Operations",
-      "My Work",
-      "IT Apps",
+    expect(groups[3].items.map((item) => [item.label, item.href])).toEqual([
+      ["To-do List", "/todos"],
+      ["Completed Work", "/items"],
+      ["Weekly Log", "/entries"],
     ]);
-    expect(groups[2].items.map((item) => item.label)).toEqual([
+    expect(groups[4].items.map((item) => item.label)).toEqual([
       "App Directory",
       "Banner",
       "High School Students",
@@ -40,5 +47,11 @@ describe("primary navigation", () => {
         .flatMap((group) => group.items)
         .filter((item) => item.href === "/student-access"),
     ).toHaveLength(1);
+  });
+
+  it("hides the administration category from non-CIO users", () => {
+    expect(
+      getNavGroups(false).some((group) => group.label === "Administration"),
+    ).toBe(false);
   });
 });

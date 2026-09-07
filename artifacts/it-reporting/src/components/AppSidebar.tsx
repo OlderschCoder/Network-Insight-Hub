@@ -86,6 +86,9 @@ export function AppSidebar() {
       <SidebarContent className="px-2 py-3">
         {groups.map((group) => {
           const isOpen = openGroups[group.label] ?? true;
+          const groupActive = group.items.some((item) =>
+            isNavItemActive(item, location),
+          );
           return (
             <Collapsible
               key={group.label}
@@ -98,19 +101,28 @@ export function AppSidebar() {
               }
             >
               <SidebarGroup>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="group flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-foreground/35 transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
+                <div className="group flex w-full items-center rounded-md text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-foreground/35 transition-colors hover:bg-white/5 hover:text-sidebar-foreground">
+                  <Link
+                    href={group.href}
+                    className={`min-w-0 flex-1 rounded-l-md px-2 py-1.5 ${groupActive ? "text-sidebar-foreground" : "text-inherit"}`}
+                    title={`Open ${group.label}`}
                   >
-                    <SidebarGroupLabel className="p-0 text-inherit">
+                    <SidebarGroupLabel className="cursor-pointer p-0 text-inherit">
                       {group.label}
                     </SidebarGroupLabel>
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`}
-                    />
-                  </button>
-                </CollapsibleTrigger>
+                  </Link>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-7 w-8 items-center justify-center rounded-r-md text-inherit hover:bg-white/10"
+                      aria-label={`${isOpen ? "Collapse" : "Expand"} ${group.label}`}
+                    >
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                      />
+                    </button>
+                  </CollapsibleTrigger>
+                </div>
                 <CollapsibleContent className="overflow-hidden">
                   <SidebarGroupContent>
                     <SidebarMenu>

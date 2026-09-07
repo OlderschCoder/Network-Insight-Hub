@@ -21,6 +21,7 @@ import {
   GraduationCap,
   PhoneCall,
   BookOpenCheck,
+  ClipboardList,
 } from "lucide-react";
 
 export type NavItem = {
@@ -36,6 +37,7 @@ export type NavItem = {
 
 export type NavGroup = {
   label: string;
+  href: string;
   items: NavItem[];
   separator?: number[];
 };
@@ -44,16 +46,30 @@ export function getNavGroups(
   isCIO: boolean,
   canNetworkTools = false,
 ): NavGroup[] {
-  const campusOperations: NavGroup = {
-    label: "Campus Operations",
+  const statusReporting: NavGroup = {
+    label: "Status & Reporting",
+    href: "/status",
     items: [
       {
         href: "/status",
-        label: "Status",
+        label: "Status Dashboard",
         desc: "Current campus health and operational workload",
         icon: LayoutDashboard,
         match: (l) => l === "/status",
       },
+      {
+        href: "/reports",
+        label: "Weekly Reports",
+        desc: "Department weekly reports",
+        icon: Files,
+      },
+    ],
+  };
+
+  const campusTechnology: NavGroup = {
+    label: "Campus Technology",
+    href: "/network/buildings",
+    items: [
       {
         href: "/network/buildings",
         label: "Buildings",
@@ -91,16 +107,34 @@ export function getNavGroups(
         desc: "VMs and cloud resource inventory",
         icon: Cloud,
       },
+      ...(canNetworkTools
+        ? [
+            {
+              href: "/network/tools",
+              label: "Network Tools",
+              desc: "Whitelist websites and generate setup scripts",
+              icon: ShieldCheck,
+              netBadge: true,
+            } as NavItem,
+          ]
+        : []),
     ],
   };
 
   const myWork: NavGroup = {
     label: "My Work",
+    href: "/todos",
     items: [
       {
+        href: "/todos",
+        label: "To-do List",
+        desc: "Assignments, due dates, and priorities",
+        icon: ClipboardList,
+      },
+      {
         href: "/items",
-        label: "My Tasks",
-        desc: "Track and update your action items",
+        label: "Completed Work",
+        desc: "Log finished work for weekly reporting",
         icon: ListChecks,
       },
       {
@@ -112,10 +146,17 @@ export function getNavGroups(
     ],
   };
 
-  const operations: NavGroup = {
-    label: "Operations",
-    separator: [3], // separator index before CIO-only items
+  const troubleshooting: NavGroup = {
+    label: "Troubleshooting",
+    href: "/support",
     items: [
+      {
+        href: "/support",
+        label: "Support Center",
+        desc: "Zendesk activity and diagnostic shortcuts",
+        icon: ShieldCheck,
+        match: (l) => l === "/support",
+      },
       {
         href: "/incidents",
         label: "Incident Rooms",
@@ -136,64 +177,23 @@ export function getNavGroups(
         icon: Activity,
       },
       {
-        href: "/reports",
-        label: "Weekly Reports",
-        desc: "Department weekly reports",
-        icon: Files,
-      },
-      ...(isCIO
-        ? [
-            {
-              href: "/projects",
-              label: "Projects",
-              desc: "Initiatives and progress tracking",
-              icon: Briefcase,
-              cioBadge: true,
-            } as NavItem,
-            {
-              href: "/strategic-objectives",
-              label: "Department Goals",
-              desc: "Strategic objectives and KPIs",
-              icon: Target,
-              cioBadge: true,
-            } as NavItem,
-            {
-              href: "/admin",
-              label: "Admin",
-              desc: "Manage users and access",
-              icon: Users,
-              cioBadge: true,
-            } as NavItem,
-          ]
-        : []),
-    ],
-  };
-
-  const infrastructure: NavGroup = {
-    label: "Infrastructure",
-    items: [
-      {
         href: "/processes",
         label: "Process Library",
         desc: "Runbooks and documented procedures",
         icon: BookOpen,
       },
-      ...(canNetworkTools
-        ? [
-            {
-              href: "/network/tools",
-              label: "Network Tools",
-              desc: "Whitelist websites and generate setup scripts",
-              icon: ShieldCheck,
-              netBadge: true,
-            } as NavItem,
-          ]
-        : []),
+      {
+        href: "/learn",
+        label: "Learn",
+        desc: "Practice IT situations with guided simulations",
+        icon: BookOpenCheck,
+      },
     ],
   };
 
   const itApps: NavGroup = {
     label: "IT Apps",
+    href: "/it-apps",
     items: [
       {
         href: "/it-apps",
@@ -217,25 +217,48 @@ export function getNavGroups(
     ],
   };
 
-  const service: NavGroup = {
-    label: "Service",
+  const administration: NavGroup = {
+    label: "Administration",
+    href: "/projects",
     items: [
       {
-        href: "/learn",
-        label: "Learn",
-        desc: "Practice real IT situations with guided simulations",
-        icon: BookOpenCheck,
+        href: "/projects",
+        label: "Projects",
+        desc: "Initiatives and progress tracking",
+        icon: Briefcase,
+        cioBadge: true,
+      },
+      {
+        href: "/strategic-objectives",
+        label: "Department Goals",
+        desc: "Strategic objectives and KPIs",
+        icon: Target,
+        cioBadge: true,
+      },
+      {
+        href: "/analytics",
+        label: "Usage Analytics",
+        desc: "Adoption and contribution trends",
+        icon: BarChart3,
+        cioBadge: true,
+      },
+      {
+        href: "/admin",
+        label: "Admin",
+        desc: "Manage users and access",
+        icon: Users,
+        cioBadge: true,
       },
     ],
   };
 
   return [
-    campusOperations,
+    statusReporting,
+    campusTechnology,
+    troubleshooting,
     myWork,
     itApps,
-    operations,
-    infrastructure,
-    service,
+    ...(isCIO ? [administration] : []),
   ];
 }
 

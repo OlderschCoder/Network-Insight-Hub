@@ -225,7 +225,7 @@ function QuickAddMenu({ iconOnly = false }: { iconOnly?: boolean }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setTaskOpen(true)}>
             <ListChecksIcon className="h-4 w-4 mr-2" />
-            Add Task
+            Log Completed Work
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/risks/new">

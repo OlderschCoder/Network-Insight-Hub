@@ -1,4 +1,11 @@
-import { boolean, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +23,8 @@ export const usersTable = pgTable("users", {
   // Entra (Azure AD) directory object id — links an SSO identity to this row.
   entraObjectId: varchar("entra_object_id", { length: 64 }).unique(),
   zendeskEmail: varchar("zendesk_email", { length: 255 }),
+  // Team-wide to-do managers can assign and manage work for every active user.
+  canManageTodos: boolean("can_manage_todos").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   // Break-glass flag: ONLY accounts with this set may use local email/password
   // login (and password reset). All other users must sign in via Entra SSO.

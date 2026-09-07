@@ -610,9 +610,15 @@ export async function ensureSchema(): Promise<void> {
         "imported_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await db.execute(sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "collection_scope" varchar(20) NOT NULL DEFAULT 'partial'`);
-    await db.execute(sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "target_ips" jsonb NOT NULL DEFAULT '[]'::jsonb`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "network_telemetry_runs_run_id_uq" ON "network_telemetry_runs" ("run_id")`);
+    await db.execute(
+      sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "collection_scope" varchar(20) NOT NULL DEFAULT 'partial'`,
+    );
+    await db.execute(
+      sql`ALTER TABLE "network_telemetry_runs" ADD COLUMN IF NOT EXISTS "target_ips" jsonb NOT NULL DEFAULT '[]'::jsonb`,
+    );
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS "network_telemetry_runs_run_id_uq" ON "network_telemetry_runs" ("run_id")`,
+    );
     logger.info("Ensured network_telemetry_runs table exists");
   } catch (err) {
     logger.error({ err }, "Failed to ensure network_telemetry_runs table");
@@ -749,6 +755,52 @@ export async function ensureSchema(): Promise<void> {
       { err },
       "Failed to ensure reports.include_cloud_inventory column",
     );
+  }
+
+  // Team to-dos are deliberately separate from completed log items. Mark and
+  // Tracy receive team-wide visibility/assignment rights; all other users are
+  // constrained to rows assigned to themselves by the API.
+  try {
+    await db.execute(sql`
+      ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "can_manage_todos" boolean DEFAULT false NOT NULL
+    `);
+    await db.execute(sql`
+      UPDATE "users"
+      SET "can_manage_todos" = true
+      WHERE "role" = 'cio'
+         OR lower("email") = 'tracy.compaan@sccc.edu'
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "team_todos" (
+        "id" serial PRIMARY KEY,
+        "assignee_id" integer NOT NULL REFERENCES "users"("id"),
+        "created_by_id" integer NOT NULL REFERENCES "users"("id"),
+        "title" varchar(500) NOT NULL,
+        "details" text,
+        "due_date" varchar(20),
+        "priority" varchar(20) DEFAULT 'normal' NOT NULL,
+        "status" varchar(20) DEFAULT 'open' NOT NULL,
+        "completed_at" timestamp,
+        "created_at" timestamp DEFAULT now() NOT NULL,
+        "updated_at" timestamp DEFAULT now() NOT NULL,
+        CONSTRAINT "team_todos_priority_check"
+          CHECK ("priority" IN ('low', 'normal', 'high', 'urgent')),
+        CONSTRAINT "team_todos_status_check"
+          CHECK ("status" IN ('open', 'in_progress', 'completed'))
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "team_todos_assignee_status_idx"
+      ON "team_todos" ("assignee_id", "status")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "team_todos_due_date_idx"
+      ON "team_todos" ("due_date")
+    `);
+    logger.info("Ensured team to-do permissions and table exist");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure team to-do schema");
   }
 
   // Product engagement is distinct from work records. A task assignment or PIR

@@ -44,6 +44,7 @@ export const LoginResponse = zod.object({
     ]),
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
+    canManageTodos: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -80,6 +81,7 @@ export const EntraExchangeResponse = zod.object({
     ]),
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
+    canManageTodos: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -104,6 +106,7 @@ export const GetMeResponse = zod.object({
   ]),
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
+  canManageTodos: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -156,6 +159,7 @@ export const ListUsersResponseItem = zod.object({
   ]),
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
+  canManageTodos: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -180,6 +184,7 @@ export const GetUserResponse = zod.object({
   ]),
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
+  canManageTodos: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -220,6 +225,7 @@ export const UpdateUserResponse = zod.object({
   ]),
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
+  canManageTodos: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -1782,6 +1788,91 @@ export const UpdateLogItemResponse = zod.object({
 });
 
 export const DeleteLogItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List visible to-dos (Mark/Tracy see all; others see their own)
+ */
+export const ListTeamTodosQueryParams = zod.object({
+  assigneeId: zod.coerce.number().optional(),
+  status: zod.enum(["open", "in_progress", "completed"]).optional(),
+});
+
+export const ListTeamTodosResponseItem = zod.object({
+  id: zod.number(),
+  assigneeId: zod.number(),
+  assigneeName: zod.string(),
+  createdById: zod.number(),
+  createdByName: zod.string(),
+  title: zod.string(),
+  details: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.enum(["low", "normal", "high", "urgent"]),
+  status: zod.enum(["open", "in_progress", "completed"]),
+  completedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListTeamTodosResponse = zod.array(ListTeamTodosResponseItem);
+
+/**
+ * @summary Create a to-do for self or, for Mark/Tracy, any active user
+ */
+export const createTeamTodoBodyTitleMax = 500;
+
+export const CreateTeamTodoBody = zod.object({
+  title: zod.string().min(1).max(createTeamTodoBodyTitleMax),
+  details: zod.string().nullish(),
+  assigneeId: zod.number().optional(),
+  dueDate: zod.string().nullish(),
+  priority: zod.enum(["low", "normal", "high", "urgent"]).optional(),
+});
+
+/**
+ * @summary List assignable users (team for managers; self for other users)
+ */
+export const ListTodoAssigneesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  role: zod.string(),
+});
+export const ListTodoAssigneesResponse = zod.array(
+  ListTodoAssigneesResponseItem,
+);
+
+export const UpdateTeamTodoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const updateTeamTodoBodyTitleMax = 500;
+
+export const UpdateTeamTodoBody = zod.object({
+  title: zod.string().min(1).max(updateTeamTodoBodyTitleMax).optional(),
+  details: zod.string().nullish(),
+  assigneeId: zod.number().optional(),
+  dueDate: zod.string().nullish(),
+  priority: zod.enum(["low", "normal", "high", "urgent"]).optional(),
+  status: zod.enum(["open", "in_progress", "completed"]).optional(),
+});
+
+export const UpdateTeamTodoResponse = zod.object({
+  id: zod.number(),
+  assigneeId: zod.number(),
+  assigneeName: zod.string(),
+  createdById: zod.number(),
+  createdByName: zod.string(),
+  title: zod.string(),
+  details: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  priority: zod.enum(["low", "normal", "high", "urgent"]),
+  status: zod.enum(["open", "in_progress", "completed"]),
+  completedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteTeamTodoParams = zod.object({
   id: zod.coerce.number(),
 });
 
