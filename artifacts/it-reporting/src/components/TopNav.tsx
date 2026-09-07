@@ -18,7 +18,7 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
     <DropdownMenu>
       <div
         className={cn(
-          "group inline-flex shrink-0 items-center rounded-md text-sm font-medium transition-colors",
+          "group inline-flex shrink-0 items-center rounded-md text-xs font-medium transition-colors xl:text-sm",
           "text-white/75 hover:bg-white/10 hover:text-white",
           groupActive && "bg-white/10 text-white",
         )}
@@ -26,7 +26,7 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
         <Link
           href={group.href}
           className={cn(
-            "rounded-l-md py-1.5 pl-3 pr-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+            "rounded-l-md py-1.5 pl-2 pr-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 xl:pl-3 xl:pr-1.5",
             groupActive && "text-white",
           )}
           title={`Open ${group.label}`}
@@ -36,7 +36,7 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-8 w-7 items-center justify-center rounded-r-md text-white/70 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 data-[state=open]:bg-white/15 data-[state=open]:text-white"
+            className="flex h-8 w-6 items-center justify-center rounded-r-md text-white/70 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 data-[state=open]:bg-white/15 data-[state=open]:text-white xl:w-7"
             aria-label={`Open ${group.label} menu`}
           >
             <ChevronDown className="h-3.5 w-3.5 transition-transform data-[state=open]:rotate-180" />
@@ -123,7 +123,7 @@ export function TopNav() {
 
   return (
     <nav
-      className="hidden min-w-0 items-center gap-0.5 overflow-x-auto sm:flex"
+      className="hidden min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden"
       aria-label="Primary"
     >
       {groups.map((g) => (
