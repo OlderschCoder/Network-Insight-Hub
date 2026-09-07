@@ -725,7 +725,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                     className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "px-1.5 py-0" : "px-2 py-0.5"} ${style.bg} ${style.border}`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em] text-foreground`}>{overlay.displayCode ?? overlay.code}</span>
+                      <span className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em] text-slate-950`}>{overlay.displayCode ?? overlay.code}</span>
                       <span
                         className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "h-2 w-2" : "h-2.5 w-2.5"} rounded-full ${
                           match?.healthColor === "green"
@@ -748,10 +748,10 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                         Remote site
                       </div>
                     )}
-                    <div className="text-[10px] font-semibold leading-tight text-foreground">
+                    <div className="text-[10px] font-bold leading-tight text-slate-950">
                       {match?.name ?? overlay.buildingName}
                     </div>
-                    <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
+                    <div className="mt-0.5 text-[9px] font-medium leading-tight text-slate-700">{style.label}</div>
                   </div>}
                 </div>
               </div>
@@ -918,18 +918,18 @@ function BuildingsGrid() {
                       : "bg-gray-300"
                     }`} />
                     <div className="flex h-full flex-col gap-2">
-                      <div className="text-muted-foreground">{style.icon}</div>
+                      <div className="text-slate-700">{style.icon}</div>
                       <div>
-                        <p className="font-semibold text-sm leading-tight">{b.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
+                        <p className="text-sm font-bold leading-tight text-slate-950">{b.name}</p>
+                        <p className="mt-0.5 text-xs font-medium text-slate-700">{style.label}</p>
                       </div>
                       <div className="flex gap-2 mt-auto pt-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-slate-600">
                           <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
                         </span>
-                        <span className="text-xs text-muted-foreground">VLANs: {b.vlanCount}</span>
+                        <span className="text-xs text-slate-600">VLANs: {b.vlanCount}</span>
                       </div>
-                      <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
+                      <span className="text-xs font-semibold text-[#244233] group-hover:underline">Open building →</span>
                     </div>
                   </div>
                 </Link>
