@@ -18,8 +18,10 @@ import { logger } from "./logger";
 import {
   executeApplicationGuidance,
   executeManageAfterAction,
+  executeManageTeamTodo,
   executeManageWeeklyLog,
   executeManageWeeklyReport,
+  executeQueryTeamTodos,
   executeZendeskCreateTicket,
   executeZendeskSolveTickets,
   fredApplicationToolsForRole,
@@ -334,7 +336,7 @@ export const CREATE_TASK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   function: {
     name: "create_task",
     description:
-      "Record a piece of work as an item in someone's 'My Tasks' list for the current week. By default the task goes to the signed-in user, and these items roll up into their weekly report automatically. To DELEGATE or ASSIGN the work to a specific active teammate instead — e.g. the user says 'have the network engineer look at the SFP issue', 'assign this to Jane', or 'add this to Mark's list' — pass that person's name or email in `assignee`; the task is added to THAT person's My Tasks and stamped with who assigned it. Use only the active team roster in the context to pick the right person; if the name is ambiguous, retired, inactive, or unknown, ask which active teammate should receive it rather than guessing. Call this whenever the user describes concrete work (an accomplishment, a completed action, a fix, or a to-do), capturing each distinct item as its own task, and prefer capturing over asking. Do NOT use this for durable environment facts (use save_memory instead), for questions, or for hypotheticals.",
+      "Record finished work in Completed Work so it rolls into the weekly report. Use for an accomplishment, completed action, or fix that already happened. Never use this tool for an outstanding assignment, reminder, future task, or to-do; use manage_team_todo instead. By default the completed-work item belongs to the signed-in user. If the user explicitly records completed work for a specific active teammate, pass that person's exact name or email in assignee. Do not use this for durable environment facts (use save_memory), questions, or hypotheticals.",
     parameters: {
       type: "object",
       properties: {
@@ -514,10 +516,10 @@ async function executeCreateTask(
 
   const forWhom =
     crossAssign && targetName
-      ? `${targetName}'s My Tasks`
-      : "the user's My Tasks";
+      ? `${targetName}'s Completed Work`
+      : "the user's Completed Work";
   return {
-    result: `Created task "${row.title}" in ${forWhom} for the week of ${weekOf} (id ${row.id}).`,
+    result: `Recorded "${row.title}" in ${forWhom} for the week of ${weekOf} (id ${row.id}).`,
     created: {
       id: row.id,
       title: row.title,
@@ -5094,6 +5096,34 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "zendesk_solve_tickets tool failed");
           resultText = "Error: Zendesk ticket solve failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "query_team_todos"
+      ) {
+        try {
+          resultText = await executeQueryTeamTodos(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName,
+            role: userRole,
+          });
+        } catch (err) {
+          logger.error({ err }, "query_team_todos tool failed");
+          resultText = "Error: to-do lookup failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "manage_team_todo"
+      ) {
+        try {
+          resultText = await executeManageTeamTodo(call.function.arguments, {
+            id: opts.userId,
+            name: opts.userName,
+            role: userRole,
+          });
+        } catch (err) {
+          logger.error({ err }, "manage_team_todo tool failed");
+          resultText = "Error: to-do write failed";
         }
       } else if (
         call.type === "function" &&
