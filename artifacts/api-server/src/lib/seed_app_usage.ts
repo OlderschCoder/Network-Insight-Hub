@@ -27,7 +27,7 @@ const APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "Start at Home (/), then choose Status & Reporting (/status), Campus Technology (/network/buildings), or Troubleshooting (/support). The fixed left sidebar is organized into clickable category headings with separate dropdown chevrons: Status & Reporting, Campus Technology, Troubleshooting, My Work, IT Apps, and CIO-only Administration. Clicking a category title opens its landing page; clicking its chevron expands or collapses its pages. The top bar provides breadcrumbs, search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. IT Apps (/it-apps) launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
+      "Use the top menu to choose Status & Reporting (/status), Campus Technology (/network/buildings), Troubleshooting (/support), My Work (/todos), IT Apps (/it-apps), or CIO-only Administration (/projects). Clicking a category title opens its landing page; clicking the separate chevron opens that category's dropdown destinations. The top bar also provides search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. IT Apps launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
   },
   {
     category: "general",
@@ -39,7 +39,7 @@ const APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: To-dos, completed work, and the Weekly Log",
     content:
-      "Use To-do List (/todos) for outstanding assignments, priorities, due dates, and completion status. Mark and Tracy can create, view, edit, reassign, complete, or delete any team member's to-do; everyone else can create and manage only their own. Completed Work (/items) is separate: staff record finished tickets, installs, research, and project work there so it rolls into the Weekly Log. When it's time to report, go to Weekly Log (/entries) and generate the week's entry. There is one weekly log per user per week, and submitting it feeds the department weekly report.",
+      "Use To-do List (/todos) for outstanding assignments, priorities, due dates, and completion status. Fred can list accessible to-dos and, after showing the exact item/change and receiving confirmation, create, edit, or complete them. Mark and Tracy can also ask Fred to move (reassign) any team member's to-do; everyone else can create and manage only their own. Completed Work (/items) is separate: staff record finished tickets, installs, research, and project work there so it rolls into the Weekly Log. When it's time to report, go to Weekly Log (/entries) and generate the week's entry. There is one weekly log per user per week, and submitting it feeds the department weekly report.",
   },
   {
     category: "general",
@@ -105,7 +105,7 @@ const APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: Fred and Fred Memory",
     content:
-      "Fred (/ai-report) can answer operational questions, guide users through the whole portal, create tasks, work with confirmed Zendesk tickets, manage confirmed Post-Incident Reviews and weekly logs within the user's permissions, and let the CIO create, edit, or finalize confirmed weekly status reports. Fred Memory is persistent knowledge about the SCCC environment; every active entry is loaded into Fred's context. Users can search, filter, add, edit, and toggle memories; only the CIO can delete. Never store passwords or secrets in Fred Memory; the system blocks credential-like content.",
+      "Fred (/ai-report) can answer operational questions, guide users through the whole portal, list accessible to-dos, create or complete confirmed to-dos, let Mark or Tracy move confirmed to-dos between team members, work with confirmed Zendesk tickets, manage confirmed Post-Incident Reviews and weekly logs within the user's permissions, and let the CIO create, edit, or finalize confirmed weekly status reports. Fred Memory is persistent knowledge about the SCCC environment; every active entry is loaded into Fred's context. Users can search, filter, add, edit, and toggle memories; only the CIO can delete. Never store passwords or secrets in Fred Memory; the system blocks credential-like content.",
   },
   {
     category: "general",

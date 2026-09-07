@@ -15,11 +15,11 @@ A step-by-step guide to using the platform. The IT team uses this app to record 
 
 ## 2. Getting around (navigation)
 
-Use the fixed sidebar to move between the Hub's major work areas. You can also
-use Search in the top header when you know the destination by name.
+Use the top menu to move between the Hub's major work areas. You can also use
+Search in the header when you know the destination by name.
 
-The fixed sidebar is organized into category dropdowns. Click a **category title**
-to open its landing page; click the separate chevron to expand or collapse its
+The top menu is organized into category dropdowns. Click a **category title**
+to open its landing page; click its separate chevron to open the category's
 options:
 
 - **Status & Reporting** — Status Dashboard and Weekly Reports
@@ -29,7 +29,10 @@ options:
 - **IT Apps** — App Directory, Banner, and High School Students
 - **Administration** (CIO) — Projects, Department Goals, Usage Analytics, and Admin
 
-The header also has a persistent **Fred** shortcut. Dashboard actions live together in the Quick Actions card.
+The header also has a persistent **Fred** shortcut. Fred can list your accessible
+to-dos and, after you confirm the exact change, create, edit, or complete them.
+Mark and Tracy can also ask Fred to move a to-do to another team member.
+Dashboard actions live together in the Quick Actions card.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
@@ -124,7 +127,7 @@ These can be included in the relevant week's report so leadership sees lessons l
 ### Monitoring & IT Apps
 
 - **Monitoring** — live Grafana dashboards embedded in the app.
-- **IT Apps** — the early sidebar group for the application directory, protected Banner/EUP operations, and High School Students access tools.
+- **IT Apps** — the top-menu category for the application directory, protected Banner/EUP operations, and High School Students access tools.
 
 ### Process Library
 

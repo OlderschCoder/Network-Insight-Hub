@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Logo, Signature } from "@/components/system";
 import QuickAddItemDialog from "@/components/QuickAddItemDialog";
 import { AppLauncher } from "@/components/AppLauncher";
-import { AppSidebar } from "@/components/AppSidebar";
+import { TopNav } from "@/components/TopNav";
 import { ZendeskAlerts } from "@/components/ZendeskAlerts";
 import { ZendeskChatWidget } from "@/components/ZendeskChatWidget";
 import { useEffect, useState } from "react";
@@ -35,7 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   ListChecks as ListChecksIcon,
   ShieldAlert as ShieldAlertIcon,
@@ -44,10 +43,7 @@ import {
 } from "lucide-react";
 import { LogOut, Zap, Sparkles, Search, Moon, Sun } from "lucide-react";
 import { trackProductUsage } from "@/lib/usage-tracking";
-import {
-  Breadcrumb,
-  FredChip,
-} from "@/components/portal-ui";
+import { Breadcrumb, FredChip } from "@/components/portal-ui";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -360,7 +356,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   if (location === "/") {
     return (
       <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
-        <header className="flex h-[60px] shrink-0 items-center gap-4 bg-[var(--portal-sidebar-bg)] px-5 text-white lg:px-10">
+        <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-x-4 gap-y-1 bg-[var(--portal-sidebar-bg)] px-5 py-2 text-white xl:flex-nowrap xl:px-10">
           <Link href="/" className="flex items-center gap-3">
             <Logo
               variant="white"
@@ -370,6 +366,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               IT Department Portal
             </span>
           </Link>
+          <div className="order-3 min-w-0 w-full xl:order-none xl:w-auto xl:flex-1">
+            <TopNav />
+          </div>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-xs text-white/55 sm:inline">
               {new Date().toLocaleDateString(undefined, {
@@ -406,84 +405,90 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen>
-      <AppSidebar />
-      <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-[52px] shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
-          <div className="flex min-w-0 items-center gap-3">
-            <Breadcrumb
-              app={appLabel}
-              page={
-                activeItem?.label ??
-                (location === "/support"
-                  ? "Support Center"
-                  : (activeGroup?.label ?? "Workspace"))
-              }
-            />
-          </div>
+    <div className="flex h-svh min-h-0 min-w-0 flex-col overflow-hidden bg-background">
+      <header className="sticky top-0 z-30 flex min-h-[60px] shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-sidebar-border/70 bg-sidebar px-4 py-2 text-sidebar-foreground xl:flex-nowrap">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Logo
+            variant="white"
+            className="h-6 w-20 object-contain object-left"
+          />
+        </Link>
+        <div className="order-3 min-w-0 w-full xl:order-none xl:w-auto xl:flex-1">
+          <TopNav />
+        </div>
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLauncherOpen(true)}
+            className="hidden h-8 items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 text-xs text-white/70 transition-colors hover:bg-white/15 sm:flex"
+            aria-label="Search pages"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden lg:inline">Search</span>
+            <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
+              ⌘K
+            </kbd>
+          </button>
 
-          <div className="ml-auto flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setLauncherOpen(true)}
-              className="hidden h-8 items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 text-xs text-white/70 transition-colors hover:bg-white/15 sm:flex"
-              aria-label="Search pages"
-            >
-              <Search className="h-4 w-4" />
-              <span className="hidden lg:inline">Search</span>
-              <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
-                ⌘K
-              </kbd>
-            </button>
+          <button
+            type="button"
+            onClick={() => setLauncherOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+            aria-label="Search pages"
+          >
+            <Search className="h-4 w-4" />
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setLauncherOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
-              aria-label="Search pages"
-            >
-              <Search className="h-4 w-4" />
-            </button>
+          <button
+            type="button"
+            onClick={() => setDarkMode((value) => !value)}
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
+            aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+          >
+            {darkMode ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setDarkMode((value) => !value)}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
-              aria-label={darkMode ? "Use light theme" : "Use dark theme"}
-            >
-              {darkMode ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </button>
+          <FredChip from={location} />
 
-            <FredChip from={location} />
+          <ZendeskAlerts />
 
-            <ZendeskAlerts />
+          <AccountMenu
+            name={user?.name}
+            role={user?.role}
+            jobTitle={user?.jobTitle}
+            onLogout={handleLogout}
+          />
+        </div>
+      </header>
 
-            <AccountMenu
-              name={user?.name}
-              role={user?.role}
-              jobTitle={user?.jobTitle}
-              onLogout={handleLogout}
-            />
-          </div>
-        </header>
+      <div className="flex h-9 shrink-0 items-center border-b border-border bg-muted/30 px-4">
+        <Breadcrumb
+          app={appLabel}
+          page={
+            activeItem?.label ??
+            (location === "/support"
+              ? "Support Center"
+              : (activeGroup?.label ?? "Workspace"))
+          }
+        />
+      </div>
 
-        <ZendeskChatWidget />
+      <ZendeskChatWidget />
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:px-6 md:py-5">
-            {children}
-          </div>
-          <footer className="border-t border-border px-6 py-4">
-            <Signature />
-          </footer>
-        </main>
+      <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:px-6 md:py-5">
+          {children}
+        </div>
+        <footer className="border-t border-border px-6 py-4">
+          <Signature />
+        </footer>
+      </main>
 
-        <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
-      </SidebarInset>
-    </SidebarProvider>
+      <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
+    </div>
   );
 }

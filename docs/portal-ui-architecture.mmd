@@ -1,5 +1,9 @@
 flowchart LR
   U[Authenticated IT user] --> H[Home command center]
+  U --> M[Role-aware top dropdown menu]
+  M --> S
+  M --> N
+  M --> T
   H --> S[Status and Reporting]
   H --> N[IT Tools and Network]
   H --> T[Troubleshooting]

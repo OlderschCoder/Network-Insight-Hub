@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getNavGroups } from "../../it-reporting/src/config/nav";
 
 describe("primary navigation", () => {
-  it("organizes the sidebar into linked category dropdowns", () => {
+  it("organizes the top menu into linked category dropdowns", () => {
     const groups = getNavGroups(true, true);
     expect(groups.map((group) => [group.label, group.href])).toEqual([
       ["Status & Reporting", "/status"],

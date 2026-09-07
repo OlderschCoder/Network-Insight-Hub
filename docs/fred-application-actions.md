@@ -11,6 +11,7 @@ Fred can guide authenticated users through the current SCCC IT Portal and can pe
 | Post-Incident Reviews | Included in Fred context               | Create; edit every PIR field                                                                                                            | Owner or CIO                                                   |
 | Weekly logs           | Included in Fred context               | Create or update every weekly-log field                                                                                                 | Owner or CIO                                                   |
 | Weekly status reports | Included in Fred context               | Create, update every report-editor field, or finalize                                                                                   | CIO only                                                       |
+| Team to-dos           | List accessible to-dos                 | Create; edit; complete; reassign                                                                                                        | Own items; Mark or Tracy may manage/reassign any team item     |
 
 Every write tool requires `confirmed: true`. Fred must first show the exact target and proposed values. Observation-only/background Fred calls cannot see any of these write tools.
 
@@ -18,6 +19,6 @@ Zendesk ticket closure uses the platform's normal lifecycle: Fred marks an expli
 
 ## Guidance source
 
-`seed_app_usage.ts` is reseeded idempotently on service start and documents the Home, Status, IT Tools & Network, Troubleshooting, sidebar, Fred, reporting, and record workflows. The `get_application_guidance` tool queries those live seeded entries, keeping how-to answers grounded in the deployed interface.
+`seed_app_usage.ts` is reseeded idempotently on service start and documents the Home, Status, Campus Technology, Troubleshooting, top-menu navigation, Fred, reporting, and record workflows. The `get_application_guidance` tool queries those live seeded entries, keeping how-to answers grounded in the deployed interface.
 
 See [fred-application-actions.mmd](fred-application-actions.mmd) for the editable authorization and write flow.

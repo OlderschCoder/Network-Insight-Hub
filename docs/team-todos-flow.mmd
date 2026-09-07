@@ -1,5 +1,7 @@
 flowchart LR
   U[Authenticated user] --> API[/api/todos]
+  U --> F[Fred to-do tools]
+  F --> P
   API --> P{Team to-do manager?}
   P -- Mark or Tracy --> ALL[All team to-dos]
   P -- Other user --> OWN[Own to-dos only]
@@ -7,4 +9,3 @@ flowchart LR
   OWN --> T
   T -. separate record stream .-> L[(log_items completed work)]
   L --> W[Weekly log and report]
-

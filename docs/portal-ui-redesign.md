@@ -11,7 +11,9 @@ The authenticated Insights experience uses a hub-and-spoke shell while preservin
 | `/network` | IT Tools & Network | Existing network reference with a clearer tab/card structure     |
 | `/support` | Troubleshooting    | Live Zendesk activity and links to existing diagnostic workflows |
 
-The other established routes remain unchanged. The sidebar mode switcher is a fast context jump, not a replacement for role-aware navigation.
+The other established routes remain unchanged. Role-aware category dropdowns
+live in the global top menu. Each category title navigates to its landing page,
+while its separate chevron opens the destination list.
 
 ## Behavior preservation
 
@@ -19,11 +21,11 @@ The other established routes remain unchanged. The sidebar mode switcher is a fa
 - The Status quick-add action still opens the existing `QuickAddItemDialog`; report, review, and export actions route to the established workflows.
 - The Troubleshooting page reads the existing Zendesk recent-activity endpoint and launches existing monitoring, network, incident, process, learning, telephony, and student-access routes.
 - Fred remains the existing `/ai-report` experience. Home and Troubleshooting may prefill its composer through a URL prompt, but they do not create a second chat implementation.
-- Fred now uses typed, confirmation-gated application tools for Zendesk tickets, Post-Incident Reviews, weekly logs, and CIO-only weekly status reports. Her live application-guidance tool reads the current seeded portal instructions. See [Fred application actions](fred-application-actions.md).
+- Fred now uses typed, confirmation-gated application tools for team to-dos, Zendesk tickets, Post-Incident Reviews, weekly logs, and CIO-only weekly status reports. Her live application-guidance tool reads the current seeded portal instructions. See [Fred application actions](fred-application-actions.md).
 - Existing role checks remain in `ProtectedRoute` and the role-aware navigation configuration.
 
 ## Visual system
 
-Portal color and status roles are defined as CSS custom properties in the frontend theme. The sidebar remains dark in both themes; the content theme can be switched from the top bar and is stored locally. Status indicators always pair color with a text label.
+Portal color and status roles are defined as CSS custom properties in the frontend theme. The global top menu remains dark in both themes; the content theme can be switched from the top bar and is stored locally. Status indicators always pair color with a text label.
 
 See [portal-ui-architecture.mmd](portal-ui-architecture.mmd) for the editable route and data-flow diagram.

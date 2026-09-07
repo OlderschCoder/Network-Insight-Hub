@@ -5,12 +5,15 @@ vi.mock("@workspace/db", () => ({
   afterActionReportsTable: {},
   entriesTable: {},
   reportsTable: {},
+  teamTodosTable: {},
+  usersTable: {},
   db: {},
 }));
 
 import {
   canManageOwnedRecord,
   canManageWeeklyReports,
+  executeManageTeamTodo,
   executeZendeskCreateTicket,
   executeZendeskSolveTickets,
   fredApplicationToolsForRole,
@@ -46,9 +49,20 @@ describe("Fred application actions", () => {
         "zendesk_solve_tickets",
         "manage_post_incident_review",
         "manage_weekly_log",
+        "query_team_todos",
+        "manage_team_todo",
         "get_application_guidance",
       ]),
     );
+  });
+
+  it("requires exact confirmation before Fred changes a to-do", async () => {
+    const result = await executeManageTeamTodo(
+      JSON.stringify({ action: "complete", id: 42, confirmed: false }),
+      { id: 7, role: "staff" },
+    );
+
+    expect(result).toContain("Confirmation required");
   });
 
   it("enforces owner and CIO boundaries", () => {
