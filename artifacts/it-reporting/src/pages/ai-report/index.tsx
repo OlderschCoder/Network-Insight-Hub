@@ -2468,7 +2468,11 @@ export default function AIReport() {
   const fromPath = searchParams.get("from") ?? "";
   const prompt = searchParams.get("prompt") ?? "";
   const requestedTab = searchParams.get("tab");
-  const defaultTab = isCIO && requestedTab === "architecture" ? "architecture" : "chat";
+  const defaultTab = requestedTab === "memory"
+    ? "memory"
+    : isCIO && ["status", "architecture", "insights"].includes(requestedTab ?? "")
+      ? requestedTab!
+      : "chat";
   const contextHint = prompt || pageHintFromPath(fromPath);
 
   return (

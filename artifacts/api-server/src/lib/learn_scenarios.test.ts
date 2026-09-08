@@ -12,6 +12,17 @@ describe("Learn simulations", () => {
     expect(LEARN_SCENARIOS.some(s => s.mode === "onsite")).toBe(true);
   });
 
+  it("trains the current SCCC wireless, identity, and Microsoft 365 rules", () => {
+    const wireless = getLearnScenario("gym-no-wifi")!;
+    const license = getLearnScenario("m365-license")!;
+    const account = getLearnScenario("student-account-missing")!;
+
+    expect(JSON.stringify(wireless)).toContain("network username and password");
+    expect(JSON.stringify(wireless)).toContain("never send the password");
+    expect(JSON.stringify(license)).toContain("SCCC IT can add, remove, or update Microsoft 365 licenses");
+    expect(JSON.stringify(account)).toContain("Zendesk already supplies the requester name and email");
+  });
+
   it("provides coaching, a Hub destination, evidence, and choices for every step", () => {
     for (const scenario of LEARN_SCENARIOS) for (const step of scenario.steps) {
       expect(step.coach.length).toBeGreaterThan(20);

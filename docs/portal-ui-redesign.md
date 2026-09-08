@@ -11,6 +11,8 @@ The authenticated Insights experience uses a hub-and-spoke shell while preservin
 | `/network`         | IT Tools & Network | Existing network reference with a clearer tab/card structure      |
 | `/support`         | Troubleshooting    | Live Zendesk activity and links to existing diagnostic workflows  |
 | `/support/zendesk` | Troubleshooting    | Conversation Log monitor with shared, editable Fred approval drafts |
+| `/quick-start`     | Troubleshooting    | Ten-minute orientation to navigation, daily work, Zendesk, and Fred |
+| `/user-guide`      | Troubleshooting    | Full step-by-step platform guide                                  |
 
 The other established routes remain unchanged. Role-aware category dropdowns
 live in the global top menu. Each category title navigates to its landing page,
@@ -24,6 +26,9 @@ while its separate chevron opens the destination list.
 - Fred remains the existing `/ai-report` experience. Home and Troubleshooting may prefill its composer through a URL prompt, but they do not create a second chat implementation.
 - Fred now uses typed, confirmation-gated application tools for team to-dos, Zendesk tickets, Post-Incident Reviews, weekly logs, and CIO-only weekly status reports. Her live application-guidance tool reads the current seeded portal instructions. See [Fred application actions](fred-application-actions.md).
 - Existing role checks remain in `ProtectedRoute` and the role-aware navigation configuration.
+- Quick Start, Learn, Process Library, and User Guide are grouped under the
+  Troubleshooting dropdown. The same Quick Start route is linked from the
+  Support Center so training remains easy to find after the navigation redesign.
 
 ## Visual system
 
@@ -33,3 +38,5 @@ both themes; health color is carried by borders, icons, and status dots rather
 than low-contrast text.
 
 See [portal-ui-architecture.mmd](portal-ui-architecture.mmd) for the editable route and data-flow diagram.
+See [quick-start-training-flow.mmd](quick-start-training-flow.mmd) for the
+editable training and Fred-knowledge flow.

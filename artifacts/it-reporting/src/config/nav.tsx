@@ -23,6 +23,7 @@ import {
   BookOpenCheck,
   ClipboardList,
   MessagesSquare,
+  Rocket,
 } from "lucide-react";
 
 export type NavItem = {
@@ -152,6 +153,13 @@ export function getNavGroups(
     href: "/support",
     items: [
       {
+        href: "/quick-start",
+        label: "Quick Start",
+        desc: "Learn the new layout and daily workflow",
+        icon: Rocket,
+        newBadge: true,
+      },
+      {
         href: "/support",
         label: "Support Center",
         desc: "Zendesk activity and diagnostic shortcuts",
@@ -195,6 +203,12 @@ export function getNavGroups(
         label: "Learn",
         desc: "Practice IT situations with guided simulations",
         icon: BookOpenCheck,
+      },
+      {
+        href: "/user-guide",
+        label: "User Guide",
+        desc: "Step-by-step help for the complete platform",
+        icon: BookOpen,
       },
     ],
   };

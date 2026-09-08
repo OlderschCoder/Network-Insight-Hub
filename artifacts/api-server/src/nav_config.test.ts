@@ -20,6 +20,17 @@ describe("primary navigation", () => {
       "Azure",
       "Network Tools",
     ]);
+    expect(groups[2].items.map((item) => item.label)).toEqual([
+      "Quick Start",
+      "Support Center",
+      "Zendesk Monitor",
+      "Incident Rooms",
+      "Risks & Issues",
+      "Post-Incident Reviews",
+      "Process Library",
+      "Learn",
+      "User Guide",
+    ]);
   });
 
   it("does not duplicate campus destinations in lower menu groups", () => {

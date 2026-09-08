@@ -41,6 +41,7 @@ import IncidentRoom from "@/pages/incidents/[id]";
 import Admin from "@/pages/admin/index";
 import AIReport, { FredMobilePage } from "@/pages/ai-report/index";
 import UserGuide from "@/pages/user-guide/index";
+import QuickStart from "@/pages/quick-start/index";
 import ProcessesIndex from "@/pages/processes/index";
 import NewProcess from "@/pages/processes/new";
 import ProcessDetail from "@/pages/processes/[id]";
@@ -360,6 +361,10 @@ function Router() {
         component={() => <ProtectedRoute component={AIReport} />}
       />
 
+      <Route
+        path="/quick-start"
+        component={() => <ProtectedRoute component={QuickStart} />}
+      />
       <Route
         path="/user-guide"
         component={() => <ProtectedRoute component={UserGuide} />}

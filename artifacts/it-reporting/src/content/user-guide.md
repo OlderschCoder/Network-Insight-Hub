@@ -2,6 +2,10 @@
 
 A step-by-step guide to using the platform. The IT team uses this app to record daily and weekly work, track tasks and projects, log risks and incidents, keep network and Azure inventory, and roll everything up into weekly executive reports for the CIO.
 
+New to the rearranged portal? Open **Troubleshooting → Quick Start** for the
+10-minute version. It explains the top-menu categories, the daily work loop,
+supervised Zendesk drafting, and how to teach Fred.
+
 ---
 
 ## 1. Signing in
@@ -24,7 +28,7 @@ options:
 
 - **Status & Reporting** — Status Dashboard and Weekly Reports
 - **Campus Technology** — Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure, and role-restricted Network Tools
-- **Troubleshooting** — Support Center, Zendesk Monitor, Incident Rooms, Risks & Issues, Post-Incident Reviews, Process Library, and Learn
+- **Troubleshooting** — Quick Start, Support Center, Zendesk Monitor, Incident Rooms, Risks & Issues, Post-Incident Reviews, Process Library, Learn, and the full User Guide
 - **My Work** — To-do List, Completed Work, and Weekly Log
 - **IT Apps** — App Directory, Banner, and High School Students
 - **Administration** (CIO) — Projects, Department Goals, Usage Analytics, and Admin
@@ -107,7 +111,7 @@ These can be included in the relevant week's report so leadership sees lessons l
 
 ---
 
-## 7. Systems & Tools
+## 7. Troubleshooting, systems, and tools
 
 ### Zendesk Monitor
 
@@ -120,6 +124,13 @@ These can be included in the relevant week's report so leadership sees lessons l
 7. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
 8. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
 9. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
+
+Fred's SCCC ticket-drafting rules:
+
+- Read the complete ticket and do not repeat questions the requester already answered.
+- Zendesk already supplies the requester's name and email address. Do not ask for either again when it is present in the ticket.
+- SCCC wireless uses the requester's SCCC network username and password. Fred may tell the requester which credentials to use, but must never ask them to send, paste, or disclose the password or an MFA code.
+- SCCC IT can add, remove, or update Microsoft 365 (Office 365) licenses. Ask only which application or entitlement is missing when the ticket does not already say.
 
 The queue and shared drafts refresh every 15 seconds; the selected Conversation
 Log refreshes every 5 seconds. Every public reply is confirmation-gated in both
@@ -181,8 +192,10 @@ Reports aggregate everyone's weekly logs into one department report per week.
 
 Open **Fred**. It has these tabs:
 
-- **Ask Fred** — chat with read access to your entries, risks, post-incident reviews, and network inventory. Great for summaries and questions ("Summarize the top 3 risks right now").
 - **Status Report** (CIO only) — generate an executive status report.
+- **Architecture** — inspect enterprise architecture evidence and relationships.
+- **Ask Fred** — chat with read access to your entries, risks, post-incident reviews, and network inventory. Great for summaries and questions ("Summarize the top 3 risks right now").
+- **CIO Insights** (CIO only) — review leadership-level operational signals.
 - **Fred Memory** — Fred's **persistent knowledge** about the SCCC environment. Every active entry is fed into Fred's context.
 
 Using Fred Memory:
@@ -192,7 +205,11 @@ Using Fred Memory:
 3. **Edit** any entry, or use the **toggle** to activate/deactivate it (inactive = ignored by the AI).
 4. Only the **CIO can delete** entries.
 
-The AI can also **save memories itself** — just tell it a durable fact or say "remember this," and you'll see a confirmation. **Never store passwords or secrets;** the system blocks credential-like content.
+Fred can also **save memories herself** — tell her a durable fact or say
+"remember this," and verify the saved entry. Editing a ticket draft does not by
+itself train Fred; save the correction to Memory when it should affect future
+answers. Use the **Process Library** for full repeatable procedures. **Never
+store passwords or secrets;** the system blocks credential-like content.
 
 ---
 

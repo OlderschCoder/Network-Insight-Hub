@@ -4,12 +4,14 @@ flowchart LR
   M --> S
   M --> N
   M --> T
+  M --> Q[Quick Start]
   H --> S[Status and Reporting]
   H --> N[IT Tools and Network]
   H --> T[Troubleshooting]
   S --> API[Existing generated API client]
   N --> API
   T --> Z[Existing Zendesk activity endpoint]
+  Q --> G[User Guide and Learn]
   T --> N
   H --> F[Fred]
   S --> F
@@ -18,3 +20,4 @@ flowchart LR
   API --> DB[(Existing operational data)]
   Z --> ZE[Zendesk]
   F --> FM[(Existing Fred topics and memory)]
+  G --> F

@@ -19,6 +19,7 @@ const QUESTIONS = [
   { id: "reports", section: "Reports", prompt: "Which section contains team and executive reporting records?", answers: ["reports", "/reports"] },
   { id: "processes", section: "Processes", prompt: "Where are reusable operational runbooks stored?", answers: ["processes", "process library", "/processes"] },
   { id: "guide", section: "User Guide", prompt: "Where can you find step-by-step instructions for using the Hub?", answers: ["user guide", "/user-guide"] },
+  { id: "quick-start", section: "Quick Start", prompt: "Which Troubleshooting page gives a 10-minute orientation to the rearranged Hub?", answers: ["quick start", "quickstart", "/quick-start"] },
   { id: "fred", section: "Fred", prompt: "What should you attach to Fred when you want current console output analyzed?", answers: ["console output", "command output", "text file", "paste the output", "pasted output"] },
 ];
 

@@ -1,0 +1,18 @@
+flowchart LR
+  U[Authenticated IT user] --> M[Top-menu Troubleshooting dropdown]
+  M --> Q[Quick Start]
+  M --> G[User Guide]
+  M --> L[Learn simulations]
+  M --> P[Process Library]
+  Q --> W[Daily work and Zendesk workflow]
+  G --> W
+  L --> W
+  P --> W
+  F[Fred] --> K[(Seeded application guidance)]
+  F --> A[(Active Fred Memory)]
+  K --> Q
+  K --> G
+  A --> R[SCCC environment facts and reply rules]
+  R --> F
+  W --> Z[Supervised Zendesk draft]
+  Z --> H[Human review and send]

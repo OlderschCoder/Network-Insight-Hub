@@ -11,6 +11,7 @@ import {
   Map,
   Network,
   PhoneCall,
+  Rocket,
   Search,
   ShieldCheck,
   Sparkles,
@@ -442,6 +443,12 @@ export default function SupportCenter() {
             <CardTitle className="mt-1 text-base">Common workflows</CardTitle>
           </CardHeader>
           <CardContent className="divide-y p-0">
+            <SupportLink
+              href="/quick-start"
+              icon={Rocket}
+              label="Quick Start"
+              detail="Learn the top menu and daily workflow"
+            />
             <SupportLink
               href="/incidents"
               icon={Activity}

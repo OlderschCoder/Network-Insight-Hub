@@ -116,11 +116,11 @@ as a parallel sign-in path.
 - Places the current operational pulse first: network availability, risks,
   incidents, calling, Zendesk performance, submissions, and recent activity
   precede learning guidance, personal work, and the Quote of the Day.
-- Leads the sidebar with **Campus Operations** in the operational drill-down
-  order: Status, Buildings, Network Map, Monitoring, Cisco Webex Phones, and
-  Azure. Those destinations appear once rather than being duplicated below.
-- Places **IT Apps** immediately after **My Work**, with App Directory, Banner,
-  and High School Students grouped together as operational applications.
+- Uses a persistent top menu with linked category titles and separate dropdown
+  chevrons for Status & Reporting, Campus Technology, Troubleshooting, My Work,
+  IT Apps, and CIO-only Administration.
+- Places **Quick Start**, Learn, Process Library, and User Guide together under
+  Troubleshooting, while **IT Apps** remains immediately after **My Work**.
 
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.
