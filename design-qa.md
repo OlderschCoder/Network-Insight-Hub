@@ -1,3 +1,51 @@
+# Network status contrast design QA
+
+- Source visual truth:
+  - `C:\Users\MARK~1.BOJ\AppData\Local\Temp\codex-clipboard-aeaaa33d-0d98-4927-937a-909d1d252e75.png`
+  - `C:\Users\MARK~1.BOJ\AppData\Local\Temp\codex-clipboard-39c98722-19fa-4703-970e-45bd479b7caf.png`
+- Implementation capture: authenticated production Chrome capture in this task; the browser connector did not provide a local screenshot path.
+- Production route: `https://app-server2.centralus.cloudapp.azure.com/network/buildings`
+- Verified state: authenticated CIO, dark theme, live campus map, red/green/unknown building cards, and the light-theme fallback.
+
+## Full-view comparison evidence
+
+The supplied screenshots showed dark-theme foreground tokens being inherited by light health surfaces. Building names and map codes were nearly white on green-50/red-50 cards, while status metadata was a low-contrast gray-green. The published implementation keeps the same light status fills, health borders, map placement, layout, and typography but gives every light health surface fixed dark ink colors.
+
+## Focused region comparison evidence
+
+- Before: map/card titles resolved to `rgb(224, 235, 230)` and status metadata to `rgb(146, 170, 158)` on green-50.
+- After: titles and map codes resolve to `rgb(20, 37, 27)`, metadata to `rgb(61, 82, 69)`, and actions to `rgb(36, 91, 53)`.
+- The same fixed ink colors remain correct when the page switches to light theme.
+- The card links and map drill-down links remain present and clickable.
+
+## Findings and comparison history
+
+### Iteration 1 — passed
+
+- No remaining P0/P1/P2 contrast findings on the supplied map or building-card surfaces.
+- Automated contrast verification confirms every title, metadata, and action token is at least 7:1 against green-50, amber-50, red-50, and gray-50.
+- Visual production inspection confirmed the map bubbles and building cards are readable without altering their health-state meaning.
+
+## Required fidelity surfaces
+
+- Fonts and typography: preserved; existing sizes and hierarchy are unchanged.
+- Spacing and layout rhythm: preserved; no spacing or geometry changes were made.
+- Colors and visual tokens: corrected only on light network-health surfaces inside either theme.
+- Image quality and assets: preserved; the campus map asset was not changed.
+- Copy and content: preserved.
+
+## Validation
+
+- TypeScript build passed.
+- Production Vite build passed.
+- Network status contrast test passed at 7:1 or better for all health fills.
+- Published CSS checksum matched the local production bundle.
+- Authenticated dark- and light-theme browser checks passed.
+
+final result: passed
+
+---
+
 # Fred responsive chat design QA
 
 - Source visual truth: `C:\Users\MARK~1.BOJ\AppData\Local\Temp\codex-clipboard-20f8a088-db77-4036-b5e4-bf6abea9e9a7.png`

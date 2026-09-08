@@ -722,10 +722,10 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
               >
                 <div className="relative">
                   <div
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "px-1.5 py-0" : "px-2 py-0.5"} ${style.bg} ${style.border}`}
+                    className={`network-status-surface absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "px-1.5 py-0" : "px-2 py-0.5"} ${style.bg} ${style.border}`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em] text-slate-950`}>{overlay.displayCode ?? overlay.code}</span>
+                      <span className={`network-status-title ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em]`}>{overlay.displayCode ?? overlay.code}</span>
                       <span
                         className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "h-2 w-2" : "h-2.5 w-2.5"} rounded-full ${
                           match?.healthColor === "green"
@@ -740,18 +740,18 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                     </div>
                   </div>
                   {!overlay.compactMarker && <div
-                    className={`absolute min-w-[96px] max-w-[148px] rounded-2xl border px-2.5 py-1.5 shadow-sm backdrop-blur-sm ${style.bg} ${style.border} ${isWestCampus ? "ring-1 ring-[#355842]/40" : ""}`}
+                    className={`network-status-surface absolute min-w-[96px] max-w-[148px] rounded-2xl border px-2.5 py-1.5 shadow-sm backdrop-blur-sm ${style.bg} ${style.border} ${isWestCampus ? "ring-1 ring-[#355842]/40" : ""}`}
                     style={{ transform: `translate(${labelDx}px, ${labelDy}px)` }}
                   >
                     {isWestCampus && (
-                      <div className="mb-1 text-[8px] font-bold uppercase leading-none tracking-[0.16em] text-[#355842]">
+                      <div className="network-status-action mb-1 text-[8px] font-bold uppercase leading-none tracking-[0.16em]">
                         Remote site
                       </div>
                     )}
-                    <div className="text-[10px] font-bold leading-tight text-slate-950">
+                    <div className="network-status-title text-[10px] font-bold leading-tight">
                       {match?.name ?? overlay.buildingName}
                     </div>
-                    <div className="mt-0.5 text-[9px] font-medium leading-tight text-slate-700">{style.label}</div>
+                    <div className="network-status-meta mt-0.5 text-[9px] font-medium leading-tight">{style.label}</div>
                   </div>}
                 </div>
               </div>
@@ -907,7 +907,7 @@ function BuildingsGrid() {
               return (
                 <Link key={b.name} href={`/network/buildings/${encodeURIComponent(b.name)}`}>
                   <div className={`
-                    group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
+                    network-status-surface group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
                     ${style.bg} ${style.border}
                     hover:shadow-md hover:scale-[1.02] focus-within:ring-2 ${style.ring}
                   `}>
@@ -918,18 +918,18 @@ function BuildingsGrid() {
                       : "bg-gray-300"
                     }`} />
                     <div className="flex h-full flex-col gap-2">
-                      <div className="text-slate-700">{style.icon}</div>
+                      <div className="network-status-meta">{style.icon}</div>
                       <div>
-                        <p className="text-sm font-bold leading-tight text-slate-950">{b.name}</p>
-                        <p className="mt-0.5 text-xs font-medium text-slate-700">{style.label}</p>
+                        <p className="network-status-title text-sm font-bold leading-tight">{b.name}</p>
+                        <p className="network-status-meta mt-0.5 text-xs font-medium">{style.label}</p>
                       </div>
                       <div className="flex gap-2 mt-auto pt-1">
-                        <span className="text-xs text-slate-600">
+                        <span className="network-status-meta text-xs">
                           <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
                         </span>
-                        <span className="text-xs text-slate-600">VLANs: {b.vlanCount}</span>
+                        <span className="network-status-meta text-xs">VLANs: {b.vlanCount}</span>
                       </div>
-                      <span className="text-xs font-semibold text-[#244233] group-hover:underline">Open building →</span>
+                      <span className="network-status-action text-xs font-semibold group-hover:underline">Open building →</span>
                     </div>
                   </div>
                 </Link>

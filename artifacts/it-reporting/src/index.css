@@ -81,6 +81,11 @@
 
 /* LIGHT MODE */
 :root {
+  /* Fixed-ink tokens for light network-health surfaces shown inside either theme. */
+  --network-status-title: #14251b;
+  --network-status-meta: #3d5245;
+  --network-status-action: #245b35;
+
   --portal-sidebar-bg: #1c3025;
   --portal-primary: #2d6a41;
   --primary-hover: #1b4d2e;
@@ -231,6 +236,27 @@
     from hsl(var(--destructive)) h s
       calc(l + var(--opaque-button-border-intensity)) / alpha
   );
+}
+
+/*
+ * Building cards and campus-map bubbles intentionally keep light status fills in
+ * dark mode. These selectors prevent dark-theme foreground tokens from washing
+ * out against those light fills while preserving health-colored borders/icons.
+ */
+.network-status-surface {
+  color: var(--network-status-title);
+}
+
+.network-status-surface .network-status-title {
+  color: var(--network-status-title);
+}
+
+.network-status-surface .network-status-meta {
+  color: var(--network-status-meta);
+}
+
+.network-status-surface .network-status-action {
+  color: var(--network-status-action);
 }
 
 .dark {
