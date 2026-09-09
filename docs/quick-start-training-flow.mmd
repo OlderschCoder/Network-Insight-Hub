@@ -1,9 +1,14 @@
 flowchart LR
-  U[Authenticated IT user] --> M[Top-menu Troubleshooting dropdown]
-  M --> Q[Quick Start]
-  M --> G[User Guide]
-  M --> L[Learn simulations]
-  M --> P[Process Library]
+  U[Authenticated IT user] --> H[Home command center]
+  H --> S[Status and Reporting]
+  H --> N[IT Tools and Network]
+  H --> I[IT Apps]
+  H --> T[Troubleshooting]
+  T --> Q[Quick Start]
+  T --> G[User Guide]
+  T --> L[Learn simulations]
+  T --> P[Process Library]
+  T --> C[Zendesk supervision status]
   Q --> W[Daily work and Zendesk workflow]
   G --> W
   L --> W
@@ -14,5 +19,6 @@ flowchart LR
   K --> G
   A --> R[SCCC environment facts and reply rules]
   R --> F
+  C --> W
   W --> Z[Supervised Zendesk draft]
-  Z --> H[Human review and send]
+  Z --> HR[Human review and send]

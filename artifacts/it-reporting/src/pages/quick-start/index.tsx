@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionEyebrow } from "@/components/portal-ui";
 
-const menuGroups = [
+export const QUICK_START_WORKSPACES = [
   {
     label: "Status & Reporting",
     href: "/status",
@@ -26,18 +26,8 @@ const menuGroups = [
   },
   {
     label: "Campus Technology",
-    href: "/network/buildings",
+    href: "/network",
     detail: "Buildings, network, phones, monitoring, and Azure",
-  },
-  {
-    label: "Troubleshooting",
-    href: "/support",
-    detail: "Zendesk, incidents, risks, reviews, training, and runbooks",
-  },
-  {
-    label: "My Work",
-    href: "/todos",
-    detail: "To-dos, completed work, and weekly logs",
   },
   {
     label: "IT Apps",
@@ -45,11 +35,14 @@ const menuGroups = [
     detail: "Shared applications and student-access tools",
   },
   {
-    label: "Administration",
-    href: "/projects",
-    detail: "CIO projects, goals, analytics, and access",
+    label: "Troubleshooting",
+    href: "/support",
+    detail: "Zendesk, incidents, risks, reviews, training, and runbooks",
   },
 ] as const;
+
+export const QUICK_START_NAVIGATION_COPY =
+  "Use the workspace switcher at the top of the fixed sidebar to move among Status, IT Tools, Apps, and Support. The sidebar underneath shows every destination in the current workspace.";
 
 const firstRunSteps = [
   {
@@ -97,8 +90,8 @@ export default function QuickStart() {
               Your first 10 minutes in Insights
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70">
-              Learn the new top-menu layout, complete the daily work cycle, and
-              use Fred without giving up human review of Zendesk replies.
+              Learn the four-workspace sidebar, complete the daily work cycle,
+              and use Fred without giving up human review of Zendesk replies.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
@@ -123,7 +116,7 @@ export default function QuickStart() {
               <div>
                 <p className="font-bold">Fred is the persistent guide</p>
                 <p className="text-xs text-white/55">
-                  Available from every top bar
+                  Available from every inner-page header
                 </p>
               </div>
             </div>
@@ -140,15 +133,15 @@ export default function QuickStart() {
         <CardHeader className="border-b pb-4">
           <SectionEyebrow>Navigation</SectionEyebrow>
           <CardTitle className="mt-1 flex items-center gap-2 text-xl">
-            <Compass className="h-5 w-5 text-primary" /> The top menu is the map
+            <Compass className="h-5 w-5 text-primary" /> Four workspaces, one
+            fixed sidebar
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Select a category title to open its landing page. Select the
-            separate chevron to see every destination in that category.
+            {QUICK_START_NAVIGATION_COPY}
           </p>
         </CardHeader>
-        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-          {menuGroups.map((group) => (
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          {QUICK_START_WORKSPACES.map((group) => (
             <Link
               key={group.label}
               href={group.href}
@@ -158,19 +151,22 @@ export default function QuickStart() {
                 <span className="text-sm font-bold group-hover:text-primary">
                   {group.label}
                 </span>
-                {group.label === "Administration" ? (
-                  <Badge variant="outline" className="text-[10px]">
-                    CIO
-                  </Badge>
-                ) : (
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                )}
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 {group.detail}
               </p>
             </Link>
           ))}
+          <div className="sm:col-span-2 xl:col-span-4 rounded-lg border bg-muted/25 p-4 text-xs leading-5 text-muted-foreground">
+            <Badge variant="outline" className="mr-2 text-[10px]">
+              Sidebar
+            </Badge>
+            <strong className="text-foreground">My Work</strong> keeps To-do
+            List, Completed Work, and Weekly Log close at hand. Authorized CIOs
+            also see <strong className="text-foreground">Administration</strong>
+            for projects, goals, analytics, and access.
+          </div>
         </CardContent>
       </Card>
 
@@ -230,6 +226,8 @@ export default function QuickStart() {
           <CardContent className="space-y-3 p-4 text-sm">
             {[
               "Fred drafting and Zendesk replies have separate supervisor switches.",
+              "The switches stay disabled while status loads; ‘Unavailable — status unknown’ means the server state could not be verified, never that a control is on.",
+              "Every authorized switch change asks for confirmation before it is saved.",
               "Prepare open drafts saves eligible replies for review; it never sends them.",
               "Read the full thread, edit the response, then save it for approval.",
               "Messaging replies are copied into Zendesk Agent Workspace for the final human send.",

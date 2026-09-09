@@ -14,6 +14,9 @@ import {
   canManageZendeskControls,
   readZendeskSupervisionConfig,
   updateZendeskSupervisionConfig,
+  withZendeskSupervisionConfig,
+  ZendeskSupervisionUnavailableError,
+  type ZendeskSupervisionConfig,
 } from "../lib/zendesk_supervision";
 import {
   isZendeskMessagingChannel,
@@ -21,13 +24,47 @@ import {
   type ZendeskConversationLogEvent,
 } from "../lib/zendesk_conversation_log";
 import {
+  claimZendeskReplyDraftForSend,
+  completeZendeskReplyDraftSend,
   getPendingZendeskReplyDraft,
   listZendeskReplyDrafts,
-  markZendeskReplyDraftSent,
+  releaseZendeskReplyDraftSend,
   saveZendeskReplyDraft,
 } from "../lib/zendesk_reply_drafts";
 
 const router = Router();
+
+const SUPERVISION_UNAVAILABLE = {
+  error: "Zendesk supervision controls are unavailable. No Zendesk action was performed.",
+  code: "ZENDESK_SUPERVISION_UNAVAILABLE",
+} as const;
+
+async function readSupervisionControls(
+  req: any,
+  res: any,
+): Promise<ZendeskSupervisionConfig | null> {
+  try {
+    return await readZendeskSupervisionConfig();
+  } catch (error) {
+    req.log?.error?.({ err: error }, "Zendesk supervision controls unavailable");
+    res.status(503).json(SUPERVISION_UNAVAILABLE);
+    return null;
+  }
+}
+
+function handleSupervisionUnavailable(
+  req: any,
+  res: any,
+  error: unknown,
+): boolean {
+  if (!(error instanceof ZendeskSupervisionUnavailableError)) return false;
+  req.log?.error?.(
+    { err: error.cause ?? error },
+    "Zendesk supervision controls unavailable",
+  );
+  res.status(503).json(SUPERVISION_UNAVAILABLE);
+  return true;
+}
 
 interface ZendeskUser {
   id: number;
@@ -405,7 +442,8 @@ router.get("/agents", requireAuth, async (_req, res) => {
 });
 
 router.get("/controls", requireAuth, async (req: any, res) => {
-  const controls = await readZendeskSupervisionConfig();
+  const controls = await readSupervisionControls(req, res);
+  if (!controls) return;
   return res.json({
     ...controls,
     canManage: canManageZendeskControls(req.user),
@@ -422,11 +460,32 @@ router.put("/controls", requireAuth, async (req: any, res) => {
   if (!validation.ok) {
     return res.status(validation.status).json({ error: validation.error });
   }
-  const controls = await updateZendeskSupervisionConfig(
-    validation.value,
-    req.user?.name || req.user?.email || "Zendesk supervisor",
-  );
-  return res.json({ ...controls, canManage: true });
+  try {
+    const controls = await updateZendeskSupervisionConfig(
+      validation.value,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        email: req.user?.email,
+        role: req.user?.role,
+        canManageTodos: req.user?.canManageTodos,
+      },
+    );
+    req.log?.info?.(
+      {
+        userId: req.user?.id,
+        userEmail: req.user?.email,
+        changes: validation.value,
+        fredEnabled: controls.fredEnabled,
+        repliesEnabled: controls.repliesEnabled,
+      },
+      "Zendesk supervision controls updated",
+    );
+    return res.json({ ...controls, canManage: true });
+  } catch (error) {
+    req.log?.error?.({ err: error }, "Zendesk supervision controls update failed");
+    return res.status(503).json(SUPERVISION_UNAVAILABLE);
+  }
 });
 
 router.get("/resolved-by-user", requireAuth, async (req, res) => {
@@ -779,23 +838,34 @@ router.put("/ticket/:id/draft", requireAuth, async (req: any, res) => {
   if (body.length > 10_000) {
     return res.status(400).json({ error: "Draft body must be 10,000 characters or fewer." });
   }
-  const controls = await readZendeskSupervisionConfig();
-  if (source === "fred" && !controls.fredEnabled) {
-    return res.status(423).json({ error: "Fred drafting is turned off by a supervisor." });
-  }
   try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    const draft = await saveZendeskReplyDraft({
-      ticketId,
-      ticketSubject: ticket.subject,
-      ticketUrl: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticketId}`,
-      channel: ticket.via?.channel ?? "ticket",
-      body,
-      source,
-      actor: draftActor(req),
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (source === "fred" && !controls.fredEnabled) {
+        return res.status(423).json({ error: "Fred drafting is turned off by a supervisor." });
+      }
+      const { ticket } = await zget<{ ticket: ZendeskTicket }>(
+        cfg,
+        `tickets/${ticketId}.json`,
+      );
+      const draft = await saveZendeskReplyDraft({
+        ticketId,
+        ticketSubject: ticket.subject,
+        ticketUrl: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticketId}`,
+        channel: ticket.via?.channel ?? "ticket",
+        body,
+        source,
+        actor: draftActor(req),
+      });
+      return res.json({ draft });
     });
-    return res.json({ draft });
   } catch (e: any) {
+    if (handleSupervisionUnavailable(req, res, e)) return;
+    if (e?.code === "ZENDESK_REPLY_DRAFT_IN_FLIGHT") {
+      return res.status(409).json({
+        error: "This ticket already has a reply being sent. Reload before editing it.",
+        code: e.code,
+      });
+    }
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
     return res.status(502).json({ error: "Zendesk API error", message: e.message });
   }
@@ -812,43 +882,94 @@ router.post("/ticket/:id/draft/approve-send", requireAuth, async (req: any, res)
   if (req.body?.confirmed !== true) {
     return res.status(409).json({ error: "Explicit approval is required before sending the draft." });
   }
-  const draft = await getPendingZendeskReplyDraft(ticketId);
-  if (!draft || draft.id !== req.body?.draftId) {
-    return res.status(409).json({ error: "The pending draft changed. Reload it before approval." });
-  }
-  const controls = await readZendeskSupervisionConfig();
-  if (!controls.repliesEnabled) {
-    return res.status(423).json({ error: "Zendesk replies are turned off by a supervisor." });
-  }
   try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    if (isZendeskMessagingChannel(ticket.via?.channel)) {
-      return res.status(409).json({
-        error: "Messaging drafts must be sent from Zendesk Agent Workspace on the current Zendesk plan.",
-        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
-        ticketUrl: draft.ticketUrl,
-      });
-    }
-    const actor = await resolveZendeskActor(cfg, req);
-    await zput(cfg, `tickets/${ticketId}.json`, {
-      ticket: {
-        comment: {
-          body: draft.body,
-          public: true,
-          ...(actor ? { author_id: actor.id } : {}),
-        },
-      },
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (!controls.repliesEnabled) {
+        return res.status(423).json({ error: "Zendesk replies are turned off by a supervisor." });
+      }
+      const draft = await claimZendeskReplyDraftForSend(
+        ticketId,
+        req.body?.draftId,
+        draftActor(req),
+      );
+      if (!draft) {
+        return res.status(409).json({ error: "The pending draft changed or is already being sent. Reload it before approval." });
+      }
+      if (draft.source === "fred" && !controls.fredEnabled) {
+        await releaseZendeskReplyDraftSend(ticketId, draft.id);
+        return res.status(423).json({
+          error: "Fred's Zendesk actions are turned off by a supervisor.",
+        });
+      }
+
+      let zendeskWriteAttempted = false;
+      try {
+        const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
+        if (isZendeskMessagingChannel(ticket.via?.channel)) {
+          await releaseZendeskReplyDraftSend(ticketId, draft.id);
+          return res.status(409).json({
+            error: "Messaging drafts must be sent from Zendesk Agent Workspace on the current Zendesk plan.",
+            code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
+            ticketUrl: draft.ticketUrl,
+          });
+        }
+        const actor = await resolveZendeskActor(cfg, req);
+        zendeskWriteAttempted = true;
+        await zput(cfg, `tickets/${ticketId}.json`, {
+          ticket: {
+            comment: {
+              body: draft.body,
+              public: true,
+              ...(actor ? { author_id: actor.id } : {}),
+            },
+          },
+        });
+        const sent = await completeZendeskReplyDraftSend(
+          ticketId,
+          draft.id,
+          draftActor(req),
+        );
+        if (!sent) {
+          throw new Error("The claimed Zendesk draft could not be marked sent.");
+        }
+        return res.json({
+          ok: true,
+          ticketId,
+          delivery: "support_ticket",
+          sentBy: sent.sentBy ?? actor?.name ?? "configured Zendesk service account",
+        });
+      } catch (e: any) {
+        // Before the outbound write, and after an explicit non-2xx response, it
+        // is safe to make the immutable revision available for retry. A network
+        // error after dispatch is uncertain, so retain the claim instead of
+        // risking a duplicate public reply.
+        const safeToRelease =
+          !zendeskWriteAttempted || typeof e?.status === "number";
+        if (safeToRelease) {
+          await releaseZendeskReplyDraftSend(ticketId, draft.id).catch(
+            (releaseError) =>
+              req.log?.error?.(
+                { err: releaseError, ticketId, draftId: draft.id },
+                "Zendesk draft send claim release failed",
+              ),
+          );
+        } else {
+          req.log?.error?.(
+            { err: e, ticketId, draftId: draft.id },
+            "Zendesk reply delivery outcome is uncertain; draft remains claimed",
+          );
+          return res.status(502).json({
+            error: "Zendesk reply delivery could not be confirmed. The draft remains locked to prevent a duplicate reply.",
+            code: "ZENDESK_REPLY_DELIVERY_UNCERTAIN",
+          });
+        }
+        if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
+        return res.status(502).json({ error: "Zendesk API error", message: e.message });
+      }
     });
-    const sent = await markZendeskReplyDraftSent(ticketId, draft.id, draftActor(req));
-    return res.json({
-      ok: true,
-      ticketId,
-      delivery: "support_ticket",
-      sentBy: sent?.sentBy ?? actor?.name ?? "configured Zendesk service account",
-    });
-  } catch (e: any) {
-    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
-    return res.status(502).json({ error: "Zendesk API error", message: e.message });
+  } catch (e) {
+    if (handleSupervisionUnavailable(req, res, e)) return;
+    throw e;
   }
 });
 
@@ -891,32 +1012,37 @@ router.post("/ticket/:id/comment", requireAuth, async (req: any, res) => {
   const validation = validateZendeskReplyRequest(req.body);
   if (!validation.ok) return res.status(validation.status).json({ error: validation.error });
   const { body, public: isPublic } = validation.value;
-  const controls = await readZendeskSupervisionConfig();
-  if (isPublic && !controls.repliesEnabled) {
-    return res.status(423).json({
-      error: "Zendesk replies are turned off by a supervisor.",
-    });
-  }
   try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    if (isPublic && isZendeskMessagingChannel(ticket.via?.channel)) {
-      return res.status(409).json({
-        error:
-          "This is a Zendesk Messaging ticket. Save the response for approval and send it from Zendesk Agent Workspace.",
-        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (isPublic && !controls.repliesEnabled) {
+        return res.status(423).json({
+          error: "Zendesk replies are turned off by a supervisor.",
+        });
+      }
+      const { ticket } = await zget<{ ticket: ZendeskTicket }>(
+        cfg,
+        `tickets/${ticketId}.json`,
+      );
+      if (isPublic && isZendeskMessagingChannel(ticket.via?.channel)) {
+        return res.status(409).json({
+          error:
+            "This is a Zendesk Messaging ticket. Save the response for approval and send it from Zendesk Agent Workspace.",
+          code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
+        });
+      }
+      const actor = await resolveZendeskActor(cfg, req);
+      await zput(cfg, `tickets/${ticketId}.json`, {
+        ticket: { comment: { body, public: isPublic, ...(actor ? { author_id: actor.id } : {}) } }
       });
-    }
-    const actor = await resolveZendeskActor(cfg, req);
-    await zput(cfg, `tickets/${ticketId}.json`, {
-      ticket: { comment: { body, public: isPublic, ...(actor ? { author_id: actor.id } : {}) } }
-    });
-    return res.json({
-      ok: true,
-      ticketId,
-      public: isPublic,
-      postedBy: actor?.name ?? "configured Zendesk service account",
+      return res.json({
+        ok: true,
+        ticketId,
+        public: isPublic,
+        postedBy: actor?.name ?? "configured Zendesk service account",
+      });
     });
   } catch (e: any) {
+    if (handleSupervisionUnavailable(req, res, e)) return;
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
     return res.status(502).json({ error: "Zendesk API error", message: e.message });
   }
@@ -981,20 +1107,36 @@ router.patch("/ticket/:id", requireAuth, async (req: any, res) => {
     if (!VALID_PRIORITIES.includes(priority)) return res.status(400).json({ error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}` });
     update.priority = priority;
   }
-  if (assignee_email) {
-    // Resolve email to Zendesk user id
-    const { users } = await zget<{ users: ZendeskUser[] }>(
-      cfg, `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`
-    ).catch(() => ({ users: [] }));
-    if (!users?.[0]) return res.status(404).json({ error: `No Zendesk user found for ${assignee_email}` });
-    update.assignee_id = users[0].id;
-  }
-  if (Object.keys(update).length === 0) return res.status(400).json({ error: "Nothing to update" });
-
   try {
-    await zput(cfg, `tickets/${ticketId}.json`, { ticket: update });
-    return res.json({ ok: true, ticketId, updated: update });
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (!controls.fredEnabled) {
+        return res.status(423).json({
+          error: "Fred's Zendesk actions are turned off by a supervisor.",
+        });
+      }
+      if (assignee_email) {
+        // Resolve email to Zendesk user id only after the Fred action is
+        // admitted under the same guard that covers the outbound write.
+        const { users } = await zget<{ users: ZendeskUser[] }>(
+          cfg,
+          `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`,
+        ).catch(() => ({ users: [] }));
+        if (!users?.[0]) {
+          return res.status(404).json({
+            error: `No Zendesk user found for ${assignee_email}`,
+          });
+        }
+        update.assignee_id = users[0].id;
+      }
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ error: "Nothing to update" });
+      }
+
+      await zput(cfg, `tickets/${ticketId}.json`, { ticket: update });
+      return res.json({ ok: true, ticketId, updated: update });
+    });
   } catch (e: any) {
+    if (handleSupervisionUnavailable(req, res, e)) return;
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
     return res.status(502).json({ error: "Zendesk API error", message: e.message });
   }

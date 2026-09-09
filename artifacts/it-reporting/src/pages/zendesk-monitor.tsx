@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   Bot,
   ClipboardCopy,
   ExternalLink,
@@ -32,6 +33,17 @@ import {
   cleanFredDraft,
   parseFredDraftDecision,
 } from "@/lib/zendesk_batch_drafting";
+import {
+  confirmZendeskControlUpdate,
+  getZendeskControls,
+  withFreshZendeskReplyPermission,
+  ZendeskControlsUnavailableError,
+  ZendeskRepliesDisabledError,
+  zendeskControlStatusText,
+  type ZendeskControlKey,
+  type ZendeskControls,
+  type ZendeskControlsStatus,
+} from "@/lib/zendesk_controls";
 
 type ZendeskTicketSummary = {
   id: number;
@@ -87,14 +99,6 @@ type ZendeskAgent = {
   role: string;
 };
 
-type ZendeskControls = {
-  fredEnabled: boolean;
-  repliesEnabled: boolean;
-  canManage: boolean;
-  updatedAt: string | null;
-  updatedBy: string | null;
-};
-
 function formatTimestamp(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
@@ -133,21 +137,40 @@ export default function ZendeskMonitor() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [reply, setReply] = useState("");
   const [drafts, setDrafts] = useState<ZendeskReplyDraft[]>([]);
-  const [currentDraft, setCurrentDraft] =
-    useState<ZendeskReplyDraft | null>(null);
+  const [currentDraft, setCurrentDraft] = useState<ZendeskReplyDraft | null>(
+    null,
+  );
   const [agents, setAgents] = useState<ZendeskAgent[]>([]);
   const [escalationEmail, setEscalationEmail] = useState("");
   const [escalationNote, setEscalationNote] = useState("");
   const [escalating, setEscalating] = useState(false);
-  const [controls, setControls] = useState<ZendeskControls>({
-    fredEnabled: true,
-    repliesEnabled: true,
-    canManage: false,
-    updatedAt: null,
-    updatedBy: null,
-  });
+  const [controls, setControls] = useState<ZendeskControls | null>(null);
+  const [controlsStatus, setControlsStatus] =
+    useState<ZendeskControlsStatus>("loading");
+  const [controlsError, setControlsError] = useState<string | null>(null);
   const [updatingControl, setUpdatingControl] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const controlsEndpoint = `${import.meta.env.BASE_URL}api/zendesk/controls`;
+
+  const loadControls = async () => {
+    setControls(null);
+    setControlsStatus("loading");
+    setControlsError(null);
+    try {
+      const next = await getZendeskControls(authFetch, controlsEndpoint);
+      setControls(next);
+      setControlsStatus("ready");
+    } catch (error) {
+      setControls(null);
+      setControlsStatus("error");
+      setControlsError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load Zendesk controls.",
+      );
+    }
+  };
 
   const loadTickets = async (quiet = false) => {
     if (!quiet) setLoadingTickets(true);
@@ -227,7 +250,8 @@ export default function ZendeskMonitor() {
         drafts?: ZendeskReplyDraft[];
         error?: string;
       } | null;
-      if (!response.ok) throw new Error(body?.error || "Unable to load drafts.");
+      if (!response.ok)
+        throw new Error(body?.error || "Unable to load drafts.");
       setDrafts(Array.isArray(body?.drafts) ? body.drafts : []);
     } catch (error) {
       if (!quiet) {
@@ -262,13 +286,7 @@ export default function ZendeskMonitor() {
   useEffect(() => {
     void loadTickets();
     void loadDrafts();
-    void authFetch(`${import.meta.env.BASE_URL}api/zendesk/controls`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load controls.");
-        return response.json() as Promise<ZendeskControls>;
-      })
-      .then(setControls)
-      .catch(() => undefined);
+    void loadControls();
     void authFetch(`${import.meta.env.BASE_URL}api/zendesk/agents`)
       .then((response) => (response.ok ? response.json() : []))
       .then((body: ZendeskAgent[]) =>
@@ -320,48 +338,24 @@ export default function ZendeskMonitor() {
     navigate(`/support/zendesk?ticket=${ticketId}`, { replace: true });
   };
 
-  const updateControl = async (
-    key: "fredEnabled" | "repliesEnabled",
-    nextValue: boolean,
-  ) => {
-    if (!controls.canManage || updatingControl) return;
+  const updateControl = async (key: ZendeskControlKey, nextValue: boolean) => {
+    if (controlsStatus !== "ready" || !controls?.canManage || updatingControl) {
+      return;
+    }
     const name = key === "fredEnabled" ? "Fred drafting" : "Zendesk replies";
-    const approved = await confirm({
-      title: `Turn ${name} ${nextValue ? "on" : "off"}?`,
-      description:
-        key === "fredEnabled"
-          ? nextValue
-            ? "Fred will be allowed to prepare Zendesk drafts and perform confirmed Zendesk actions again."
-            : "Fred will stop preparing drafts and all of his Zendesk write actions will be blocked."
-          : nextValue
-            ? "Supervisors will be able to post confirmed public replies from this monitor again."
-            : "All public replies from this monitor and Fred will be blocked at the API. Escalation remains available.",
-      confirmText: `Turn ${nextValue ? "on" : "off"}`,
-      destructive: !nextValue,
-    });
-    if (!approved) return;
-
     setUpdatingControl(key);
     try {
-      const response = await authFetch(
-        `${import.meta.env.BASE_URL}api/zendesk/controls`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [key]: nextValue }),
-        },
+      const next = await confirmZendeskControlUpdate(
+        confirm,
+        authFetch,
+        controlsEndpoint,
+        key,
+        nextValue,
       );
-      const body = (await response.json().catch(() => null)) as
-        | ZendeskControls
-        | { error?: string }
-        | null;
-      if (!response.ok || !body || !("fredEnabled" in body)) {
-        throw new Error(
-          (body as { error?: string } | null)?.error ||
-            "Unable to update Zendesk controls.",
-        );
-      }
-      setControls(body);
+      if (!next) return;
+      setControls(next);
+      setControlsStatus("ready");
+      setControlsError(null);
       toast({
         title: `${name} turned ${nextValue ? "on" : "off"}`,
         description: "The global supervisor control is active now.",
@@ -375,6 +369,7 @@ export default function ZendeskMonitor() {
             : "Unable to save the control.",
         variant: "destructive",
       });
+      await loadControls();
     } finally {
       setUpdatingControl(null);
     }
@@ -391,7 +386,9 @@ export default function ZendeskMonitor() {
     if (!response.ok || !body || !("id" in body)) {
       const errorBody = body as { error?: string; message?: string } | null;
       throw new Error(
-        errorBody?.message || errorBody?.error || "Unable to load conversation.",
+        errorBody?.message ||
+          errorBody?.error ||
+          "Unable to load conversation.",
       );
     }
     return body;
@@ -399,13 +396,13 @@ export default function ZendeskMonitor() {
 
   const askFredForDraft = async (ticketDetail: ZendeskTicketDetail) => {
     const monitoredTranscript = ticketDetail.comments
-        .slice(-30)
-        .map(
-          (comment) =>
-            `[${comment.createdAt}] ${comment.author} (${comment.authorType ?? "participant"}):\n${comment.body}`,
-        )
-        .join("\n\n")
-        .slice(-12_000);
+      .slice(-30)
+      .map(
+        (comment) =>
+          `[${comment.createdAt}] ${comment.author} (${comment.authorType ?? "participant"}):\n${comment.body}`,
+      )
+      .join("\n\n")
+      .slice(-12_000);
     const response = await authFetch(
       `${import.meta.env.BASE_URL}api/status-report/chat`,
       {
@@ -466,12 +463,21 @@ export default function ZendeskMonitor() {
   };
 
   const draftWithFred = async () => {
-    if (!detail || drafting || batchDrafting || !controls.fredEnabled) return;
+    if (
+      !detail ||
+      drafting ||
+      batchDrafting ||
+      controls?.fredEnabled !== true
+    ) {
+      return;
+    }
     setDrafting(true);
     try {
       const decision = await askFredForDraft(detail);
       if (!decision.body) {
-        throw new Error(decision.reason || "Fred found no safe reply to prepare.");
+        throw new Error(
+          decision.reason || "Fred found no safe reply to prepare.",
+        );
       }
       const exactDraft = cleanFredDraft(decision.body);
       const saved = await persistDraft(exactDraft, "fred", true);
@@ -520,7 +526,7 @@ export default function ZendeskMonitor() {
   };
 
   const prepareOpenDrafts = async () => {
-    if (batchDrafting || drafting || !controls.fredEnabled) return;
+    if (batchDrafting || drafting || controls?.fredEnabled !== true) return;
     const pendingTicketIds = new Set(drafts.map((draft) => draft.ticketId));
     const candidates = tickets
       .filter((ticket) => !pendingTicketIds.has(ticket.id))
@@ -619,7 +625,14 @@ export default function ZendeskMonitor() {
   };
 
   const sendReply = async () => {
-    if (!detail || !reply.trim() || sending || !controls.repliesEnabled) return;
+    if (
+      !detail ||
+      !reply.trim() ||
+      sending ||
+      controls?.repliesEnabled !== true
+    ) {
+      return;
+    }
     setSending(true);
     try {
       const exactReply = reply.trim();
@@ -677,7 +690,14 @@ export default function ZendeskMonitor() {
   };
 
   const openMessagingDraft = async () => {
-    if (!detail || !reply.trim() || sending) return;
+    if (
+      !detail ||
+      !reply.trim() ||
+      sending ||
+      controls?.repliesEnabled !== true
+    ) {
+      return;
+    }
     setSending(true);
     try {
       const exactReply = reply.trim();
@@ -691,9 +711,35 @@ export default function ZendeskMonitor() {
         confirmText: "Copy & open Zendesk",
       });
       if (!approved) return;
-      await navigator.clipboard.writeText(exactReply);
-      const opened = window.open(detail.url, "_blank", "noopener,noreferrer");
-      if (!opened) window.location.assign(detail.url);
+      try {
+        const verified = await withFreshZendeskReplyPermission(
+          authFetch,
+          controlsEndpoint,
+          async () => {
+            await navigator.clipboard.writeText(exactReply);
+            const opened = window.open(
+              detail.url,
+              "_blank",
+              "noopener,noreferrer",
+            );
+            if (!opened) window.location.assign(detail.url);
+          },
+        );
+        setControls(verified.controls);
+        setControlsStatus("ready");
+        setControlsError(null);
+      } catch (error) {
+        if (error instanceof ZendeskRepliesDisabledError) {
+          setControls(error.controls);
+          setControlsStatus("ready");
+          setControlsError(null);
+        } else if (error instanceof ZendeskControlsUnavailableError) {
+          setControls(null);
+          setControlsStatus("error");
+          setControlsError(error.message);
+        }
+        throw error;
+      }
       toast({
         title: "Draft copied; Zendesk opened",
         description:
@@ -802,17 +848,26 @@ export default function ZendeskMonitor() {
             <div>
               <p className="text-sm font-bold">Fred drafting</p>
               <p className="text-[11px] text-white/65">
-                {controls.fredEnabled
-                  ? "Available for supervised drafts"
-                  : "Blocked from Zendesk actions"}
+                {zendeskControlStatusText(
+                  controlsStatus,
+                  controls?.fredEnabled === true,
+                  {
+                    on: "Available for supervised drafts",
+                    off: "Blocked from Zendesk actions",
+                  },
+                )}
               </p>
             </div>
             <Switch
-              checked={controls.fredEnabled}
+              checked={controls?.fredEnabled === true}
               onCheckedChange={(checked) =>
                 void updateControl("fredEnabled", checked)
               }
-              disabled={!controls.canManage || updatingControl !== null}
+              disabled={
+                controlsStatus !== "ready" ||
+                !controls?.canManage ||
+                updatingControl !== null
+              }
               aria-label="Toggle Fred Zendesk drafting"
             />
           </div>
@@ -820,22 +875,57 @@ export default function ZendeskMonitor() {
             <div>
               <p className="text-sm font-bold">Zendesk replies</p>
               <p className="text-[11px] text-white/65">
-                {controls.repliesEnabled
-                  ? "Confirmed public replies allowed"
-                  : "Public replies blocked"}
+                {zendeskControlStatusText(
+                  controlsStatus,
+                  controls?.repliesEnabled === true,
+                  {
+                    on: "Confirmed public replies allowed",
+                    off: "Public replies blocked",
+                  },
+                )}
               </p>
             </div>
             <Switch
-              checked={controls.repliesEnabled}
+              checked={controls?.repliesEnabled === true}
               onCheckedChange={(checked) =>
                 void updateControl("repliesEnabled", checked)
               }
-              disabled={!controls.canManage || updatingControl !== null}
+              disabled={
+                controlsStatus !== "ready" ||
+                !controls?.canManage ||
+                updatingControl !== null
+              }
               aria-label="Toggle Zendesk public replies"
             />
           </div>
         </div>
-        {controls.updatedBy ? (
+        {controlsStatus === "error" ? (
+          <div
+            role="alert"
+            className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300/30 bg-amber-950/35 px-4 py-3 text-amber-50"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />
+            <div className="min-w-[220px] flex-1">
+              <p className="text-xs font-bold">
+                Zendesk controls are unavailable
+              </p>
+              <p className="mt-0.5 text-[11px] text-amber-50/75">
+                No control changes can be made until the current server state
+                loads. {controlsError}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-amber-200/40 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              onClick={() => void loadControls()}
+            >
+              <RefreshCw className="mr-2 h-3.5 w-3.5" /> Retry controls
+            </Button>
+          </div>
+        ) : null}
+        {controls?.updatedBy ? (
           <p className="mt-2 text-right text-[10px] text-white/50">
             Last changed by {controls.updatedBy}
             {controls.updatedAt
@@ -884,7 +974,7 @@ export default function ZendeskMonitor() {
               }}
               disabled={
                 drafting ||
-                !controls.fredEnabled ||
+                controls?.fredEnabled !== true ||
                 (!batchDrafting && tickets.length === 0)
               }
             >
@@ -917,11 +1007,12 @@ export default function ZendeskMonitor() {
               >
                 <div className="space-y-1 font-semibold text-foreground">
                   <span>
-                    Fred reviewed {batchProgress.processed} of {batchProgress.total}
+                    Fred reviewed {batchProgress.processed} of{" "}
+                    {batchProgress.total}
                   </span>
                   <span>
-                    {batchProgress.saved} saved · {batchProgress.skipped} skipped ·{" "}
-                    {batchProgress.failed} failed
+                    {batchProgress.saved} saved · {batchProgress.skipped}{" "}
+                    skipped · {batchProgress.failed} failed
                   </span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -1080,14 +1171,19 @@ export default function ZendeskMonitor() {
                         response
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Fred saves a shared draft; a person remains the final editor and sender.
+                        Fred saves a shared draft; a person remains the final
+                        editor and sender.
                       </p>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => void draftWithFred()}
-                      disabled={drafting || batchDrafting || !controls.fredEnabled}
+                      disabled={
+                        drafting ||
+                        batchDrafting ||
+                        controls?.fredEnabled !== true
+                      }
                     >
                       {drafting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1096,9 +1192,13 @@ export default function ZendeskMonitor() {
                       )}
                       {drafting
                         ? "Fred is drafting…"
-                        : controls.fredEnabled
-                          ? "Draft with Fred"
-                          : "Fred is off"}
+                        : controlsStatus === "loading"
+                          ? "Loading Fred status…"
+                          : controlsStatus === "error"
+                            ? "Fred status unavailable"
+                            : controls?.fredEnabled
+                              ? "Draft with Fred"
+                              : "Fred is off"}
                     </Button>
                   </div>
                   <Textarea
@@ -1170,7 +1270,9 @@ export default function ZendeskMonitor() {
                             : sendReply())
                         }
                         disabled={
-                          !reply.trim() || sending || !controls.repliesEnabled
+                          !reply.trim() ||
+                          sending ||
+                          controls?.repliesEnabled !== true
                         }
                       >
                         {sending ? (
@@ -1184,11 +1286,15 @@ export default function ZendeskMonitor() {
                           ? detail.isMessaging
                             ? "Opening…"
                             : "Sending…"
-                          : controls.repliesEnabled
-                            ? detail.isMessaging
-                              ? "Copy & open Zendesk"
-                              : "Approve & send"
-                            : "Replies are off"}
+                          : controlsStatus === "loading"
+                            ? "Loading reply status…"
+                            : controlsStatus === "error"
+                              ? "Reply status unavailable"
+                              : controls?.repliesEnabled
+                                ? detail.isMessaging
+                                  ? "Copy & open Zendesk"
+                                  : "Approve & send"
+                                : "Replies are off"}
                       </Button>
                     </div>
                   </div>

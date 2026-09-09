@@ -1,16 +1,26 @@
 import type { ComponentType, ReactNode } from "react";
-import { Home, LifeBuoy, Map, Sparkles } from "lucide-react";
+import { Home, LayoutGrid, LifeBuoy, Map, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
-export type PortalMode = "status" | "network" | "support";
+export type PortalMode = "status" | "network" | "apps" | "support";
 
 export function portalModeForPath(pathname: string): PortalMode {
   if (
+    pathname.startsWith("/it-apps") ||
+    pathname.startsWith("/banner") ||
+    pathname.startsWith("/student-access") ||
+    pathname.startsWith("/password-reset-activity") ||
+    pathname.startsWith("/mfa-tap-activity") ||
+    pathname.startsWith("/acr") ||
+    pathname.startsWith("/online-kiosk")
+  ) {
+    return "apps";
+  }
+  if (
     pathname.startsWith("/network") ||
     pathname.startsWith("/monitoring") ||
-    pathname.startsWith("/azure") ||
-    pathname.startsWith("/it-apps/cisco-calling")
+    pathname.startsWith("/azure")
   ) {
     return "network";
   }
@@ -18,54 +28,72 @@ export function portalModeForPath(pathname: string): PortalMode {
     pathname.startsWith("/support") ||
     pathname.startsWith("/incidents") ||
     pathname.startsWith("/learn") ||
-    pathname.startsWith("/processes")
+    pathname.startsWith("/processes") ||
+    pathname.startsWith("/quick-start") ||
+    pathname.startsWith("/user-guide") ||
+    pathname.startsWith("/risks") ||
+    pathname.startsWith("/after-action")
   ) {
     return "support";
   }
   return "status";
 }
 
-const appModes: Record<
-  PortalMode,
-  Array<{
-    href: string;
-    label: string;
-    icon: ComponentType<{ className?: string }>;
-  }>
-> = {
+type PortalModeLink = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+const appModes: Record<PortalMode, PortalModeLink[]> = {
   status: [
     { href: "/", label: "Home", icon: Home },
     { href: "/status", label: "Status", icon: Sparkles },
+    { href: "/it-apps", label: "Apps", icon: LayoutGrid },
     { href: "/support", label: "Support", icon: LifeBuoy },
   ],
   network: [
     { href: "/", label: "Home", icon: Home },
     { href: "/network", label: "IT Tools", icon: Map },
+    { href: "/it-apps", label: "Apps", icon: LayoutGrid },
+    { href: "/support", label: "Support", icon: LifeBuoy },
+  ],
+  apps: [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/network", label: "IT Tools", icon: Map },
+    { href: "/it-apps", label: "Apps", icon: LayoutGrid },
     { href: "/support", label: "Support", icon: LifeBuoy },
   ],
   support: [
     { href: "/", label: "Home", icon: Home },
     { href: "/network", label: "IT Tools", icon: Map },
+    { href: "/it-apps", label: "Apps", icon: LayoutGrid },
     { href: "/support", label: "Support", icon: LifeBuoy },
   ],
 };
+
+export function getPortalModeLinks(mode: PortalMode): PortalModeLink[] {
+  return appModes[mode];
+}
 
 export function AppModeSwitcher({ pathname }: { pathname: string }) {
   const mode = portalModeForPath(pathname);
   return (
     <nav
       aria-label="Switch portal app"
-      className="mx-2 grid grid-cols-3 gap-1 rounded-lg bg-black/20 p-1"
+      className="mx-2 grid grid-cols-4 gap-1 rounded-lg bg-black/20 p-1"
     >
-      {appModes[mode].map(({ href, label, icon: Icon }) => {
+      {getPortalModeLinks(mode).map(({ href, label, icon: Icon }) => {
         const active =
           href === "/status"
             ? mode === "status"
             : href === "/network"
               ? mode === "network"
-              : href === "/support"
-                ? mode === "support"
-                : false;
+              : href === "/it-apps"
+                ? mode === "apps"
+                : href === "/support"
+                  ? mode === "support"
+                  : false;
         return (
           <Link
             key={href}

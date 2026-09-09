@@ -5,6 +5,15 @@ import { requireAuth } from "./auth";
 import { z } from "zod";
 import { saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { pingManyViaNoc } from "../lib/noc_probe";
+import { mergeMonitoringInventory } from "../lib/network_monitoring_inventory";
+import {
+  DEFAULT_AUTHORITATIVE_BUILDINGS,
+  getAssignedBuildingName,
+  getCanonicalBuildingName,
+  normalizeBuildingKey,
+} from "../lib/building_assignment";
+
+export { getCanonicalBuildingName } from "../lib/building_assignment";
 
 const router = Router();
 
@@ -17,39 +26,10 @@ const INFLUX_ORG   = process.env.INFLUXDB_ORG ?? "SCCC";
 const INFLUX_BUCKET = process.env.INFLUXDB_BUCKET ?? "telegraf";
 const BUILDING_OVERLAY_PREFIX = "building-overlay:";
 const BUILDING_MASTER_PREFIX = "building-master:";
+const BUILDING_HIDDEN_PREFIX = "building-hidden:";
+const BUILDING_DISABLED_PREFIX = "building-disabled:";
 const NOC_REACHABILITY_CACHE_MS = 30_000;
 const nocReachabilityCache = new Map<string, { status: LiveStatus; expiresAt: number }>();
-const DEFAULT_AUTHORITATIVE_BUILDINGS = [
-  "Agriculture",
-  "Allied Health",
-  "Azure (Hybrid-VNet)",
-  "Baseball Field",
-  "Business",
-  "Campus Wide",
-  "Cosmetology",
-  "Epworth ALC",
-  "Hobble",
-  "Humanities",
-  "Industrial Technology Campus",
-  "Tech Building A",
-  "Tech Building B",
-  "Tech Building D",
-  "Tech Building T",
-  "Maintenance Building",
-  "Sharp Champion Center",
-  "Softball Field",
-  "Student Health Center",
-  "Student Living Center",
-  "Student Living F",
-  "Student Living G",
-  "Student Living H",
-  "Student Living J",
-  "Student Living R",
-  "Student Living S",
-  "Student Living T",
-  "Student Union / Student Activities",
-  "West Campus",
-] as const;
 const BUILDING_MONITOR_IPS: Record<string, string[]> = {
   Agriculture: ["192.168.2.195"],
   "Allied Health": ["192.168.2.44", "192.168.2.216"],
@@ -94,8 +74,9 @@ const BUILDING_MONITOR_IPS: Record<string, string[]> = {
     "192.168.2.183",
     "192.168.2.184",
   ],
-  "Student Union / Student Activities": ["192.168.2.194", "192.168.2.200", "192.168.252.46"],
-  "West Campus": ["172.25.0.2", "172.25.0.3"],
+  "Student Activities": ["192.168.2.50", "192.168.2.194", "192.168.252.46"],
+  "Student Union": ["192.168.2.26", "192.168.2.200"],
+  "West Campus": ["172.25.0.1", "172.25.0.2", "172.25.0.3"],
 };
 const CAMPUS_BACKBONE_INTERFACES = [
   { sysName: "sw-aa144-A24.sccc.edu", ifName: "Ethernet1/20" }, // SLC1151
@@ -240,117 +221,12 @@ function isMonitorableHost(value: string | null | undefined): value is string {
   return !!key && !["unknown", "n/a", "na", "none", "null", "tbd", "pending"].includes(key);
 }
 
-function normalizeBuildingKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-export function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
-  const original = rawBuilding?.trim();
-  if (!original) return "Unknown Building";
-
-  const key = normalizeBuildingKey(original);
-  const exactMatches: Record<string, string> = {
-    "academic arts": "Hobble",
-    "academic arts 144": "Hobble",
-    "academic arts 161": "Hobble",
-    "agriculture v201": "Agriculture",
-    "allied health": "Allied Health",
-    "baseball field pressbox": "Baseball Field",
-    "campus wide": "Campus Wide",
-    "canoys wide": "Campus Wide",
-    "cio office aa151": "Hobble",
-    "cosmetology cos109": "Cosmetology",
-    "epworth alc building": "Epworth ALC",
-    "main campus": "Hobble",
-    "sharp center": "Sharp Champion Center",
-    "softball": "Softball Field",
-    "student union": "Student Union / Student Activities",
-    "student union gym 208 sugymcam": "Student Union / Student Activities",
-    "student living center slc151": "Student Living Center",
-    "student life ab": "Student Living Center",
-    "student life de": "Student Living Center",
-    "swa slab": "Student Living Center",
-    "swa slcde": "Student Living Center",
-    "student living slg": "Student Living Center",
-    "student living slh": "Student Living Center",
-    "student living slj": "Student Living Center",
-    "student living slr": "Student Living Center",
-    "student living sls": "Student Living Center",
-    "student living slt": "Student Living Center",
-    "tech ta107": "Industrial Technology Campus",
-    "tech tt103": "Industrial Technology Campus",
-    "tech t122 mgmt": "Industrial Technology Campus",
-    "tech t122 svi": "Industrial Technology Campus",
-    "tech b141": "Industrial Technology Campus",
-    "tech d201": "Industrial Technology Campus",
-    "tech core 3": "Industrial Technology Campus",
-    "tech core 4": "Industrial Technology Campus",
-    "tech building": "Industrial Technology Campus",
-    "tech building b": "Industrial Technology Campus",
-    "tech building d": "Industrial Technology Campus",
-    "tech building f": "Industrial Technology Campus",
-    "tech building t": "Industrial Technology Campus",
-    "technology": "Industrial Technology Campus",
-    "technology a": "Industrial Technology Campus",
-    "technology b": "Industrial Technology Campus",
-    "technology d": "Industrial Technology Campus",
-    "technology t": "Industrial Technology Campus",
-    "west campus": "West Campus",
-  };
-  if (exactMatches[key]) return exactMatches[key];
-
-  if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
-  if (key.includes("azure")) return "Azure (Hybrid-VNet)";
-  if (key.includes("student health")) return "Student Health Center";
-  if (key.includes("student living") || key.includes("student life") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) {
-    return "Student Living Center";
-  }
-  if (key.includes("student union") || key.includes("student activities") || key.includes("sports & activities")) {
-    return "Student Union / Student Activities";
-  }
-  if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) {
-    return "Sharp Champion Center";
-  }
-  if (key.includes("allied health") || key.includes("colvin family center")) return "Allied Health";
-  if (key.includes("agriculture")) return "Agriculture";
-  if (key.includes("cosmetology")) return "Cosmetology";
-  if (key.includes("humanities")) return "Humanities";
-  if (key.includes("maintenance")) return "Maintenance Building";
-  if (key.includes("baseball")) return "Baseball Field";
-  if (key.includes("softball")) return "Softball Field";
-  if (key.includes("epworth")) return "Epworth ALC";
-  if (key.includes("hobble")) return "Hobble";
-  if (
-    key.includes("aa105") ||
-    key.includes("aa151") ||
-    key.includes("a161") ||
-    key.includes("aa 105") ||
-    key.includes("aa 151") ||
-    key.includes("a 144") ||
-    key.includes("aa 144") ||
-    key.includes("fortigate firewall") ||
-    key.includes("nexus core 1") ||
-    key.includes("nexus core 2")
-  ) {
-    return "Hobble";
-  }
-  if (
-    key.includes("industrial tech") ||
-    key.includes("industrial technology campus") ||
-    key.startsWith("tech ") ||
-    key === "technology" ||
-    key.startsWith("technology ")
-  ) {
-    return "Industrial Technology Campus";
-  }
-
-  return original;
-}
-
 function getBuildingMonitorHosts(buildingName: string, fallbackHosts: string[]): string[] {
+  const assignedHosts = Array.from(new Set(fallbackHosts.filter(Boolean)));
+  if (assignedHosts.length > 0) return assignedHosts;
   const monitors = BUILDING_MONITOR_IPS[buildingName];
   if (monitors?.length) return monitors;
-  return Array.from(new Set(fallbackHosts.filter(Boolean)));
+  return [];
 }
 
 function mapAzureVmStatus(status: string | null | undefined): LiveStatus {
@@ -445,53 +321,49 @@ function explicitBuildingNodeId(name: string): string {
   return `${BUILDING_MASTER_PREFIX}${encodeURIComponent(name.trim())}`;
 }
 
-function explicitBuildingNameFromNodeId(nodeId: string): string | null {
-  if (!nodeId.startsWith(BUILDING_MASTER_PREFIX)) return null;
+function hiddenBuildingNodeId(name: string): string {
+  return `${BUILDING_HIDDEN_PREFIX}${encodeURIComponent(name.trim())}`;
+}
+
+function disabledBuildingNodeId(name: string): string {
+  return `${BUILDING_DISABLED_PREFIX}${encodeURIComponent(name.trim())}`;
+}
+
+function customBuildingOverlayCode(name: string): string {
+  return `CUSTOM:${encodeURIComponent(name.trim())}`;
+}
+
+function storedBuildingNameFromNodeId(nodeId: string, prefix: string): string | null {
+  if (!nodeId.startsWith(prefix)) return null;
   try {
-    return decodeURIComponent(nodeId.slice(BUILDING_MASTER_PREFIX.length));
+    return decodeURIComponent(nodeId.slice(prefix.length));
   } catch {
-    return nodeId.slice(BUILDING_MASTER_PREFIX.length);
+    return nodeId.slice(prefix.length);
   }
 }
 
-async function listExplicitBuildings(): Promise<string[]> {
-  const rows = await db.select().from(networkLayoutPositionsTable);
-  return rows
-    .map((row) => explicitBuildingNameFromNodeId(row.nodeId))
-    .filter((value): value is string => !!value)
-    .sort((a, b) => a.localeCompare(b));
+function explicitBuildingNameFromNodeId(nodeId: string): string | null {
+  return storedBuildingNameFromNodeId(nodeId, BUILDING_MASTER_PREFIX);
 }
 
 async function listAuthoritativeBuildings(): Promise<string[]> {
-  const explicitBuildings = await listExplicitBuildings();
+  const rows = await db.select().from(networkLayoutPositionsTable);
+  const explicitBuildings = rows
+    .map((row) => explicitBuildingNameFromNodeId(row.nodeId))
+    .filter((value): value is string => !!value);
+  const disabledBuildings = new Set(
+    rows
+      .map((row) => storedBuildingNameFromNodeId(row.nodeId, BUILDING_DISABLED_PREFIX))
+      .filter((value): value is string => !!value),
+  );
   const canonicalBuildings = Array.from(
     new Set(
       [...DEFAULT_AUTHORITATIVE_BUILDINGS, ...explicitBuildings]
         .map((name) => String(name).trim())
-        .filter((name) => !!name),
+        .filter((name) => !!name && !disabledBuildings.has(name)),
     ),
   ).sort((a, b) => a.localeCompare(b));
   return canonicalBuildings;
-}
-
-function getAssignedBuildingName(building: string | null | undefined, location?: string | null, hostname?: string | null): string {
-  const hint = normalizeBuildingKey(`${location ?? ""} ${hostname ?? ""}`);
-  if (/\btech core\b/.test(hint)) return "Industrial Technology Campus";
-  const lettered: Array<[RegExp, string]> = [
-    [/\b(?:slg|student living g)\b/, "Student Living G"],
-    [/\b(?:slh|dorm h|building h)\b/, "Student Living H"],
-    [/\b(?:slj|dorms? j|building j)\b/, "Student Living J"],
-    [/\b(?:slr|dorm r|building r)\b/, "Student Living R"],
-    [/\b(?:sls|student living s)\b/, "Student Living S"],
-    [/\b(?:slt|student living t)\b/, "Student Living T"],
-    [/\b(?:ta107|tech ta|technology a)\b/, "Tech Building A"],
-    [/\b(?:tb141|tech b141|technology b)\b/, "Tech Building B"],
-    [/\b(?:td201|tech d201|technology d)\b/, "Tech Building D"],
-    [/\b(?:slf|student living f|building f)\b/, "Student Living F"],
-    [/\b(?:tt103|t122|technology t)\b/, "Tech Building T"],
-  ];
-  for (const [pattern, assigned] of lettered) if (pattern.test(hint)) return assigned;
-  return getCanonicalBuildingName(building);
 }
 
 async function getBuildingMapLayoutPositions() {
@@ -513,7 +385,7 @@ async function getBuildingMapLayoutPositions() {
 }
 
 export async function getBuildingSummaries() {
-  const [nodeRows, switchRows, vlanRows, azureHybridStatus] = await Promise.all([
+  const [nodeRows, switchRows, vlanRows, azureHybridStatus, layoutRows] = await Promise.all([
     db.select({
       building: netNodesTable.building,
       mgmtIp: netNodesTable.mgmtIp,
@@ -531,6 +403,7 @@ export async function getBuildingSummaries() {
     }).from(networkSwitchesTable),
     db.select({ building: vlansTable.building }).from(vlansTable),
     getAzureHybridVmStatus(),
+    db.select({ nodeId: networkLayoutPositionsTable.nodeId }).from(networkLayoutPositionsTable),
   ]);
   const liveStatuses = await getDeviceStatus(
     switchRows
@@ -539,6 +412,11 @@ export async function getBuildingSummaries() {
   );
   const authoritativeBuildings = await listAuthoritativeBuildings();
   const authoritativeBuildingSet = new Set(authoritativeBuildings);
+  const hiddenBuildings = new Set(
+    layoutRows
+      .map((row) => storedBuildingNameFromNodeId(row.nodeId, BUILDING_HIDDEN_PREFIX))
+      .filter((value): value is string => !!value),
+  );
 
   const nodeMap: Record<string, number> = {};
   const deviceMap: Record<string, number> = {};
@@ -598,6 +476,7 @@ export async function getBuildingSummaries() {
       influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
       category: classification.category,
       monitoringStrategy: classification.monitoringStrategy,
+      displayOnCampusMap: !hiddenBuildings.has(name),
     };
   });
 }
@@ -782,7 +661,7 @@ from(bucket: "${INFLUX_BUCKET}")
 }
 
 export async function getMonitoringSnapshot(publicMode = false) {
-  const [switchRows, vlans, buildings, azureHybridStatus] = await Promise.all([
+  const [switchRows, mapNodeRows, vlans, buildings, azureHybridStatus] = await Promise.all([
     db.select({
       id: networkSwitchesTable.id,
       hostname: networkSwitchesTable.hostname,
@@ -793,25 +672,23 @@ export async function getMonitoringSnapshot(publicMode = false) {
       lastSeen: networkSwitchesTable.lastSeen,
       location: networkSwitchesTable.location,
     }).from(networkSwitchesTable),
+    db.select({
+      id: netNodesTable.id,
+      hostname: netNodesTable.hostname,
+      displayName: netNodesTable.displayName,
+      nodeKind: netNodesTable.nodeKind,
+      vendor: netNodesTable.vendor,
+      model: netNodesTable.model,
+      mgmtIp: netNodesTable.mgmtIp,
+      building: netNodesTable.building,
+      location: netNodesTable.location,
+      role: netNodesTable.role,
+    }).from(netNodesTable),
     db.select({ id: vlansTable.id, building: vlansTable.building }).from(vlansTable),
     getBuildingSummaries(),
     getAzureHybridVmStatus(),
   ]);
-  const nodes = switchRows.map((node) => {
-    const fingerprint = normalizeTelemetryKey(`${node.hostname} ${node.location ?? ""}`);
-    const nodeKind = !node.model && /(?:^|[\s_-])svi(?:$|[\s_-])/.test(fingerprint)
-      ? "svi"
-      : /\bboiler room\b/.test(fingerprint) && !node.model
-        ? "endpoint"
-        : "switch";
-    return {
-      ...node,
-      displayName: node.hostname,
-      nodeKind,
-      vendor: node.model?.split(/\s+/)[0] ?? null,
-      role: nodeKind === "svi" ? "svi" : null as string | null,
-    };
-  });
+  const nodes = mergeMonitoringInventory(switchRows, mapNodeRows);
 
   const heartbeatHosts = nodes
     .map((node) => node.mgmtIp)
@@ -1182,9 +1059,9 @@ router.delete("/links/:id", requireAuth, async (req, res) => {
 // BUILDINGS – summary + detail
 // ---------------------------------------------------------------------------
 
-const buildingOverlayPutSchema = z.object({
+export const buildingOverlayPutSchema = z.object({
   positions: z.array(z.object({
-    code: z.string().trim().min(1).max(20),
+    code: z.string().trim().min(1).max(200),
     x: z.number().finite().min(0).max(100),
     y: z.number().finite().min(0).max(100),
     labelDx: z.number().finite().min(-400).max(400).optional().nullable(),
@@ -1247,7 +1124,7 @@ router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
 
 router.delete("/buildings/map-layout", requireAuth, async (req, res) => {
   const parsed = z.object({
-    codes: z.array(z.string().trim().min(1).max(20)).optional(),
+    codes: z.array(z.string().trim().min(1).max(200)).optional(),
   }).safeParse(req.body ?? {});
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1273,26 +1150,129 @@ router.delete("/buildings/map-layout", requireAuth, async (req, res) => {
 });
 
 router.post("/buildings", requireAuth, async (req: any, res) => {
-  const parsed = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
+  const parsed = z.object({
+    name: z.string().trim().min(1).max(80),
+    displayOnCampusMap: z.boolean().optional().default(true),
+  }).safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
   }
 
-  const name = parsed.data.name;
-  await db
-    .insert(networkLayoutPositionsTable)
-    .values({
-      nodeId: explicitBuildingNodeId(name),
-      x: 0,
-      y: 0,
-      width: null,
-      height: null,
-      updatedAt: new Date(),
-      updatedBy: req.user?.id ?? null,
-    })
-    .onConflictDoNothing();
+  const { name, displayOnCampusMap } = parsed.data;
+  const now = new Date();
+  const marker = (nodeId: string) => ({
+    nodeId,
+    x: 0,
+    y: 0,
+    width: null,
+    height: null,
+    updatedAt: now,
+    updatedBy: req.user?.id ?? null,
+  });
+  await db.transaction(async (tx) => {
+    await tx.insert(networkLayoutPositionsTable).values(marker(explicitBuildingNodeId(name))).onConflictDoNothing();
+    await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, disabledBuildingNodeId(name)));
+    if (displayOnCampusMap) {
+      await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, hiddenBuildingNodeId(name)));
+    } else {
+      await tx.insert(networkLayoutPositionsTable).values(marker(hiddenBuildingNodeId(name))).onConflictDoNothing();
+    }
+  });
 
-  return res.status(201).json({ name });
+  return res.status(201).json({ name, displayOnCampusMap });
+});
+
+/** PATCH /network/buildings/:name/map-visibility – show or hide one building on the campus map */
+router.patch("/buildings/:name/map-visibility", requireAuth, async (req: any, res) => {
+  const name = decodeURIComponent(req.params.name).trim();
+  const parsed = z.object({ displayOnCampusMap: z.boolean() }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  }
+
+  const authoritativeBuildings = await listAuthoritativeBuildings();
+  if (!authoritativeBuildings.includes(name)) return res.status(404).json({ error: "Building not found" });
+
+  const nodeId = hiddenBuildingNodeId(name);
+  if (parsed.data.displayOnCampusMap) {
+    await db.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, nodeId));
+  } else {
+    await db
+      .insert(networkLayoutPositionsTable)
+      .values({
+        nodeId,
+        x: 0,
+        y: 0,
+        width: null,
+        height: null,
+        updatedAt: new Date(),
+        updatedBy: req.user?.id ?? null,
+      })
+      .onConflictDoNothing();
+  }
+
+  return res.json({ name, displayOnCampusMap: parsed.data.displayOnCampusMap });
+});
+
+/** PATCH /network/buildings/:name/devices/:nodeId – move one device and keep inventory synchronized */
+router.patch("/buildings/:name/devices/:nodeId", requireAuth, async (req: any, res) => {
+  const currentName = decodeURIComponent(req.params.name).trim();
+  const { nodeId } = req.params;
+  const parsed = z.object({ building: z.string().trim().min(1).max(80) }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  }
+
+  const [existing] = await db.select().from(netNodesTable).where(eq(netNodesTable.id, nodeId));
+  if (!existing) return res.status(404).json({ error: "Node not found" });
+
+  const assignedBuilding = getAssignedBuildingName(existing.building, existing.location, existing.hostname);
+  if (assignedBuilding !== currentName) {
+    return res.status(409).json({
+      error: "STALE_BUILDING_ASSIGNMENT",
+      message: `${existing.hostname} is currently assigned to ${assignedBuilding}. Refresh the building before moving it.`,
+    });
+  }
+
+  const destination = parsed.data.building;
+  const movedAt = new Date();
+  const result = await db.transaction(async (tx) => {
+    const [node] = await tx
+      .update(netNodesTable)
+      .set({ building: destination, updatedAt: movedAt })
+      .where(eq(netNodesTable.id, nodeId))
+      .returning();
+
+    const inventoryMatches = [ilike(networkSwitchesTable.hostname, existing.hostname)];
+    if (existing.mgmtIp) inventoryMatches.push(eq(networkSwitchesTable.ipAddress, existing.mgmtIp));
+    const inventoryRows = await tx
+      .update(networkSwitchesTable)
+      .set({ building: destination, updatedAt: movedAt })
+      .where(or(...inventoryMatches))
+      .returning({ id: networkSwitchesTable.id });
+
+    await tx
+      .insert(networkLayoutPositionsTable)
+      .values({
+        nodeId: explicitBuildingNodeId(destination),
+        x: 0,
+        y: 0,
+        width: null,
+        height: null,
+        updatedAt: movedAt,
+        updatedBy: req.user?.id ?? null,
+      })
+      .onConflictDoNothing();
+
+    return { node, inventoryRowsUpdated: inventoryRows.length };
+  });
+
+  return res.json({
+    node: result.node,
+    oldBuilding: currentName,
+    building: destination,
+    inventoryRowsUpdated: result.inventoryRowsUpdated,
+  });
 });
 
 /** GET /network/buildings – all buildings with node/vlan counts + live status */
@@ -1309,26 +1289,51 @@ router.patch("/buildings/:name", requireAuth, async (req, res) => {
   const newName = parsed.data.name;
   const currentExplicitId = explicitBuildingNodeId(currentName);
   const newExplicitId = explicitBuildingNodeId(newName);
+  const currentHiddenId = hiddenBuildingNodeId(currentName);
+  const newHiddenId = hiddenBuildingNodeId(newName);
+  const currentOverlayId = overlayNodeId(customBuildingOverlayCode(currentName));
+  const newOverlayId = overlayNodeId(customBuildingOverlayCode(newName));
 
   await db.transaction(async (tx) => {
     await tx.update(netNodesTable).set({ building: newName, updatedAt: new Date() }).where(ilike(netNodesTable.building, currentName));
-    await tx.update(vlansTable).set({ building: newName, updatedAt: new Date() }).where(ilike(vlansTable.building, currentName));
-    const [existingExplicit] = await tx
-      .select()
-      .from(networkLayoutPositionsTable)
-      .where(eq(networkLayoutPositionsTable.nodeId, currentExplicitId));
-    if (existingExplicit) {
+    await tx.update(networkSwitchesTable).set({ building: newName, updatedAt: new Date() }).where(ilike(networkSwitchesTable.building, currentName));
+    await tx.update(vlansTable).set({ building: newName }).where(ilike(vlansTable.building, currentName));
+    const now = new Date();
+    const userId = (req as any).user?.id ?? null;
+    const marker = (nodeId: string) => ({
+      nodeId,
+      x: 0,
+      y: 0,
+      width: null,
+      height: null,
+      updatedAt: now,
+      updatedBy: userId,
+    });
+    const [existingHidden] = await tx.select().from(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentHiddenId));
+    const [existingOverlay] = await tx.select().from(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentOverlayId));
+
+    await tx.insert(networkLayoutPositionsTable).values(marker(newExplicitId)).onConflictDoNothing();
+    await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentExplicitId));
+    await tx.insert(networkLayoutPositionsTable).values(marker(disabledBuildingNodeId(currentName))).onConflictDoNothing();
+    await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, disabledBuildingNodeId(newName)));
+
+    if (existingHidden) {
+      await tx.insert(networkLayoutPositionsTable).values({ ...existingHidden, nodeId: newHiddenId, updatedAt: now, updatedBy: userId }).onConflictDoNothing();
+    }
+    await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentHiddenId));
+
+    if (existingOverlay) {
       await tx
         .insert(networkLayoutPositionsTable)
         .values({
-          ...existingExplicit,
-          nodeId: newExplicitId,
-          updatedAt: new Date(),
-          updatedBy: null,
+          ...existingOverlay,
+          nodeId: newOverlayId,
+          updatedAt: now,
+          updatedBy: userId,
         })
         .onConflictDoNothing();
-      await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentExplicitId));
     }
+    await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentOverlayId));
   });
 
   return res.json({ oldName: currentName, name: newName });
@@ -1337,23 +1342,44 @@ router.patch("/buildings/:name", requireAuth, async (req, res) => {
 router.delete("/buildings/:name", requireAuth, async (req, res) => {
   const rawName = decodeURIComponent(req.params.name).trim();
   const canonicalName = getCanonicalBuildingName(rawName);
-  const [allNodes, allVlans] = await Promise.all([
-    db.select({ building: netNodesTable.building }).from(netNodesTable),
+  const [allNodes, allSwitches, allVlans] = await Promise.all([
+    db.select({ building: netNodesTable.building, location: netNodesTable.location, hostname: netNodesTable.hostname }).from(netNodesTable),
+    db.select({ building: networkSwitchesTable.building, location: networkSwitchesTable.location, hostname: networkSwitchesTable.hostname }).from(networkSwitchesTable),
     db.select({ building: vlansTable.building }).from(vlansTable),
   ]);
-  const nodeCount = allNodes.filter((node) => getCanonicalBuildingName(node.building) === canonicalName).length;
+  const nodeCount = allNodes.filter((node) => getAssignedBuildingName(node.building, node.location, node.hostname) === canonicalName).length;
+  const switchCount = allSwitches.filter((node) => getAssignedBuildingName(node.building, node.location, node.hostname) === canonicalName).length;
   const vlanCount = allVlans.filter((vlan) => getCanonicalBuildingName(vlan.building) === canonicalName).length;
 
-  if (nodeCount > 0 || vlanCount > 0) {
+  if (nodeCount > 0 || switchCount > 0 || vlanCount > 0) {
     return res.status(409).json({
       error: "BUILDING_NOT_EMPTY",
       message: "Move or delete the switches and VLANs in this building before removing it.",
       nodeCount,
+      switchCount,
       vlanCount,
     });
   }
 
-  await db.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, explicitBuildingNodeId(rawName)));
+  await db.transaction(async (tx) => {
+    await tx.delete(networkLayoutPositionsTable).where(inArray(networkLayoutPositionsTable.nodeId, [
+      explicitBuildingNodeId(rawName),
+      hiddenBuildingNodeId(rawName),
+      overlayNodeId(customBuildingOverlayCode(rawName)),
+    ]));
+    await tx
+      .insert(networkLayoutPositionsTable)
+      .values({
+        nodeId: disabledBuildingNodeId(rawName),
+        x: 0,
+        y: 0,
+        width: null,
+        height: null,
+        updatedAt: new Date(),
+        updatedBy: null,
+      })
+      .onConflictDoNothing();
+  });
   return res.json({ ok: true, name: rawName });
 });
 /** GET /network/buildings/:name – all nodes, vlans, and live status for a building */
@@ -1362,10 +1388,13 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   const authoritativeBuildings = await listAuthoritativeBuildings();
   const canonicalName = authoritativeBuildings.includes(name) ? name : getCanonicalBuildingName(name);
 
-  const [allNodes, allVlans, azureHybridStatus] = await Promise.all([
+  const [allNodes, allVlans, azureHybridStatus, hiddenRows] = await Promise.all([
     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
     db.select().from(vlansTable).orderBy(vlansTable.building, vlansTable.vlanId),
     getAzureHybridVmStatus(),
+    db.select({ nodeId: networkLayoutPositionsTable.nodeId })
+      .from(networkLayoutPositionsTable)
+      .where(eq(networkLayoutPositionsTable.nodeId, hiddenBuildingNodeId(canonicalName))),
   ]);
 
   const nodes = allNodes.filter((node) => getAssignedBuildingName(node.building, node.location, node.hostname) === canonicalName);
@@ -1414,6 +1443,7 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
     category: classification.category,
     monitoringStrategy: classification.monitoringStrategy,
+    displayOnCampusMap: hiddenRows.length === 0,
   });
 });
 

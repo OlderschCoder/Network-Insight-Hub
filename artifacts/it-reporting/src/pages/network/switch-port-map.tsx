@@ -144,7 +144,7 @@ export function TelemetrySwitchPortMap({
   const [pinnedName, setPinnedName] = useState<string | null>(null);
   const switches = useMemo(
     () => nodes
-      .filter((node) => node.nodeKind === "switch" || node.nodeKind === "router")
+      .filter((node) => ["switch", "router", "firewall"].includes(node.nodeKind))
       .sort((a, b) => a.hostname.localeCompare(b.hostname)),
     [nodes],
   );
@@ -250,14 +250,14 @@ export function TelemetrySwitchPortMap({
     physicalInterfaces.every((iface) => iface.rxPowerDbm == null && iface.txPowerDbm == null) ? "optics / DOM" : null,
   ].filter(Boolean) as string[];
 
-  if (!switches.length) return <div className="py-16 text-center text-muted-foreground">No switches in the Network Map yet.</div>;
+  if (!switches.length) return <div className="py-16 text-center text-muted-foreground">No switches, routers, or firewalls are in the Network Map yet.</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         {showSelector && (
           <Select value={effectiveId} onValueChange={(value) => { setSelectedId(value); setPinnedName(null); setHoveredName(null); }}>
-            <SelectTrigger className="w-72"><SelectValue placeholder="Select switch…" /></SelectTrigger>
+            <SelectTrigger className="w-72"><SelectValue placeholder="Select network device…" /></SelectTrigger>
             <SelectContent>
               {switches.map((node) => <SelectItem key={node.id} value={node.id}>{node.hostname} — {node.building}</SelectItem>)}
             </SelectContent>
@@ -276,7 +276,7 @@ export function TelemetrySwitchPortMap({
       {isLoading && <div className="py-12 flex items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading interface telemetry…</div>}
       {!isLoading && (isError || physicalInterfaces.length === 0) && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">No physical-interface telemetry has been imported for this switch.</p>
+          <p className="font-semibold">No physical-interface telemetry has been imported for this device.</p>
           <p className="text-xs mt-1">Topology links are preserved below, but the app will not invent a 24- or 48-port faceplate.</p>
         </div>
       )}
@@ -368,10 +368,10 @@ export function SingleSwitchPortMap({ nodeId }: { nodeId: string }) {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   if (nodesLoading || linksLoading) {
-    return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading switch faceplate…</div>;
+    return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading device faceplate…</div>;
   }
   const selected = nodeById.get(nodeId);
-  if (!selected) return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This switch is not yet linked to the Port Map inventory.</div>;
+  if (!selected) return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This device is not yet linked to the Port Map inventory.</div>;
 
   return <TelemetrySwitchPortMap nodes={[selected]} links={links} nodeById={nodeById} initialNodeId={nodeId} showSelector={false} />;
 }

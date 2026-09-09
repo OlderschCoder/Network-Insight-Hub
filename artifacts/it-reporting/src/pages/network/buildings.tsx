@@ -9,12 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Server, Wifi, WifiOff, AlertTriangle, Activity,
   ArrowLeft, ChevronRight, Loader2, RefreshCw, Search, Pencil, Save, X, PhoneCall, ExternalLink,
+  Eye, EyeOff, Plus, Trash2,
 } from "lucide-react";
 import { TelemetrySwitchPortMap } from "./switch-port-map";
 
@@ -30,6 +34,7 @@ interface BuildingSummary {
   vlanCount: number;
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  displayOnCampusMap: boolean;
 }
 
 interface NetNodeSummary {
@@ -64,6 +69,7 @@ interface BuildingDetail {
   links: any[];
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  displayOnCampusMap: boolean;
 }
 
 interface OverlayPosition {
@@ -75,7 +81,7 @@ interface OverlayPosition {
 }
 
 interface CampusStatusMapProps {
-  buildings: BuildingSummary[];
+  buildings: CampusMapBuildingHealth[];
   publicMode?: boolean;
 }
 
@@ -132,6 +138,7 @@ interface CallingSupportSnapshot {
 export type CampusMapBuildingHealth = {
   name: string;
   healthColor: "green" | "amber" | "red" | "unknown";
+  displayOnCampusMap?: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -195,11 +202,12 @@ const CAMPUS_OVERLAYS: CampusOverlay[] = [
   { code: "AA", buildingName: "Hobble", aliases: ["aa", "hobble", "hobble academic", "hobble academic building"], x: 34.8, y: 49.0, labelDx: 8, labelDy: -10, labelGroup: "hobble", labelAnchor: true, displayCode: "AA/A" },
   { code: "A", buildingName: "Hobble", aliases: ["a", "hobble", "hobble academic", "hobble academic building"], x: 39.2, y: 52.0, labelDx: 8, labelDy: -8, labelGroup: "hobble" },
   { code: "H", buildingName: "Humanities Building", preferredNames: ["Humanities"], aliases: ["h", "humanities", "humanities building"], x: 50.6, y: 60.5, labelDx: 8, labelDy: -10 },
-  { code: "SA", buildingName: "Student Union / Activities", preferredNames: ["Student Union / Student Activities"], aliases: ["sa", "student union / student activities", "student union / activities", "student union"], x: 69.0, y: 41.2, labelDx: 10, labelDy: 10, labelGroup: "student-union" },
-  { code: "SU", buildingName: "Student Union / Activities", preferredNames: ["Student Union / Student Activities"], aliases: ["su", "student union / student activities", "student union / activities", "student union"], x: 70.8, y: 36.8, labelDx: 10, labelDy: -2, labelGroup: "student-union", labelAnchor: true, displayCode: "SA/SU/SW" },
-  { code: "SW", buildingName: "Student Union / Activities", preferredNames: ["Student Union / Student Activities"], aliases: ["sw", "student union / student activities", "student union / activities", "student union"], x: 72.5, y: 32.5, labelDx: 10, labelDy: -14, labelGroup: "student-union" },
+  { code: "SA", buildingName: "Student Activities", preferredNames: ["Student Activities"], aliases: ["sa", "student activities", "activities"], x: 69.0, y: 41.2, labelDx: 10, labelDy: 10, labelGroup: "student-activities", labelAnchor: true, displayCode: "SA" },
+  { code: "SU", buildingName: "Student Union", preferredNames: ["Student Union"], aliases: ["su", "student union"], x: 70.8, y: 36.8, labelDx: 10, labelDy: -2, labelGroup: "student-union", labelAnchor: true, displayCode: "SU/SW" },
+  { code: "SW", buildingName: "Student Union", preferredNames: ["Student Union"], aliases: ["sw", "student union"], x: 72.5, y: 32.5, labelDx: 10, labelDy: -14, labelGroup: "student-union", compactMarker: true },
   { code: "SHC", buildingName: "Student Health Center", preferredNames: ["Student Health Center"], aliases: ["shc", "student health center"], x: 78.2, y: 24.0, labelDx: 8, labelDy: -10 },
   { code: "SLC", buildingName: "Student Living Center", preferredNames: ["Student Living Center", "Student Living Center (SLC151)"], aliases: ["slc", "student living center"], x: 81.2, y: 31.0, labelDx: 8, labelDy: -10 },
+  { code: "MAN", buildingName: "Mansions", preferredNames: ["Mansions"], aliases: ["mansions", "student living ab", "student living de"], x: 19.6, y: 32.0, labelDx: 8, labelDy: -10 },
   { code: "SLF", buildingName: "Student Living F", preferredNames: ["Student Living F"], aliases: ["student living f"], x: 16.6, y: 27.8, displayCode: "F", compactMarker: true },
   { code: "SLG", buildingName: "Student Living G", preferredNames: ["Student Living G"], aliases: ["student living g"], x: 20.8, y: 27.8, displayCode: "G", compactMarker: true },
   { code: "SLH", buildingName: "Student Living H", preferredNames: ["Student Living H"], aliases: ["student living h"], x: 23.3, y: 27.8, displayCode: "H", compactMarker: true },
@@ -216,6 +224,17 @@ const INTERNET_UPLINK_POINT = { x: -2, y: 50.2 };
 
 function normalizeBuildingName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function customBuildingOverlayCode(name: string): string {
+  return `CUSTOM:${encodeURIComponent(name.trim())}`;
+}
+
+function buildingDisplayCode(name: string): string {
+  const words = name.match(/[A-Za-z0-9]+/g) ?? [];
+  return (words.length > 1 ? words.map((word) => word[0]).join("") : words[0]?.slice(0, 3) ?? "NEW")
+    .slice(0, 4)
+    .toUpperCase();
 }
 
 function matchesAlias(name: string, aliases: string[]): boolean {
@@ -257,7 +276,7 @@ export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(bu
   const byName = new Map(buildings.map((building) => [normalizeBuildingName(building.name), building]));
   const visibleOverlayCodes = getVisibleCampusOverlayCodes();
 
-  return CAMPUS_OVERLAYS
+  const staticEntries = CAMPUS_OVERLAYS
     .filter((overlay) => visibleOverlayCodes.has(overlay.code))
     .map((overlay) => {
       let match = null as T | null;
@@ -281,7 +300,26 @@ export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(bu
         displayCode: overlay.displayCode ?? overlay.code,
         match,
       };
-    });
+    })
+    .filter((entry) => entry.match?.displayOnCampusMap !== false);
+
+  const matchedBuildingNames = new Set(
+    staticEntries
+      .map((entry) => entry.match?.name)
+      .filter((name): name is string => !!name)
+      .map(normalizeBuildingName),
+  );
+  const customEntries = buildings
+    .filter((building) => building.displayOnCampusMap !== false)
+    .filter((building) => !matchedBuildingNames.has(normalizeBuildingName(building.name)))
+    .map((building) => ({
+      code: customBuildingOverlayCode(building.name),
+      buildingName: building.name,
+      displayCode: buildingDisplayCode(building.name),
+      match: building,
+    }));
+
+  return [...staticEntries, ...customEntries];
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -347,10 +385,26 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
   const { toast } = useToast();
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ code: string; offsetX: number; offsetY: number } | null>(null);
+  const mapDisplayEntries = useMemo(() => getCampusMapDisplayEntries(buildings), [buildings]);
+  const overlayDefinitions = useMemo<CampusOverlay[]>(() => {
+    const customEntries = mapDisplayEntries.filter((entry) => entry.code.startsWith("CUSTOM:"));
+    const customOverlays = customEntries.map((entry, index) => ({
+      code: entry.code,
+      buildingName: entry.buildingName,
+      preferredNames: [entry.buildingName],
+      aliases: [entry.buildingName],
+      displayCode: entry.displayCode,
+      x: 8 + (index % 5) * 8,
+      y: 90 - Math.floor(index / 5) * 8,
+      labelDx: 8,
+      labelDy: -10,
+    }));
+    return [...CAMPUS_OVERLAYS, ...customOverlays];
+  }, [mapDisplayEntries]);
   const defaultPositions = useMemo<Record<string, OverlayPosition>>(
     () =>
       Object.fromEntries(
-        CAMPUS_OVERLAYS.map((overlay) => [
+        overlayDefinitions.map((overlay) => [
           overlay.code,
           {
             code: overlay.code,
@@ -361,7 +415,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           },
         ]),
       ),
-    [],
+    [overlayDefinitions],
   );
   const [savedPositions, setSavedPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
   const [overlayPositions, setOverlayPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
@@ -378,7 +432,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       const rows = (await response.json()) as OverlayPosition[];
       const nextPositions = { ...defaultPositions };
       for (const row of rows) {
-        const overlayDefinition = CAMPUS_OVERLAYS.find((overlay) => overlay.code === row.code);
+        const overlayDefinition = overlayDefinitions.find((overlay) => overlay.code === row.code);
         const isLegacyDormPosition = overlayDefinition?.compactMarker
           && row.code.startsWith("SL")
           && row.code !== "SLC"
@@ -404,7 +458,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
         variant: "destructive",
       });
     }
-  }, [defaultPositions, publicMode, toast]);
+  }, [defaultPositions, overlayDefinitions, publicMode, toast]);
 
   useEffect(() => {
     void loadLayout();
@@ -523,7 +577,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
 
   const overlays = useMemo(
     () =>
-      CAMPUS_OVERLAYS.map((overlay) => {
+      overlayDefinitions.map((overlay) => {
         const saved = overlayPositions[overlay.code];
         return {
           ...overlay,
@@ -533,19 +587,22 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           labelDy: saved?.labelDy ?? overlay.labelDy,
         };
       }),
-    [overlayPositions],
+    [overlayDefinitions, overlayPositions],
   );
 
   const buildingByCode = useMemo(
-    () => new Map(getCampusMapDisplayEntries(buildings).map((entry) => [entry.code, entry.match])),
-    [buildings],
+    () => new Map(mapDisplayEntries.map((entry) => [entry.code, entry.match])),
+    [mapDisplayEntries],
   );
 
   const visibleOverlayCodes = useMemo(() => getVisibleCampusOverlayCodes(), []);
 
   const visibleOverlays = useMemo(
-    () => overlays.filter((overlay) => visibleOverlayCodes.has(overlay.code)),
-    [overlays, visibleOverlayCodes],
+    () => overlays.filter((overlay) =>
+      (visibleOverlayCodes.has(overlay.code) || overlay.code.startsWith("CUSTOM:"))
+      && !!buildingByCode.get(overlay.code)
+      && buildingByCode.get(overlay.code)?.displayOnCampusMap !== false),
+    [buildingByCode, overlays, visibleOverlayCodes],
   );
 
   const fiberLines = useMemo(
@@ -775,6 +832,9 @@ function BuildingsGrid() {
   const [callingSupport, setCallingSupport] = useState<CallingSupportSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [newBuildingName, setNewBuildingName] = useState("");
+  const [savingBuilding, setSavingBuilding] = useState(false);
+  const [manageBuildingsOpen, setManageBuildingsOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const canEdit = !!user;
@@ -798,6 +858,77 @@ function BuildingsGrid() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  const addBuilding = async () => {
+    const name = newBuildingName.trim();
+    if (!name) return;
+    setSavingBuilding(true);
+    try {
+      const response = await authFetch(`${API}/network/buildings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, displayOnCampusMap: true }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setNewBuildingName("");
+      toast({ title: "Building added", description: `${name} is ready for switches and VLANs.` });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Building add failed", description: error.message, variant: "destructive" });
+    } finally {
+      setSavingBuilding(false);
+    }
+  };
+
+  const renameBuilding = async (building: BuildingSummary) => {
+    const name = window.prompt("Rename building", building.name)?.trim();
+    if (!name || name === building.name) return;
+    try {
+      const response = await authFetch(`${API}/network/buildings/${encodeURIComponent(building.name)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      toast({ title: "Building renamed", description: `${building.name} is now ${name}.` });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Building rename failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const removeBuilding = async (building: BuildingSummary) => {
+    if (!window.confirm(`Remove ${building.name}? Empty buildings can be restored later by adding them again.`)) return;
+    try {
+      const response = await authFetch(`${API}/network/buildings/${encodeURIComponent(building.name)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await response.text());
+      toast({ title: "Building removed", description: building.name });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Building removal failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const setMapVisibility = async (building: BuildingSummary, displayOnCampusMap: boolean) => {
+    try {
+      const response = await authFetch(
+        `${API}/network/buildings/${encodeURIComponent(building.name)}/map-visibility`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayOnCampusMap }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      toast({
+        title: displayOnCampusMap ? "Building shown on map" : "Building hidden from map",
+        description: building.name,
+      });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Map visibility update failed", description: error.message, variant: "destructive" });
+    }
+  };
 
   const filtered = buildings.filter(b =>
     b.name.toLowerCase().includes(search.toLowerCase())
@@ -841,29 +972,22 @@ function BuildingsGrid() {
         </div>
         <div className="flex items-center gap-2">
           {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              onClick={async () => {
-                const name = window.prompt("New building name")?.trim();
-                if (!name) return;
-                try {
-                  const r = await authFetch(`${API}/network/buildings`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name }),
-                  });
-                  if (!r.ok) throw new Error(await r.text());
-                  toast({ title: "Building added", description: name });
-                  await load();
-                } catch (e: any) {
-                  toast({ title: "Building add failed", description: e.message, variant: "destructive" });
-                }
-              }}
-            >
-              <Building2 className="h-4 w-4" /> Add Building
-            </Button>
+            <>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setManageBuildingsOpen(true)}>
+                <Eye className="h-4 w-4" /> Manage Buildings
+              </Button>
+              <Input
+                className="h-9 w-52"
+                placeholder="New building name"
+                value={newBuildingName}
+                onChange={(event) => setNewBuildingName(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") void addBuilding(); }}
+                aria-label="New building name"
+              />
+              <Button variant="outline" size="sm" className="gap-1" onClick={addBuilding} disabled={savingBuilding || !newBuildingName.trim()}>
+                <Plus className="h-4 w-4" /> {savingBuilding ? "Adding..." : "Add Building"}
+              </Button>
+            </>
           )}
           <Button variant="outline" size="sm" onClick={load} className="gap-1">
             <RefreshCw className="h-4 w-4" /> Refresh
@@ -885,6 +1009,61 @@ function BuildingsGrid() {
         <Input className="pl-9" placeholder="Filter buildings..." value={search}
           onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {canEdit && (
+        <Dialog open={manageBuildingsOpen} onOpenChange={setManageBuildingsOpen}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Manage Buildings</DialogTitle>
+              <DialogDescription>
+                Rename buildings, remove empty ones, or choose which buildings appear on the campus map.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-80 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Building</TableHead>
+                    <TableHead className="w-24">Devices</TableHead>
+                    <TableHead className="w-32">Campus map</TableHead>
+                    <TableHead className="w-[23rem] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sorted.map((building) => (
+                    <TableRow key={`manage-${building.name}`}>
+                      <TableCell className="font-medium">{building.name}</TableCell>
+                      <TableCell>{building.nodeCount}</TableCell>
+                      <TableCell>
+                        <Badge variant={building.displayOnCampusMap ? "default" : "outline"}>
+                          {building.displayOnCampusMap ? "Shown" : "Hidden"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link href={`/network/buildings/${encodeURIComponent(building.name)}`}>Open</Link>
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setMapVisibility(building, !building.displayOnCampusMap)}>
+                            {building.displayOnCampusMap ? <EyeOff className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}
+                            {building.displayOnCampusMap ? "Hide" : "Show"}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => renameBuilding(building)}>
+                            <Pencil className="mr-1 h-4 w-4" /> Rename
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => removeBuilding(building)} disabled={building.nodeCount > 0 || building.vlanCount > 0}>
+                            <Trash2 className="mr-1 h-4 w-4" /> Remove
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <CampusStatusMap buildings={buildings} />
 
@@ -1198,6 +1377,55 @@ function BuildingDetailView({ name }: { name: string }) {
       toast({ title: "VLAN update failed", description: e.message, variant: "destructive" });
     }
   };
+
+  const moveDevice = async (node: NetNodeSummary) => {
+    const building = window.prompt(
+      `Move ${node.displayName || node.hostname} to which building? You can enter an existing or new building.`,
+      name,
+    )?.trim();
+    if (!building || building === name) return;
+    try {
+      const r = await authFetch(
+        `${API}/network/buildings/${encodeURIComponent(name)}/devices/${encodeURIComponent(node.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ building }),
+        },
+      );
+      if (!r.ok) throw new Error(await r.text());
+      toast({
+        title: "Device moved",
+        description: `${node.displayName || node.hostname} is now assigned to ${building}.`,
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Device move failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const toggleMapVisibility = async () => {
+    if (!detail) return;
+    const displayOnCampusMap = !detail.displayOnCampusMap;
+    try {
+      const response = await authFetch(
+        `${API}/network/buildings/${encodeURIComponent(detail.name)}/map-visibility`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayOnCampusMap }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      toast({
+        title: displayOnCampusMap ? "Building shown on map" : "Building hidden from map",
+        description: detail.name,
+      });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Map visibility update failed", description: error.message, variant: "destructive" });
+    }
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1259,6 +1487,10 @@ function BuildingDetailView({ name }: { name: string }) {
         </div>
         {canEdit && !editingName && (
           <>
+            <Button variant="outline" size="sm" onClick={toggleMapVisibility} className="gap-1">
+              {detail.displayOnCampusMap ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {detail.displayOnCampusMap ? "Hide from Map" : "Show on Map"}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setEditingName(true)} className="gap-1"><Pencil className="h-4 w-4" /> Edit Building</Button>
             <Button
               variant="destructive"
@@ -1317,7 +1549,7 @@ function BuildingDetailView({ name }: { name: string }) {
             <p className="text-muted-foreground text-center py-12">No devices associated with this building.</p>
           ) : (
             <div className="rounded-md border overflow-x-auto">
-              <Table className="table-fixed min-w-[1050px]">
+              <Table className="table-fixed min-w-[1130px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[18rem]">Hostname</TableHead>
@@ -1329,6 +1561,7 @@ function BuildingDetailView({ name }: { name: string }) {
                     <TableHead className="w-[8rem]">Criticality</TableHead>
                     <TableHead className="w-[7rem]">Status</TableHead>
                     {detail.influxConfigured && <TableHead className="w-[6rem]">Live</TableHead>}
+                    {canEdit && <TableHead className="w-[8rem] text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1371,6 +1604,13 @@ function BuildingDetailView({ name }: { name: string }) {
                       <TableCell className="text-xs align-top">{node.status ?? "—"}</TableCell>
                       {detail.influxConfigured && (
                         <TableCell className="align-top"><LiveBadge status={node.liveStatus} /></TableCell>
+                      )}
+                      {canEdit && (
+                        <TableCell className="text-right align-top">
+                          <Button variant="ghost" size="sm" onClick={() => moveDevice(node)}>
+                            <Building2 className="h-4 w-4 mr-1" /> Move
+                          </Button>
+                        </TableCell>
                       )}
                     </TableRow>
                   ))}

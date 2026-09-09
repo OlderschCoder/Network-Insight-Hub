@@ -1,9 +1,9 @@
 flowchart LR
-  U[Authenticated user] --> API[/api/todos]
+  U[Authenticated user] --> API["/api/todos"]
   U --> F[Fred to-do tools]
   F --> P
   API --> P{Team to-do manager?}
-  P -- Mark or Tracy --> ALL[All team to-dos]
+  P -- Manage Todos capability --> ALL[All team to-dos]
   P -- Other user --> OWN[Own to-dos only]
   ALL --> T[(team_todos)]
   OWN --> T

@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@workspace/db", () => ({
@@ -18,19 +21,38 @@ import {
   executeZendeskSolveTickets,
   fredApplicationToolsForRole,
 } from "./fred_application_actions";
+import { updateZendeskSupervisionConfig } from "./zendesk_supervision";
+
+let supervisionDirectory: string | null = null;
 
 describe("Fred application actions", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.ZENDESK_SUBDOMAIN = "example";
     process.env.ZENDESK_EMAIL = "fred@example.edu";
     process.env.ZENDESK_API_TOKEN = "test-token";
+    supervisionDirectory = await mkdtemp(
+      path.join(tmpdir(), "fred-zendesk-controls-"),
+    );
+    process.env.ZENDESK_SUPERVISION_CONFIG_PATH = path.join(
+      supervisionDirectory,
+      "controls.json",
+    );
+    await updateZendeskSupervisionConfig(
+      { fredEnabled: true, repliesEnabled: true },
+      { id: 1, name: "Test setup", role: "cio" },
+    );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
     delete process.env.ZENDESK_SUBDOMAIN;
     delete process.env.ZENDESK_EMAIL;
     delete process.env.ZENDESK_API_TOKEN;
+    delete process.env.ZENDESK_SUPERVISION_CONFIG_PATH;
+    if (supervisionDirectory) {
+      await rm(supervisionDirectory, { recursive: true, force: true });
+      supervisionDirectory = null;
+    }
   });
 
   it("exposes CIO report management and staff-safe application tools", () => {
@@ -82,6 +104,43 @@ describe("Fred application actions", () => {
     );
 
     expect(result).toContain("Confirmation required");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks create and solve at the executor boundary when Fred is disabled", async () => {
+    await updateZendeskSupervisionConfig(
+      { fredEnabled: false },
+      { id: 1, name: "CIO", role: "cio" },
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      executeZendeskCreateTicket(
+        JSON.stringify({ subject: "Printer", body: "Offline", confirmed: true }),
+      ),
+    ).resolves.toContain("turned off by a supervisor");
+    await expect(
+      executeZendeskSolveTickets(
+        JSON.stringify({ ticket_ids: [101], confirmed: true }),
+      ),
+    ).resolves.toContain("turned off by a supervisor");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks ticket creation when public Zendesk replies are disabled", async () => {
+    await updateZendeskSupervisionConfig(
+      { repliesEnabled: false },
+      { id: 1, name: "CIO", role: "cio" },
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      executeZendeskCreateTicket(
+        JSON.stringify({ subject: "Printer", body: "Offline", confirmed: true }),
+      ),
+    ).resolves.toContain("public replies are turned off by a supervisor");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

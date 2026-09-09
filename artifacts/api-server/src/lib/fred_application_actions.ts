@@ -15,6 +15,7 @@ import {
   todoAssigneeForCreate,
   type TodoActor,
 } from "./team_todo_policy";
+import { withZendeskSupervisionConfig } from "./zendesk_supervision";
 
 export type FredActor = {
   id: number | null;
@@ -199,32 +200,38 @@ export async function executeZendeskCreateTicket(
   const subject = cleanText(args.subject);
   const body = cleanText(args.body);
   if (!subject || !body) return "Error: subject and body are required.";
+  return withZendeskSupervisionConfig(async (controls) => {
+    if (!controls.fredEnabled) {
+      return "Fred's Zendesk actions are turned off by a supervisor.";
+    }
+    if (!controls.repliesEnabled) {
+      return "Zendesk public replies are turned off by a supervisor.";
+    }
 
-  const ticket: Record<string, unknown> = {
-    subject,
-    comment: { body, public: true },
-  };
-  if (cleanText(args.priority)) ticket.priority = cleanText(args.priority);
-  if (cleanText(args.ticket_type)) ticket.type = cleanText(args.ticket_type);
-  const tags = cleanStringArray(args.tags);
-  if (tags?.length) ticket.tags = tags;
-  const requesterEmail = cleanText(args.requester_email);
-  if (requesterEmail) {
-    ticket.requester = {
-      email: requesterEmail,
-      name: cleanText(args.requester_name) || requesterEmail,
+    const ticket: Record<string, unknown> = {
+      subject,
+      comment: { body, public: true },
     };
-  }
-  const assigneeEmail = cleanText(args.assignee_email);
-  if (assigneeEmail)
-    ticket.assignee_id = await resolveZendeskAgent(assigneeEmail);
+    if (cleanText(args.priority)) ticket.priority = cleanText(args.priority);
+    if (cleanText(args.ticket_type)) ticket.type = cleanText(args.ticket_type);
+    const tags = cleanStringArray(args.tags);
+    if (tags?.length) ticket.tags = tags;
+    const requesterEmail = cleanText(args.requester_email);
+    if (requesterEmail) {
+      ticket.requester = {
+        email: requesterEmail,
+        name: cleanText(args.requester_name) || requesterEmail,
+      };
+    }
+    const assigneeEmail = cleanText(args.assignee_email);
+    if (assigneeEmail)
+      ticket.assignee_id = await resolveZendeskAgent(assigneeEmail);
 
-  const result = await zendeskFetch<{ ticket: { id: number; status: string } }>(
-    "POST",
-    "tickets.json",
-    { ticket },
-  );
-  return `✓ Zendesk ticket #${result.ticket.id} created with status ${result.ticket.status}.`;
+    const result = await zendeskFetch<{
+      ticket: { id: number; status: string };
+    }>("POST", "tickets.json", { ticket });
+    return `✓ Zendesk ticket #${result.ticket.id} created with status ${result.ticket.status}.`;
+  });
 }
 
 export async function executeZendeskSolveTickets(
@@ -238,26 +245,33 @@ export async function executeZendeskSolveTickets(
     return "Error: at least one explicit ticket id is required.";
   if (ids.length > 25)
     return "Error: at most 25 tickets can be solved in one confirmed batch.";
+  return withZendeskSupervisionConfig(async (controls) => {
+    if (!controls.fredEnabled) {
+      return "Fred's Zendesk actions are turned off by a supervisor.";
+    }
 
-  const results = await Promise.allSettled(
-    ids.map((id) =>
-      zendeskFetch("PUT", `tickets/${id}.json`, {
-        ticket: { status: "solved" },
-      }),
-    ),
-  );
-  const solved = ids.filter(
-    (_, index) => results[index].status === "fulfilled",
-  );
-  const failed = ids.filter((_, index) => results[index].status === "rejected");
-  return [
-    `Solved ${solved.length} ticket${solved.length === 1 ? "" : "s"}${solved.length ? `: ${solved.map((id) => `#${id}`).join(", ")}` : ""}.`,
-    failed.length
-      ? `Failed ${failed.length}: ${failed.map((id) => `#${id}`).join(", ")}.`
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        zendeskFetch("PUT", `tickets/${id}.json`, {
+          ticket: { status: "solved" },
+        }),
+      ),
+    );
+    const solved = ids.filter(
+      (_, index) => results[index].status === "fulfilled",
+    );
+    const failed = ids.filter(
+      (_, index) => results[index].status === "rejected",
+    );
+    return [
+      `Solved ${solved.length} ticket${solved.length === 1 ? "" : "s"}${solved.length ? `: ${solved.map((id) => `#${id}`).join(", ")}` : ""}.`,
+      failed.length
+        ? `Failed ${failed.length}: ${failed.map((id) => `#${id}`).join(", ")}.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  });
 }
 
 const afterActionProperties = {

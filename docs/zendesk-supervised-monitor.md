@@ -2,9 +2,12 @@
 
 ## Purpose
 
-The Zendesk Monitor at `/support/zendesk` gives authenticated Insights users a
-single place to watch the current open-ticket conversation queue, inspect the
-recent thread, and manage shared reply drafts.
+The **Troubleshooting** workspace at `/support` is the starting point for
+Zendesk work. Its **ZENDESK SUPERVISION** card is headed **Fred & reply
+controls** and shows the current global safety state. Select **Open Monitor**
+to open `/support/zendesk`, where authenticated Insights users can watch the
+current open-ticket conversation queue, inspect the recent thread, and manage
+shared reply drafts.
 
 Fred may prepare a reply, but drafting is always an observation-only AI call.
 It cannot post, edit, solve, or reassign a Zendesk ticket during that step.
@@ -22,19 +25,46 @@ the exact response later.
 
 ## Supervisor controls
 
-Mark, Tracy, and CIO-role users can change two global controls at the top of
-the monitor. **Fred drafting** disables the monitor's draft button and blocks
-Fred's Zendesk write tools. **Zendesk replies** blocks all public replies from
-the monitor and Fred at the API. Each change requires a confirmation and stores
-the operator name and timestamp in `data/zendesk-supervision.json`.
+The control card appears on both the Troubleshooting page and the Zendesk
+Monitor. The controls are independent and global:
 
-Escalation is independent of the reply switch, so a supervisor can still assign
-an urgent ticket to a person while public replies are paused. Other signed-in
-users can see the current control state but cannot change it.
+| Control | ON | OFF |
+| --- | --- | --- |
+| **Fred drafting** | **ON — supervised drafts allowed**. Fred may prepare saved drafts and perform separately confirmed Zendesk actions. | **OFF — Zendesk actions blocked**. The API blocks Fred-authored drafts, comments, internal notes, and ticket changes. |
+| **Zendesk replies** | **ON — confirmed replies allowed**. A reviewed Support-ticket draft may be sent after explicit approval. | **OFF — public replies blocked** across every Insights and Fred send path. Pending drafts remain drafts; internal notes may still be allowed when the Fred control and the action's confirmation permit them. |
+
+Only the CIO or a user granted the existing **Manage Todos** capability can
+change these controls. A person's name or job title does not grant this
+permission. Other signed-in users can see the current state, but the switches
+are disabled for them. Each change shows a confirmation dialog before it is
+saved.
+
+On the monitor, the same ready states read **Available for supervised drafts**,
+**Blocked from Zendesk actions**, **Confirmed public replies allowed**, and
+**Public replies blocked**.
+
+The saved OFF state is authoritative until an authorized supervisor changes
+it. Reloading the page, restarting the browser, or deploying the application
+must not silently turn a control back on. When present, **Last changed by** and
+the timestamp identify the most recent saved change. This is the current-state
+audit marker; Zendesk keeps its own actor and ticket-history records for each
+ticket write.
+
+If Insights cannot read the current control state, it displays **Unavailable —
+status unknown**, disables both switches and Zendesk actions, and offers
+**Retry controls**. Never interpret an unavailable card as ON. Restore or
+verify the control API before drafting or sending.
+
+If no control file exists yet, the first safe state is both controls OFF. An
+authorized supervisor can then confirm either switch ON from the interface.
+
+Escalation is independent of both switches, so the team can still assign an
+urgent ticket to a person while Fred or public replies are paused.
 
 ## Sending a response
 
-1. Open **Troubleshooting → Zendesk Monitor**.
+1. Open **Troubleshooting**, check **Fred & reply controls**, then select
+   **Open Monitor**.
 2. To prepare the queue, select **Prepare open drafts** and confirm the ticket
    count. Fred saves only reviewable drafts and reports saved, skipped, and
    failed counts. Nothing is sent.
@@ -45,9 +75,11 @@ users can see the current control state but cannot change it.
 6. Edit or replace the response as needed, then select **Save for approval**.
 7. For email, web form, and other Support tickets, select **Approve & send** and
    approve the exact text in the confirmation dialog.
-8. For a Messaging ticket, select **Copy & open Zendesk**. Review the copied
-   text in Zendesk Agent Workspace and send it from the Messaging composer.
-   Insights does not claim that a Messaging draft was delivered.
+8. For a Messaging ticket, select **Copy & open Zendesk**. Insights rechecks
+   the current global reply control immediately before copying or opening
+   anything; an OFF or unavailable control blocks the handoff. Review the
+   copied text in Zendesk Agent Workspace and send it from the Messaging
+   composer. Insights does not claim that a Messaging draft was delivered.
 
 To escalate instead, choose an active team member under **Escalate to a team
 member**, add an optional private handoff note, and confirm the exact
@@ -61,9 +93,44 @@ configured integration account as the updater, so the native ticket audit
 history still records the write.
 
 The API independently requires `confirmed: true` and the current saved draft
-ID. A stale or replaced draft cannot be sent. The API also refuses to post a
-public ticket comment to a Messaging ticket because Zendesk does not deliver
-that operation to the live conversation.
+ID. A stale or replaced draft cannot be sent: reload it, review the current
+text, and confirm again. The API also refuses to post a public ticket comment
+to a Messaging ticket because Zendesk does not deliver that operation to the
+live conversation.
+
+Fred chat uses the same controls. She may search and read tickets, but every
+write starts with a preview of the exact ticket, audience, and proposed values.
+The user's explicit confirmation must follow that preview; an earlier general
+instruction or Fred's own draft is not confirmation. With **Fred drafting**
+OFF, Fred cannot add a public reply or internal note, create or update a ticket,
+or solve tickets. With **Zendesk replies** OFF, no public reply can be posted,
+even when Fred is ON; a confirmed internal note may still be permitted.
+Requests such as “close all tickets” are not bounded approval. Fred must list
+the exact ticket IDs and uses Zendesk's reversible **solved** state; Zendesk
+automation applies final **closed** later.
+
+## Failure and unavailable states
+
+- **Loading control status…** means the saved state is not known yet. Wait; do
+  not draft, approve, or change a control.
+- **Unavailable — status unknown** means the control request failed. Both
+  switches and dependent actions remain disabled until **Retry controls**
+  succeeds.
+- **Fred drafting is turned off** or **Zendesk replies are turned off** is an
+  enforced pause, not a suggestion. Do not retry through another Insights
+  route or relabel a Fred draft as an operator draft to bypass it.
+- **The pending draft changed** means another user or browser replaced the
+  draft. Reload, review the new body, and confirm that exact version.
+- **Messaging manual send required** means copy the draft into Zendesk Agent
+  Workspace, review it there, and use Zendesk's own Send action. Insights has
+  not delivered it.
+- A permission error means the signed-in account lacks the required supervisor
+  capability. Ask the CIO to review the account; do not infer access from a
+  name.
+- If Zendesk is unconfigured or its API fails, Insights remains available for
+  other work but must not report a draft, reply, note, assignment, or status
+  change as successful. Use the native Zendesk workspace if it is available
+  and report the integration failure.
 
 ## Monitoring and limits
 
@@ -88,6 +155,18 @@ that operation to the live conversation.
   license is required before Insights can deliver Messaging replies itself.
 - The optional `ZENDESK_WIDGET_KEY` enables Zendesk's requester-facing floating
   widget; it does not grant Fred agent permissions.
+
+## Control API for administrators
+
+`GET /api/zendesk/controls` requires an authenticated session and returns
+`fredEnabled`, `repliesEnabled`, `updatedAt`, `updatedBy`,
+`updatedByUserId`, `updatedByEmail`, and `canManage`.
+`PUT /api/zendesk/controls` accepts one or both boolean control fields from an
+authorized supervisor. It rejects an empty body, non-boolean values, and
+unknown fields; it never treats malformed input as permission to reset a saved
+state. State-file read or write failures return HTTP 503 with code
+`ZENDESK_SUPERVISION_UNAVAILABLE`, and no Zendesk write occurs. A forbidden
+response means the account does not have the required capability.
 
 See [zendesk-supervised-monitor-flow.mmd](zendesk-supervised-monitor-flow.mmd)
 for the editable flow diagram.

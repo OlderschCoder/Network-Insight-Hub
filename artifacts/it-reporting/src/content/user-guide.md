@@ -1,10 +1,10 @@
-# SCCC IT Department Reporting — User Guide
+# SCCC IT Insights Hub — User Guide
 
 A step-by-step guide to using the platform. The IT team uses this app to record daily and weekly work, track tasks and projects, log risks and incidents, keep network and Azure inventory, and roll everything up into weekly executive reports for the CIO.
 
 New to the rearranged portal? Open **Troubleshooting → Quick Start** for the
-10-minute version. It explains the top-menu categories, the daily work loop,
-supervised Zendesk drafting, and how to teach Fred.
+10-minute version. It explains the four workspaces, fixed sidebar, daily work
+loop, supervised Zendesk drafting, and how to teach Fred.
 
 ---
 
@@ -19,12 +19,18 @@ supervised Zendesk drafting, and how to teach Fred.
 
 ## 2. Getting around (navigation)
 
-Use the top menu to move between the Hub's major work areas. You can also use
-Search in the header when you know the destination by name.
+The Insights Home page presents four first-class workspaces:
 
-The top menu is organized into category dropdowns. Click a **category title**
-to open its landing page; click its separate chevron to open the category's
-options:
+- **Status & Reporting** — operational reporting, KPIs, submissions, and weekly reports
+- **IT Tools & Network** — campus technology, buildings, monitoring, switching, telephony, and Azure
+- **IT Apps** — the Applications launchpad for operational systems, reports, ACR, and student access
+- **Troubleshooting** — the Support Center, Zendesk activity and supervision, diagnostics, response, and training
+
+On inner pages, use the fixed sidebar or the four-position workspace switcher
+at its top. **Apps** remains visible in that switcher from every workspace.
+Search in the header can find a destination by name.
+
+The sidebar is grouped as:
 
 - **Status & Reporting** — Status Dashboard and Weekly Reports
 - **Campus Technology** — Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure, and role-restricted Network Tools
@@ -33,10 +39,12 @@ options:
 - **IT Apps** — App Directory, Banner, and High School Students
 - **Administration** (CIO) — Projects, Department Goals, Usage Analytics, and Admin
 
-The header also has a persistent **Fred** shortcut. Fred can list your accessible
+The header also has a persistent **Fred** shortcut. The Home and
+Troubleshooting prompts open that same Fred experience with page context
+prefilled; they do not create separate chats. Fred can list your accessible
 to-dos and, after you confirm the exact change, create, edit, or complete them.
-Mark and Tracy can also ask Fred to move a to-do to another team member.
-Dashboard actions live together in the Quick Actions card.
+Users granted **Manage Todos** can also ask Fred to move a to-do to another team
+member. Dashboard actions live together in the Quick Actions card.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
@@ -61,7 +69,7 @@ Use **To-do List** for work that still needs to happen:
 1. Open **My Work → To-do List**.
 2. Click **New to-do**, then add a title, details, due date, and priority.
 3. Mark the item complete when the work is finished; click its title to edit it.
-4. Mark and Tracy can view the whole team and assign or reassign work. Other users can create, view, edit, complete, and delete only their own items.
+4. Users granted **Manage Todos** can view the whole team and assign or reassign work. Other users can create, view, edit, complete, and delete only their own items.
 
 Use **Completed Work** to record finished tickets, installs, research, and project
 work. Those completed-work records—not outstanding to-dos—are the raw material
@@ -115,13 +123,13 @@ These can be included in the relevant week's report so leadership sees lessons l
 
 ### Zendesk Monitor
 
-1. Open **Troubleshooting → Zendesk Monitor** to watch the open conversation queue and select a ticket.
-2. Mark, Tracy, or the CIO can use the two supervisor switches to turn **Fred drafting** and **Zendesk replies** on or off for everyone. Each change requires confirmation and records who changed it.
+1. Open **Troubleshooting**. Under **ZENDESK SUPERVISION**, check the **Fred & reply controls** card, then select **Open Monitor** to watch the open conversation queue.
+2. **Fred drafting** and **Zendesk replies** are separate, global controls. The CIO or a user granted **Manage Todos** can change them after confirming the exact switch change. Other signed-in users can view the state but cannot change it.
 3. Select **Prepare open drafts** to let Fred review up to 25 loaded open tickets one at a time. She skips existing drafts, pending tickets, staff-last replies, internal-only activity, and escalation-only cases. The progress panel shows saved, skipped, and failed totals; nothing sends.
 4. Read the live Conversation Log, then select **Draft with Fred** for a single ticket. Fred saves the suggested response in the shared approval queue; she does not send it.
 5. Edit Fred's draft, replace it with your own response, or select **Save for approval** so another signed-in team member can review it.
 6. For email, web form, and other Support tickets, select **Approve & send** and approve the exact saved draft.
-7. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
+7. For a Messaging ticket, select **Copy & open Zendesk**. Insights rechecks the global reply control immediately before it copies the draft or opens Zendesk; an OFF or unavailable control blocks the handoff. Paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
 8. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
 9. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
 
@@ -139,9 +147,22 @@ Fred.
 Fred can also recommend an escalation in chat and, after you approve the exact
 assignee, reassign the Zendesk ticket to that team member.
 Turning **Zendesk replies** off blocks public comments at the server even if a
-browser is stale. Turning **Fred drafting** off also blocks Fred's Zendesk write
-tools. Escalation stays available so a supervisor can still hand urgent work to
-a person.
+browser is stale. A pending draft remains a draft; a confirmed internal note
+may remain available if Fred is otherwise enabled. Turning **Fred drafting**
+off blocks Fred-authored drafts, replies, internal notes, and ticket changes.
+Escalation stays available so the team can still hand urgent work to a person.
+
+The saved OFF state remains authoritative across reloads and deployments. When
+available, the monitor shows who last changed it and when. If the card says
+**Loading control status…**, wait. If it says **Unavailable — status unknown**,
+both switches and dependent actions remain disabled; select **Retry controls**
+and do not assume either control is ON.
+
+If approval reports that a pending draft changed, reload and review the current
+text before confirming again. A Messaging reply must be sent in Zendesk Agent
+Workspace; copying it does not mean it was delivered. If Zendesk or its control
+API is unavailable, do not claim that a reply, note, reassignment, or status
+change succeeded.
 
 ### Network
 
@@ -151,7 +172,8 @@ a person.
 ### Network Tools (network-admin roles only)
 
 - **FortiGate website whitelist** — add a URL to the FortiGate web-filter exemption list. Works only when the server can reach the FortiGate (on the SCCC network/VPN).
-- **PowerShell generators** — Install Printer, Add Laptop, Remove Equipment. These produce a **downloadable `.ps1` file** to run on the target Windows machine; nothing runs on the server.
+- **Install Printer** — authorized network staff select an exact driver registered on `prntsp2.sccc.edu`, then create or update the shared queue directly through Fred. Fred accepts only private campus IPv4 addresses, verifies TCP/9100 first, and displays the client UNC path. It never installs or guesses driver packages. If the driver list does not load, stop and report the service error instead of choosing an approximate model.
+- **PowerShell generators** — Add Laptop and Remove Equipment still produce a **downloadable `.ps1` file** to run on the target Windows machine.
 
 ### Azure
 
@@ -161,7 +183,7 @@ a person.
 ### Monitoring & IT Apps
 
 - **Monitoring** — live Grafana dashboards embedded in the app.
-- **IT Apps** — the top-menu category for the application directory, protected Banner/EUP operations, and High School Students access tools.
+- **IT Apps** — a first-class workspace available from Home, the workspace switcher, and the sidebar. Its App Directory launches Cisco Webex Phones, Banner/EUP operations, reports, ACR tools, and student-access systems.
 
 ### Process Library
 
@@ -190,7 +212,7 @@ Reports aggregate everyone's weekly logs into one department report per week.
 
 ## 10. Fred & Fred Memory
 
-Open **Fred**. It has these tabs:
+Open **Fred** from the header, Home, or Troubleshooting. It has these tabs:
 
 - **Status Report** (CIO only) — generate an executive status report.
 - **Architecture** — inspect enterprise architecture evidence and relationships.
@@ -210,6 +232,12 @@ Fred can also **save memories herself** — tell her a durable fact or say
 itself train Fred; save the correction to Memory when it should affect future
 answers. Use the **Process Library** for full repeatable procedures. **Never
 store passwords or secrets;** the system blocks credential-like content.
+
+Fred may search and read Zendesk tickets. Before any Zendesk or application
+write, she must show the exact record, audience, and proposed values and receive
+your explicit confirmation. Her own draft and an earlier broad request do not
+count. A success message identifies the completed action; a blocked,
+unavailable, or failed response means no success should be assumed.
 
 ---
 

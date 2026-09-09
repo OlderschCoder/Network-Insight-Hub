@@ -1,64 +1,75 @@
 sequenceDiagram
-    actor Operator
-    participant Monitor as Insights Zendesk Monitor
-    participant Fred
+    actor User as Authenticated IT user
+    actor Supervisor as CIO or Manage Todos supervisor
+    participant Support as Troubleshooting
+    participant Monitor as Zendesk Monitor
     participant API as Insights API
+    participant Fred
     participant Zendesk
 
-    Operator->>Monitor: Confirm Fred or reply switch change
-    Monitor->>API: Persist global supervision control
-    API-->>Monitor: Current state, actor, and timestamp
+    User->>Support: Open /support
+    Support->>API: GET /api/zendesk/controls
+    alt Current saved state loads
+        API-->>Support: Flags, canManage, actor, timestamp
+    else State unavailable
+        API-->>Support: HTTP 503 read failure
+        Support-->>User: Status unknown, controls and actions disabled
+        User->>Support: Retry controls
+    end
 
-    loop Queue 15 seconds; selected thread 5 seconds
-        Monitor->>API: Read open queue, drafts, and selected ticket
+    opt Authorized global control change
+        Supervisor->>Support: Confirm one switch change
+        Support->>API: PUT one boolean control
+        API->>API: Authorize, validate, and persist
+        API-->>Support: Current state, actor, timestamp
+    end
+
+    User->>Monitor: Open Monitor
+    loop Queue 15 seconds, selected thread 5 seconds
+        Monitor->>API: Read queue, drafts, and selected ticket
         API->>Zendesk: Read ticket and Conversation Log
-        Zendesk-->>API: Live user, agent, and bot messages
-        API-->>Monitor: Queue and thread
+        Zendesk-->>API: Current user, agent, and bot messages
+        API-->>Monitor: Queue, thread, and saved control state
     end
 
-    opt Operator prepares the open-ticket queue
-        Operator->>Monitor: Confirm Prepare open drafts
-        loop Each ticket without a pending draft
-            Monitor->>API: Read current ticket and Conversation Log
-            API->>Zendesk: Fetch current conversation evidence
-            Zendesk-->>API: Ticket and thread
-            API-->>Monitor: Current status, authors, and messages
-            alt Requester is waiting and a public reply is safe
-                Monitor->>Fred: Observation-only draft request
-                Fred-->>Monitor: Reply body only
-                Monitor->>API: Save shared pending draft
-            else Pending, staff-last, internal-only, or escalation-only
-                Monitor-->>Operator: Skip with reason
-            end
+    User->>Monitor: Request one or batch Fred draft
+    Monitor->>API: Prepare and save Fred draft
+    API->>API: Enforce current Fred control
+    alt Fred is OFF or control state is unavailable
+        API-->>Monitor: Draft blocked, no Zendesk write
+    else Fred is ON
+        API->>Fred: Observation-only request with ticket evidence
+        Fred-->>API: Draft body only
+        API-->>Monitor: Shared pending draft and audit metadata
+    end
+
+    User->>Monitor: Edit and confirm exact saved draft
+    alt Zendesk Messaging ticket
+        Monitor->>API: Recheck current reply control immediately before handoff
+        alt Replies are OFF or state is unavailable
+            API-->>Monitor: Handoff blocked, nothing copied or opened
+        else Replies are ON
+            API-->>Monitor: Current permission confirmed
+            Monitor-->>User: Copy draft and open Agent Workspace
+            User->>Zendesk: Review and send in Messaging composer
         end
-        Monitor-->>Operator: Saved, skipped, and failed totals; nothing sent
+    else Zendesk Support ticket
+        Monitor->>API: Approve with confirmed flag and current draft token
+        API->>API: Reject stale draft and atomically claim send
+        alt Replies are OFF or state is unavailable
+            API-->>Monitor: Send blocked, draft remains pending
+        else Replies are ON
+            API->>Zendesk: Add confirmed public reply
+            Zendesk-->>API: Reply accepted
+            API-->>Monitor: Sent status, actor, timestamp
+        end
     end
 
-    Operator->>Monitor: Request Fred draft
-    Monitor->>API: Check Fred drafting control
-    Monitor->>Fred: Observation-only request plus current Conversation Log
-    Fred-->>Monitor: Draft text only
-    Monitor->>API: Save shared pending draft
-    API-->>Monitor: Draft ID and audit metadata
-    Operator->>Monitor: Edit, replace, or clear draft
-    Operator->>API: Save edited draft for approval
-    alt Email, web form, or other Support ticket
-        Operator->>Monitor: Approve exact saved draft
-        Monitor->>API: Send with confirmed draft ID
-        API->>API: Reject stale draft; enforce reply control
-        API->>Zendesk: Add public ticket reply
-        Zendesk-->>Monitor: Updated conversation
-    else Messaging ticket on Suite Growth
-        Operator->>Monitor: Copy draft and open Zendesk
-        Monitor-->>Operator: Draft copied; nothing sent yet
-        Operator->>Zendesk: Review and send in Messaging composer
-        Zendesk-->>Monitor: Conversation Log shows sent message
-    end
-
-    alt Operator escalates
-        Operator->>Monitor: Choose teammate and optional private note
-        Operator->>Monitor: Confirm exact handoff
-        Monitor->>API: Submit confirmed escalation
+    opt Confirmed human escalation
+        User->>Monitor: Choose teammate and optional private note
+        Monitor->>API: Submit confirmed handoff
         API->>Zendesk: Reassign ticket and add internal note
         Zendesk-->>Monitor: Updated owner and conversation
     end
+
+    Note over API,Zendesk: Escalation remains available while Fred or public replies are paused.

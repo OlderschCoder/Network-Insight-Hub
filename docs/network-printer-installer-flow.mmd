@@ -1,0 +1,24 @@
+flowchart LR
+  User[Authorized network staff] -->|Authenticated browser session| FredUI[Fred Network Tools]
+  FredUI -->|GET registered drivers| FredAPI[Fred API on Linux<br/>role gate]
+  FredUI -->|POST name, RFC1918 IPv4,<br/>exact driver, location, comment| FredAPI
+
+  subgraph Azure[Azure application boundary]
+    FredAPI
+  end
+
+  FredAPI -->|Private HTTP to 10.0.0.30:9124<br/>Bearer service token| Firewall[Windows Firewall<br/>Fred 10.0.0.44 plus local self-test]
+  Firewall --> Bridge[Restricted Windows print bridge<br/>PRNTSP2]
+
+  subgraph Campus[Private campus boundary]
+    Bridge -->|Get-PrinterDriver| Drivers[(Registered drivers)]
+    Bridge -->|Bounded TCP/9100 check| Device[Printer IPv4 address]
+    Bridge -->|Add-PrinterPort without -SNMP<br/>Add-Printer or Set-Printer| Queue[(Shared queue on prntsp2)]
+  end
+
+  Drivers -->|Exact driver list| Bridge
+  Queue -->|Verified queue and UNC path| Bridge
+  Bridge -->|Structured verification or phase error| FredAPI
+  FredAPI -->|Success or actionable failure| FredUI
+
+  Missing[Missing driver package] -.->|Installed separately by an administrator| Drivers

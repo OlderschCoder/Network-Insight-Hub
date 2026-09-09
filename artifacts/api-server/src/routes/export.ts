@@ -19,8 +19,31 @@ import {
   buildReportDocxBuffer,
   buildReportPdfSections,
 } from "../lib/report_export";
+import {
+  withZendeskSupervisionConfig,
+  ZendeskSupervisionUnavailableError,
+} from "../lib/zendesk_supervision";
 
 const router = Router();
+
+const ZENDESK_SUPERVISION_UNAVAILABLE = {
+  error: "Zendesk supervision controls are unavailable. No Zendesk action was performed.",
+  code: "ZENDESK_SUPERVISION_UNAVAILABLE",
+} as const;
+
+function handleZendeskSupervisionUnavailable(
+  req: any,
+  res: any,
+  error: unknown,
+) {
+  if (!(error instanceof ZendeskSupervisionUnavailableError)) return false;
+  req.log?.error?.(
+    { err: error.cause ?? error },
+    "Zendesk supervision controls unavailable",
+  );
+  res.status(503).json(ZENDESK_SUPERVISION_UNAVAILABLE);
+  return true;
+}
 
 async function buildDocxBuffer(title: string, blocks: Array<{ heading?: string; level?: 1 | 2 | 3; text?: string; bullets?: string[] }>) {
   const { Document, Packer, Paragraph, HeadingLevel } = await import("docx");
@@ -735,36 +758,44 @@ router.post("/report/:id/zendesk", requireAuth, requireCIO, async (req: any, res
   }
 
   try {
-    const credentials = Buffer.from(`${zendeskEmail}/token:${zendeskToken}`).toString("base64");
-    const response = await fetch(`https://${zendeskDomain}.zendesk.com/api/v2/tickets.json`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${credentials}`,
-      },
-      body: JSON.stringify({
-        ticket: {
-          subject: parsed.data.subject,
-          comment: { body },
-          priority: parsed.data.priority,
-          requester: parsed.data.requesterEmail ? { email: parsed.data.requesterEmail } : undefined,
-          tags: ["it-report", "weekly-report"],
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (!controls.repliesEnabled) {
+        return res.status(423).json({
+          error: "Zendesk replies are turned off by a supervisor.",
+        });
+      }
+      const credentials = Buffer.from(`${zendeskEmail}/token:${zendeskToken}`).toString("base64");
+      const response = await fetch(`https://${zendeskDomain}.zendesk.com/api/v2/tickets.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${credentials}`,
         },
-      }),
-    });
+        body: JSON.stringify({
+          ticket: {
+            subject: parsed.data.subject,
+            comment: { body },
+            priority: parsed.data.priority,
+            requester: parsed.data.requesterEmail ? { email: parsed.data.requesterEmail } : undefined,
+            tags: ["it-report", "weekly-report"],
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(502).json({ error: "Zendesk API error", message: text });
-    }
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(502).json({ error: "Zendesk API error", message: text });
+      }
 
-    const data = await response.json() as any;
-    return res.json({
-      ticketId: data.ticket.id,
-      ticketUrl: `https://${zendeskDomain}.zendesk.com/agent/tickets/${data.ticket.id}`,
-      status: data.ticket.status,
+      const data = await response.json() as any;
+      return res.json({
+        ticketId: data.ticket.id,
+        ticketUrl: `https://${zendeskDomain}.zendesk.com/agent/tickets/${data.ticket.id}`,
+        status: data.ticket.status,
+      });
     });
   } catch (err) {
+    if (handleZendeskSupervisionUnavailable(req, res, err)) return;
     return res.status(502).json({ error: "Failed to create Zendesk ticket" });
   }
 });
@@ -808,35 +839,43 @@ router.post("/entry/:id/zendesk", requireAuth, async (req: any, res) => {
   }
 
   try {
-    const credentials = Buffer.from(`${zendeskEmail}/token:${zendeskToken}`).toString("base64");
-    const response = await fetch(`https://${zendeskDomain}.zendesk.com/api/v2/tickets.json`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Basic ${credentials}`,
-      },
-      body: JSON.stringify({
-        ticket: {
-          subject: parsed.data.subject,
-          comment: { body },
-          priority: parsed.data.priority,
-          tags: ["it-report", "log-entry"],
+    return await withZendeskSupervisionConfig(async (controls) => {
+      if (!controls.repliesEnabled) {
+        return res.status(423).json({
+          error: "Zendesk replies are turned off by a supervisor.",
+        });
+      }
+      const credentials = Buffer.from(`${zendeskEmail}/token:${zendeskToken}`).toString("base64");
+      const response = await fetch(`https://${zendeskDomain}.zendesk.com/api/v2/tickets.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${credentials}`,
         },
-      }),
-    });
+        body: JSON.stringify({
+          ticket: {
+            subject: parsed.data.subject,
+            comment: { body },
+            priority: parsed.data.priority,
+            tags: ["it-report", "log-entry"],
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(502).json({ error: "Zendesk API error", message: text });
-    }
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(502).json({ error: "Zendesk API error", message: text });
+      }
 
-    const data = await response.json() as any;
-    return res.json({
-      ticketId: data.ticket.id,
-      ticketUrl: `https://${zendeskDomain}.zendesk.com/agent/tickets/${data.ticket.id}`,
-      status: data.ticket.status,
+      const data = await response.json() as any;
+      return res.json({
+        ticketId: data.ticket.id,
+        ticketUrl: `https://${zendeskDomain}.zendesk.com/agent/tickets/${data.ticket.id}`,
+        status: data.ticket.status,
+      });
     });
   } catch (err) {
+    if (handleZendeskSupervisionUnavailable(req, res, err)) return;
     return res.status(502).json({ error: "Failed to create Zendesk ticket" });
   }
 });

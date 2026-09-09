@@ -1,21 +1,27 @@
 flowchart LR
   U[Authenticated IT user] --> H[Home command center]
-  U --> M[Role-aware top dropdown menu]
-  M --> S
-  M --> N
-  M --> T
-  M --> Q[Quick Start]
   H --> S[Status and Reporting]
   H --> N[IT Tools and Network]
+  H --> A[IT Apps and App Directory]
   H --> T[Troubleshooting]
+  SW[Inner-page workspace switcher] --> S
+  SW --> N
+  SW --> A
+  SW --> T
   S --> API[Existing generated API client]
   N --> API
+  A --> IA[Existing internal application routes]
+  A --> EA[Approved external application links]
   T --> Z[Existing Zendesk activity endpoint]
+  T --> C[Zendesk supervision controls]
+  C --> API
+  T --> Q[Quick Start]
   Q --> G[User Guide and Learn]
   T --> N
   H --> F[Fred]
   S --> F
   N --> F
+  A --> F
   T --> F
   API --> DB[(Existing operational data)]
   Z --> ZE[Zendesk]

@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  claimZendeskReplyDraftForSend,
+  completeZendeskReplyDraftSend,
   getPendingZendeskReplyDraft,
   listZendeskReplyDrafts,
-  markZendeskReplyDraftSent,
+  releaseZendeskReplyDraftSend,
   saveZendeskReplyDraft,
 } from "./zendesk_reply_drafts";
 
@@ -41,7 +43,7 @@ describe("Zendesk reply drafts", () => {
     ).toBeTruthy();
   });
 
-  it("updates one pending draft instead of duplicating it", async () => {
+  it("rotates the approval token when a pending draft body changes", async () => {
     const base = {
       ticketId: 12,
       ticketSubject: "Printer",
@@ -50,13 +52,41 @@ describe("Zendesk reply drafts", () => {
       source: "operator" as const,
       actor: { id: 2, name: "Tracy" },
     };
-    await saveZendeskReplyDraft({ ...base, body: "First" });
-    await saveZendeskReplyDraft({ ...base, body: "Revised" });
+    const original = await saveZendeskReplyDraft({ ...base, body: "First" });
+    const revised = await saveZendeskReplyDraft({ ...base, body: "Revised" });
     expect(await listZendeskReplyDrafts()).toHaveLength(1);
-    expect((await getPendingZendeskReplyDraft(12))?.body).toBe("Revised");
+    expect(revised.id).not.toBe(original.id);
+    await expect(
+      claimZendeskReplyDraftForSend(12, original.id, { name: "Mark" }),
+    ).resolves.toBeNull();
+    const claimed = await claimZendeskReplyDraftForSend(12, revised.id, {
+      name: "Mark",
+    });
+    expect(claimed?.body).toBe("Revised");
+    await releaseZendeskReplyDraftSend(12, revised.id);
   });
 
-  it("records the approving sender", async () => {
+  it("allows only one concurrent claim for an immutable draft revision", async () => {
+    const draft = await saveZendeskReplyDraft({
+      ticketId: 32,
+      ticketSubject: "Login",
+      ticketUrl: "https://sccc.zendesk.com/agent/tickets/32",
+      channel: "email",
+      body: "Please try again.",
+      source: "fred",
+      actor: { name: "Mark" },
+    });
+
+    const claims = await Promise.all([
+      claimZendeskReplyDraftForSend(32, draft.id, { name: "Tracy" }),
+      claimZendeskReplyDraftForSend(32, draft.id, { name: "Craig" }),
+    ]);
+
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(await listZendeskReplyDrafts("sending")).toHaveLength(1);
+  });
+
+  it("rejects edits during a send and records the claimed body and approver", async () => {
     const draft = await saveZendeskReplyDraft({
       ticketId: 33,
       ticketSubject: "Login",
@@ -66,8 +96,29 @@ describe("Zendesk reply drafts", () => {
       source: "fred",
       actor: { name: "Mark" },
     });
-    await markZendeskReplyDraftSent(33, draft.id, { name: "Tracy" });
+    const claimed = await claimZendeskReplyDraftForSend(33, draft.id, {
+      name: "Tracy",
+    });
+
+    await expect(
+      saveZendeskReplyDraft({
+        ticketId: 33,
+        ticketSubject: "Login",
+        ticketUrl: "https://sccc.zendesk.com/agent/tickets/33",
+        channel: "email",
+        body: "A different, unreviewed reply.",
+        source: "operator",
+        actor: { name: "Craig" },
+      }),
+    ).rejects.toMatchObject({ code: "ZENDESK_REPLY_DRAFT_IN_FLIGHT" });
+
+    expect(claimed?.body).toBe("Please try again.");
+    await completeZendeskReplyDraftSend(33, draft.id, { name: "Tracy" });
     expect(await listZendeskReplyDrafts("pending")).toHaveLength(0);
-    expect((await listZendeskReplyDrafts("sent"))[0].sentBy).toBe("Tracy");
+    expect((await listZendeskReplyDrafts("sent"))[0]).toMatchObject({
+      body: "Please try again.",
+      sendStartedBy: "Tracy",
+      sentBy: "Tracy",
+    });
   });
 });

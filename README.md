@@ -50,6 +50,12 @@ as a parallel sign-in path.
   staff member edits and approves every response. Standard
   Support-channel replies can be sent from Insights; Messaging drafts open in
   Zendesk Agent Workspace for the final send on Suite Growth.
+- Shows the persisted global **Fred drafting** and **Zendesk replies** controls
+  on the Troubleshooting page and Zendesk Monitor. Only the CIO or an account
+  with the existing Manage Todos capability can change them. The API enforces
+  current OFF states across Fred and public-reply routes; a failed state read is
+  shown as unavailable and never treated as ON. Confirmed human escalation
+  remains available.
 - Applies that same current-team roster to weekly submission status. Retired and
   former staff remain in historical attribution but do not appear as current
   participants.
@@ -91,6 +97,11 @@ as a parallel sign-in path.
   source, action, and field-level before/after values. Authorized updates can be
   rolled back, and the rollback creates another audit record.
 - Supports maintenance notes and exportable switch/VLAN maintenance history.
+- Provides a role-gated **Install Printer** workflow that reads the exact
+  registered driver list from `prntsp2.sccc.edu`, accepts only private campus
+  IPv4 addresses, verifies TCP/9100, and creates or updates a shared queue
+  through the restricted Windows bridge. Fred never guesses or installs a
+  driver package.
 - Provides a **Cisco Webex Phones** workspace for the phone directory, live
   device status, building assignments, and E-911 health; the menu and IT Apps
   directory identify it as a new feature.
@@ -116,11 +127,14 @@ as a parallel sign-in path.
 - Places the current operational pulse first: network availability, risks,
   incidents, calling, Zendesk performance, submissions, and recent activity
   precede learning guidance, personal work, and the Quote of the Day.
-- Uses a persistent top menu with linked category titles and separate dropdown
-  chevrons for Status & Reporting, Campus Technology, Troubleshooting, My Work,
-  IT Apps, and CIO-only Administration.
+- Presents four equal Home workspaces: **Status & Reporting**, **IT Tools &
+  Network**, **IT Apps**, and **Troubleshooting**.
+- Uses a fixed role-aware sidebar for detailed destinations and a four-position
+  workspace switcher on inner pages. **Apps** stays visible in that switcher
+  from every mode.
 - Places **Quick Start**, Learn, Process Library, and User Guide together under
-  Troubleshooting, while **IT Apps** remains immediately after **My Work**.
+  Troubleshooting, while IT Apps remains a first-class launchpad rather than a
+  network subpage.
 
 - Embeds live Grafana monitoring when the private Grafana integration is
   configured.
@@ -201,6 +215,13 @@ transcript is not resent to the model on every turn. The original topic remains
 stored even when only the checkpoint and recent turns are sent for inference.
 
 ### Change handling
+
+Fred must show the exact ticket or record, audience, and proposed values before
+an application write. A user's explicit confirmation must follow that preview;
+Fred's draft or an earlier broad instruction is not approval. For Zendesk,
+**Fred drafting** OFF blocks Fred-originated writes and **Zendesk replies** OFF
+blocks every public send path. A stale draft, unavailable control state, or
+integration failure is reported as a failure—not as a completed action.
 
 When diagnosis reaches the first change-producing recommendation, Fred asks
 once:
@@ -438,6 +459,10 @@ failure, not misrepresented as a passing test.
 - [Formal EA integration](docs/formal-ea-integration.md)
 - [Fred delta-first behavior](docs/fred-delta-first.md)
 - [Fred network evidence workflow](docs/fred-network-evidence.md)
+- [Fred application actions](docs/fred-application-actions.md)
+- [Zendesk supervised conversation monitor](docs/zendesk-supervised-monitor.md)
+- [Shared-printer installer](docs/network-printer-installer.md)
+- [Insights Quick Start and Fred training](docs/quick-start-and-training.md)
 - [Learn simulations](docs/learn.md)
 - [Usage analytics](docs/usage-analytics.md)
 - [Entra access policy](docs/entra-access-policy.md)
@@ -472,10 +497,11 @@ mark another asset stale, down, bad, retired, or deleted. See
 
 ## Portal navigation
 
-Insights opens on a cross-app command center at `/`. The existing operational
-dashboard is available at `/status`, network tooling remains rooted at
-`/network`, and the troubleshooting launchpad is at `/support`. These
-surfaces reuse the established API hooks, authenticated integrations, Fred
+Insights opens on a cross-app command center at `/` with four first-class
+workspaces: Status & Reporting (`/status`), IT Tools & Network (`/network`), IT
+Apps (`/it-apps`), and Troubleshooting (`/support`). Apps remains visible in the
+inner-page workspace switcher from every mode. These surfaces reuse the
+established API hooks, authenticated integrations, application directory, Fred
 chat, and role checks; the redesign changes presentation and navigation rather
 than replacing operational logic. See
 [Insights portal UI architecture](docs/portal-ui-redesign.md).

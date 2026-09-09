@@ -6,11 +6,13 @@ flowchart LR
   P --> U
   C -- Yes --> R{Role and ownership check}
   R -- Denied --> D[Explain permission boundary]
-  R -- Allowed --> Z[Zendesk ticket API]
+  R -- Allowed --> ZC{Zendesk controls loaded and enabled?}
+  ZC -- No --> D
+  ZC -- Yes --> Z[Zendesk ticket API]
   R -- Allowed --> A[(Post-Incident Reviews)]
   R -- Allowed --> L[(Weekly logs)]
   R -- Allowed --> TD[(Own team to-dos)]
-  R -- Mark or Tracy --> TA[(Any team to-do and reassignment)]
+  R -- Manage Todos capability --> TA[(Any team to-do and reassignment)]
   R -- CIO only --> W[(Weekly status reports)]
   Z --> S[Solved tickets]
   S --> X[Zendesk automation closes later]

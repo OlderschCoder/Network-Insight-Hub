@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type ZendeskReplyDraftStatus = "pending" | "sent";
+export type ZendeskReplyDraftStatus = "pending" | "sending" | "sent";
 
 export type ZendeskReplyDraft = {
   id: string;
@@ -18,6 +18,8 @@ export type ZendeskReplyDraft = {
   createdByUserId: number | null;
   requestedBy: string;
   updatedAt: string;
+  sendStartedAt: string | null;
+  sendStartedBy: string | null;
   sentAt: string | null;
   sentBy: string | null;
 };
@@ -42,6 +44,15 @@ type SaveDraftInput = {
 
 const MAX_DRAFTS = 500;
 let draftMutation = Promise.resolve();
+
+export class ZendeskReplyDraftConflictError extends Error {
+  readonly code = "ZENDESK_REPLY_DRAFT_IN_FLIGHT";
+
+  constructor(ticketId: number) {
+    super(`Ticket #${ticketId} already has a reply being sent.`);
+    this.name = "ZendeskReplyDraftConflictError";
+  }
+}
 
 function draftFilePath() {
   return (
@@ -115,12 +126,23 @@ export async function getPendingZendeskReplyDraft(ticketId: number) {
 export async function saveZendeskReplyDraft(input: SaveDraftInput) {
   return mutateDrafts(async (file) => {
     const now = new Date().toISOString();
+    if (
+      file.drafts.some(
+        (draft) =>
+          draft.ticketId === input.ticketId && draft.status === "sending",
+      )
+    ) {
+      throw new ZendeskReplyDraftConflictError(input.ticketId);
+    }
     const existing = file.drafts.find(
       (draft) =>
         draft.ticketId === input.ticketId && draft.status === "pending",
     );
     const requester = actorName(input.actor);
     if (existing) {
+      // The ID is the approval token. A body edit must invalidate every stale
+      // browser that previously reviewed this draft.
+      if (existing.body !== input.body) existing.id = randomUUID();
       existing.ticketSubject = input.ticketSubject;
       existing.ticketUrl = input.ticketUrl;
       existing.channel = input.channel;
@@ -148,6 +170,8 @@ export async function saveZendeskReplyDraft(input: SaveDraftInput) {
         input.source === "fred" ? null : (input.actor.id ?? null),
       requestedBy: requester,
       updatedAt: now,
+      sendStartedAt: null,
+      sendStartedBy: null,
       sentAt: null,
       sentBy: null,
     };
@@ -156,7 +180,7 @@ export async function saveZendeskReplyDraft(input: SaveDraftInput) {
   });
 }
 
-export async function markZendeskReplyDraftSent(
+export async function claimZendeskReplyDraftForSend(
   ticketId: number,
   draftId: string,
   actor: DraftActor,
@@ -167,6 +191,48 @@ export async function markZendeskReplyDraftSent(
         candidate.ticketId === ticketId &&
         candidate.id === draftId &&
         candidate.status === "pending",
+    );
+    if (!draft) return null;
+    const now = new Date().toISOString();
+    draft.status = "sending";
+    draft.sendStartedAt = now;
+    draft.sendStartedBy = actorName(actor);
+    draft.updatedAt = now;
+    return draft;
+  });
+}
+
+export async function releaseZendeskReplyDraftSend(
+  ticketId: number,
+  draftId: string,
+) {
+  return mutateDrafts(async (file) => {
+    const draft = file.drafts.find(
+      (candidate) =>
+        candidate.ticketId === ticketId &&
+        candidate.id === draftId &&
+        candidate.status === "sending",
+    );
+    if (!draft) return null;
+    draft.status = "pending";
+    draft.sendStartedAt = null;
+    draft.sendStartedBy = null;
+    draft.updatedAt = new Date().toISOString();
+    return draft;
+  });
+}
+
+export async function completeZendeskReplyDraftSend(
+  ticketId: number,
+  draftId: string,
+  actor: DraftActor,
+) {
+  return mutateDrafts(async (file) => {
+    const draft = file.drafts.find(
+      (candidate) =>
+        candidate.ticketId === ticketId &&
+        candidate.id === draftId &&
+        candidate.status === "sending",
     );
     if (!draft) return null;
     const now = new Date().toISOString();

@@ -101,4 +101,17 @@ describe("Zendesk supervision control policy", () => {
       value: { fredEnabled: false, repliesEnabled: true },
     });
   });
+
+  it("rejects unexpected control properties", () => {
+    expect(
+      validateZendeskControlRequest({
+        fredEnabled: false,
+        force: true,
+      }),
+    ).toEqual({
+      ok: false,
+      status: 400,
+      error: "Unexpected control setting: force.",
+    });
+  });
 });

@@ -4,6 +4,7 @@ import {
   Activity,
   ArrowRight,
   BarChart3,
+  LayoutGrid,
   LifeBuoy,
   Map,
   Search,
@@ -25,6 +26,13 @@ import {
 function appHealth(issueCount: number): PortalHealth {
   return issueCount > 0 ? "degraded" : "operational";
 }
+
+export const HOME_WORKSPACE_HREFS = {
+  status: "/status",
+  network: "/network",
+  apps: "/it-apps",
+  support: "/support",
+} as const;
 
 export default function HomeHub() {
   const { user } = useAuth();
@@ -88,8 +96,8 @@ export default function HomeHub() {
             SCCC IT <span className="text-emerald-300">Command Center</span>
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
-            One clear starting point for reporting, campus technology, and
-            troubleshooting across the IT department.
+            One clear starting point for reporting, campus technology,
+            applications, and troubleshooting across the IT department.
           </p>
         </div>
 
@@ -169,9 +177,9 @@ export default function HomeHub() {
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </p>
         </div>
-        <div className="grid gap-5 xl:grid-cols-3">
+        <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-4">
           <HomeAppCard
-            href="/status"
+            href={HOME_WORKSPACE_HREFS.status}
             eyebrow="Status & reporting"
             title="Operational reporting"
             description="KPIs, team submissions, weekly reports, projects, and risk activity."
@@ -193,7 +201,7 @@ export default function HomeHub() {
             }
           />
           <HomeAppCard
-            href="/network"
+            href={HOME_WORKSPACE_HREFS.network}
             eyebrow="IT tools & network"
             title="Campus technology"
             description="Buildings, live monitoring, switching, VLANs, telephony, and Azure."
@@ -218,7 +226,29 @@ export default function HomeHub() {
             }
           />
           <HomeAppCard
-            href="/support"
+            href={HOME_WORKSPACE_HREFS.apps}
+            eyebrow="IT Apps"
+            title="Applications"
+            description="One launchpad for operational systems, reports, academic continuity, and student access."
+            icon={LayoutGrid}
+            iconClass="bg-[linear-gradient(135deg,#ede9fe,#c4b5fd)] text-violet-800"
+            stats={[
+              ["12", "Listed tools"],
+              ["4", "ACR apps"],
+              ["3", "Student tools"],
+            ]}
+            rows={[
+              "Cisco Webex Phones",
+              "Banner and EUP operations",
+              "Call and identity reports",
+              "ACR and student systems",
+            ]}
+            status={
+              <StatusDot status="operational" label="Directory available" />
+            }
+          />
+          <HomeAppCard
+            href={HOME_WORKSPACE_HREFS.support}
             eyebrow="Troubleshooting"
             title="Support center"
             description="Zendesk activity, diagnostics, incident response, guided learning, and Fred."

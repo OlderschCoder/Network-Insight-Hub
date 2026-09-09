@@ -15,7 +15,7 @@ import {
 import { netPortsTable } from "@workspace/db/net_ports";
 import { eq, asc, gte, and, or, sql, desc, ilike } from "drizzle-orm";
 import { logger } from "./logger";
-import { readZendeskSupervisionConfig } from "./zendesk_supervision";
+import { withZendeskSupervisionConfig } from "./zendesk_supervision";
 import {
   isZendeskMessagingChannel,
   normalizeZendeskConversationLog,
@@ -2587,79 +2587,82 @@ async function executeZendeskSearchTickets(argsJson: string): Promise<string> {
   }
 }
 
-async function executeZendeskAddComment(argsJson: string): Promise<string> {
+export async function executeZendeskAddComment(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
   if (!cfg) return "Zendesk is not configured on this server.";
   const { ticket_id, body, public: isPublic, confirmed } = JSON.parse(argsJson);
   if (confirmed !== true)
     return "Confirmation required. Show the exact reply or internal note, then ask the user to confirm before posting it.";
   if (!body?.trim()) return "Error: comment body is required.";
-  const controls = await readZendeskSupervisionConfig();
-  if (!controls.fredEnabled)
-    return "Fred's Zendesk actions are turned off by a supervisor.";
-  if (isPublic && !controls.repliesEnabled)
-    return "Zendesk public replies are turned off by a supervisor.";
-  try {
-    if (isPublic) {
-      const { ticket } = await zdeskFetch<{
-        ticket: { via?: { channel?: string } };
-      }>(cfg, "GET", `tickets/${ticket_id}.json`);
-      if (isZendeskMessagingChannel(ticket.via?.channel)) {
-        return `Messaging reply not sent. Ticket #${ticket_id} requires a shared Fred draft and human approval in Zendesk Agent Workspace on the current Zendesk plan.`;
+  return withZendeskSupervisionConfig(async (controls) => {
+    if (!controls.fredEnabled)
+      return "Fred's Zendesk actions are turned off by a supervisor.";
+    if (isPublic && !controls.repliesEnabled)
+      return "Zendesk public replies are turned off by a supervisor.";
+    try {
+      if (isPublic) {
+        const { ticket } = await zdeskFetch<{
+          ticket: { via?: { channel?: string } };
+        }>(cfg, "GET", `tickets/${ticket_id}.json`);
+        if (isZendeskMessagingChannel(ticket.via?.channel)) {
+          return `Messaging reply not sent. Ticket #${ticket_id} requires a shared Fred draft and human approval in Zendesk Agent Workspace on the current Zendesk plan.`;
+        }
       }
+      await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
+        ticket: { comment: { body: body.trim(), public: !!isPublic } },
+      });
+      return `✓ ${isPublic ? "Public reply" : "Internal note"} added to ticket #${ticket_id}.`;
+    } catch (e: any) {
+      return `Error adding comment to ticket #${ticket_id}: ${e.message}`;
     }
-    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
-      ticket: { comment: { body: body.trim(), public: !!isPublic } },
-    });
-    return `✓ ${isPublic ? "Public reply" : "Internal note"} added to ticket #${ticket_id}.`;
-  } catch (e: any) {
-    return `Error adding comment to ticket #${ticket_id}: ${e.message}`;
-  }
+  });
 }
 
-async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
+export async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
   if (!cfg) return "Zendesk is not configured on this server.";
   const { ticket_id, subject, status, assignee_email, priority, confirmed } =
     JSON.parse(argsJson);
   if (confirmed !== true)
     return "Confirmation required. Show the exact ticket fields and values, then ask the user to confirm before updating them.";
-  if (!(await readZendeskSupervisionConfig()).fredEnabled)
-    return "Fred's Zendesk actions are turned off by a supervisor.";
-  const update: Record<string, unknown> = {};
-  if (subject?.trim()) update.subject = subject.trim();
-  if (status) update.status = status;
-  if (priority) update.priority = priority;
-  if (assignee_email) {
-    try {
-      type ZUser = { id: number; name: string; email: string };
-      const { users } = await zdeskFetch<{ users: ZUser[] }>(
-        cfg,
-        "GET",
-        `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`,
-      );
-      if (!users?.[0])
-        return `Error: No Zendesk user found for ${assignee_email}`;
-      update.assignee_id = users[0].id;
-    } catch (e: any) {
-      return `Error resolving assignee: ${e.message}`;
+  return withZendeskSupervisionConfig(async (controls) => {
+    if (!controls.fredEnabled)
+      return "Fred's Zendesk actions are turned off by a supervisor.";
+    const update: Record<string, unknown> = {};
+    if (subject?.trim()) update.subject = subject.trim();
+    if (status) update.status = status;
+    if (priority) update.priority = priority;
+    if (assignee_email) {
+      try {
+        type ZUser = { id: number; name: string; email: string };
+        const { users } = await zdeskFetch<{ users: ZUser[] }>(
+          cfg,
+          "GET",
+          `users/search.json?query=${encodeURIComponent(`email:${assignee_email}`)}`,
+        );
+        if (!users?.[0])
+          return `Error: No Zendesk user found for ${assignee_email}`;
+        update.assignee_id = users[0].id;
+      } catch (e: any) {
+        return `Error resolving assignee: ${e.message}`;
+      }
     }
-  }
-  if (Object.keys(update).length === 0)
-    return "Error: no fields to update (provide subject, status, assignee_email, or priority).";
-  try {
-    await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
-      ticket: update,
-    });
-    const parts = [];
-    if (subject?.trim()) parts.push(`subject → ${subject.trim()}`);
-    if (status) parts.push(`status → ${status}`);
-    if (priority) parts.push(`priority → ${priority}`);
-    if (assignee_email) parts.push(`assigned → ${assignee_email}`);
-    return `✓ Ticket #${ticket_id} updated: ${parts.join(", ")}.`;
-  } catch (e: any) {
-    return `Error updating ticket #${ticket_id}: ${e.message}`;
-  }
+    if (Object.keys(update).length === 0)
+      return "Error: no fields to update (provide subject, status, assignee_email, or priority).";
+    try {
+      await zdeskFetch(cfg, "PUT", `tickets/${ticket_id}.json`, {
+        ticket: update,
+      });
+      const parts = [];
+      if (subject?.trim()) parts.push(`subject → ${subject.trim()}`);
+      if (status) parts.push(`status → ${status}`);
+      if (priority) parts.push(`priority → ${priority}`);
+      if (assignee_email) parts.push(`assigned → ${assignee_email}`);
+      return `✓ Ticket #${ticket_id} updated: ${parts.join(", ")}.`;
+    } catch (e: any) {
+      return `Error updating ticket #${ticket_id}: ${e.message}`;
+    }
+  });
 }
 
 /**
@@ -5122,9 +5125,9 @@ export async function runChatWithMemory(
         call.function.name === "zendesk_create_ticket"
       ) {
         try {
-          resultText = (await readZendeskSupervisionConfig()).fredEnabled
-            ? await executeZendeskCreateTicket(call.function.arguments)
-            : "Fred's Zendesk actions are turned off by a supervisor.";
+          resultText = await executeZendeskCreateTicket(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "zendesk_create_ticket tool failed");
           resultText = "Error: Zendesk ticket creation failed";
@@ -5134,9 +5137,9 @@ export async function runChatWithMemory(
         call.function.name === "zendesk_solve_tickets"
       ) {
         try {
-          resultText = (await readZendeskSupervisionConfig()).fredEnabled
-            ? await executeZendeskSolveTickets(call.function.arguments)
-            : "Fred's Zendesk actions are turned off by a supervisor.";
+          resultText = await executeZendeskSolveTickets(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "zendesk_solve_tickets tool failed");
           resultText = "Error: Zendesk ticket solve failed";

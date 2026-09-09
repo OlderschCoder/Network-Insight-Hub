@@ -112,6 +112,15 @@ export function validateZendeskControlRequest(
     return { ok: false, status: 400, error: "Control settings are required." };
   }
   const body = input as Record<string, unknown>;
+  const allowedKeys = new Set(["fredEnabled", "repliesEnabled"]);
+  const unexpectedKeys = Object.keys(body).filter((key) => !allowedKeys.has(key));
+  if (unexpectedKeys.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Unexpected control setting${unexpectedKeys.length === 1 ? "" : "s"}: ${unexpectedKeys.join(", ")}.`,
+    };
+  }
   const updates: ZendeskControlRequest = {};
   if (body.fredEnabled !== undefined) {
     if (typeof body.fredEnabled !== "boolean") {

@@ -1,0 +1,16 @@
+flowchart LR
+  User[Buildings UI] -->|Create building| Master[(Building master)]
+  User -->|Show or hide| Visibility[(Map visibility)]
+  User -->|Rename or remove empty| Master
+  User -->|Move device| API[Building assignment API]
+  API -->|One transaction| Nodes[(net_nodes)]
+  API -->|One transaction| Switches[(network_switches)]
+  API -->|Ensure destination exists| Master
+  Nodes --> Detail[Building detail]
+  Switches --> Health[Live building health]
+  Master --> List[Building list and campus map]
+  Visibility --> Map[Campus map overlays]
+  Master --> Map
+  Detail --> User
+  Health --> User
+  List --> User

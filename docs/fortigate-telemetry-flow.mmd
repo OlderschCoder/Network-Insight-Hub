@@ -1,0 +1,26 @@
+flowchart LR
+    Main[Main FortiGate<br/>192.168.1.1]
+    West[West FortiGate<br/>172.25.0.1]
+    Config[Complete Telegraf config<br/>45 unique targets / 6 blocks]
+    Collector[Read-only collector<br/>10.0.0.22]
+    Legacy[(network_switches<br/>status and last seen)]
+    Nodes[(net_nodes<br/>identity, kind, role)]
+    Ports[(net_ports<br/>observed interfaces)]
+    Summary[Network Nodes]
+    PortMap[Port Map]
+    History[Imported snapshot banner]
+
+    Main --> Config
+    West --> Config
+    Config -. SNMPv3 polling .-> Collector
+    Collector --> Legacy
+    Collector --> Ports
+    Legacy --> Summary
+    Nodes --> Summary
+    Nodes --> PortMap
+    Ports --> PortMap
+    Collector --> History
+
+    Note[Missing or old collection is shown as<br/>unknown / historical, never invented]
+    Note --- PortMap
+    Note --- History
