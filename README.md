@@ -72,6 +72,9 @@ as a parallel sign-in path.
 
 - Maintains switch and VLAN inventory, including hostname, management address,
   model, building, location, status, subnet, gateway, type, and notes.
+- Reconciles approved switch assignments across both inventory tables with a
+  guarded preview/apply workflow; see
+  [Fred switch inventory reconciliation](docs/fred-switch-inventory-reconciliation.md).
 - Groups switches, VLANs, phones, links, and related evidence by building.
 - Uses the clickable campus map as the primary support entry point, followed
   immediately by health-sorted building cards. Each building detail includes a

@@ -33,6 +33,7 @@ node_modules
 /data/zendesk-supervision.json
 /data/zendesk-reply-drafts.json
 /coverage
+/backups/
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log

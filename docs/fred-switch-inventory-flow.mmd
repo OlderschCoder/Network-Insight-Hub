@@ -1,0 +1,12 @@
+flowchart LR
+  Request[Operator-approved switch assignments] --> Preview[Read-only nine-IP preview]
+  Preview --> Gate{One row per IP in both tables?}
+  Gate -->|No| Stop[Stop without changes]
+  Gate -->|Yes| Backup[Write before evidence]
+  Backup --> Transaction[Single database transaction]
+  Transaction --> Nodes[(net_nodes<br/>building, location, role, vendor)]
+  Transaction --> Inventory[(network_switches<br/>building, location)]
+  Nodes --> Verify[Post-change validation]
+  Inventory --> Verify
+  Verify --> Evidence[Write after evidence]
+  Evidence --> Fred[Network Map, Buildings, and Fred AI]
