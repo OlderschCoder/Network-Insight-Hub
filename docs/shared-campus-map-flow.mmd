@@ -1,0 +1,17 @@
+flowchart LR
+    E[Buildings map editor] -->|PUT saved positions| A[/Canonical map-layout API/]
+    A --> D[(network_layout_positions)]
+    D --> A
+    A -->|GET no-store| B[Buildings CampusStatusMap]
+    A -->|GET no-store| M[Monitoring CampusStatusMap]
+    E -. save/reset event .-> B
+    E -. same-tab or cross-tab refresh .-> M
+    T[Focus, visibility, and 30-second refresh] -.-> B
+    T -.-> M
+
+    classDef editor fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+    classDef source fill:#ecfdf5,stroke:#16a34a,color:#14532d;
+    classDef consumer fill:#f8fafc,stroke:#475569,color:#0f172a;
+    class E editor;
+    class A,D source;
+    class B,M,T consumer;

@@ -29,3 +29,12 @@ Building cards and campus-map markers use a normal single selection. This keeps
 the flow usable with a mouse, keyboard, touch display, and assistive technology.
 The Port Map is preserved without simplification because its port-level evidence
 is valuable during engineering work.
+
+## Shared campus-map layout
+
+Buildings and Monitoring render the same `CampusStatusMap` component and read
+the same persisted `/api/network/buildings/map-layout` records. Layout reads are
+served with `Cache-Control: no-store`; each open view refreshes on focus, tab
+visibility, a save/reset notification, and a 30-second safety interval. Editing
+remains in Buildings, while Monitoring is a live consumer of that canonical
+saved layout. See [shared-campus-map-flow.mmd](shared-campus-map-flow.mmd).

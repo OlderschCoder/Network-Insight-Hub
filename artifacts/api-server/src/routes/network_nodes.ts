@@ -1193,6 +1193,7 @@ const buildingOverlayPutSchema = z.object({
 });
 
 router.get("/public/buildings/map-layout", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   return res.json(await getBuildingMapLayoutPositions());
 });
 
@@ -1206,6 +1207,7 @@ router.get("/public/monitoring/summary", async (_req, res) => {
 });
 
 router.get("/buildings/map-layout", requireAuth, async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   return res.json(await getBuildingMapLayoutPositions());
 });
 

@@ -21,6 +21,9 @@ import { TelemetrySwitchPortMap } from "./switch-port-map";
 const API = "/api";
 const PUBLIC_BUILDINGS_API = `${API}/network/public/buildings`;
 const PUBLIC_BUILDINGS_LAYOUT_API = `${API}/network/public/buildings/map-layout`;
+const CAMPUS_MAP_LAYOUT_REFRESH_MS = 30_000;
+const CAMPUS_MAP_LAYOUT_UPDATED_EVENT = "sccc:campus-map-layout-updated";
+const CAMPUS_MAP_LAYOUT_STORAGE_KEY = "sccc-campus-map-layout-version";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,11 +75,6 @@ interface OverlayPosition {
   y: number;
   labelDx?: number | null;
   labelDy?: number | null;
-}
-
-interface CampusStatusMapProps {
-  buildings: BuildingSummary[];
-  publicMode?: boolean;
 }
 
 interface CallingSupportSnapshot {
@@ -133,6 +131,11 @@ export type CampusMapBuildingHealth = {
   name: string;
   healthColor: "green" | "amber" | "red" | "unknown";
 };
+
+interface CampusStatusMapProps {
+  buildings: CampusMapBuildingHealth[];
+  publicMode?: boolean;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -369,11 +372,14 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
   const [savingLayout, setSavingLayout] = useState(false);
   const [dirtyLayout, setDirtyLayout] = useState(false);
 
-  const loadLayout = useCallback(async () => {
+  const loadLayout = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
     try {
       const response = publicMode
-        ? await fetch(PUBLIC_BUILDINGS_LAYOUT_API)
-        : await authFetch(`${API}/network/buildings/map-layout`, { credentials: "include" });
+        ? await fetch(PUBLIC_BUILDINGS_LAYOUT_API, { cache: "no-store" })
+        : await authFetch(`${API}/network/buildings/map-layout`, {
+            credentials: "include",
+            cache: "no-store",
+          });
       if (!response.ok) throw new Error(await response.text());
       const rows = (await response.json()) as OverlayPosition[];
       const nextPositions = { ...defaultPositions };
@@ -396,19 +402,56 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       setOverlayPositions(nextPositions);
       setDirtyLayout(false);
     } catch (error: any) {
-      setSavedPositions(defaultPositions);
-      setOverlayPositions(defaultPositions);
-      toast({
-        title: "Couldn't load map positions",
-        description: error?.message ?? "Using default overlay positions.",
-        variant: "destructive",
-      });
+      if (!quiet) {
+        setSavedPositions(defaultPositions);
+        setOverlayPositions(defaultPositions);
+        toast({
+          title: "Couldn't load map positions",
+          description: error?.message ?? "Using default overlay positions.",
+          variant: "destructive",
+        });
+      }
     }
   }, [defaultPositions, publicMode, toast]);
 
   useEffect(() => {
     void loadLayout();
   }, [loadLayout]);
+
+  useEffect(() => {
+    const refreshSavedLayout = () => {
+      if (!editMode && !dirtyLayout) void loadLayout({ quiet: true });
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshSavedLayout();
+    };
+    const refreshFromAnotherTab = (event: StorageEvent) => {
+      if (event.key === CAMPUS_MAP_LAYOUT_STORAGE_KEY) refreshSavedLayout();
+    };
+    const intervalId = window.setInterval(refreshSavedLayout, CAMPUS_MAP_LAYOUT_REFRESH_MS);
+
+    window.addEventListener("focus", refreshSavedLayout);
+    window.addEventListener(CAMPUS_MAP_LAYOUT_UPDATED_EVENT, refreshSavedLayout);
+    window.addEventListener("storage", refreshFromAnotherTab);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSavedLayout);
+      window.removeEventListener(CAMPUS_MAP_LAYOUT_UPDATED_EVENT, refreshSavedLayout);
+      window.removeEventListener("storage", refreshFromAnotherTab);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [dirtyLayout, editMode, loadLayout]);
+
+  const announceLayoutUpdate = useCallback(() => {
+    window.dispatchEvent(new Event(CAMPUS_MAP_LAYOUT_UPDATED_EVENT));
+    try {
+      window.localStorage.setItem(CAMPUS_MAP_LAYOUT_STORAGE_KEY, String(Date.now()));
+    } catch {
+      // Cross-tab refresh is a convenience; the no-cache focus/interval refresh remains authoritative.
+    }
+  }, []);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -457,6 +500,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       setSavedPositions(overlayPositions);
       setDirtyLayout(false);
       setEditMode(false);
+      announceLayoutUpdate();
       toast({ title: "Campus map saved", description: "Bubble positions were updated for everyone." });
     } catch (error: any) {
       toast({
@@ -467,7 +511,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
     } finally {
       setSavingLayout(false);
     }
-  }, [overlayPositions, toast]);
+  }, [announceLayoutUpdate, overlayPositions, toast]);
 
   const cancelEditing = useCallback(() => {
     setOverlayPositions(savedPositions);
@@ -490,6 +534,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       setOverlayPositions(defaultPositions);
       setDirtyLayout(false);
       setEditMode(false);
+      announceLayoutUpdate();
       toast({ title: "Campus map reset", description: "Overlay positions were restored to the defaults." });
     } catch (error: any) {
       toast({
@@ -500,7 +545,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
     } finally {
       setSavingLayout(false);
     }
-  }, [defaultPositions, toast]);
+  }, [announceLayoutUpdate, defaultPositions, toast]);
 
   const beginDrag = useCallback((event: React.PointerEvent<HTMLDivElement>, code: string) => {
     if (!editMode) return;

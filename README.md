@@ -80,6 +80,9 @@ as a parallel sign-in path.
   immediately by health-sorted building cards. Each building detail includes a
   building-scoped physical Port Map; the campus-wide Port Map remains available
   as the unfiltered engineering view.
+- Uses one saved campus-map layout for both Buildings and Monitoring. A layout
+  saved under Buildings is loaded without browser caching and is refreshed in
+  an already-open Monitoring view.
 - Presents a campus map, topology map, node details, reciprocal links, and a
   physical Port Map with interface descriptions and learned relationships.
 - Uses current monitoring and topology evidence to distinguish a physical
