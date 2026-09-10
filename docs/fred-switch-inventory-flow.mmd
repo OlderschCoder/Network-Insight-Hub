@@ -1,12 +1,17 @@
 flowchart LR
-  Request[Operator-approved switch assignments] --> Preview[Read-only nine-IP preview]
-  Preview --> Gate{One row per IP in both tables?}
-  Gate -->|No| Stop[Stop without changes]
-  Gate -->|Yes| Backup[Write before evidence]
-  Backup --> Transaction[Single database transaction]
-  Transaction --> Nodes[(net_nodes<br/>building, location, role, vendor)]
-  Transaction --> Inventory[(network_switches<br/>building, location)]
-  Nodes --> Verify[Post-change validation]
+  Catalog[Canonical catalog<br/>49 monitoring-required physical switches] --> Plan[Identity-aware dry run]
+  Collector[Collector inventory<br/>exact operator locations] --> Plan
+  Plan --> Match{One row by canonical<br/>IP or hostname?}
+  Match -->|Split or duplicate identity| Stop[Stop without changes]
+  Match -->|Existing alias| Move[Keep row ID and move it<br/>to canonical management IP]
+  Match -->|Missing| Insert[Insert with unknown status]
+  Match -->|Exact| Update[Update canonical fields]
+  Move --> Backup[Write before snapshot]
+  Insert --> Backup
+  Update --> Backup
+  Backup --> Transaction[One PostgreSQL transaction]
+  Transaction --> Nodes[(net_nodes<br/>Fred topology and AI)]
+  Transaction --> Inventory[(network_switches<br/>Fred inventory and NOC dashboard)]
+  Nodes --> Verify[Validate all 49 in both tables]
   Inventory --> Verify
-  Verify --> Evidence[Write after evidence]
-  Evidence --> Fred[Network Map, Buildings, and Fred AI]
+  Verify --> Evidence[Write after snapshot]

@@ -72,8 +72,10 @@ as a parallel sign-in path.
 
 - Maintains switch and VLAN inventory, including hostname, management address,
   model, building, location, status, subnet, gateway, type, and notes.
-- Reconciles approved switch assignments across both inventory tables with a
-  guarded preview/apply workflow; see
+- Reconciles all 49 monitoring-required physical switches across Fred topology
+  and the NOC dashboard inventory with a guarded, identity-aware preview/apply
+  workflow. Missing observations remain `unknown`, while an observed failed
+  probe remains `down`; see
   [Fred switch inventory reconciliation](docs/fred-switch-inventory-reconciliation.md).
 - Groups switches, VLANs, phones, links, and related evidence by building.
 - Uses the clickable campus map as the primary support entry point, followed
