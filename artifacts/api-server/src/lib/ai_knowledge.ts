@@ -27,6 +27,7 @@ import {
   executeManageTeamTodo,
   executeManageWeeklyLog,
   executeManageWeeklyReport,
+  executePrepareEntraPasswordReset,
   executeQueryTeamTodos,
   executeZendeskCreateTicket,
   executeZendeskSolveTickets,
@@ -5210,6 +5211,23 @@ export async function runChatWithMemory(
         } catch (err) {
           logger.error({ err }, "manage_weekly_status_report tool failed");
           resultText = "Error: weekly status report write failed";
+        }
+      } else if (
+        call.type === "function" &&
+        call.function.name === "prepare_entra_password_reset"
+      ) {
+        try {
+          resultText = await executePrepareEntraPasswordReset(
+            call.function.arguments,
+            {
+              id: opts.userId,
+              name: opts.userName,
+              role: userRole,
+            },
+          );
+        } catch (err) {
+          logger.error({ err }, "prepare_entra_password_reset tool failed");
+          resultText = "Error: assisted Entra recovery failed";
         }
       } else if (
         call.type === "function" &&

@@ -721,19 +721,22 @@ export const FRED_APPLICATION_PAGES: FredApplicationPage[] = [
     access:
       "Eligible students through the protected recovery service; administrative functions have separate authorization",
     purpose:
-      "Match one active regular-student identity, let the student choose a private password, and issue a one-use Microsoft pass under rate limits and audit controls.",
+      "Match one active regular-student identity, let the student choose a private password, and issue a one-use Microsoft pass under rate limits and audit controls. Authorized staff can prepare a supervised ten-minute recovery link through Fred after independent identity verification.",
     functions: [
       "Verify legal name, full 800 number, and SCCC username",
       "Set a student-selected private password",
       "Issue and verify a one-use Microsoft pass",
       "Create a support ticket on failure",
     ],
-    fredDirect: [],
+    fredDirect: [
+      "For CIO and help-desk users, prepare a ten-minute single-use assisted reset link after exact identity matching, approved independent verification, Zendesk ticket attribution, and explicit confirmation",
+    ],
     fredGuides: [
       "Direct eligible students to the kiosk",
       "Never request or repeat passwords, MFA codes, or TAP values",
       "Treat names, username, and 800 number as matching data rather than sufficient authentication",
-      "Do not promise account unlock or a staff reset until the separately governed reset broker is implemented",
+      "Explain that completing the password reset clears Entra Smart Lockout but does not re-enable an administratively disabled, withdrawn, or ineligible account",
+      "Escalate disabled or ineligible accounts for source-of-truth review rather than trying to enable them",
     ],
   },
 ];

@@ -62,11 +62,11 @@ describe("Fred application capability catalog", () => {
     ).toContain("Student Password Reset Activity");
   });
 
-  it("does not claim that Fred can perform student password recovery", () => {
+  it("documents Fred's guarded student password-recovery boundary", () => {
     const [kiosk] = findFredApplicationPages("/online-kiosk");
-    expect(kiosk.fredDirect).toEqual([]);
+    expect(kiosk.fredDirect.join(" ")).toContain("ten-minute single-use");
     expect(kiosk.fredGuides.join(" ")).toContain(
-      "separately governed reset broker",
+      "does not re-enable an administratively disabled",
     );
   });
 });

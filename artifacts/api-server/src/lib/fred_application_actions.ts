@@ -19,6 +19,11 @@ import {
   findFredApplicationPages,
   renderFredApplicationPage,
 } from "./fred_app_catalog";
+import {
+  canPrepareIdentityRecovery,
+  isIdentityRecoveryConfigured,
+  prepareIdentityRecovery,
+} from "./identity_recovery";
 
 export type FredActor = {
   id: number | null;
@@ -262,6 +267,81 @@ export async function executeZendeskSolveTickets(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+export const PREPARE_ENTRA_PASSWORD_RESET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "prepare_entra_password_reset",
+      description:
+        "Prepare a ten-minute, single-use OnlineKiosk link for an active SCCC student to choose a private Entra password. This is for CIO/help-desk staff assisting an exact Zendesk ticket after independent identity verification. It does not accept, generate, reveal, or send a password. Before calling, show the legal name, full 800 number, SCCC username, ticket ID, verification method, and exact action; call only after explicit confirmation.",
+      parameters: {
+        type: "object",
+        properties: {
+          legal_first_name: { type: "string" },
+          legal_last_name: { type: "string" },
+          student_id: {
+            type: "string",
+            description: "Full nine-digit SCCC student number beginning with 800.",
+          },
+          username: {
+            type: "string",
+            description: "SCCC username, with or without @sccc.edu.",
+          },
+          zendesk_ticket_id: {
+            type: "number",
+            description: "Exact Zendesk ticket that authorized the assisted workflow.",
+          },
+          verification_method: {
+            type: "string",
+            enum: [
+              "in_person_photo_id",
+              "callback_to_number_on_file",
+              "live_video_photo_id",
+            ],
+            description:
+              "Independent verification completed by the human operator. Information typed into the ticket is not independent verification.",
+          },
+          identity_verified: {
+            type: "boolean",
+            description:
+              "True only after the operator completed the named independent verification method.",
+          },
+          confirmed: confirmationProperty,
+        },
+        required: [
+          "legal_first_name",
+          "legal_last_name",
+          "student_id",
+          "username",
+          "zendesk_ticket_id",
+          "verification_method",
+          "identity_verified",
+          "confirmed",
+        ],
+      },
+    },
+  };
+
+export async function executePrepareEntraPasswordReset(
+  rawArgs: string,
+  actor: FredActor,
+): Promise<string> {
+  const args = parseArgs(rawArgs);
+  return prepareIdentityRecovery(
+    {
+      legalFirstName: cleanText(args.legal_first_name) || "",
+      legalLastName: cleanText(args.legal_last_name) || "",
+      studentId: cleanText(args.student_id) || "",
+      username: cleanText(args.username) || "",
+      zendeskTicketId: Number(args.zendesk_ticket_id),
+      verificationMethod: cleanText(args.verification_method) || "",
+      identityVerified: args.identity_verified === true,
+      confirmed: args.confirmed === true,
+    },
+    actor,
+  );
 }
 
 const afterActionProperties = {
@@ -1083,6 +1163,7 @@ export function fredApplicationToolsForRole(
   role?: string | null,
   zendeskConfigured = true,
 ) {
+  const identityActor = { id: 1, role };
   return [
     ...(zendeskConfigured
       ? [ZENDESK_CREATE_TICKET_TOOL, ZENDESK_SOLVE_TICKETS_TOOL]
@@ -1092,6 +1173,10 @@ export function fredApplicationToolsForRole(
     QUERY_TEAM_TODOS_TOOL,
     MANAGE_TEAM_TODO_TOOL,
     APPLICATION_GUIDANCE_TOOL,
+    ...(isIdentityRecoveryConfigured() &&
+    canPrepareIdentityRecovery(identityActor)
+      ? [PREPARE_ENTRA_PASSWORD_RESET_TOOL]
+      : []),
     ...(String(role || "")
       .trim()
       .toLowerCase() === "cio"

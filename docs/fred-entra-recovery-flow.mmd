@@ -1,0 +1,32 @@
+sequenceDiagram
+    actor Student
+    actor Operator as CIO or help desk
+    participant ZD as Zendesk ticket
+    participant Fred
+    participant Hub as Insights API
+    participant Kiosk as OnlineKiosk broker
+    participant Entra as Microsoft Entra ID
+    participant Audit as Reset audit
+
+    Student->>ZD: Requests password or locked-account help
+    Operator->>ZD: Reads complete ticket
+    Operator->>Student: Verifies identity independently
+    Operator->>Fred: Supplies exact identifiers, ticket, and method
+    Fred->>Operator: Presents exact ten-minute-link action
+    Operator->>Fred: Explicitly confirms
+    Fred->>Hub: prepare_entra_password_reset
+    Hub->>Kiosk: Signed timestamp, nonce, and exact request
+    Kiosk->>Kiosk: Verify caller, HMAC, time, nonce, and role
+    Kiosk->>Entra: Match name, 800 number, username, and eligibility
+    alt Unique active eligible student
+        Kiosk->>Audit: Record assisted-link issue
+        Kiosk-->>Fred: Single-use ten-minute URL
+        Operator-->>Student: Provides approved private link
+        Student->>Kiosk: Opens link and chooses private password
+        Kiosk->>Entra: Reset password and issue one-use pass
+        Kiosk->>Audit: Record result without secrets
+        Kiosk-->>Student: Confirmation and next sign-in step
+    else Disabled, ineligible, or no unique match
+        Kiosk->>Audit: Record denial without secrets
+        Kiosk-->>Fred: No account changed; escalate for review
+    end

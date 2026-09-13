@@ -234,6 +234,7 @@ export default function QuickStart() {
               "Read the full thread, edit the response, then save it for approval.",
               "Messaging replies are copied into Zendesk Agent Workspace for the final human send.",
               "Use Escalate to a team member when the ticket needs another owner.",
+              "For an active-student reset, verify identity independently, then ask Fred to prepare the ten-minute private OnlineKiosk link. Fred never sees the password.",
             ].map((item) => (
               <div key={item} className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -299,6 +300,11 @@ export default function QuickStart() {
               password. Zendesk already provides requester identity and email,
               so Fred should not ask for them again. SCCC IT handles Microsoft
               365 license changes.
+              For student password recovery, the name, username, email, and 800
+              number are matching data—not proof. CIO/help-desk staff must
+              independently verify the student and confirm Fred&apos;s exact
+              action; the student then chooses the password privately in
+              OnlineKiosk.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

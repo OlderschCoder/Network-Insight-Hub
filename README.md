@@ -145,6 +145,10 @@ as a parallel sign-in path.
   deployment change history produced by the associated provisioning services.
 - Provides authorized student-access, password-reset, MFA/TAP, and kiosk report
   views when their source feeds are installed.
+- Lets authorized CIO and help-desk staff ask Fred to prepare a ten-minute,
+  single-use OnlineKiosk link for an active regular student after independent
+  identity verification and explicit confirmation. The student chooses the
+  password privately; Fred never receives it.
 
 ### Learn simulations
 
@@ -323,6 +327,9 @@ The following boundaries are intentional and important:
   material, or full sensitive scanner/firewall output in memory.
 - Fred does **not** replace human authorization for destructive, high-impact,
   physical, or approval-gated work.
+- Fred does **not** re-enable administratively disabled, withdrawn, or otherwise
+  ineligible Entra accounts. An assisted password reset clears cloud Smart
+  Lockout only when the active student completes the private OnlineKiosk flow.
 - Learn exercises do **not** touch production or reveal their hidden answer.
 - External integrations do **not** work merely because their page exists. Each
   requires valid credentials, network reachability, permissions, and a fresh
@@ -392,6 +399,8 @@ Core configuration includes:
   and NOC probe settings
 - Collaboration/SaaS: Webex, Zendesk, and SMTP settings
 - Report feeds: configured Banner/EUP, MFA/TAP, kiosk, and activity-feed paths
+- Assisted identity recovery: `IDENTITY_RECOVERY_BROKER_URL`, shared HMAC key
+  file paths on Insights and OnlineKiosk, allowed caller IP, and public kiosk URL
 
 Grant every integration the least privilege necessary for its documented read
 or write operation. A configured secret does not override the application's
@@ -415,6 +424,7 @@ role and tool safeguards.
 pnpm install
 pnpm --filter @workspace/api-server build
 pnpm --filter @workspace/it-reporting build
+dotnet test services/Sccc.OnlineKiosk.Tests/Sccc.OnlineKiosk.Tests.csproj -c Release
 ```
 
 For development, provide a safe non-production environment and run the API and
@@ -456,6 +466,7 @@ failure, not misrepresented as a passing test.
 - [Fred delta-first behavior](docs/fred-delta-first.md)
 - [Fred network evidence workflow](docs/fred-network-evidence.md)
 - [Fred application capability catalog](docs/fred-application-capability-catalog.md)
+- [Fred assisted Entra recovery](docs/fred-entra-recovery.md)
 - [Learn simulations](docs/learn.md)
 - [Usage analytics](docs/usage-analytics.md)
 - [Entra access policy](docs/entra-access-policy.md)

@@ -30,6 +30,13 @@ Center's Guides and practice card. The full User Guide remains at `/user-guide`.
 - Fred-created Zendesk responses remain supervised drafts until a person
   reviews and sends the exact reply. Messaging replies are sent from the native
   Zendesk Agent Workspace.
+- For an active-student password-reset or locked-account ticket, authorized CIO
+  or help-desk staff may ask Fred to prepare an assisted reset link only after
+  independently verifying the student in person with photo ID, by calling a
+  number already on file, or by live video with photo ID. Ticket-supplied name,
+  SCCC username, email, and 800 number are matching data, not proof. The student
+  chooses the new password privately in OnlineKiosk, and no password or
+  Temporary Access Pass belongs in Fred, Zendesk, Memory, or a process record.
 
 ## Updating training
 

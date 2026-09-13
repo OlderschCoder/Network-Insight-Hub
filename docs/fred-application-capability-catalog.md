@@ -42,10 +42,14 @@ startup, while the tool reads the release-owned catalog directly. That gives
 Fred an immediately correct answer even if a database seed from an older build
 still exists during deployment.
 
-Student and employee identity recovery remains a separate security boundary.
-The catalog directs users to OnlineKiosk but does not claim Fred can reset or
-unlock an account until a least-privilege broker, independent identity proof,
-role policy, and audit path are implemented and approved.
+Student identity recovery remains a separate security boundary. For an active
+regular-student account, authorized CIO and help-desk staff can ask Fred to
+prepare a ten-minute, single-use OnlineKiosk link only after independent
+identity verification and explicit confirmation. The broker matches the legal
+name, full 800 number, and SCCC username to the same active Entra student. The
+student enters the new password privately; Fred never receives it. Completing
+the password reset clears Entra Smart Lockout, but Fred cannot re-enable an
+administratively disabled, withdrawn, or otherwise ineligible account.
 
 See [fred-application-guidance-flow.mmd](fred-application-guidance-flow.mmd) for
 the decision flow.
