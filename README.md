@@ -197,6 +197,9 @@ inventory, and approved live evidence tools.
 
 Fred conversations are durable and isolated by authenticated user. A user can:
 
+- Use the compact workspace toolbar to switch or rename a topic, open the file
+  library, copy the transcript, start a new topic, and adjust the lookback
+  window without crowding the conversation.
 - Give the current conversation an editable topic name.
 - Start a new topic without deleting the previous one.
 - Use the topic dropdown to reopen current or archived topics with their

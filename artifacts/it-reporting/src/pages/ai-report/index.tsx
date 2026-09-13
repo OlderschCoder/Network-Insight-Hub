@@ -1535,32 +1535,32 @@ function ChatTab({
 
   return (
     <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : "h-full min-h-[32rem] w-full flex-1"}`}>
-      <CardHeader className={`shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : ""}`}>
-        <div className={`gap-3 ${mobileFieldMode ? "flex flex-col" : "flex items-center justify-between flex-wrap"}`}>
-          <div className="flex flex-col">
-            <CardTitle className={mobileFieldMode ? "text-xl leading-tight" : undefined}>
+      <CardHeader className={`shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : "px-4 py-2"}`}>
+        <div className={`gap-3 ${mobileFieldMode ? "flex flex-col" : "flex items-center justify-between"}`}>
+          <div className={mobileFieldMode ? "flex flex-col" : "flex min-w-0 flex-1 items-center gap-2"}>
+            <CardTitle className={mobileFieldMode ? "text-xl leading-tight" : "sr-only"}>
               {mobileFieldMode ? "Fred" : "Ask Fred"}
             </CardTitle>
-            <CardDescription className={mobileFieldMode ? "mt-0.5 text-xs leading-4" : undefined}>
+            <CardDescription className={mobileFieldMode ? "mt-0.5 text-xs leading-4" : "sr-only"}>
               {mobileFieldMode
                 ? "Field support chat"
                 : "The AI has read access to entries, risks, after-action reports, and network inventory."}
             </CardDescription>
-            <div className={`order-2 mt-2 ${mobileFieldMode ? "w-full" : "w-full max-w-xl"}`}>
-              <Label htmlFor="fred-current-topic" className="text-xs font-bold uppercase tracking-wide text-foreground">
+            <div className={`order-2 ${mobileFieldMode ? "mt-2 w-full" : "min-w-0 flex-1"}`}>
+              <Label htmlFor="fred-current-topic" className={mobileFieldMode ? "text-xs font-bold uppercase tracking-wide text-foreground" : "sr-only"}>
                 Current thread
               </Label>
               <Input
                 id="fred-current-topic"
                 value={chat.title}
                 onChange={(event) => setChat((current) => ({ ...current, title: event.target.value.slice(0, 200), savedAt: new Date().toISOString() }))}
-                className={`mt-1 font-bold ${mobileFieldMode ? "h-9 text-sm" : "h-8"}`}
+                className={`font-bold ${mobileFieldMode ? "mt-1 h-9 text-sm" : "h-9"}`}
                 aria-label="Fred conversation thread"
                 placeholder="Conversation thread"
               />
             </div>
-            <div className={`order-1 mt-3 ${mobileFieldMode ? "w-full" : "w-full max-w-xl"}`}>
-              <Label className="mb-1 block text-base font-bold uppercase tracking-wide text-foreground">Threads</Label>
+            <div className={`order-1 ${mobileFieldMode ? "mt-3 w-full" : "w-[min(34rem,42vw)] shrink-0"}`}>
+              <Label className={mobileFieldMode ? "mb-1 block text-base font-bold uppercase tracking-wide text-foreground" : "sr-only"}>Threads</Label>
               <Select
                 value={chat.sessionId ?? undefined}
                 onOpenChange={(open) => { if (open) void loadTopics(); }}
@@ -1573,7 +1573,7 @@ function ChatTab({
                   }));
                 }}
               >
-                <SelectTrigger className={mobileFieldMode ? "h-11 text-base font-semibold" : "h-10 text-base font-semibold"} aria-label="Open a saved Fred thread">
+                <SelectTrigger className={mobileFieldMode ? "h-11 text-base font-semibold" : "h-9 text-sm font-semibold"} aria-label="Open a saved Fred thread">
                   <span className="mr-2 inline-flex items-center gap-1.5 truncate">
                     <History className="h-4 w-4 shrink-0" />
                     <SelectValue placeholder={topicsLoading ? "Loading threads..." : "Open a thread"} />
@@ -1600,7 +1600,7 @@ function ChatTab({
               </Select>
             </div>
           </div>
-          <div className={mobileFieldMode ? "grid grid-cols-2 gap-2" : "flex items-center gap-2 flex-wrap"}>
+          <div className={mobileFieldMode ? "grid grid-cols-2 gap-2" : "flex shrink-0 items-center gap-1"}>
             {mobileFieldMode && (
               <>
                 <input
@@ -2109,14 +2109,17 @@ function ChatTab({
                 >
                   <Trash2 className="h-4 w-4 mr-1" /> New thread
                 </Button>
-                <Label className="text-xs text-muted-foreground">Lookback days:</Label>
+                <Label className="sr-only" htmlFor="fred-lookback-days">Lookback days</Label>
                 <Input
+                  id="fred-lookback-days"
                   type="number"
                   min={1}
                   max={365}
                   value={lookbackDays}
                   onChange={(e) => setLookbackDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="h-8 w-20"
+                  className="h-8 w-16"
+                  title="Lookback days"
+                  aria-label="Lookback days"
                 />
               </>
             )}
@@ -2476,48 +2479,47 @@ export default function AIReport() {
   const contextHint = prompt || pageHintFromPath(fromPath);
 
   return (
-    <div className="flex h-full min-h-[calc(100svh-11rem)] min-w-0 flex-1 flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Sparkles className="h-7 w-7" />
-          Fred
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Ask Fred about IT data, or (for the CIO) generate executive status reports.
-        </p>
-      </div>
-
+    <div className="flex h-full min-h-[calc(100svh-11rem)] min-w-0 flex-1 flex-col">
       <Tabs defaultValue={defaultTab} className="flex min-h-0 flex-1 flex-col">
-        <TabsList>
-          {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
-          {isCIO && <TabsTrigger value="architecture">Architecture</TabsTrigger>}
-          <TabsTrigger value="chat">Ask Fred</TabsTrigger>
-          {isCIO && (
-            <TabsTrigger value="insights">
-              <Flag className="h-4 w-4 mr-1.5" /> CIO Insights
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="memory">Fred Memory</TabsTrigger>
-        </TabsList>
+        <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <Sparkles className="h-5 w-5 shrink-0" />
+            <h1 className="text-xl font-bold tracking-tight">Fred</h1>
+            <p className="hidden truncate text-xs text-muted-foreground md:block">
+              Ask about IT data or generate executive reports.
+            </p>
+          </div>
+          <TabsList className="h-9 max-w-full justify-start overflow-x-auto">
+            {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
+            {isCIO && <TabsTrigger value="architecture">Architecture</TabsTrigger>}
+            <TabsTrigger value="chat">Ask Fred</TabsTrigger>
+            {isCIO && (
+              <TabsTrigger value="insights">
+                <Flag className="h-4 w-4 mr-1.5" /> CIO Insights
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="memory">Fred Memory</TabsTrigger>
+          </TabsList>
+        </div>
         {isCIO && (
-          <TabsContent value="status" className="mt-6">
+          <TabsContent value="status" className="mt-3">
             <StatusReportTab />
           </TabsContent>
         )}
         {isCIO && (
-          <TabsContent value="architecture" className="mt-6">
+          <TabsContent value="architecture" className="mt-3">
             <EnterpriseArchitectureTab />
           </TabsContent>
         )}
         {isCIO && (
-          <TabsContent value="insights" className="mt-6">
+          <TabsContent value="insights" className="mt-3">
             <CIOInsightsTab />
           </TabsContent>
         )}
-        <TabsContent value="chat" className="mt-6 min-h-0 flex-1 data-[state=active]:flex">
+        <TabsContent value="chat" className="mt-3 min-h-0 flex-1 data-[state=active]:flex">
           <ChatTab contextHint={contextHint} />
         </TabsContent>
-        <TabsContent value="memory" className="mt-6">
+        <TabsContent value="memory" className="mt-3">
           <MemoryTab />
         </TabsContent>
       </Tabs>

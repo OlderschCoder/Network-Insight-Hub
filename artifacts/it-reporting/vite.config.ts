@@ -59,6 +59,11 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  // Tailwind is handled by @tailwindcss/vite. Keep unrelated PostCSS files in
+  // parent directories from leaking into worktree and production builds.
+  css: {
+    postcss: {},
+  },
   server: {
     port,
     host: "0.0.0.0",
