@@ -7,6 +7,14 @@ Entra account. The operator must be signed into Insights as CIO or help desk,
 must cite one exact Zendesk ticket, must independently verify the student, and
 must confirm the exact action Fred presents.
 
+Before creating a recovery grant, Insights verifies that the cited Zendesk
+ticket exists and is still active. After OnlineKiosk returns the link, Fred
+saves a requester-safe response to that same ticket's supervised draft queue.
+The draft is never sent automatically and does not replace an existing pending
+draft. For a Messaging conversation, the operator copies the reviewed draft to
+Zendesk Agent Workspace; other supported ticket channels can use the monitor's
+explicit **Approve & send** action.
+
 The workflow does not give Insights a general Microsoft Graph directory-write
 credential. Insights signs a narrow request to the existing OnlineKiosk host,
 which already owns the student-reset integration. OnlineKiosk rechecks that the
@@ -38,7 +46,12 @@ Access Pass in Zendesk, Fred Memory, logs, or chat.
 The Insights API exposes `prepare_entra_password_reset` only when the signed-in
 role is `cio` or `helpdesk` and the HMAC key file exists. Before using the tool,
 Fred presents the exact student identifiers, ticket, verification method, and
-ten-minute-link action and waits for explicit confirmation.
+ten-minute-link action and waits for explicit confirmation. The final tool
+result states whether the same-ticket draft was saved, skipped because a draft
+already exists, or blocked by the supervisor's Fred-off control. When Fred
+drafting is off, the tool stops before asking OnlineKiosk to create a recovery
+link. Fred must not say that the account is unlocked until the student completes
+the private reset.
 
 The broker additionally enforces:
 
@@ -91,6 +104,9 @@ both services after configuration changes.
    request, return no match, and make no account change.
 6. Verify Fred describes the confirmation boundary and that only CIO/help-desk
    users receive the recovery tool.
+7. In a non-production ticket fixture, verify a successful link creates one
+   pending Fred draft for the exact active ticket, never sends it, and never
+   overwrites an operator's pending draft.
 
 To roll back, restore the prior OnlineKiosk symlink target, restart
 `sccc-online-kiosk`, deploy the prior Insights commit, and restart `sccc-api`.

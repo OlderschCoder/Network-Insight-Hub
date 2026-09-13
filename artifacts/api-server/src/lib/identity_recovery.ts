@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import {
+  getZendeskRecoveryTicket,
+  isZendeskFredDraftingEnabled,
+  saveIdentityRecoveryTicketDraft,
+} from "./zendesk_recovery_draft";
+import { isZendeskMessagingChannel } from "./zendesk_conversation_log";
 
 export type IdentityRecoveryActor = {
   id: number | null;
@@ -29,8 +35,7 @@ type BrokerResponse = {
   message?: string;
 };
 
-const DEFAULT_BROKER_URL =
-  "http://10.0.0.45/internal/admin-recovery-link";
+const DEFAULT_BROKER_URL = "http://10.0.0.45/internal/admin-recovery-link";
 const DEFAULT_KEY_PATH = "/etc/sccc-identity-recovery.key";
 const DEFAULT_ALLOWED_ROLES = new Set(["cio", "helpdesk"]);
 const STUDENT_ID_PATTERN = /^800\d{6}$/;
@@ -53,7 +58,11 @@ export function canPrepareIdentityRecovery(
 ): boolean {
   return (
     actor.id != null &&
-    allowedRoles().has(String(actor.role || "").trim().toLowerCase())
+    allowedRoles().has(
+      String(actor.role || "")
+        .trim()
+        .toLowerCase(),
+    )
   );
 }
 
@@ -142,6 +151,16 @@ export async function prepareIdentityRecovery(
   const validationError = validateIdentityRecoveryInput(input);
   if (validationError) return `Error: ${validationError}`;
 
+  let ticket;
+  try {
+    ticket = await getZendeskRecoveryTicket(input.zendeskTicketId);
+  } catch (error) {
+    return `Error: ${error instanceof Error ? error.message : "Zendesk could not verify the ticket."} No account was changed.`;
+  }
+  if (!(await isZendeskFredDraftingEnabled())) {
+    return "Error: Fred drafting is turned off by a supervisor. No recovery link was created and no account was changed.";
+  }
+
   const key = (await readFile(identityRecoveryKeyPath(), "utf8")).trim();
   if (key.length < 32)
     return "Error: the identity-recovery signing key is missing or invalid.";
@@ -189,9 +208,30 @@ export async function prepareIdentityRecovery(
   const recoveryUrl = safeRecoveryUrl(result.recoveryUrl);
   if (!recoveryUrl)
     return "Error: the identity broker returned an invalid recovery link.";
+
+  let draftMessage: string;
+  try {
+    const draftResult = await saveIdentityRecoveryTicketDraft({
+      ticket,
+      recoveryUrl,
+      expiresUtc: result.expiresUtc,
+      actor,
+    });
+    draftMessage =
+      draftResult.status === "saved"
+        ? isZendeskMessagingChannel(ticket.channel)
+          ? `Fred saved the exact recovery response as a supervised draft for Zendesk ticket #${input.zendeskTicketId}. Review it in Troubleshooting → Zendesk Monitor, then use Copy & open Zendesk for the final Agent Workspace send.`
+          : `Fred saved the exact recovery response as a supervised draft for Zendesk ticket #${input.zendeskTicketId}. Review it in Troubleshooting → Zendesk Monitor before explicitly approving the send.`
+        : draftResult.status === "existing_draft"
+          ? `Zendesk ticket #${input.zendeskTicketId} already has a pending draft, so Fred did not overwrite it. Review the existing draft and add this link manually if appropriate.`
+          : "Fred drafting is turned off by a supervisor, so no Zendesk response draft was saved.";
+  } catch {
+    draftMessage = `The recovery link is ready, but Fred could not save the Zendesk draft. Copy the link into a supervised response for ticket #${input.zendeskTicketId}; no reply was sent automatically.`;
+  }
   return [
     `✓ Identity matched for ${clean(result.displayName) || "the student"} (${clean(result.upn) || username}).`,
     `A single-use assisted Entra password-reset link is ready until ${clean(result.expiresUtc) || "ten minutes from now"}: ${recoveryUrl}`,
+    draftMessage,
     "The student must open the link and choose the password privately. Fred cannot see, set, repeat, or place the password in Zendesk. Completing the reset clears Entra Smart Lockout; it does not re-enable an administratively disabled account.",
     `Audit reference: Zendesk ticket #${input.zendeskTicketId}.`,
   ].join("\n");

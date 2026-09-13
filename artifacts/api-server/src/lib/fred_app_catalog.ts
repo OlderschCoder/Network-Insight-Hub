@@ -726,13 +726,15 @@ export const FRED_APPLICATION_PAGES: FredApplicationPage[] = [
       "Verify legal name, full 800 number, and SCCC username",
       "Set a student-selected private password",
       "Issue and verify a one-use Microsoft pass",
+      "Save the assisted-recovery response to the exact ticket's supervised Zendesk draft queue",
       "Create a support ticket on failure",
     ],
     fredDirect: [
-      "For CIO and help-desk users, prepare a ten-minute single-use assisted reset link after exact identity matching, approved independent verification, Zendesk ticket attribution, and explicit confirmation",
+      "For CIO and help-desk users, verify the cited Zendesk ticket is active, prepare a ten-minute single-use assisted reset link after exact identity matching, approved independent verification, and explicit confirmation, then save the link response as a supervised draft for that ticket",
     ],
     fredGuides: [
       "Direct eligible students to the kiosk",
+      "Explain that Fred prepares the same-ticket response for review but does not send it automatically",
       "Never request or repeat passwords, MFA codes, or TAP values",
       "Treat names, username, and 800 number as matching data rather than sufficient authentication",
       "Explain that completing the password reset clears Entra Smart Lockout but does not re-enable an administratively disabled, withdrawn, or ineligible account",

@@ -65,6 +65,7 @@ describe("Fred application capability catalog", () => {
   it("documents Fred's guarded student password-recovery boundary", () => {
     const [kiosk] = findFredApplicationPages("/online-kiosk");
     expect(kiosk.fredDirect.join(" ")).toContain("ten-minute single-use");
+    expect(kiosk.fredDirect.join(" ")).toContain("supervised draft");
     expect(kiosk.fredGuides.join(" ")).toContain(
       "does not re-enable an administratively disabled",
     );

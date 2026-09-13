@@ -147,8 +147,10 @@ as a parallel sign-in path.
   views when their source feeds are installed.
 - Lets authorized CIO and help-desk staff ask Fred to prepare a ten-minute,
   single-use OnlineKiosk link for an active regular student after independent
-  identity verification and explicit confirmation. The student chooses the
-  password privately; Fred never receives it.
+  identity verification and explicit confirmation. Fred verifies the exact
+  Zendesk ticket is active and saves the link response to its supervised draft
+  queue without sending or overwriting another pending draft. The student
+  chooses the password privately; Fred never receives it.
 
 ### Learn simulations
 

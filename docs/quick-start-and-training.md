@@ -34,9 +34,12 @@ Center's Guides and practice card. The full User Guide remains at `/user-guide`.
   or help-desk staff may ask Fred to prepare an assisted reset link only after
   independently verifying the student in person with photo ID, by calling a
   number already on file, or by live video with photo ID. Ticket-supplied name,
-  SCCC username, email, and 800 number are matching data, not proof. The student
-  chooses the new password privately in OnlineKiosk, and no password or
-  Temporary Access Pass belongs in Fred, Zendesk, Memory, or a process record.
+  SCCC username, email, and 800 number are matching data, not proof. Fred first
+  verifies that the cited Zendesk ticket is active. After confirmation and a
+  successful broker match, Fred saves the exact link response to that ticket's
+  supervised draft queue without sending or overwriting another pending draft.
+  The student chooses the new password privately in OnlineKiosk, and no password
+  or Temporary Access Pass belongs in Fred, Zendesk, Memory, or a process record.
 
 ## Updating training
 

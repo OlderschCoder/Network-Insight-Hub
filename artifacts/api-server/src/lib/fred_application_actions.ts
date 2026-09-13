@@ -275,7 +275,7 @@ export const PREPARE_ENTRA_PASSWORD_RESET_TOOL: OpenAI.Chat.Completions.ChatComp
     function: {
       name: "prepare_entra_password_reset",
       description:
-        "Prepare a ten-minute, single-use OnlineKiosk link for an active SCCC student to choose a private Entra password. This is for CIO/help-desk staff assisting an exact Zendesk ticket after independent identity verification. It does not accept, generate, reveal, or send a password. Before calling, show the legal name, full 800 number, SCCC username, ticket ID, verification method, and exact action; call only after explicit confirmation.",
+        "For an active Zendesk ticket, prepare a ten-minute, single-use OnlineKiosk link for an active SCCC student to choose a private Entra password, then save the exact link response as a supervised Zendesk draft. This is for CIO/help-desk staff after independent identity verification. It does not accept, generate, reveal, or send a password, and it never sends the draft automatically. Before calling, read the ticket, show the legal name, full 800 number, SCCC username, ticket ID, verification method, and exact action; call only after explicit confirmation.",
       parameters: {
         type: "object",
         properties: {
@@ -283,7 +283,8 @@ export const PREPARE_ENTRA_PASSWORD_RESET_TOOL: OpenAI.Chat.Completions.ChatComp
           legal_last_name: { type: "string" },
           student_id: {
             type: "string",
-            description: "Full nine-digit SCCC student number beginning with 800.",
+            description:
+              "Full nine-digit SCCC student number beginning with 800.",
           },
           username: {
             type: "string",
@@ -291,7 +292,8 @@ export const PREPARE_ENTRA_PASSWORD_RESET_TOOL: OpenAI.Chat.Completions.ChatComp
           },
           zendesk_ticket_id: {
             type: "number",
-            description: "Exact Zendesk ticket that authorized the assisted workflow.",
+            description:
+              "Exact Zendesk ticket that authorized the assisted workflow.",
           },
           verification_method: {
             type: "string",

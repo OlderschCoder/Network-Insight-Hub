@@ -87,6 +87,27 @@ export const LEARN_SCENARIOS: LearnScenario[] = [
     ],
   },
   {
+    id: "student-account-recovery", title: "Verified student account recovery", mode: "desk", minutes: 8,
+    summary: "Verify identity independently, let Fred prepare the secure recovery link, and review the same-ticket draft before sending.", sections: ["Zendesk Monitor", "Fred", "OnlineKiosk", "Password Reset Activity"],
+    steps: [
+      { title: "Separate matching from verification", situation: "An open Zendesk ticket includes a student's name, SCCC username, email, and full 800 number and asks for an account unlock.", coach: "The ticket values help match the account, but they all came through the same channel. Complete an approved independent identity check before any reset action.", pageLabel: "Zendesk Monitor", pageHref: "/support/zendesk", evidence: "Simulation: the supplied identifiers agree, but no independent verification is recorded yet.", question: "What must happen next?", choices: [
+        { label: "Verify in person with photo ID, by callback to a number already on file, or by live video with photo ID.", correct: true, result: "Correct. Matching data is useful, but it is not independent proof." },
+        { label: "Treat the 800 number in the ticket as sufficient proof.", correct: false, result: "No. That value arrived through the same unverified ticket channel." },
+        { label: "Ask the student to send their current password.", correct: false, result: "Never collect an existing password or MFA code." },
+      ]},
+      { title: "Prepare the supervised recovery", situation: "The operator completed an approved independent verification method and Fred has read the exact active ticket.", coach: "Give Fred the exact identifiers, ticket ID, and verification method. Review the proposed action, then explicitly confirm creation of the ten-minute link and same-ticket draft.", pageLabel: "Fred", pageHref: "/ai-report", evidence: "Simulation: the ticket is active and the verified name, 800 number, and username identify one eligible student.", question: "What does Fred do after confirmation?", choices: [
+        { label: "Create the single-use OnlineKiosk link and save its response as a pending draft for that ticket.", correct: true, result: "Correct. The recovery action and response are joined, but the operator remains the sender." },
+        { label: "Set a predictable default password and post it publicly.", correct: false, result: "That exposes a credential and bypasses the student's private password choice." },
+        { label: "Send the reply immediately without review.", correct: false, result: "No. Fred saves a supervised draft and never auto-sends it." },
+      ]},
+      { title: "Confirm the actual unlock", situation: "The draft is ready, but the student has not opened the recovery link yet.", coach: "Review and send the exact draft through the supported Zendesk surface. Do not say the account is unlocked until Password Reset Activity shows the student completed the reset.", pageLabel: "Password Reset Activity", pageHref: "/password-reset-activity", evidence: "Simulation: a link was issued, but no completed reset event exists.", question: "What is the accurate ticket status?", choices: [
+        { label: "Recovery link prepared; account unlock is still awaiting student completion.", correct: true, result: "Complete. A prepared link is not the same thing as a completed reset." },
+        { label: "Account unlocked successfully.", correct: false, result: "Not yet. Only a completed password reset clears the cloud lockout." },
+        { label: "Administratively re-enable the account regardless of eligibility.", correct: false, result: "Disabled or ineligible accounts require source-of-truth review and escalation." },
+      ]},
+    ],
+  },
+  {
     id: "saas-outage", title: "A SaaS application is unavailable", mode: "desk", minutes: 10,
     summary: "Separate local access, Azure/platform health, and vendor service failure before escalating.", sections: ["IT Apps", "Azure", "Monitoring", "Incident Rooms", "After-Action"],
     steps: [

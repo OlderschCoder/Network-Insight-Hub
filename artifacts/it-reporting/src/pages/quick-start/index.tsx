@@ -66,7 +66,7 @@ const firstRunSteps = [
     number: "02",
     title: "Work a support conversation",
     icon: MessagesSquare,
-    body: "Open Zendesk Monitor, select a ticket, read the complete thread, and let Fred prepare a supervised draft. Edit or save it for approval; a person remains the sender.",
+    body: "Open Zendesk Monitor, select a ticket, and read the complete thread. For a verified active-student lockout, Fred can prepare the secure reset link and save the same-ticket response as a supervised draft. A person remains the sender.",
     actions: [
       { label: "Open Zendesk Monitor", href: "/support/zendesk" },
       { label: "Open Support Center", href: "/support" },

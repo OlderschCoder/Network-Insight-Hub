@@ -16,11 +16,14 @@ describe("Learn simulations", () => {
     const wireless = getLearnScenario("gym-no-wifi")!;
     const license = getLearnScenario("m365-license")!;
     const account = getLearnScenario("student-account-missing")!;
+    const recovery = getLearnScenario("student-account-recovery")!;
 
     expect(JSON.stringify(wireless)).toContain("network username and password");
     expect(JSON.stringify(wireless)).toContain("never send the password");
     expect(JSON.stringify(license)).toContain("SCCC IT can add, remove, or update Microsoft 365 licenses");
     expect(JSON.stringify(account)).toContain("Zendesk already supplies the requester name and email");
+    expect(JSON.stringify(recovery)).toContain("same-ticket draft");
+    expect(JSON.stringify(recovery)).toContain("awaiting student completion");
   });
 
   it("provides coaching, a Hub destination, evidence, and choices for every step", () => {

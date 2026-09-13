@@ -131,7 +131,7 @@ Fred's SCCC ticket-drafting rules:
 - Zendesk already supplies the requester's name and email address. Do not ask for either again when it is present in the ticket.
 - SCCC wireless uses the requester's SCCC network username and password. Fred may tell the requester which credentials to use, but must never ask them to send, paste, or disclose the password or an MFA code.
 - SCCC IT can add, remove, or update Microsoft 365 (Office 365) licenses. Ask only which application or entitlement is missing when the ticket does not already say.
-- For an active-student password-reset or locked-account ticket, a CIO or help-desk operator can open **Fred**, provide the exact Zendesk ticket ID plus the student's legal name, full 800 number, and SCCC username, and identify the independent verification method used: in-person photo ID, callback to a number already on file, or live video with photo ID. The values in the ticket are matching data, not independent proof. Fred presents the exact proposed action and waits for confirmation before preparing a ten-minute, single-use OnlineKiosk link. The student opens that link and chooses the password privately. Never put a password, MFA code, or Temporary Access Pass in Fred or Zendesk.
+- For an active-student password-reset or locked-account ticket, a CIO or help-desk operator can open **Fred**, provide the exact Zendesk ticket ID plus the student's legal name, full 800 number, and SCCC username, and identify the independent verification method used: in-person photo ID, callback to a number already on file, or live video with photo ID. The values in the ticket are matching data, not independent proof. Fred verifies that the ticket is active, presents the exact proposed action, and waits for confirmation before preparing a ten-minute, single-use OnlineKiosk link. Fred then saves the link response to that same ticket's supervised draft queue without sending or replacing an existing pending draft. The student opens the approved link and chooses the password privately. Never put a password, MFA code, or Temporary Access Pass in Fred or Zendesk.
 
 The queue and shared drafts refresh every 15 seconds; the selected Conversation
 Log refreshes every 5 seconds. Every public reply is confirmation-gated in both
@@ -139,13 +139,15 @@ the interface and the server API, so the operator can always stop or override
 Fred.
 Fred can also recommend an escalation in chat and, after you approve the exact
 assignee, reassign the Zendesk ticket to that team member.
-Completing an assisted password reset clears Entra Smart Lockout. It does not
+Only say the account is unlocked after the student completes the assisted reset.
+Completing that reset clears Entra Smart Lockout. It does not
 re-enable an account that was administratively disabled or made ineligible by
 the student source of truth; escalate those cases for eligibility review.
 Turning **Zendesk replies** off blocks public comments at the server even if a
 browser is stale. Turning **Fred drafting** off also blocks Fred's Zendesk write
-tools. Escalation stays available so a supervisor can still hand urgent work to
-a person.
+tools and stops the combined assisted-recovery workflow before a link is
+created. Escalation stays available so a supervisor can still hand urgent work
+to a person.
 
 ### Network
 
