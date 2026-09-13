@@ -39,22 +39,46 @@ git pull --ff-only
 # ── DB Migrations ─────────────────────────────────────────────────────────────
 echo ""
 echo ">> Running DB migrations..."
-DB_URL=$(grep DATABASE_URL "$DEST/.env.production" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
+read_database_url() {
+  local env_file="$1"
+  local line value first last
+  line=$(grep -m1 '^DATABASE_URL=' "$env_file" 2>/dev/null || true)
+  [ -n "$line" ] || return 1
+  value=${line#DATABASE_URL=}
+  value=${value%$'\r'}
+  if [ "${#value}" -ge 2 ]; then
+    first=${value:0:1}
+    last=${value: -1}
+    if { [ "$first" = '"' ] && [ "$last" = '"' ]; } || \
+       { [ "$first" = "'" ] && [ "$last" = "'" ]; }; then
+      value=${value:1:${#value}-2}
+    fi
+  fi
+  [ -n "$value" ] || return 1
+  printf '%s' "$value"
+}
+
+DB_URL=$(read_database_url "$DEST/.env.production" || true)
 if [ -z "$DB_URL" ]; then
-  DB_URL=$(grep DATABASE_URL "$SRC/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
+  DB_URL=$(read_database_url "$SRC/.env" || true)
 fi
 
 if [ -z "$DB_URL" ]; then
-  echo "   WARNING: DATABASE_URL not found — skipping migrations"
+  echo "   ERROR: DATABASE_URL not found — refusing to deploy without schema validation" >&2
+  exit 1
 else
   for sql_file in \
     "$MIGRATION_DIR/add_ai_knowledge_scope.sql" \
     "$MIGRATION_DIR/add_device_configs.sql" \
-    "$MIGRATION_DIR/add_incident_rooms.sql"
+    "$MIGRATION_DIR/add_incident_rooms.sql" \
+    "$MIGRATION_DIR/add_fred_building_alerts.sql"
   do
     if [ -f "$sql_file" ]; then
       echo "   Applying $(basename $sql_file)..."
-      psql "$DB_URL" -f "$sql_file" 2>&1 | grep -v "^$" || true
+      # Stop the release if any statement fails. Continuing after a partial or
+      # rejected schema change can start application code against the wrong
+      # database contract.
+      psql -X "$DB_URL" -v ON_ERROR_STOP=1 -f "$sql_file"
     fi
   done
 fi

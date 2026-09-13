@@ -30,6 +30,12 @@ node_modules
 !.vscode/extensions.json
 
 # misc
+/.env
+/.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!deploy/.env.production.template
 /.sass-cache
 /connect.lock
 /data/zendesk-supervision.json

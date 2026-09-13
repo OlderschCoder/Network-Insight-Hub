@@ -134,6 +134,11 @@ as a parallel sign-in path.
   configured.
 - Reads bounded network telemetry through approved tools rather than exposing a
   general shell.
+- Evaluates explicitly approved building-anchor switches every 30 seconds and
+  can send durable, audited Fred outage/recovery notifications after three
+  fresh failures or two fresh recoveries. Stale and missing evidence remains
+  unknown, and production delivery is disabled until anchors are validated;
+  see [Fred building and switch outage alerts](docs/fred-building-alerts.md).
 - Inventories Azure VMs and Azure resources and can compare stored inventory
   with live Azure state.
 - Reads Azure Resource Health, Defender for Cloud alerts, and policy status when
@@ -415,8 +420,6 @@ role and tool safeguards.
 - Node.js compatible with the repository toolchain
 - `pnpm`
 - PostgreSQL
-- A POSIX-compatible shell for the root preinstall check; on Windows use WSL or
-  Git Bash rather than plain PowerShell for installation
 - Development Entra registration and integration credentials for the features
   being exercised
 
@@ -469,6 +472,7 @@ failure, not misrepresented as a passing test.
 - [Fred network evidence workflow](docs/fred-network-evidence.md)
 - [Fred application capability catalog](docs/fred-application-capability-catalog.md)
 - [Fred assisted Entra recovery](docs/fred-entra-recovery.md)
+- [Fred building and switch outage alerts](docs/fred-building-alerts.md)
 - [Learn simulations](docs/learn.md)
 - [Usage analytics](docs/usage-analytics.md)
 - [Entra access policy](docs/entra-access-policy.md)

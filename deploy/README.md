@@ -3,14 +3,14 @@
 Everything needed to configure and roll out the SCCC IT Reporting Hub on the
 Azure VM, so we stop editing snippets by hand.
 
-| File | What it does |
-|---|---|
-| `.env.production.template` | Full production config — every variable the app reads, non-secret IDs pre-filled, `<...>` placeholders for secrets only. |
-| `configure-o365-sender.ps1` | Microsoft 365 (Exchange Online) setup for **Option A** email: dedicated sender mailbox + SMTP AUTH + "Send As" `itech@sccc.edu`. |
-| `deploy.sh` | Build from source and roll out to `/opt/sccc-it`, then restart the service. |
-| `noc_probe_agent.py` | Restricted probe used by FRED on `10.0.0.22`; supports bounded ping, TCP, and read-only LLDP/SNMP collection. |
-| `configure_noc_probe_snmp.py` | Builds root-owned SNMPv3 profiles from the working local Telegraf configuration without printing credentials. |
-| `sccc-noc-probe.env.template` | Root-only probe settings, including allowed target networks and collection limits. |
+| File                          | What it does                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `.env.production.template`    | Full production config — every variable the app reads, non-secret IDs pre-filled, `<...>` placeholders for secrets only.         |
+| `configure-o365-sender.ps1`   | Microsoft 365 (Exchange Online) setup for **Option A** email: dedicated sender mailbox + SMTP AUTH + "Send As" `itech@sccc.edu`. |
+| `deploy.sh`                   | Build from source and roll out to `/opt/sccc-it`, then restart the service.                                                      |
+| `noc_probe_agent.py`          | Restricted probe used by FRED on `10.0.0.22`; supports bounded ping, TCP, and read-only LLDP/SNMP collection.                    |
+| `configure_noc_probe_snmp.py` | Builds root-owned SNMPv3 profiles from the working local Telegraf configuration without printing credentials.                    |
+| `sccc-noc-probe.env.template` | Root-only probe settings, including allowed target networks and collection limits.                                               |
 
 ## 1. Configure the email sender (one time, in M365)
 
@@ -48,6 +48,31 @@ that these exact packages remain set to `true` under `allowBuilds` in
 `pnpm-workspace.yaml`; do not approve an unreviewed dependency just to make a
 deployment continue.
 
+## 4. Activate Fred outage alerts deliberately
+
+Fred building/switch alerts are deployed with `FRED_ALERT_ENABLED=false`.
+Before enabling them, configure the dedicated Fred Telnyx key, messaging
+profile, sender, personal/work operational recipients, Ed25519 public key,
+public HTTPS origin, dedicated recipient-HMAC key, and independent email
+recipient in the root-owned service environment. Never reuse the SafeDate
+messaging profile or recipient data.
+
+Insert and validate one explicit anchor switch per building with each anchor
+row disabled. After physical-topology review, enable only approved anchor rows,
+run the fixed non-outage test command, and verify both SMS acceptance and the
+signed final delivery callback. Only then set `FRED_ALERT_ENABLED=true` and
+restart `sccc-api`.
+
+```bash
+node artifacts/api-server/dist/scripts/send_fred_test_alert.mjs
+sudo systemctl restart sccc-api
+```
+
+The test text explicitly says that no building outage is active and does not
+alter monitoring state. Full configuration, validation, incident thresholds,
+STOP handling, and rollback are in
+[`docs/fred-building-alerts.md`](../docs/fred-building-alerts.md).
+
 ## Login fails right after "Sign in with Microsoft" (`relation "sessions" does not exist`)
 
 The production database is missing schema changes that exist in the code
@@ -76,6 +101,7 @@ sudo journalctl -u sccc-api -n 30 --no-pager | grep -iv 'systemd\['
 - `5.7.60 ... send as this user` → the "Send As" grant on `itech` is missing or
   hasn't propagated yet.
 - Full deployment/security reference: `docs/azure-vm-deployment-runbook.md`.
+- Fred alert activation and rollback: `docs/fred-building-alerts.md`.
 
 ## FRED LLDP collector on 10.0.0.22
 

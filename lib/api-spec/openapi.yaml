@@ -47,6 +47,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: A required startup or background health check is degraded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
 
   # AUTH
   /auth/login:
@@ -2273,7 +2279,39 @@ components:
             Status of the emergency break-glass login seeder. "failed" means the
             feature is configured but the emergency CIO account could not be
             created on boot, which forces the overall status to "degraded".
-      required: [status]
+        fredAlerts:
+          $ref: "#/components/schemas/FredAlertHealth"
+      required: [status, fredAlerts]
+
+    FredAlertHealth:
+      type: object
+      description: >-
+        Sanitized Fred alert-worker health. It contains no configuration values,
+        recipient identifiers, provider payloads, or secrets.
+      properties:
+        state:
+          type: string
+          enum: [disabled, starting, ok, degraded]
+        lastSuccessAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastErrorAt:
+          type: string
+          format: date-time
+          nullable: true
+        errorCode:
+          type: string
+          nullable: true
+          enum:
+            - configuration_invalid
+            - anchor_seed_failed
+            - no_enabled_anchors
+            - sms_configuration_invalid
+            - lease_lost
+            - tick_failed
+            - fallback_failed
+      required: [state, lastSuccessAt, lastErrorAt, errorCode]
 
     ErrorResponse:
       type: object

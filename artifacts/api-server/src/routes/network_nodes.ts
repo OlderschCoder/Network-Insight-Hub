@@ -5,6 +5,7 @@ import { requireAuth } from "./auth";
 import { z } from "zod";
 import { saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { pingManyViaNoc } from "../lib/noc_probe";
+import { parseFredNocPingManyResponse } from "../lib/fred_noc_ping_validation";
 
 const router = Router();
 
@@ -18,7 +19,10 @@ const INFLUX_BUCKET = process.env.INFLUXDB_BUCKET ?? "telegraf";
 const BUILDING_OVERLAY_PREFIX = "building-overlay:";
 const BUILDING_MASTER_PREFIX = "building-master:";
 const NOC_REACHABILITY_CACHE_MS = 30_000;
-const nocReachabilityCache = new Map<string, { status: LiveStatus; expiresAt: number }>();
+const nocReachabilityCache = new Map<
+  string,
+  { status: LiveStatus; observedAt: string; expiresAt: number }
+>();
 const DEFAULT_AUTHORITATIVE_BUILDINGS = [
   "Agriculture",
   "Allied Health",
@@ -138,12 +142,23 @@ function mergeObservedStatuses(...values: Array<LiveStatus | undefined>): LiveSt
   return "unknown";
 }
 
-async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveStatus>> {
+type NocDeviceObservation = {
+  status: LiveStatus;
+  observedAt: string | null;
+};
+
+async function getNocDeviceObservations(
+  hosts: string[],
+  forceRefresh = false,
+): Promise<Record<string, NocDeviceObservation>> {
   const requested = Array.from(new Set(hosts.filter(isMonitorableHost).map(normalizeTelemetryKey)));
   if (requested.length === 0) return {};
 
   const now = Date.now();
+  const refreshedHosts = new Set<string>();
+  let forcedUnknownObservedAt: string | null = null;
   const missing = requested.filter((host) => {
+    if (forceRefresh) return true;
     const cached = nocReachabilityCache.get(host);
     return !cached || cached.expiresAt <= now;
   });
@@ -153,23 +168,60 @@ async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveS
         missing.map((target) => ({ target })),
         { count: 1, timeoutMs: 30_000 },
       );
+      const observedAt = new Date().toISOString();
+      forcedUnknownObservedAt = observedAt;
       const expiresAt = Date.now() + NOC_REACHABILITY_CACHE_MS;
-      for (const observation of response.results ?? []) {
-        nocReachabilityCache.set(normalizeTelemetryKey(observation.target), {
+      const observations = parseFredNocPingManyResponse(
+        response,
+        missing,
+        normalizeTelemetryKey,
+      );
+      if (!observations) throw new Error("Malformed NOC ping-many response.");
+      for (const [target, status] of observations) {
+        refreshedHosts.add(target);
+        nocReachabilityCache.set(target, {
           // A completed negative ping is down evidence. A probe execution
           // error is not; leave it unknown so another source can decide.
-          status: observation.error ? "unknown" : observation.reachable ? "up" : "down",
+          status,
+          observedAt,
           expiresAt,
         });
       }
     } catch {
       // NOC reachability is an optional corroborating signal. Leave the
       // result unknown when the probe service itself is unavailable.
+      for (const target of missing) nocReachabilityCache.delete(target);
+      if (forceRefresh) forcedUnknownObservedAt = new Date().toISOString();
     }
   }
 
   return Object.fromEntries(
-    requested.map((host) => [host, nocReachabilityCache.get(host)?.status ?? "unknown"]),
+    requested.map((host) => {
+      if (forceRefresh && !refreshedHosts.has(host)) {
+        return [
+          host,
+          {
+            status: "unknown",
+            observedAt: forcedUnknownObservedAt ?? new Date().toISOString(),
+          },
+        ];
+      }
+      const cached = nocReachabilityCache.get(host);
+      return [
+        host,
+        {
+          status: cached?.status ?? "unknown",
+          observedAt: cached?.observedAt ?? null,
+        },
+      ];
+    }),
+  );
+}
+
+async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveStatus>> {
+  const observations = await getNocDeviceObservations(hosts);
+  return Object.fromEntries(
+    Object.entries(observations).map(([host, observation]) => [host, observation.status]),
   );
 }
 
@@ -662,6 +714,74 @@ from(bucket: "${INFLUX_BUCKET}")
   }
 
   return result;
+}
+
+export type FredMonitoringTarget = {
+  switchId: string;
+  host: string;
+};
+
+export type FredMonitoringObservation = {
+  switchId: string;
+  status: "up" | "down" | "unknown";
+  observedAt: string;
+  source: "noc" | "influx";
+};
+
+function toFredObservationStatus(status: LiveStatus): FredMonitoringObservation["status"] {
+  if (status === "up" || status === "down") return status;
+  return "unknown";
+}
+
+/**
+ * Return raw, timestamped observations for Fred's durable alert evaluator.
+ * Sources deliberately remain separate: the evaluator applies freshness and
+ * source priority, so an old Influx "up" cannot hide a fresh NOC "down".
+ */
+export async function getFredSwitchObservations(
+  targets: readonly FredMonitoringTarget[],
+): Promise<FredMonitoringObservation[]> {
+  const cleanTargets = targets
+    .map((target) => ({
+      switchId: target.switchId.trim(),
+      host: target.host.trim(),
+    }))
+    .filter((target) => target.switchId && isMonitorableHost(target.host));
+  const hosts = Array.from(new Set(cleanTargets.map((target) => target.host)));
+  if (hosts.length === 0) return [];
+
+  const [noc, influx] = await Promise.all([
+    // Alert counters require a distinct probe per cycle; dashboard caching
+    // must never turn one negative ping into several "fresh" failures.
+    getNocDeviceObservations(hosts, true),
+    getDeviceHeartbeat(hosts),
+  ]);
+  const observations: FredMonitoringObservation[] = [];
+
+  for (const target of cleanTargets) {
+    const key = normalizeTelemetryKey(target.host);
+    const nocObservation = noc[key];
+    if (nocObservation?.observedAt) {
+      observations.push({
+        switchId: target.switchId,
+        status: toFredObservationStatus(nocObservation.status),
+        observedAt: nocObservation.observedAt,
+        source: "noc",
+      });
+    }
+
+    const influxObservation = influx[key];
+    if (influxObservation?.lastSeen) {
+      observations.push({
+        switchId: target.switchId,
+        status: toFredObservationStatus(influxObservation.status),
+        observedAt: influxObservation.lastSeen,
+        source: "influx",
+      });
+    }
+  }
+
+  return observations;
 }
 
 async function getPingTrend(hours = 6): Promise<Array<{ time: string; averageResponseMs: number | null; percentPacketLoss: number | null }>> {

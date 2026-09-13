@@ -28,3 +28,4 @@ export * from "./net_ports";
 export * from "./net_routing_adjacencies";
 export * from "./network_telemetry_runs";
 export * from "./formal_ea";
+export * from "./fred_building_alerts";

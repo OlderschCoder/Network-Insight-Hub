@@ -18,6 +18,26 @@ export const HealthCheckResponse = zod.object({
     .describe(
       'Status of the emergency break-glass login seeder. \"failed\" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to \"degraded\".',
     ),
+  fredAlerts: zod
+    .object({
+      state: zod.enum(["disabled", "starting", "ok", "degraded"]),
+      lastSuccessAt: zod.coerce.date().nullable(),
+      lastErrorAt: zod.coerce.date().nullable(),
+      errorCode: zod
+        .enum([
+          "configuration_invalid",
+          "anchor_seed_failed",
+          "no_enabled_anchors",
+          "sms_configuration_invalid",
+          "lease_lost",
+          "tick_failed",
+          "fallback_failed",
+        ])
+        .nullable(),
+    })
+    .describe(
+      "Sanitized Fred alert-worker health. It contains no configuration values, recipient identifiers, provider payloads, or secrets.",
+    ),
 });
 
 /**

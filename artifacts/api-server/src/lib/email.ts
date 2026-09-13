@@ -16,6 +16,11 @@ function getTransporter(): Transporter {
     port,
     secure: port === 465,
     auth: { user, pass },
+    // Bound SMTP stalls so operational workers can release their durable
+    // leases and record an auditable failure instead of hanging indefinitely.
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
   });
   return cached;
 }
@@ -47,5 +52,9 @@ export async function sendReportEmail(opts: {
 }
 
 export function isEmailConfigured(): boolean {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return !!(
+    process.env.SMTP_HOST &&
+    process.env.SMTP_USER &&
+    process.env.SMTP_PASS
+  );
 }

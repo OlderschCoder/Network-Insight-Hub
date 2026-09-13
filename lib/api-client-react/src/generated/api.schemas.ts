@@ -25,10 +25,45 @@ export const HealthStatusBreakGlass = {
   failed: "failed",
 } as const;
 
+export type FredAlertHealthState =
+  (typeof FredAlertHealthState)[keyof typeof FredAlertHealthState];
+
+export const FredAlertHealthState = {
+  disabled: "disabled",
+  starting: "starting",
+  ok: "ok",
+  degraded: "degraded",
+} as const;
+
+export type FredAlertHealthErrorCode =
+  | (typeof FredAlertHealthErrorCode)[keyof typeof FredAlertHealthErrorCode]
+  | null;
+
+export const FredAlertHealthErrorCode = {
+  configuration_invalid: "configuration_invalid",
+  anchor_seed_failed: "anchor_seed_failed",
+  no_enabled_anchors: "no_enabled_anchors",
+  sms_configuration_invalid: "sms_configuration_invalid",
+  lease_lost: "lease_lost",
+  tick_failed: "tick_failed",
+  fallback_failed: "fallback_failed",
+} as const;
+
+/**
+ * Sanitized Fred alert-worker health. It contains no configuration values, recipient identifiers, provider payloads, or secrets.
+ */
+export interface FredAlertHealth {
+  state: FredAlertHealthState;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  errorCode: FredAlertHealthErrorCode;
+}
+
 export interface HealthStatus {
   status: HealthStatusStatus;
   /** Status of the emergency break-glass login seeder. "failed" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to "degraded". */
   breakGlass?: HealthStatusBreakGlass;
+  fredAlerts: FredAlertHealth;
 }
 
 export interface ErrorResponse {

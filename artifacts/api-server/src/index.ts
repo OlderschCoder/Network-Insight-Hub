@@ -2,9 +2,16 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureSchema } from "./lib/ensure_schema";
 import { seedAppUsageKnowledge } from "./lib/seed_app_usage";
-import { seedBreakGlassAccount, stripNonBreakGlassPasswords } from "./lib/seed_breakglass";
+import {
+  seedBreakGlassAccount,
+  stripNonBreakGlassPasswords,
+} from "./lib/seed_breakglass";
 import { startSessionCleanup } from "./routes/auth";
 import { startWebexCallHistorySync } from "./routes/dashboard";
+import {
+  prepareFredBuildingAlerts,
+  startFredBuildingAlerts,
+} from "./lib/fred_building_alert_worker";
 
 const rawPort = process.env["PORT"];
 
@@ -34,6 +41,11 @@ if (
     "Refusing to start the production API outside systemd. Use: systemctl restart sccc-api",
   );
 }
+
+// Validate an explicitly enabled Fred worker before opening the HTTP listener.
+// Invalid alerting configuration is a startup failure, never a silently healthy
+// API with its monitoring worker left off.
+const fredAlertRuntime = prepareFredBuildingAlerts();
 
 async function main(): Promise<void> {
   // Reconcile known schema drift on self-hosted databases (sessions table,
@@ -70,6 +82,9 @@ async function main(): Promise<void> {
     // Maintain the rolling 90-day IT hunt-group history without waiting for a
     // user to open the report.
     startWebexCallHistorySync();
+    // Seed disabled anchor candidates on every release and start monitoring
+    // only when an operator has explicitly enabled both the worker and anchors.
+    void startFredBuildingAlerts(fredAlertRuntime);
   });
 }
 

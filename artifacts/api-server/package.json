@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "import:formal-ea": "tsx src/scripts/import_formal_ea.ts",
-    "apply:voice-vlans": "tsx src/scripts/apply_voice_vlan_authority.ts"
+    "apply:voice-vlans": "tsx src/scripts/apply_voice_vlan_authority.ts",
+    "test:fred-alerts": "node --enable-source-maps ./dist/scripts/send_fred_test_alert.mjs"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.21",

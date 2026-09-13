@@ -1,0 +1,81 @@
+flowchart TD
+  subgraph Evidence[Fresh monitoring evidence]
+    NOC[NOC observation]
+    Influx[Influx observation]
+  end
+
+  subgraph Worker[Fred alert worker every 30 seconds]
+    Lease{Durable PostgreSQL<br/>poll lease acquired?}
+    Anchors[Load explicitly enabled building anchors]
+    Validate{Global topology unique?}
+    Probe[Run one fresh monitoring probe cycle]
+    Resolve[Validate and resolve observation<br/>NOC up/down, then Influx fallback]
+    Unknown{Fresh up or down?}
+    Cadence{Timestamp fits cadence?}
+    Count[Update durable consecutive counters<br/>reset partial sequence after a long gap]
+    Threshold{Transition threshold reached?}
+    Suppress[Suppress child switch transitions<br/>during an anchor outage]
+    Policy{Mute or maintenance delivery gate?}
+    PolicyAudit[Record suppression policy audit<br/>without sending]
+    Fence{Lease token still current?}
+    HealthState[Sanitized worker health<br/>state, timestamps, generic code]
+  end
+
+  subgraph Store[PostgreSQL]
+    State[(Alert state)]
+    Incidents[(Incidents and operator actions)]
+    Deliveries[(Idempotent delivery audit)]
+    Claims[(Webhook event claims)]
+  end
+
+  subgraph Channels[Notification channels]
+    Telnyx[Telnyx SMS<br/>Fred sender to approved recipients]
+    Email[Independent email fallback]
+  end
+
+  subgraph Callbacks[Signed delivery callbacks on the Fred VM]
+    Primary[Primary status endpoint]
+    Failover[Failover status endpoint<br/>same VM, not an independent fault domain]
+    Verify[Verify Ed25519 signature<br/>timestamp and event ID]
+  end
+
+  Health[/GET /api/healthz<br/>503 while starting or degraded/]
+
+  Start[Scheduled tick] --> Lease
+  Start -. updates .-> HealthState
+  HealthState --> Health
+  Lease -->|No| Exit[End this cycle]
+  Lease -->|Yes| Anchors
+  Anchors --> Validate
+  Validate -->|No| Exit
+  Validate -->|Yes| Probe
+  Probe --> NOC
+  Probe --> Influx
+  NOC --> Resolve
+  Influx --> Resolve
+  Resolve --> Unknown
+  Unknown -->|No, stale, missing, or unknown| State
+  Unknown -->|Yes| Cadence
+  Cadence -->|Duplicate timestamp| State
+  Cadence -->|Usable or long-gap reset| Count
+  Count --> State
+  Count --> Threshold
+  Threshold -->|No| Exit
+  Threshold -->|Building outage| Suppress
+  Suppress --> Fence
+  Threshold -->|Switch transition or building recovery| Fence
+  Fence -->|Lost| Exit
+  Fence -->|Current| Incidents
+  Incidents --> Policy
+  Policy -->|Suppressed| PolicyAudit
+  PolicyAudit --> Deliveries
+  Policy -->|Send| Deliveries
+  Deliveries -->|Queued SMS only| Telnyx
+  Telnyx -->|Rejected or acceptance ambiguous; no SMS resend| Email
+  Deliveries -->|Historical missing or failed/unknown SMS| Email
+  Telnyx --> Primary
+  Telnyx -. route failover .-> Failover
+  Primary --> Verify
+  Failover --> Verify
+  Verify --> Claims
+  Claims --> Deliveries
