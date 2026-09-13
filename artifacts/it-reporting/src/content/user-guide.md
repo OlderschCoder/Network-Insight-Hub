@@ -198,6 +198,14 @@ Open **Fred**. It has these tabs:
 - **CIO Insights** (CIO only) — review leadership-level operational signals.
 - **Fred Memory** — Fred's **persistent knowledge** about the SCCC environment. Every active entry is fed into Fred's context.
 
+Fred has a release-owned capability catalog covering every Insights page. Ask
+where a page lives, what each control does, who can use it, or how to complete a
+workflow. Fred will give the current top-menu path and direct route. When an
+approved tool exists for your role, Fred can use it under the normal evidence
+and confirmation rules. Otherwise, Fred says that the action remains
+page-controlled and gives the exact click-by-click steps instead of claiming it
+was performed.
+
 Using Fred Memory:
 
 1. **Search** or **filter by category** to find what the AI already knows.

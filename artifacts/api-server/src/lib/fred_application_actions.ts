@@ -15,6 +15,10 @@ import {
   todoAssigneeForCreate,
   type TodoActor,
 } from "./team_todo_policy";
+import {
+  findFredApplicationPages,
+  renderFredApplicationPage,
+} from "./fred_app_catalog";
 
 export type FredActor = {
   id: number | null;
@@ -1013,13 +1017,14 @@ export const APPLICATION_GUIDANCE_TOOL: OpenAI.Chat.Completions.ChatCompletionTo
     function: {
       name: "get_application_guidance",
       description:
-        "Read the current, seeded step-by-step guidance for the SCCC IT Portal. Use for navigation, permissions, workflows, or any 'how do I use this app?' question instead of guessing from an old interface.",
+        "Read the release-owned catalog for every SCCC Insights page, route, permission, function, and Fred execution boundary. Always call this for navigation, permissions, workflows, or any question about what a page or function does. Use an approved action tool when the catalog says Fred can perform the action; otherwise give the exact route and UI steps without pretending the action was performed.",
       parameters: {
         type: "object",
         properties: {
           topic: {
             type: "string",
-            description: "Optional feature or workflow to narrow the guide.",
+            description:
+              "Optional page name, route, feature, or workflow. Pass an exact route when one is known. Omit to list the complete page catalog.",
           },
         },
         required: [],
@@ -1032,6 +1037,23 @@ export async function executeApplicationGuidance(
 ): Promise<string> {
   const args = parseArgs(rawArgs);
   const topic = cleanText(args.topic);
+  const catalogPages = findFredApplicationPages(topic);
+  if (catalogPages.length) {
+    if (!topic) {
+      return [
+        "# SCCC Insights application capability catalog",
+        "Use get_application_guidance again with a page name, route, feature, or workflow for full functions and Fred action boundaries.",
+        ...catalogPages.map(
+          (page) =>
+            `- ${page.name}: ${page.routes.join(", ")} | ${page.menu} | ${page.access}`,
+        ),
+      ].join("\n");
+    }
+    return catalogPages
+      .slice(0, 12)
+      .map(renderFredApplicationPage)
+      .join("\n\n");
+  }
   const conditions = [
     eq(aiKnowledgeTable.source, "seed"),
     eq(aiKnowledgeTable.isActive, true),
@@ -1053,7 +1075,7 @@ export async function executeApplicationGuidance(
     .where(and(...conditions))
     .limit(20);
   if (!rows.length)
-    return `No application guidance matched ${topic ? `“${topic}”` : "that request"}.`;
+    return `No application guidance matched ${topic ? `“${topic}”` : "that request"}. Do not invent a page or function; say that the current catalog has no match.`;
   return rows.map((row) => `## ${row.title}\n${row.content}`).join("\n\n");
 }
 

@@ -1,6 +1,7 @@
 import { and, eq, like, sql } from "drizzle-orm";
 import { db, aiKnowledgeTable } from "@workspace/db";
 import { logger } from "./logger";
+import { fredApplicationKnowledgeEntries } from "./fred_app_catalog";
 
 // Arbitrary constant key for a Postgres advisory lock so concurrent app
 // instances/restarts can't run the delete+insert at the same time.
@@ -12,7 +13,7 @@ const SEED_LOCK_KEY = 748213001;
 // the production database, which is provisioned fresh (schema only) on publish.
 const TITLE_PREFIX = "Using the Platform:";
 
-const APP_USAGE_ENTRIES: {
+const CORE_APP_USAGE_ENTRIES: {
   category: string;
   title: string;
   content: string;
@@ -131,6 +132,11 @@ const APP_USAGE_ENTRIES: {
     content:
       "Recommended rhythm: (1) start at Home and use Status for current workload; (2) track outstanding assignments in To-do List, then record finished work under Completed Work; (3) log risks/issues and write Post-Incident Reviews for incidents; (4) near week-end, generate, review, and submit the Weekly Log; (5) the CIO opens the weekly Report, selects PIRs, maintenance, goal progress, open risks, and other extras, then finalizes and exports or emails it. Fred can guide each step and, after showing the exact change and receiving confirmation, can create or edit the relevant supported records within the signed-in user's permissions.",
   },
+];
+
+export const APP_USAGE_ENTRIES = [
+  ...CORE_APP_USAGE_ENTRIES,
+  ...fredApplicationKnowledgeEntries(),
 ];
 
 // Idempotent: removes the previously seeded app-usage rows (identified by the

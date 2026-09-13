@@ -1,0 +1,11 @@
+flowchart LR
+  U[Authenticated Insights user] --> F[Ask Fred about a page or function]
+  F --> C[get_application_guidance]
+  C --> K[Release-owned route and capability catalog]
+  K --> P{Approved Fred tool for this role?}
+  P -->|Yes| G[Apply role, evidence, confirmation, and limit guards]
+  G --> T[Invoke the specific approved tool]
+  T --> V[Return verified result and record link]
+  P -->|No| D[Give exact route and click-by-click directions]
+  D --> H[User completes the page-controlled action]
+  K --> X[Never infer write authority from page knowledge]

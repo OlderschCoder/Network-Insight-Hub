@@ -166,6 +166,12 @@ given the authenticated user's identity and role, recent team work, governed
 team and personal memory, the current topic checkpoint, selected files, network
 inventory, and approved live evidence tools.
 
+Fred also has a tested, release-owned catalog of every Insights route and page
+function. It distinguishes functions she can execute through approved tools
+from functions where she must provide the exact route and UI steps. Adding a
+frontend route without a corresponding catalog entry fails the API test suite;
+see [Fred application capability catalog](docs/fred-application-capability-catalog.md).
+
 ### How Fred is expected to work
 
 - Lead with the answer or current state, the meaningful delta, and the next
@@ -449,6 +455,7 @@ failure, not misrepresented as a passing test.
 - [Formal EA integration](docs/formal-ea-integration.md)
 - [Fred delta-first behavior](docs/fred-delta-first.md)
 - [Fred network evidence workflow](docs/fred-network-evidence.md)
+- [Fred application capability catalog](docs/fred-application-capability-catalog.md)
 - [Learn simulations](docs/learn.md)
 - [Usage analytics](docs/usage-analytics.md)
 - [Entra access policy](docs/entra-access-policy.md)
