@@ -46,6 +46,54 @@ final result: passed
 
 ---
 
+# Fred compact conversation workspace design QA
+
+- Source visual truth: `C:\Users\MARK~1.BOJ\AppData\Local\Temp\codex-clipboard-19d963d6-7698-4068-be87-fa45aa42babb.png`
+- Implementation screenshot: unavailable because the signed-in Chrome tab was not attached to the browser connector after deployment; the user confirmed the refreshed production page renders the compact layout.
+- Production route: `https://app-server2.centralus.cloudapp.azure.com/ai-report`
+- State: authenticated CIO, dark theme, Ask Fred selected, populated saved thread, and composer visible.
+
+## Full-view comparison evidence
+
+The source placed the Fred title, subtitle, report tabs, duplicate thread labels, thread selector, editable topic, and actions in separate vertical bands. The implementation consolidates the Fred identity and tabs into one responsive row, then places the saved-thread selector, editable topic, file/copy/new-thread actions, and lookback control into one compact toolbar. The transcript begins materially higher while the existing message viewport and fixed composer behavior remain intact.
+
+## Focused region comparison evidence
+
+- The Fred page heading is reduced from the large display treatment to a compact workspace heading.
+- The explanatory copy remains available beside the heading instead of occupying its own row.
+- The selected report tab remains visually distinct inside a shorter tab strip.
+- Duplicate visible `Ask Fred`, `Threads`, and `Current thread` headings are retained as screen-reader labels rather than consuming vertical space.
+- Files, Copy, New thread, thread switching, topic editing, and lookback controls remain available.
+
+## Findings and comparison history
+
+### Iteration 1 - passed
+
+- P1 from the source: controls above the transcript consumed too much vertical space and obscured Fred's useful response area.
+- Fix: consolidated the page header and conversation controls, reduced padding, and preserved accessible names for hidden labels.
+- No remaining P0/P1/P2 issue was reported after the refreshed production build; the user confirmed the compact layout is working.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing SCCC type family and hierarchy are preserved; only workspace-scale heading size changed.
+- Spacing and layout rhythm: intentionally tightened above the transcript.
+- Colors and visual tokens: unchanged.
+- Image quality and assets: unchanged.
+- Copy and content: shortened only in the compact subtitle; all workflow controls remain named and available.
+
+## Validation
+
+- Production Vite build passed.
+- Live `index.html` references the deployed hashed CSS and JavaScript assets.
+- Deployed index checksum matches the local production build.
+- `sccc-api` remained active; no service restart was required.
+- The user confirmed the refreshed production interface renders the compact layout.
+- Direct workspace type-check still reports pre-existing errors outside this layout change; no new build-blocking error was introduced.
+
+final result: passed
+
+---
+
 # Fred responsive chat design QA
 
 - Source visual truth: `C:\Users\MARK~1.BOJ\AppData\Local\Temp\codex-clipboard-20f8a088-db77-4036-b5e4-bf6abea9e9a7.png`
