@@ -1,7 +1,11 @@
 flowchart LR
   C[Fresh console output] --> X[Evidence reconciliation]
   G[Stored known-good configuration] --> X
-  T[Current telemetry and topology] --> X
+  T[Current telemetry and topology] --> M{Metric observed in current source?}
+  M -->|Yes| V[Expose exact measured value]
+  M -->|No| B[Return blank / not collected]
+  V --> X
+  B --> X
   X --> L[Local access port and VLAN]
   L --> U[Local uplink and LAG]
   U --> R[Reciprocal upstream port]

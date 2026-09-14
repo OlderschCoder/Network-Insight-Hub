@@ -419,6 +419,8 @@ export interface AggregateReport {
   weekOf: string;
   totalEntries: number;
   contributorCount: number;
+  /** User IDs whose weekly logs satisfy the shared department-report submission policy. */
+  eligibleUserIds: number[];
   byRole?: AggregateReportByRole;
   byCategory?: AggregateReportByCategory;
   totalTickets?: number;

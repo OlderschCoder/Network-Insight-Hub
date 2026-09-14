@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Server, Wifi, WifiOff, AlertTriangle, Activity,
   ArrowLeft, ChevronRight, Loader2, RefreshCw, Search, Pencil, Save, X, PhoneCall, ExternalLink,
+  Eye, EyeOff,
 } from "lucide-react";
 import { TelemetrySwitchPortMap } from "./switch-port-map";
 
@@ -69,12 +70,22 @@ interface BuildingDetail {
   influxConfigured: boolean;
 }
 
-interface OverlayPosition {
+export interface OverlayPosition {
   code: string;
   x: number;
   y: number;
   labelDx?: number | null;
   labelDy?: number | null;
+  visible?: boolean;
+}
+
+export interface SavedOverlayLayoutRow {
+  code: string;
+  x?: number;
+  y?: number;
+  labelDx?: number | null;
+  labelDy?: number | null;
+  visible?: boolean;
 }
 
 interface CallingSupportSnapshot {
@@ -135,6 +146,7 @@ export type CampusMapBuildingHealth = {
 interface CampusStatusMapProps {
   buildings: CampusMapBuildingHealth[];
   publicMode?: boolean;
+  onLayoutChange?: (layout: Record<string, OverlayPosition>) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -203,6 +215,7 @@ const CAMPUS_OVERLAYS: CampusOverlay[] = [
   { code: "SW", buildingName: "Student Union / Activities", preferredNames: ["Student Union / Student Activities"], aliases: ["sw", "student union / student activities", "student union / activities", "student union"], x: 72.5, y: 32.5, labelDx: 10, labelDy: -14, labelGroup: "student-union" },
   { code: "SHC", buildingName: "Student Health Center", preferredNames: ["Student Health Center"], aliases: ["shc", "student health center"], x: 78.2, y: 24.0, labelDx: 8, labelDy: -10 },
   { code: "SLC", buildingName: "Student Living Center", preferredNames: ["Student Living Center", "Student Living Center (SLC151)"], aliases: ["slc", "student living center"], x: 81.2, y: 31.0, labelDx: 8, labelDy: -10 },
+  { code: "MAN", buildingName: "Mansions", preferredNames: ["Mansions"], aliases: ["mansions", "student living ab", "student living de"], x: 19.6, y: 32.0, labelDx: 8, labelDy: -10 },
   { code: "SLF", buildingName: "Student Living F", preferredNames: ["Student Living F"], aliases: ["student living f"], x: 16.6, y: 27.8, displayCode: "F", compactMarker: true },
   { code: "SLG", buildingName: "Student Living G", preferredNames: ["Student Living G"], aliases: ["student living g"], x: 20.8, y: 27.8, displayCode: "G", compactMarker: true },
   { code: "SLH", buildingName: "Student Living H", preferredNames: ["Student Living H"], aliases: ["student living h"], x: 23.3, y: 27.8, displayCode: "H", compactMarker: true },
@@ -221,6 +234,21 @@ function normalizeBuildingName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+export function canEditCampusMap(role: string | null | undefined): boolean {
+  return role === "cio";
+}
+
+function customBuildingOverlayCode(name: string): string {
+  return `CUSTOM:${encodeURIComponent(name.trim())}`;
+}
+
+function buildingDisplayCode(name: string): string {
+  const words = name.match(/[A-Za-z0-9]+/g) ?? [];
+  return (words.length > 1 ? words.map((word) => word[0]).join("") : words[0]?.slice(0, 3) ?? "NEW")
+    .slice(0, 4)
+    .toUpperCase();
+}
+
 function matchesAlias(name: string, aliases: string[]): boolean {
   const normalized = normalizeBuildingName(name);
   return aliases.some((alias) => {
@@ -229,6 +257,22 @@ function matchesAlias(name: string, aliases: string[]): boolean {
     if (candidate.length < 4) return false;
     return normalized.includes(candidate);
   });
+}
+
+function findOverlayBuildingMatch<T extends CampusMapBuildingHealth>(
+  overlay: CampusOverlay,
+  buildings: T[],
+  byName: Map<string, T>,
+): T | null {
+  for (const preferredName of overlay.preferredNames ?? []) {
+    const preferredMatch = byName.get(normalizeBuildingName(preferredName));
+    if (preferredMatch) return preferredMatch;
+  }
+
+  const nameMatch = byName.get(normalizeBuildingName(overlay.buildingName));
+  if (nameMatch) return nameMatch;
+
+  return buildings.find((building) => matchesAlias(building.name, overlay.aliases)) ?? null;
 }
 
 function getVisibleCampusOverlayCodes() {
@@ -256,27 +300,18 @@ function getVisibleCampusOverlayCodes() {
   return anchors;
 }
 
-export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(buildings: T[]) {
+export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(
+  buildings: T[],
+  layout: Record<string, Pick<OverlayPosition, "visible">> = {},
+) {
   const byName = new Map(buildings.map((building) => [normalizeBuildingName(building.name), building]));
   const visibleOverlayCodes = getVisibleCampusOverlayCodes();
 
-  return CAMPUS_OVERLAYS
+  const staticEntries = CAMPUS_OVERLAYS
     .filter((overlay) => visibleOverlayCodes.has(overlay.code))
+    .filter((overlay) => layout[overlay.code]?.visible !== false)
     .map((overlay) => {
-      let match = null as T | null;
-
-      for (const preferredName of overlay.preferredNames ?? []) {
-        match = byName.get(normalizeBuildingName(preferredName)) ?? null;
-        if (match) break;
-      }
-
-      if (!match) {
-        match = byName.get(normalizeBuildingName(overlay.buildingName)) ?? null;
-      }
-
-      if (!match) {
-        match = buildings.find((building) => matchesAlias(building.name, overlay.aliases)) ?? null;
-      }
+      const match = findOverlayBuildingMatch(overlay, buildings, byName);
 
       return {
         code: overlay.code,
@@ -285,6 +320,70 @@ export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(bu
         match,
       };
     });
+
+  const staticallyMatchedBuildingNames = new Set(
+    CAMPUS_OVERLAYS
+      .map((overlay) => findOverlayBuildingMatch(overlay, buildings, byName)?.name)
+      .filter((name): name is string => !!name)
+      .map(normalizeBuildingName),
+  );
+  const customEntries = buildings
+    .filter((building) => !staticallyMatchedBuildingNames.has(normalizeBuildingName(building.name)))
+    .map((building) => ({
+      code: customBuildingOverlayCode(building.name),
+      buildingName: building.name,
+      displayCode: buildingDisplayCode(building.name),
+      match: building,
+    }))
+    .filter((entry) => layout[entry.code]?.visible !== false);
+
+  return [...staticEntries, ...customEntries];
+}
+
+export function mergeCampusMapLayoutRows(
+  defaultPositions: Record<string, OverlayPosition>,
+  rows: SavedOverlayLayoutRow[],
+  compactOverlayCodes: ReadonlySet<string> = new Set(),
+): Record<string, OverlayPosition> {
+  const nextPositions = { ...defaultPositions };
+  for (const row of rows) {
+    const isLegacyDormPosition = compactOverlayCodes.has(row.code)
+      && row.code.startsWith("SL")
+      && row.code !== "SLC"
+      && typeof row.x === "number"
+      && row.x > 30;
+    if (isLegacyDormPosition) continue;
+
+    const defaultPosition = nextPositions[row.code];
+    const x = typeof row.x === "number" && Number.isFinite(row.x) ? row.x : defaultPosition?.x;
+    const y = typeof row.y === "number" && Number.isFinite(row.y) ? row.y : defaultPosition?.y;
+    // Visibility-only metadata is useful only after its built-in or dynamic
+    // custom marker has supplied a safe default coordinate.
+    if (x === undefined || y === undefined) continue;
+    nextPositions[row.code] = {
+      code: row.code,
+      x,
+      y,
+      labelDx: row.labelDx ?? defaultPosition?.labelDx ?? null,
+      labelDy: row.labelDy ?? defaultPosition?.labelDy ?? null,
+      visible: row.visible ?? defaultPosition?.visible ?? true,
+    };
+  }
+  return nextPositions;
+}
+
+export function setCampusMapMarkerVisibility(
+  positions: Record<string, OverlayPosition>,
+  defaultPositions: Record<string, OverlayPosition>,
+  code: string,
+  visible: boolean,
+): Record<string, OverlayPosition> {
+  const position = positions[code] ?? defaultPositions[code];
+  if (!position) return positions;
+  return {
+    ...positions,
+    [code]: { ...position, code, visible },
+  };
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -344,16 +443,36 @@ const callingHealthLabel: Record<string, string> = {
 
 // ─── Grid View ────────────────────────────────────────────────────────────────
 
-export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusMapProps) {
+export function CampusStatusMap({
+  buildings,
+  publicMode = false,
+  onLayoutChange,
+}: CampusStatusMapProps) {
   const { user } = useAuth();
-  const canEditMap = !publicMode && !!user;
+  const canEditMap = !publicMode && canEditCampusMap(user?.role);
   const { toast } = useToast();
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ code: string; offsetX: number; offsetY: number } | null>(null);
+  const allMapDisplayEntries = useMemo(() => getCampusMapDisplayEntries(buildings), [buildings]);
+  const overlayDefinitions = useMemo<CampusOverlay[]>(() => {
+    const customEntries = allMapDisplayEntries.filter((entry) => entry.code.startsWith("CUSTOM:"));
+    const customOverlays = customEntries.map((entry, index) => ({
+      code: entry.code,
+      buildingName: entry.buildingName,
+      preferredNames: [entry.buildingName],
+      aliases: [entry.buildingName],
+      displayCode: entry.displayCode,
+      x: 8 + (index % 5) * 8,
+      y: 90 - Math.floor(index / 5) * 8,
+      labelDx: 8,
+      labelDy: -10,
+    }));
+    return [...CAMPUS_OVERLAYS, ...customOverlays];
+  }, [allMapDisplayEntries]);
   const defaultPositions = useMemo<Record<string, OverlayPosition>>(
     () =>
       Object.fromEntries(
-        CAMPUS_OVERLAYS.map((overlay) => [
+        overlayDefinitions.map((overlay) => [
           overlay.code,
           {
             code: overlay.code,
@@ -361,10 +480,11 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             y: overlay.y,
             labelDx: overlay.labelDx ?? null,
             labelDy: overlay.labelDy ?? null,
+            visible: true,
           },
         ]),
       ),
-    [],
+    [overlayDefinitions],
   );
   const [savedPositions, setSavedPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
   const [overlayPositions, setOverlayPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
@@ -381,30 +501,20 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             cache: "no-store",
           });
       if (!response.ok) throw new Error(await response.text());
-      const rows = (await response.json()) as OverlayPosition[];
-      const nextPositions = { ...defaultPositions };
-      for (const row of rows) {
-        const overlayDefinition = CAMPUS_OVERLAYS.find((overlay) => overlay.code === row.code);
-        const isLegacyDormPosition = overlayDefinition?.compactMarker
-          && row.code.startsWith("SL")
-          && row.code !== "SLC"
-          && row.x > 30;
-        if (isLegacyDormPosition) continue;
-        nextPositions[row.code] = {
-          code: row.code,
-          x: row.x,
-          y: row.y,
-          labelDx: row.labelDx ?? nextPositions[row.code]?.labelDx ?? null,
-          labelDy: row.labelDy ?? nextPositions[row.code]?.labelDy ?? null,
-        };
-      }
+      const rows = (await response.json()) as SavedOverlayLayoutRow[];
+      const compactOverlayCodes = new Set(
+        overlayDefinitions.filter((overlay) => overlay.compactMarker).map((overlay) => overlay.code),
+      );
+      const nextPositions = mergeCampusMapLayoutRows(defaultPositions, rows, compactOverlayCodes);
       setSavedPositions(nextPositions);
       setOverlayPositions(nextPositions);
+      onLayoutChange?.(nextPositions);
       setDirtyLayout(false);
     } catch (error: any) {
       if (!quiet) {
         setSavedPositions(defaultPositions);
         setOverlayPositions(defaultPositions);
+        onLayoutChange?.(defaultPositions);
         toast({
           title: "Couldn't load map positions",
           description: error?.message ?? "Using default overlay positions.",
@@ -412,7 +522,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
         });
       }
     }
-  }, [defaultPositions, publicMode, toast]);
+  }, [defaultPositions, onLayoutChange, overlayDefinitions, publicMode, toast]);
 
   useEffect(() => {
     void loadLayout();
@@ -498,10 +608,11 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       });
       if (!response.ok) throw new Error(await response.text());
       setSavedPositions(overlayPositions);
+      onLayoutChange?.(overlayPositions);
       setDirtyLayout(false);
       setEditMode(false);
       announceLayoutUpdate();
-      toast({ title: "Campus map saved", description: "Bubble positions were updated for everyone." });
+      toast({ title: "Campus map saved", description: "Marker positions and visibility were updated for everyone." });
     } catch (error: any) {
       toast({
         title: "Couldn't save map positions",
@@ -511,7 +622,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
     } finally {
       setSavingLayout(false);
     }
-  }, [announceLayoutUpdate, overlayPositions, toast]);
+  }, [announceLayoutUpdate, onLayoutChange, overlayPositions, toast]);
 
   const cancelEditing = useCallback(() => {
     setOverlayPositions(savedPositions);
@@ -532,6 +643,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       if (!response.ok) throw new Error(await response.text());
       setSavedPositions(defaultPositions);
       setOverlayPositions(defaultPositions);
+      onLayoutChange?.(defaultPositions);
       setDirtyLayout(false);
       setEditMode(false);
       announceLayoutUpdate();
@@ -545,7 +657,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
     } finally {
       setSavingLayout(false);
     }
-  }, [announceLayoutUpdate, defaultPositions, toast]);
+  }, [announceLayoutUpdate, defaultPositions, onLayoutChange, toast]);
 
   const beginDrag = useCallback((event: React.PointerEvent<HTMLDivElement>, code: string) => {
     if (!editMode) return;
@@ -568,7 +680,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
 
   const overlays = useMemo(
     () =>
-      CAMPUS_OVERLAYS.map((overlay) => {
+      overlayDefinitions.map((overlay) => {
         const saved = overlayPositions[overlay.code];
         return {
           ...overlay,
@@ -576,22 +688,36 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           y: saved?.y ?? overlay.y,
           labelDx: saved?.labelDx ?? overlay.labelDx,
           labelDy: saved?.labelDy ?? overlay.labelDy,
+          visible: saved?.visible ?? true,
         };
       }),
-    [overlayPositions],
+    [overlayDefinitions, overlayPositions],
   );
 
   const buildingByCode = useMemo(
-    () => new Map(getCampusMapDisplayEntries(buildings).map((entry) => [entry.code, entry.match])),
-    [buildings],
+    () => new Map(allMapDisplayEntries.map((entry) => [entry.code, entry.match])),
+    [allMapDisplayEntries],
   );
 
-  const visibleOverlayCodes = useMemo(() => getVisibleCampusOverlayCodes(), []);
+  const defaultVisibleOverlayCodes = useMemo(() => getVisibleCampusOverlayCodes(), []);
+  const displayedEntryCodes = useMemo(
+    () => new Set(getCampusMapDisplayEntries(buildings, overlayPositions).map((entry) => entry.code)),
+    [buildings, overlayPositions],
+  );
 
   const visibleOverlays = useMemo(
-    () => overlays.filter((overlay) => visibleOverlayCodes.has(overlay.code)),
-    [overlays, visibleOverlayCodes],
+    () => overlays.filter((overlay) =>
+      (defaultVisibleOverlayCodes.has(overlay.code) || overlay.code.startsWith("CUSTOM:"))
+      && displayedEntryCodes.has(overlay.code)
+      && overlay.visible !== false),
+    [defaultVisibleOverlayCodes, displayedEntryCodes, overlays],
   );
+
+  const setMarkerVisibility = useCallback((code: string, visible: boolean) => {
+    setOverlayPositions((current) =>
+      setCampusMapMarkerVisibility(current, defaultPositions, code, visible));
+    setDirtyLayout(true);
+  }, [defaultPositions]);
 
   const fiberLines = useMemo(
     () =>
@@ -645,9 +771,34 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           Building codes are matched to the campus map and colored by current building health.
         </p>
         {editMode && (
-          <p className="text-xs text-muted-foreground">
-            Drag the building bubbles where you want them, then click <span className="font-medium text-foreground">Save Map</span>.
-          </p>
+          <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">
+              Drag the building bubbles where you want them. Use the controls below to choose which markers appear in both Buildings and Monitoring, then click <span className="font-medium text-foreground">Save Map</span>.
+            </p>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">Building visibility</p>
+              <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto" role="group" aria-label="Campus map building visibility">
+                {allMapDisplayEntries.map((entry) => {
+                  const visible = overlayPositions[entry.code]?.visible !== false;
+                  return (
+                    <Button
+                      key={`visibility-${entry.code}`}
+                      type="button"
+                      variant={visible ? "secondary" : "outline"}
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      aria-pressed={visible}
+                      onClick={() => setMarkerVisibility(entry.code, !visible)}
+                      disabled={savingLayout}
+                    >
+                      {visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                      {entry.match?.name ?? entry.buildingName}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         )}
       </CardHeader>
       <CardContent className="space-y-4">

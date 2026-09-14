@@ -47,8 +47,9 @@ Dashboard actions live together in the Quick Actions card.
 
 1. Open **Campus Technology → Buildings**. Start on the live campus map; select a building marker to drill in. The same health-sorted building cards appear immediately below the map.
 2. Select a building card—or its marker on the campus map—to open the building detail page.
-3. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
-4. Use **Campus Technology → Network Map → Port Map** for the unfiltered, campus-wide engineering view.
+3. Mark and Tracy can select **Edit Map**, change **Building visibility**, drag markers, and choose **Save Map**. The saved view is used by both Buildings and Monitoring. Mansions is shown by default.
+4. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
+5. Use **Campus Technology → Network Map → Port Map** for the unfiltered, campus-wide engineering view.
 
 Long dropdown lists are height-limited and scrollable. Use the mouse wheel, the visible scrollbar, arrow keys, Page Up/Page Down, or type the first letters of a switch name to move through the list.
 
@@ -75,11 +76,16 @@ At the end of the week, consolidate your work.
 
 1. Open **Weekly Log**.
 2. Create or **generate** the current week's entry — all of that week's **Completed Work items are rolled in automatically**.
-3. Review, add accomplishments/challenges/support-needed, and **submit**.
+3. Wait for **Zendesk Tickets You Resolved This Week** to finish loading, then review the linked tickets.
+4. Add the headline, summary, challenges, and support needed.
+5. Choose **Save Draft** if you are still working, or **Submit Weekly Log** to include it in the department report.
 
 Notes:
 
 - There is **one weekly log per person per week**.
+- A draft is visible to the CIO but is not included in the department rollup until it is submitted.
+- If Zendesk cannot load, save a draft and click **Retry tickets** before submitting; the app will not silently submit an incomplete ticket list.
+- Solved tickets stay with the week in which they were solved, even if someone updates the ticket later.
 - Once rolled in, past logs stay stable even if you edit the underlying items later.
 - To write a log directly, use **Weekly Log → New**.
 
@@ -177,13 +183,14 @@ to a person.
 
 ## 8. Weekly Reports (CIO)
 
-Reports aggregate everyone's weekly logs into one department report per week.
+Reports aggregate everyone's **submitted** weekly logs into one department report per week. A CIO's personal Weekly Log is separate from the department report.
 
-1. Open **Reports** and select the week.
-2. In the report editor, choose the **extras** to include: Post-Incident Reviews, network maintenance windows, a goal-progress snapshot, and open risks.
-3. Review the assembled report. Resolved **Zendesk tickets** for that week are pulled in automatically.
-4. **Finalize** to lock it.
-5. **Export** as DOCX, XLSX, or PDF — or **Email Report** to send a PDF/DOCX to recipients (requires SMTP to be configured).
+1. First submit your own contribution under **My Work → Weekly Log** (this applies to Tracy and every other CIO too).
+2. Open **Status & Reporting → Weekly Reports** and select the week.
+3. In the report editor, choose the **extras** to include: Post-Incident Reviews, network maintenance windows, a goal-progress snapshot, and open risks.
+4. Review the assembled report. Resolved **Zendesk tickets** are pulled by solved date for that exact week.
+5. **Finalize** to lock it.
+6. **Export** as DOCX, XLSX, or PDF — or **Email Report** to send a PDF/DOCX to recipients (requires SMTP to be configured).
 
 ---
 
@@ -245,9 +252,9 @@ store passwords or secrets;** the system blocks credential-like content.
 
 1. Track outstanding assignments in **To-do List**, then record finished work under **Completed Work**.
 2. Log **Risks & Issues** and write **Post-Incident Reviews** for any incidents.
-3. End of week: open **Weekly Log**, generate/submit the entry (completed-work items roll in automatically).
+3. End of week: open **Weekly Log**, generate the entry, verify the Zendesk list, then click **Submit Weekly Log** (completed-work items roll in automatically).
 
-**CIO:** 4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
+**CIO:** 4. After submitting your own Weekly Log, open the week's department **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
 
 At any point, use **Fred** to draft summaries or answer questions about the data.
 

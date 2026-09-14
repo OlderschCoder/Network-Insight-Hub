@@ -3,6 +3,7 @@ import { db, entriesTable, usersTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
+import { explicitWeeklyLogSubmissionUpdate } from "../lib/weekly_log_submission";
 
 // Compute ISO Monday for a YYYY-MM-DD date string in America/Chicago.
 function isoWeekStartCentral(dateStr: string): string {
@@ -87,25 +88,33 @@ router.post("/", requireAuth, async (req: any, res) => {
     zendeskTicketIds: parsed.data.zendeskTicketIds ?? [],
     ticketCount: parsed.data.zendeskTicketIds?.length ?? parsed.data.ticketCount ?? 0,
   };
+  const conflictUpdates: any = {
+    category: values.category,
+    title: values.title,
+    description: values.description,
+    accomplishments: values.accomplishments,
+    challenges: values.challenges,
+    supportNeeded: values.supportNeeded,
+    entryDate: values.entryDate,
+    tags: values.tags,
+    completedItems: values.completedItems,
+    ...explicitWeeklyLogSubmissionUpdate(parsed.data.isSubmitted),
+    updatedAt: new Date(),
+  };
+  // Do not erase a previously attached ticket set when Zendesk was unavailable
+  // and the caller intentionally omitted zendeskTicketIds.
+  if (parsed.data.zendeskTicketIds !== undefined) {
+    conflictUpdates.zendeskTicketIds = values.zendeskTicketIds;
+    conflictUpdates.ticketCount = values.ticketCount;
+  } else if (parsed.data.ticketCount !== undefined) {
+    conflictUpdates.ticketCount = values.ticketCount;
+  }
   const [entry] = await db
     .insert(entriesTable)
     .values(values)
     .onConflictDoUpdate({
       target: [entriesTable.userId, entriesTable.weekOf],
-      set: {
-        category: values.category,
-        title: values.title,
-        description: values.description,
-        accomplishments: values.accomplishments,
-        challenges: values.challenges,
-        supportNeeded: values.supportNeeded,
-        entryDate: values.entryDate,
-        tags: values.tags,
-        completedItems: values.completedItems,
-        zendeskTicketIds: values.zendeskTicketIds,
-        ticketCount: values.ticketCount,
-        updatedAt: new Date(),
-      },
+      set: conflictUpdates,
     })
     .returning();
   // Stably link this user's items for the same week to this weekly log,

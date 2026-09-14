@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Plus, FileText, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, FileText, ChevronRight, Trash2, ClipboardCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -63,9 +63,16 @@ export default function WeeklyTeam() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-muted-foreground">
-          CIO-curated weekly summaries that aggregate every team member's logs and items.
-        </p>
+        <div>
+          <p className="text-sm text-muted-foreground">
+            CIO-curated weekly summaries that aggregate every team member's submitted logs and items.
+          </p>
+          {isCIO && (
+            <Link href="/entries/new" className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1">
+              <ClipboardCheck className="h-3.5 w-3.5" /> Submit my own Weekly Log
+            </Link>
+          )}
+        </div>
         {isCIO && (
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> New Report
@@ -129,8 +136,8 @@ export default function WeeklyTeam() {
           <DialogHeader>
             <DialogTitle>New Weekly Team Report</DialogTitle>
             <DialogDescription>
-              Pick the week. The report auto-aggregates every team member's logs, items,
-              and open risks for that week.
+              Pick the week. The report auto-aggregates every team member's submitted
+              weekly log, linked items, and open risks for that week.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">

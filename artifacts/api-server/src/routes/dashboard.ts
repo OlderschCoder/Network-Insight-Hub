@@ -7,6 +7,10 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { logger } from "../lib/logger";
+import {
+  includedWeeklyLogs,
+  isWeeklyLogIncludedInDepartmentReport,
+} from "../lib/weekly_report_entry_policy";
 
 const router = Router();
 // Cisco retired analytics.webexapis.com for Calling CDRs in February 2026.
@@ -433,17 +437,19 @@ router.get("/summary", requireAuth, async (_req: any, res) => {
         userId: entriesTable.userId,
         ticketCount: entriesTable.ticketCount,
         isSubmitted: entriesTable.isSubmitted,
+        updatedAt: entriesTable.updatedAt,
       })
       .from(entriesTable)
       .where(eq(entriesTable.weekOf, weekOf));
 
+    const reportEligibleEntries = includedWeeklyLogs(thisWeekEntries);
     const contributorIds = new Set<number>();
     const submittedUserIds = new Set<number>();
     let totalTickets = 0;
-    for (const e of thisWeekEntries) {
+    for (const e of reportEligibleEntries) {
       if (typeof e.userId === "number") contributorIds.add(e.userId);
       totalTickets += e.ticketCount ?? 0;
-      if (e.isSubmitted && typeof e.userId === "number") submittedUserIds.add(e.userId);
+      if (typeof e.userId === "number") submittedUserIds.add(e.userId);
     }
 
     const [
@@ -481,7 +487,7 @@ router.get("/summary", requireAuth, async (_req: any, res) => {
     const pendingSubmissions = Math.max(0, submittingUserCount - submittingSubmittedCount);
 
     return res.json({
-      thisWeekEntries: thisWeekEntries.length,
+      thisWeekEntries: reportEligibleEntries.length,
       thisWeekContributors: contributorIds.size,
       openRisks: openRisksRows[0]?.value ?? 0,
       criticalRisks: criticalRisksRows[0]?.value ?? 0,
@@ -589,7 +595,7 @@ router.get("/week-status", requireAuth, async (_req: any, res) => {
 
     const submissions = allUsers.map(user => {
       const userEntries = entries.filter(e => e.userId === user.id);
-      const isSubmitted = userEntries.some(e => e.isSubmitted);
+      const isSubmitted = userEntries.some(isWeeklyLogIncludedInDepartmentReport);
       return {
         userId: user.id,
         userName: user.name,

@@ -17,6 +17,14 @@ import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { sendReportEmail } from "../lib/email";
 import { buildReportPdfBuffer, buildReportDocxBuffer, getCloudInventorySnapshot } from "../lib/report_export";
+import {
+  zendeskSolvedTicketQuery,
+  zendeskSolvedWindow,
+} from "../lib/zendesk_solved_window";
+import {
+  includedWeeklyLogs,
+  isWeeklyLogIncludedInDepartmentReport,
+} from "../lib/weekly_report_entry_policy";
 
 const router = Router();
 
@@ -32,12 +40,13 @@ router.get("/aggregate", requireAuth, async (req: any, res) => {
   const { weekOf } = req.query;
   if (!weekOf) return res.status(400).json({ error: "weekOf required" });
 
-  const entries = await db.select({
+  const entries = (await db.select({
     entry: entriesTable,
     user: usersTable,
   }).from(entriesTable)
     .leftJoin(usersTable, eq(entriesTable.userId, usersTable.id))
-    .where(eq(entriesTable.weekOf, weekOf as string));
+    .where(eq(entriesTable.weekOf, weekOf as string)))
+    .filter(({ entry }) => isWeeklyLogIncludedInDepartmentReport(entry));
 
   const risks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));
 
@@ -69,6 +78,7 @@ router.get("/aggregate", requireAuth, async (req: any, res) => {
     weekOf,
     totalEntries: entries.length,
     contributorCount: contributors.size,
+    eligibleUserIds: [...contributors],
     byRole,
     byCategory,
     totalTickets,
@@ -143,22 +153,18 @@ router.get("/:id/tickets", requireAuth, async (req: any, res) => {
   const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
   const group = process.env.ZENDESK_GROUP || "Onsite_it";
 
-  // Build a 7-day date set starting at weekOf
-  const dateSet = new Set<string>();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(report.weekOf + "T00:00:00Z");
-    d.setUTCDate(d.getUTCDate() + i);
-    dateSet.add(d.toISOString().slice(0, 10));
+  let solvedWindow;
+  try {
+    solvedWindow = zendeskSolvedWindow(report.weekOf, report.weekOf);
+  } catch {
+    return res.status(500).json({ error: "Report has an invalid weekOf date" });
   }
-  const earliest = Array.from(dateSet).sort()[0];
-  const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
-    .toISOString().slice(0, 10);
 
   try {
     const all: any[] = [];
     let nextUrl: string | null =
       `https://${subdomain}.zendesk.com/api/v2/search.json?query=${encodeURIComponent(
-        `type:ticket solved>${dayBefore} group:"${group}"`
+        zendeskSolvedTicketQuery(group, solvedWindow),
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
@@ -172,10 +178,8 @@ router.get("/:id/tickets", requireAuth, async (req: any, res) => {
       pages++;
     }
 
-    const onWeek = all.filter((t) => dateSet.has((t.updated_at || "").slice(0, 10)));
-
     // Resolve assignee names
-    const ids = Array.from(new Set(onWeek.map((t) => t.assignee_id).filter(Boolean)));
+    const ids = Array.from(new Set(all.map((t) => t.assignee_id).filter(Boolean)));
     const userMap = new Map<number, string>();
     if (ids.length > 0) {
       const r = await fetch(
@@ -190,9 +194,9 @@ router.get("/:id/tickets", requireAuth, async (req: any, res) => {
 
     return res.json({
       weekOf: report.weekOf,
-      count: onWeek.length,
+      count: all.length,
       configured: true,
-      tickets: onWeek.map((t) => ({
+      tickets: all.map((t) => ({
         id: t.id,
         subject: t.subject,
         status: t.status,
@@ -529,7 +533,9 @@ router.post("/:id/finalize", requireAuth, requireCIO, async (req: any, res) => {
   const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Not found" });
 
-  const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
+  const entries = includedWeeklyLogs(
+    await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf)),
+  );
   const contributors = new Set(entries.map(e => e.userId));
   let totalTickets = entries.reduce((sum, e) => sum + (e.ticketCount ?? 0), 0);
 

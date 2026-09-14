@@ -163,6 +163,39 @@ def safe_int(value: str | None) -> int | None:
         return None
 
 
+def first_observed_int(*values: str | None) -> int | None:
+    """Return the first counter that was actually present, including zero."""
+    for value in values:
+        parsed = safe_int(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def observed_interface_counters(
+    if_table: dict[tuple[int, ...], str],
+    ifx_table: dict[tuple[int, ...], str],
+    if_index: int,
+) -> dict[str, int | str | None]:
+    """Keep unsupported or absent counter OIDs null instead of inventing zero."""
+    in_octets = first_observed_int(
+        ifx_table.get((6, if_index)),
+        if_table.get((10, if_index)),
+    )
+    out_octets = first_observed_int(
+        ifx_table.get((10, if_index)),
+        if_table.get((16, if_index)),
+    )
+    return {
+        "inErrors": safe_int(if_table.get((14, if_index))),
+        "outErrors": safe_int(if_table.get((20, if_index))),
+        "inDiscards": safe_int(if_table.get((13, if_index))),
+        "outDiscards": safe_int(if_table.get((19, if_index))),
+        "inOctets": str(in_octets) if in_octets is not None else None,
+        "outOctets": str(out_octets) if out_octets is not None else None,
+    }
+
+
 def status_name(value: str | None) -> str | None:
     number = safe_int(value)
     return {
@@ -370,6 +403,7 @@ def collect_lldp_target(target: dict) -> dict:
             port_mode = "routed"
         else:
             port_mode = "unknown"
+        counters = observed_interface_counters(if_table, ifx_table, if_index)
         interfaces.append({
             "ifIndex": if_index,
             "interfaceName": name[:80],
@@ -385,12 +419,7 @@ def collect_lldp_target(target: dict) -> dict:
             "allowedVlans": allowed or ([native_vlan] if native_vlan is not None else []),
             "portMode": port_mode,
             "portchannel": str(portchannel)[:40] if portchannel else None,
-            "inErrors": safe_int(if_table.get((14, if_index))) or 0,
-            "outErrors": safe_int(if_table.get((20, if_index))) or 0,
-            "inDiscards": safe_int(if_table.get((13, if_index))) or 0,
-            "outDiscards": safe_int(if_table.get((19, if_index))) or 0,
-            "inOctets": str(safe_int(ifx_table.get((6, if_index))) or safe_int(if_table.get((10, if_index))) or 0),
-            "outOctets": str(safe_int(ifx_table.get((10, if_index))) or safe_int(if_table.get((16, if_index))) or 0),
+            **counters,
         })
 
     return {

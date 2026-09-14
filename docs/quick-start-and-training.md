@@ -41,6 +41,15 @@ Center's Guides and practice card. The full User Guide remains at `/user-guide`.
   The student chooses the new password privately in OnlineKiosk, and no password
   or Temporary Access Pass belongs in Fred, Zendesk, Memory, or a process record.
 
+## Weekly report handoff
+
+Every team member, including a CIO, submits their own weekly log from **My Work
+> Weekly Log**. Wait for the resolved Zendesk ticket lookup to finish before
+reviewing the log. **Save Draft** keeps the entry out of the department report;
+**Submit Weekly Log** makes the entry and its eligible completed-work items
+available to the CIO. A CIO submits their own log first, then opens **Status &
+Reporting > Weekly Reports** to review and publish the department report.
+
 ## Updating training
 
 Application rearrangements must update the route, top-menu configuration,

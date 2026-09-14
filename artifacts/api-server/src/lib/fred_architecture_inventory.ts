@@ -1,3 +1,5 @@
+import { observedPortMeasurements } from "./port_telemetry_policy";
+
 function cell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
   return String(value).replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ").trim();
@@ -112,9 +114,10 @@ export function buildNetworkInventoryAppendix(input: {
   for (const node of [...input.nodes].sort((a, b) => String(a.building).localeCompare(String(b.building)) || String(a.hostname).localeCompare(String(b.hostname)))) {
     const ports = (portsByNode.get(String(node.id)) ?? []).sort((a, b) => String(a.interfaceName).localeCompare(String(b.interfaceName), undefined, { numeric: true }));
     if (!ports.length) continue;
-    out.push(`### ${cell(node.hostname)} — ${cell(node.building)} (${ports.length} physical ports)`, "", "```text", "Interface | Admin | Oper | Description | Mode | Native | Allowed | Po/vPC | MACs | LLDP | In/Out errors | Util% | Telemetry");
+    out.push(`### ${cell(node.hostname)} — ${cell(node.building)} (${ports.length} physical ports)`, "", "```text", "Interface | Admin | Oper | Description | Mode | Native | Allowed | Po/vPC | MACs | LLDP | In/Out errors | In/Out discards | Util% | Optics | Rx/Tx dBm | Temp C | Telemetry");
     for (const port of ports) {
-      out.push([port.interfaceName, port.adminStatus, port.operStatus, port.description, port.portMode, port.nativeVlan, Array.isArray(port.allowedVlans) ? port.allowedVlans.join(",") : port.allowedVlans, [port.portchannel, port.vpcId].filter(Boolean).join("/"), port.macCount, port.lldpNeighborCount, `${port.inErrors ?? 0}/${port.outErrors ?? 0}`, port.utilizationPct, port.telemetryUpdatedAt].map(cell).join(" | "));
+      const measurements = observedPortMeasurements(port);
+      out.push([port.interfaceName, port.adminStatus, port.operStatus, port.description, port.portMode, port.nativeVlan, Array.isArray(port.allowedVlans) ? port.allowedVlans.join(",") : port.allowedVlans, [port.portchannel, port.vpcId].filter(Boolean).join("/"), port.macCount, port.lldpNeighborCount, `${cell(measurements.inErrors)}/${cell(measurements.outErrors)}`, `${cell(measurements.inDiscards)}/${cell(measurements.outDiscards)}`, measurements.utilizationPct, measurements.opticsStatus, `${cell(measurements.rxPowerDbm)}/${cell(measurements.txPowerDbm)}`, measurements.temperatureC, port.telemetryUpdatedAt].map(cell).join(" | "));
     }
     out.push("```", "");
   }

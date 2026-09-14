@@ -12,6 +12,7 @@ import { isIP } from "node:net";
 import crypto from "node:crypto";
 import { normalizeNetworkIdentityData, saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { computeTelemetryPortDelta } from "../lib/network_telemetry_delta";
+import { blankUncollectedPortMeasurements } from "../lib/port_telemetry_policy";
 
 const router = Router();
 
@@ -630,6 +631,10 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     const portMode = iface.mode && ["trunk", "access", "routed", "peerlink", "heartbeat", "unknown"].includes(iface.mode)
       ? iface.mode
       : null;
+    // The normalized SSH collector does not include performance counters or
+    // DOM. Explicit nulls prevent an older measurement from surviving while
+    // this import advances the general port telemetry timestamp.
+    const uncollectedMeasurements = blankUncollectedPortMeasurements();
     const values: any = {
       nodeId: sourceNode.id,
       interfaceName: iface.port.trim(),
@@ -645,6 +650,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       nativeVlan,
       macCount: macCounts.get(telemetryPort(iface.port)) ?? 0,
       lldpNeighborCount: lldpCounts.get(telemetryPort(iface.port)) ?? 0,
+      ...uncollectedMeasurements,
       telemetryEvidence: `collector:${runId}:${sourceHostname}`,
       telemetryUpdatedAt: polledAt,
       updatedAt: new Date(),
@@ -658,6 +664,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       mediaType,
       macCount: values.macCount,
       lldpNeighborCount: values.lldpNeighborCount,
+      ...uncollectedMeasurements,
       telemetryEvidence: values.telemetryEvidence,
       telemetryUpdatedAt: polledAt,
       updatedAt: new Date(),

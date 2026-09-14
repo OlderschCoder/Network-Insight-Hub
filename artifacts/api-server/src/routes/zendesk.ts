@@ -26,6 +26,10 @@ import {
   markZendeskReplyDraftSent,
   saveZendeskReplyDraft,
 } from "../lib/zendesk_reply_drafts";
+import {
+  zendeskSolvedTicketQuery,
+  zendeskSolvedWindow,
+} from "../lib/zendesk_solved_window";
 
 const router = Router();
 
@@ -569,7 +573,7 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
 });
 
 // Tickets resolved by the current logged-in user on a given date (YYYY-MM-DD).
-// Matches by email local-part or by last name (handles Zendesk vs SCCC email differences).
+// Match the authenticated app user's normalized SCCC or explicit Zendesk email.
 router.get("/my-tickets", requireAuth, async (req: any, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {
@@ -583,16 +587,13 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
   if (weekOf && !/^\d{4}-\d{2}-\d{2}$/.test(weekOf)) {
     return res.status(400).json({ error: "Invalid weekOf format, use YYYY-MM-DD" });
   }
-  // Build the date set we're filtering by — single day or all 7 days of the week
-  const dateSet = new Set<string>();
-  if (weekOf) {
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekOf + "T00:00:00Z");
-      d.setUTCDate(d.getUTCDate() + i);
-      dateSet.add(d.toISOString().slice(0, 10));
-    }
-  } else {
-    dateSet.add(date);
+  let solvedWindow;
+  try {
+    solvedWindow = zendeskSolvedWindow(date, weekOf);
+  } catch (error) {
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : "Invalid reporting date",
+    });
   }
   const me = req.user;
   // Strict email match: prefer the explicit zendeskEmail override if set,
@@ -604,15 +605,10 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
 
   try {
     const group = process.env.ZENDESK_GROUP || "Onsite_it";
-    // Pick the earliest date we care about, then fetch from the day before that
-    // and paginate fully. This works for both single-day and weekly queries.
-    const earliest = Array.from(dateSet).sort()[0];
-    const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
-      .toISOString().slice(0, 10);
     const allResults: ZendeskTicket[] = [];
     let nextUrl: string | null =
       `search.json?query=${encodeURIComponent(
-        `type:ticket solved>${dayBefore} group:"${group}"`
+        zendeskSolvedTicketQuery(group, solvedWindow),
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
@@ -625,14 +621,8 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
         : null;
     }
 
-    // Filter to tickets last-updated within the date set. For solved tickets
-    // updated_at corresponds to when the ticket was solved.
-    const onDate = allResults.filter((t) =>
-      dateSet.has((t.updated_at || "").slice(0, 10))
-    );
-
     const candidateIds = Array.from(
-      new Set(onDate.map((t) => t.assignee_id).filter((x): x is number => !!x))
+      new Set(allResults.map((t) => t.assignee_id).filter((x): x is number => !!x))
     );
     const userMap = new Map<number, ZendeskUser>();
     if (candidateIds.length > 0) {
@@ -644,7 +634,7 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
     }
 
     // Match assignee by zendeskEmail override or normalized email local-part
-    const mine = onDate.filter((t) => {
+    const mine = allResults.filter((t) => {
       if (!t.assignee_id) return false;
       const u = userMap.get(t.assignee_id);
       if (!u || !u.email) return false;

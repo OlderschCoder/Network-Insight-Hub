@@ -3,6 +3,10 @@ import { netPortsTable } from "@workspace/db/net_ports";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { collectLldpViaNoc } from "./noc_probe";
+import {
+  blankUncollectedOptics,
+  utilizationPercentFromCurrentPoll,
+} from "./port_telemetry_policy";
 
 export interface LldpMapCollectionSummary {
   vantage: string;
@@ -151,12 +155,18 @@ export async function collectLldpIntoNetworkMap(): Promise<LldpMapCollectionSumm
         inBps = Math.round(Number(currentIn - priorIn) * 8 / elapsedSeconds);
         outBps = Math.round(Number(currentOut - priorOut) * 8 / elapsedSeconds);
       }
-      const speedMbps = observation.speedMbps && observation.speedMbps > 0
+      const observedSpeedMbps = observation.speedMbps && observation.speedMbps > 0
         ? observation.speedMbps
-        : previous?.speedMbps ?? null;
-      const utilizationPct = speedMbps && inBps != null && outBps != null
-        ? Math.min(100, Math.round((Math.max(inBps, outBps) / (speedMbps * 1_000_000)) * 10_000) / 100)
         : null;
+      // Preserve the last known inventory speed for display, but require a
+      // speed returned by this same poll before publishing fresh utilization.
+      // A stale capacity value is not current utilization evidence.
+      const speedMbps = observedSpeedMbps ?? previous?.speedMbps ?? null;
+      const utilizationPct = utilizationPercentFromCurrentPoll({
+        observedSpeedMbps,
+        inBps,
+        outBps,
+      });
       const hasConfig = !!previous?.configUpdatedAt;
       const values = {
         nodeId: source.id,
@@ -192,6 +202,9 @@ export async function collectLldpIntoNetworkMap(): Promise<LldpMapCollectionSumm
         inBps,
         outBps,
         utilizationPct,
+        // This SNMP profile does not collect DOM. Clear older values so this
+        // observation cannot make stale optical measurements look current.
+        ...blankUncollectedOptics(),
         telemetryEvidence: `snmp:10.0.0.22:${device.ip}`.slice(0, 300),
         telemetryUpdatedAt: capturedAt,
         updatedAt: new Date(),

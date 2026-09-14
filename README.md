@@ -42,7 +42,13 @@ as a parallel sign-in path.
 - Records accomplishments, follow-up work, status, dates, notes, and ownership.
 - Lets authorized staff delegate work to another active team member with
   attribution to the assigning person.
-- Rolls individual work into department weekly reporting.
+- Gives every employee, including each CIO, an explicit **Save Draft** or
+  **Submit Weekly Log** choice and rolls only submitted logs into department
+  weekly reporting. Weekly logs last updated before the September 14, 2026
+  submission cutover remain eligible until edited, preserving historical
+  reports; see [weekly-report submission policy](docs/weekly-report-submission-policy.md).
+- Pulls Zendesk work by the ticket's solved-date window for the selected week;
+  later ticket comments or edits do not make previously solved work disappear.
 - Shows the authenticated team a shared Zendesk resolved-ticket scorecard limited
   to Tracy, Mark, Maria, Lucas, Illia, and Craig, including zero-count rows.
 - Provides a supervised Zendesk approval queue: Fred reads the Conversation Log,
@@ -85,6 +91,10 @@ as a parallel sign-in path.
 - Uses one saved campus-map layout for both Buildings and Monitoring. A layout
   saved under Buildings is loaded without browser caching and is refreshed in
   an already-open Monitoring view.
+- CIO users Mark and Tracy can use **Buildings → Edit Map → Building
+  visibility** to show or hide markers and save the choice with marker
+  positions. Mansions is included by default and is backed by `SWA-SLAB`
+  (`192.168.2.176`) and `SWA-SLCDE` (`192.168.2.177`).
 - Presents a campus map, topology map, node details, reciprocal links, and a
   physical Port Map with interface descriptions and learned relationships.
 - Uses current monitoring and topology evidence to distinguish a physical
@@ -111,6 +121,9 @@ as a parallel sign-in path.
 - Gives Fred inventory-freshness evidence: telemetry older than 36 hours or
   never collected, plus configuration evidence older than 90 days or missing.
   Fred reports the affected devices so collection/import work is actionable.
+- Keeps port performance evidence observation-only. Missing SNMP counters,
+  utilization samples, and optics/DOM readings remain blank; Fred never turns
+  an absent measurement into zero or infers optical health from link state.
 - Persists every switch-telemetry import with its collector run ID, failures,
   and per-port delta. Network Map shows the latest check to every user, and
   Fred retains the change log without mistaking observations for outages.
@@ -504,6 +517,9 @@ Telemetry imports are scoped observations, never inventory reconciliation.
 Only explicitly targeted switches are updated; absence from an upload cannot
 mark another asset stale, down, bad, retired, or deleted. See
 [Network drill-down and evidence freshness](docs/network-drilldown-and-freshness.md).
+The same evidence rule applies inside each port: a zero is reported only when
+the collector returned zero. Uncollected counters, utilization, and optical
+diagnostics are represented as null or a blank display value.
 
 ## Portal navigation
 

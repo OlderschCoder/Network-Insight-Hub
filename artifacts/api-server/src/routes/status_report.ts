@@ -45,6 +45,13 @@ import {
   extractNetworkConfigFacts,
 } from "../lib/fred_architecture_inventory";
 import { storeArchitectureProjection } from "../lib/fred_architecture_store";
+import { PORT_TELEMETRY_OBSERVATION_POLICY } from "../lib/port_telemetry_policy";
+import {
+  includedWeeklyLogOwnerWeeks,
+  includedWeeklyLogUserIds,
+  includedWeeklyLogs,
+  weeklyLogOwnerWeekKey,
+} from "../lib/weekly_report_entry_policy";
 
 const router = Router();
 
@@ -281,12 +288,11 @@ router.post(
 
       // Gather operational data from DB
       const [
-        entriesData,
+        entriesDataRaw,
         reportsData,
         risksData,
         aarData,
-        ticketStats,
-        logItemsData,
+        logItemsDataRaw,
         projectsData,
         objectivesData,
         switchesData,
@@ -294,6 +300,7 @@ router.post(
       ] = await Promise.all([
         db
           .select({
+            userId: entries.userId,
             category: entries.category,
             title: entries.title,
             description: entries.description,
@@ -302,6 +309,8 @@ router.post(
             ticketCount: entries.ticketCount,
             entryDate: entries.entryDate,
             weekOf: entries.weekOf,
+            isSubmitted: entries.isSubmitted,
+            updatedAt: entries.updatedAt,
           })
           .from(entries)
           .where(
@@ -377,20 +386,10 @@ router.post(
             ),
           ),
         db
-          .select({
-            total: sql<number>`COALESCE(SUM(${entries.ticketCount}), 0)::int`,
-            categoryCounts: sql<string>`STRING_AGG(DISTINCT ${entries.category}, ',')`,
-          })
-          .from(entries)
-          .where(
-            and(
-              gte(entries.entryDate, start.toISOString().slice(0, 10)),
-              lte(entries.entryDate, end.toISOString().slice(0, 10)),
-            ),
-          ),
-        db
-          .select({
-            title: logItemsTable.title,
+            .select({
+              userId: logItemsTable.userId,
+              weekOf: logItemsTable.weekOf,
+              title: logItemsTable.title,
             category: logItemsTable.category,
             notes: logItemsTable.notes,
             itemDate: logItemsTable.itemDate,
@@ -438,6 +437,22 @@ router.post(
           })
           .from(vlansTable),
       ]);
+
+      const entriesData = includedWeeklyLogs(entriesDataRaw);
+      const reportEligibleOwnerWeeks = includedWeeklyLogOwnerWeeks(entriesData);
+      const logItemsData = logItemsDataRaw.filter((item) =>
+        reportEligibleOwnerWeeks.has(
+          weeklyLogOwnerWeekKey(item.userId, item.weekOf),
+        ),
+      );
+      const ticketStats = [{
+        total: entriesData.reduce(
+          (total, entry) => total + (entry.ticketCount ?? 0),
+          0,
+        ),
+        categoryCounts: [...new Set(entriesData.map((entry) => entry.category))]
+          .join(","),
+      }];
 
       // Filter maintenance windows to the date range — OR semantics on
       // createdAt / windowStart / windowEnd so a window qualifies if any one
@@ -992,6 +1007,8 @@ Never ask the user to repeat a check whose result is already present in the curr
 ## Network evidence workflow
 
 Fresh console output pasted or attached by the user is live evidence. Do not demote it merely because it did not come from an API. Parse its device prompt, command, timestamps, interfaces, neighbors, VLANs, counters, state changes, and errors. State which facts the console proves and when it was observed. Compare those facts with the stored device configuration as the known-good or intended state by calling query_device_config, and with current inventory/telemetry by calling the applicable read-only tools. A stored configuration is a baseline, not proof of current state; console output is current for what it shows, not proof of the entire path.
+
+Port measurement policy: ${PORT_TELEMETRY_OBSERVATION_POLICY}
 
 For link, VLAN, reachability, and building incidents, examine the complete service path rather than one box in isolation:
 1. affected endpoint, SVI, phone, or downstream device;
@@ -1548,11 +1565,12 @@ router.post(
         .toISOString()
         .slice(0, 10);
 
-      const [tasksData, entriesData, risksData, aarData, projectsData] =
+      const [tasksDataRaw, entriesDataRaw, risksData, aarData, projectsData] =
         await Promise.all([
           db
             .select({
               id: logItemsTable.id,
+              userId: logItemsTable.userId,
               title: logItemsTable.title,
               category: logItemsTable.category,
               itemDate: logItemsTable.itemDate,
@@ -1563,10 +1581,13 @@ router.post(
           db
             .select({
               id: entriesTable.id,
+              userId: entriesTable.userId,
               title: entriesTable.title,
               category: entriesTable.category,
               challenges: entriesTable.challenges,
               description: entriesTable.description,
+              isSubmitted: entriesTable.isSubmitted,
+              updatedAt: entriesTable.updatedAt,
             })
             .from(entriesTable)
             .where(eq(entriesTable.weekOf, weekOf))
@@ -1622,6 +1643,11 @@ router.post(
             .limit(100),
         ]);
 
+      const entriesData = includedWeeklyLogs(entriesDataRaw);
+      const eligibleUserIds = includedWeeklyLogUserIds(entriesData);
+      const tasksData = tasksDataRaw.filter((task) =>
+        eligibleUserIds.has(task.userId),
+      );
       const knowledgeContext = await getKnowledgeContext();
       const context = {
         weekOf,

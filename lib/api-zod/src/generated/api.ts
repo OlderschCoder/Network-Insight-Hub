@@ -684,6 +684,11 @@ export const GetAggregateReportResponse = zod.object({
   weekOf: zod.string(),
   totalEntries: zod.number(),
   contributorCount: zod.number(),
+  eligibleUserIds: zod
+    .array(zod.number())
+    .describe(
+      "User IDs whose weekly logs satisfy the shared department-report submission policy.",
+    ),
   byRole: zod.record(zod.string(), zod.number()).optional(),
   byCategory: zod.record(zod.string(), zod.number()).optional(),
   totalTickets: zod.number().optional(),

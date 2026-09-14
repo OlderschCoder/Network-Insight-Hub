@@ -111,6 +111,13 @@ numeric-OID `snmpwalk` requests from `10.0.0.22`, and the Hub records confirmed
 port-to-port links. Unknown LLDP neighbors are reported for review and are not
 automatically added as trusted devices.
 
+Counter fields are observation-only. If a device/profile does not return an
+error, discard, or octet OID, the probe emits JSON `null`; it never substitutes
+zero. Zero remains valid when the OID explicitly returns zero. Utilization is
+calculated only from two valid octet observations, a valid interval, and known
+port speed. This probe does not collect optics/DOM, so those fields remain
+blank until an approved optical telemetry source supplies them.
+
 On `10.0.0.22`, install or update the probe once:
 
 ```bash

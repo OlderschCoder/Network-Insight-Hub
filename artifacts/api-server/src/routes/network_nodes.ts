@@ -1,11 +1,31 @@
 import { Router } from "express";
 import { db, netNodesTable, netLinksTable, vlansTable, networkLayoutPositionsTable, azureVmsTable, networkSwitchesTable } from "@workspace/db";
 import { eq, or, ilike, and, inArray, sql } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { pingManyViaNoc } from "../lib/noc_probe";
 import { parseFredNocPingManyResponse } from "../lib/fred_noc_ping_validation";
+import {
+  DEFAULT_AUTHORITATIVE_BUILDINGS,
+  getAssignedBuildingName,
+  getCanonicalBuildingName,
+  normalizeBuildingKey,
+} from "../lib/building_assignment";
+import {
+  BUILDING_LEGACY_HIDDEN_PREFIX,
+  BUILDING_OVERLAY_HIDDEN_PREFIX,
+  BUILDING_OVERLAY_PREFIX,
+  buildingOverlayDeleteSchema,
+  buildingOverlayHiddenNodeId,
+  buildingOverlayNodeId,
+  buildingOverlayPutSchema,
+  buildingVisibilityMetadataNodeIds,
+  getBuildingVisibilityMutation,
+  serializeBuildingMapLayoutRows,
+} from "../lib/building_map_layout";
+
+export { getCanonicalBuildingName } from "../lib/building_assignment";
 
 const router = Router();
 
@@ -16,44 +36,12 @@ const INFLUX_URL   = process.env.INFLUXDB_URL;      // e.g. http://10.0.0.22:808
 const INFLUX_TOKEN = process.env.INFLUXDB_TOKEN;     // read-only token
 const INFLUX_ORG   = process.env.INFLUXDB_ORG ?? "SCCC";
 const INFLUX_BUCKET = process.env.INFLUXDB_BUCKET ?? "telegraf";
-const BUILDING_OVERLAY_PREFIX = "building-overlay:";
 const BUILDING_MASTER_PREFIX = "building-master:";
 const NOC_REACHABILITY_CACHE_MS = 30_000;
 const nocReachabilityCache = new Map<
   string,
   { status: LiveStatus; observedAt: string; expiresAt: number }
 >();
-const DEFAULT_AUTHORITATIVE_BUILDINGS = [
-  "Agriculture",
-  "Allied Health",
-  "Azure (Hybrid-VNet)",
-  "Baseball Field",
-  "Business",
-  "Campus Wide",
-  "Cosmetology",
-  "Epworth ALC",
-  "Hobble",
-  "Humanities",
-  "Industrial Technology Campus",
-  "Tech Building A",
-  "Tech Building B",
-  "Tech Building D",
-  "Tech Building T",
-  "Maintenance Building",
-  "Sharp Champion Center",
-  "Softball Field",
-  "Student Health Center",
-  "Student Living Center",
-  "Student Living F",
-  "Student Living G",
-  "Student Living H",
-  "Student Living J",
-  "Student Living R",
-  "Student Living S",
-  "Student Living T",
-  "Student Union / Student Activities",
-  "West Campus",
-] as const;
 const BUILDING_MONITOR_IPS: Record<string, string[]> = {
   Agriculture: ["192.168.2.195"],
   "Allied Health": ["192.168.2.44", "192.168.2.216"],
@@ -86,6 +74,7 @@ const BUILDING_MONITOR_IPS: Record<string, string[]> = {
     "192.168.2.190",
   ],
   "Maintenance Building": ["192.168.2.205"],
+  Mansions: ["192.168.2.176", "192.168.2.177"],
   "Sharp Champion Center": ["192.168.2.203"],
   "Softball Field": ["192.168.2.204"],
   "Student Health Center": ["192.168.2.212"],
@@ -292,113 +281,6 @@ function isMonitorableHost(value: string | null | undefined): value is string {
   return !!key && !["unknown", "n/a", "na", "none", "null", "tbd", "pending"].includes(key);
 }
 
-function normalizeBuildingKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-export function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
-  const original = rawBuilding?.trim();
-  if (!original) return "Unknown Building";
-
-  const key = normalizeBuildingKey(original);
-  const exactMatches: Record<string, string> = {
-    "academic arts": "Hobble",
-    "academic arts 144": "Hobble",
-    "academic arts 161": "Hobble",
-    "agriculture v201": "Agriculture",
-    "allied health": "Allied Health",
-    "baseball field pressbox": "Baseball Field",
-    "campus wide": "Campus Wide",
-    "canoys wide": "Campus Wide",
-    "cio office aa151": "Hobble",
-    "cosmetology cos109": "Cosmetology",
-    "epworth alc building": "Epworth ALC",
-    "main campus": "Hobble",
-    "sharp center": "Sharp Champion Center",
-    "softball": "Softball Field",
-    "student union": "Student Union / Student Activities",
-    "student union gym 208 sugymcam": "Student Union / Student Activities",
-    "student living center slc151": "Student Living Center",
-    "student life ab": "Student Living Center",
-    "student life de": "Student Living Center",
-    "swa slab": "Student Living Center",
-    "swa slcde": "Student Living Center",
-    "student living slg": "Student Living Center",
-    "student living slh": "Student Living Center",
-    "student living slj": "Student Living Center",
-    "student living slr": "Student Living Center",
-    "student living sls": "Student Living Center",
-    "student living slt": "Student Living Center",
-    "tech ta107": "Industrial Technology Campus",
-    "tech tt103": "Industrial Technology Campus",
-    "tech t122 mgmt": "Industrial Technology Campus",
-    "tech t122 svi": "Industrial Technology Campus",
-    "tech b141": "Industrial Technology Campus",
-    "tech d201": "Industrial Technology Campus",
-    "tech core 3": "Industrial Technology Campus",
-    "tech core 4": "Industrial Technology Campus",
-    "tech building": "Industrial Technology Campus",
-    "tech building b": "Industrial Technology Campus",
-    "tech building d": "Industrial Technology Campus",
-    "tech building f": "Industrial Technology Campus",
-    "tech building t": "Industrial Technology Campus",
-    "technology": "Industrial Technology Campus",
-    "technology a": "Industrial Technology Campus",
-    "technology b": "Industrial Technology Campus",
-    "technology d": "Industrial Technology Campus",
-    "technology t": "Industrial Technology Campus",
-    "west campus": "West Campus",
-  };
-  if (exactMatches[key]) return exactMatches[key];
-
-  if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
-  if (key.includes("azure")) return "Azure (Hybrid-VNet)";
-  if (key.includes("student health")) return "Student Health Center";
-  if (key.includes("student living") || key.includes("student life") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) {
-    return "Student Living Center";
-  }
-  if (key.includes("student union") || key.includes("student activities") || key.includes("sports & activities")) {
-    return "Student Union / Student Activities";
-  }
-  if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) {
-    return "Sharp Champion Center";
-  }
-  if (key.includes("allied health") || key.includes("colvin family center")) return "Allied Health";
-  if (key.includes("agriculture")) return "Agriculture";
-  if (key.includes("cosmetology")) return "Cosmetology";
-  if (key.includes("humanities")) return "Humanities";
-  if (key.includes("maintenance")) return "Maintenance Building";
-  if (key.includes("baseball")) return "Baseball Field";
-  if (key.includes("softball")) return "Softball Field";
-  if (key.includes("epworth")) return "Epworth ALC";
-  if (key.includes("hobble")) return "Hobble";
-  if (
-    key.includes("aa105") ||
-    key.includes("aa151") ||
-    key.includes("a161") ||
-    key.includes("aa 105") ||
-    key.includes("aa 151") ||
-    key.includes("a 144") ||
-    key.includes("aa 144") ||
-    key.includes("fortigate firewall") ||
-    key.includes("nexus core 1") ||
-    key.includes("nexus core 2")
-  ) {
-    return "Hobble";
-  }
-  if (
-    key.includes("industrial tech") ||
-    key.includes("industrial technology campus") ||
-    key.startsWith("tech ") ||
-    key === "technology" ||
-    key.startsWith("technology ")
-  ) {
-    return "Industrial Technology Campus";
-  }
-
-  return original;
-}
-
 function getBuildingMonitorHosts(buildingName: string, fallbackHosts: string[]): string[] {
   const monitors = BUILDING_MONITOR_IPS[buildingName];
   if (monitors?.length) return monitors;
@@ -483,16 +365,6 @@ function isConnectivityObjectNode(
   return false;
 }
 
-function overlayNodeId(code: string): string {
-  return `${BUILDING_OVERLAY_PREFIX}${code}`;
-}
-
-function overlayCodeFromNodeId(nodeId: string): string | null {
-  return nodeId.startsWith(BUILDING_OVERLAY_PREFIX)
-    ? nodeId.slice(BUILDING_OVERLAY_PREFIX.length)
-    : null;
-}
-
 function explicitBuildingNodeId(name: string): string {
   return `${BUILDING_MASTER_PREFIX}${encodeURIComponent(name.trim())}`;
 }
@@ -526,42 +398,9 @@ async function listAuthoritativeBuildings(): Promise<string[]> {
   return canonicalBuildings;
 }
 
-function getAssignedBuildingName(building: string | null | undefined, location?: string | null, hostname?: string | null): string {
-  const hint = normalizeBuildingKey(`${location ?? ""} ${hostname ?? ""}`);
-  if (/\btech core\b/.test(hint)) return "Industrial Technology Campus";
-  const lettered: Array<[RegExp, string]> = [
-    [/\b(?:slg|student living g)\b/, "Student Living G"],
-    [/\b(?:slh|dorm h|building h)\b/, "Student Living H"],
-    [/\b(?:slj|dorms? j|building j)\b/, "Student Living J"],
-    [/\b(?:slr|dorm r|building r)\b/, "Student Living R"],
-    [/\b(?:sls|student living s)\b/, "Student Living S"],
-    [/\b(?:slt|student living t)\b/, "Student Living T"],
-    [/\b(?:ta107|tech ta|technology a)\b/, "Tech Building A"],
-    [/\b(?:tb141|tech b141|technology b)\b/, "Tech Building B"],
-    [/\b(?:td201|tech d201|technology d)\b/, "Tech Building D"],
-    [/\b(?:slf|student living f|building f)\b/, "Student Living F"],
-    [/\b(?:tt103|t122|technology t)\b/, "Tech Building T"],
-  ];
-  for (const [pattern, assigned] of lettered) if (pattern.test(hint)) return assigned;
-  return getCanonicalBuildingName(building);
-}
-
 async function getBuildingMapLayoutPositions() {
   const rows = await db.select().from(networkLayoutPositionsTable);
-  return rows
-    .map((row) => {
-      const code = overlayCodeFromNodeId(row.nodeId);
-      if (!code) return null;
-      return {
-        code,
-        x: row.x,
-        y: row.y,
-        labelDx: row.width ?? null,
-        labelDy: row.height ?? null,
-        updatedAt: row.updatedAt.toISOString(),
-      };
-    })
-    .filter(Boolean);
+  return serializeBuildingMapLayoutRows(rows);
 }
 
 export async function getBuildingSummaries() {
@@ -1302,16 +1141,6 @@ router.delete("/links/:id", requireAuth, async (req, res) => {
 // BUILDINGS – summary + detail
 // ---------------------------------------------------------------------------
 
-const buildingOverlayPutSchema = z.object({
-  positions: z.array(z.object({
-    code: z.string().trim().min(1).max(20),
-    x: z.number().finite().min(0).max(100),
-    y: z.number().finite().min(0).max(100),
-    labelDx: z.number().finite().min(-400).max(400).optional().nullable(),
-    labelDy: z.number().finite().min(-400).max(400).optional().nullable(),
-  })).min(1).max(100),
-});
-
 router.get("/public/buildings/map-layout", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   return res.json(await getBuildingMapLayoutPositions());
@@ -1331,7 +1160,7 @@ router.get("/buildings/map-layout", requireAuth, async (_req, res) => {
   return res.json(await getBuildingMapLayoutPositions());
 });
 
-router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
+router.put("/buildings/map-layout", requireAuth, requireCIO, async (req: any, res) => {
   const parsed = buildingOverlayPutSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1340,7 +1169,7 @@ router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
   const now = new Date();
   const userId = req.user?.id ?? null;
   const values = parsed.data.positions.map((position) => ({
-    nodeId: overlayNodeId(position.code),
+    nodeId: buildingOverlayNodeId(position.code),
     x: position.x,
     y: position.y,
     width: position.labelDx ?? null,
@@ -1348,45 +1177,78 @@ router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
     updatedAt: now,
     updatedBy: userId,
   }));
+  const visibilityMutation = getBuildingVisibilityMutation(parsed.data.positions);
+  const hiddenValues = visibilityMutation.hiddenCodesToInsert.map((code) => ({
+    nodeId: buildingOverlayHiddenNodeId(code),
+    x: 0,
+    y: 0,
+    width: null,
+    height: null,
+    updatedAt: now,
+    updatedBy: userId,
+  }));
 
-  await db
-    .insert(networkLayoutPositionsTable)
-    .values(values)
-    .onConflictDoUpdate({
-      target: networkLayoutPositionsTable.nodeId,
-      set: {
-        x: sql`excluded.x`,
-        y: sql`excluded.y`,
-        width: sql`excluded.width`,
-        height: sql`excluded.height`,
-        updatedAt: sql`excluded.updated_at`,
-        updatedBy: sql`excluded.updated_by`,
-      },
-    });
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(networkLayoutPositionsTable)
+      .values(values)
+      .onConflictDoUpdate({
+        target: networkLayoutPositionsTable.nodeId,
+        set: {
+          x: sql`excluded.x`,
+          y: sql`excluded.y`,
+          width: sql`excluded.width`,
+          height: sql`excluded.height`,
+          updatedAt: sql`excluded.updated_at`,
+          updatedBy: sql`excluded.updated_by`,
+        },
+      });
+
+    // Visibility metadata uses ordinary layout rows so no production schema
+    // migration can strand the map. Only explicit visibility values modify
+    // tombstones, so an older cached editor cannot reveal hidden buildings.
+    if (visibilityMutation.nodeIdsToDelete.length > 0) {
+      await tx
+        .delete(networkLayoutPositionsTable)
+        .where(inArray(
+          networkLayoutPositionsTable.nodeId,
+          visibilityMutation.nodeIdsToDelete,
+        ));
+    }
+
+    if (hiddenValues.length > 0) {
+      await tx.insert(networkLayoutPositionsTable).values(hiddenValues);
+    }
+  });
 
   return res.json({ saved: values.length });
 });
 
-router.delete("/buildings/map-layout", requireAuth, async (req, res) => {
-  const parsed = z.object({
-    codes: z.array(z.string().trim().min(1).max(20)).optional(),
-  }).safeParse(req.body ?? {});
+router.delete("/buildings/map-layout", requireAuth, requireCIO, async (req, res) => {
+  const parsed = buildingOverlayDeleteSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
   }
 
   const codes = parsed.data.codes ?? [];
   if (codes.length > 0) {
+    const nodeIds = codes.flatMap((code) => [
+      buildingOverlayNodeId(code),
+      ...buildingVisibilityMetadataNodeIds(code),
+    ]);
     await db
       .delete(networkLayoutPositionsTable)
-      .where(inArray(networkLayoutPositionsTable.nodeId, codes.map(overlayNodeId)));
+      .where(inArray(networkLayoutPositionsTable.nodeId, nodeIds));
     return res.json({ ok: true, removed: codes.length });
   }
 
   const rows = await db.select().from(networkLayoutPositionsTable);
   const ids = rows
     .map((row) => row.nodeId)
-    .filter((nodeId) => nodeId.startsWith(BUILDING_OVERLAY_PREFIX));
+    .filter((nodeId) =>
+      nodeId.startsWith(BUILDING_OVERLAY_PREFIX)
+      || nodeId.startsWith(BUILDING_OVERLAY_HIDDEN_PREFIX)
+      || nodeId.startsWith(BUILDING_LEGACY_HIDDEN_PREFIX));
 
   if (ids.length > 0) {
     await db.delete(networkLayoutPositionsTable).where(inArray(networkLayoutPositionsTable.nodeId, ids));

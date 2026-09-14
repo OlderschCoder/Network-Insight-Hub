@@ -40,6 +40,29 @@ flowchart LR
 - Missing evidence is reported as `never_collected` or `not_imported`; it is
   never interpreted as a healthy or known-good device.
 
+## Per-metric evidence coverage
+
+Port timestamps describe the overall observation, not proof that every metric
+was available. Error and discard counters, utilization, and optics/DOM values
+are independently observation-only:
+
+- A returned numeric zero is retained as an observed zero.
+- A missing or unsupported OID is stored and reported as `null` (rendered as a
+  blank/em dash), never converted to zero.
+- Utilization requires two valid octet observations, a valid elapsed interval,
+  and a positive port speed observed in the current poll. A stored speed from
+  an older poll may remain visible as inventory context, but it is not reused
+  to manufacture a fresh utilization value. Otherwise utilization remains blank.
+- The current NOC SNMP profile does not collect optics/DOM. Link-up state,
+  transceiver media type, speed, and a fresh port timestamp cannot substitute
+  for received/transmit power, temperature, or optical alarm evidence.
+- A normalized SSH telemetry import explicitly clears older counter,
+  utilization, and DOM values because that import schema does not collect
+  them. This prevents stale measurements from masquerading as current.
+
+Fred receives nulls plus this evidence policy and must say “not collected” or
+“unavailable” rather than infer a healthy value.
+
 ## Telemetry run history and delta
 
 Every telemetry file declares its collection scope and exact target IPs. A

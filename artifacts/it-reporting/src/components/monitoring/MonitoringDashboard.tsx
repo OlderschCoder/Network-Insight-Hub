@@ -27,7 +27,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CampusStatusMap, getCampusMapDisplayEntries } from "@/pages/network/buildings";
+import {
+  CampusStatusMap,
+  getCampusMapDisplayEntries,
+  type OverlayPosition,
+} from "@/pages/network/buildings";
 
 const API = "/api";
 const AUTH_MONITORING_API = `${API}/network/monitoring/summary`;
@@ -48,7 +52,7 @@ interface MonitoringBuildingSummary {
   monitoringStrategy?: string;
 }
 
-interface MonitoringSnapshot {
+export interface MonitoringSnapshot {
   configured: boolean;
   reachable: boolean;
   lastUpdatedAt: string | null;
@@ -119,18 +123,24 @@ async function monitoringResponseError(response: Response) {
   return `${statusMessage} Retrying automatically.`;
 }
 
-function getCampusMapBuildings(snapshot: MonitoringSnapshot | null) {
+export function getCampusMapBuildings(
+  snapshot: MonitoringSnapshot | null,
+  layout: Record<string, Pick<OverlayPosition, "visible">> = {},
+) {
   if (!snapshot) return [];
-  return getCampusMapDisplayEntries(snapshot.buildings).map((entry) => ({
+  return getCampusMapDisplayEntries(snapshot.buildings, layout).map((entry) => ({
     code: entry.code,
     healthColor: entry.match?.healthColor ?? "unknown",
   }));
 }
 
-function snapshotMode(snapshot: MonitoringSnapshot | null) {
+export function snapshotMode(
+  snapshot: MonitoringSnapshot | null,
+  layout: Record<string, Pick<OverlayPosition, "visible">> = {},
+) {
   if (!snapshot?.configured) return "not-configured";
   if (!snapshot.reachable) return "telemetry-unreachable";
-  const campusMapBuildings = getCampusMapBuildings(snapshot);
+  const campusMapBuildings = getCampusMapBuildings(snapshot, layout);
   const campusMapAllGreen =
     campusMapBuildings.length > 0 &&
     campusMapBuildings.every((building) => building.healthColor === "green");
@@ -149,7 +159,11 @@ function snapshotMode(snapshot: MonitoringSnapshot | null) {
 
 function modeCopy(
   snapshot: MonitoringSnapshot | null,
-  options: { loading: boolean; error: string | null },
+  options: {
+    loading: boolean;
+    error: string | null;
+    layout: Record<string, Pick<OverlayPosition, "visible">>;
+  },
 ) {
   if (!snapshot && options.loading) {
     return {
@@ -167,7 +181,7 @@ function modeCopy(
       tone: "from-amber-950 via-amber-900 to-slate-900",
     };
   }
-  const mode = snapshotMode(snapshot);
+  const mode = snapshotMode(snapshot, options.layout);
   if (mode === "not-configured") {
     return {
       title: "Monitoring not configured",
@@ -263,6 +277,7 @@ function OverviewCard({
 
 export function MonitoringDashboard({ publicMode = false }: { publicMode?: boolean }) {
   const [snapshot, setSnapshot] = useState<MonitoringSnapshot | null>(null);
+  const [campusMapLayout, setCampusMapLayout] = useState<Record<string, OverlayPosition>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -306,8 +321,8 @@ export function MonitoringDashboard({ publicMode = false }: { publicMode?: boole
   }, [load]);
 
   const copy = useMemo(
-    () => modeCopy(snapshot, { loading, error }),
-    [error, loading, snapshot],
+    () => modeCopy(snapshot, { loading, error, layout: campusMapLayout }),
+    [campusMapLayout, error, loading, snapshot],
   );
 
   const vendorRows = useMemo(
@@ -326,8 +341,8 @@ export function MonitoringDashboard({ publicMode = false }: { publicMode?: boole
   );
 
   const campusMapBuildings = useMemo(
-    () => getCampusMapBuildings(snapshot),
-    [snapshot],
+    () => getCampusMapBuildings(snapshot, campusMapLayout),
+    [campusMapLayout, snapshot],
   );
 
   const campusMapGreenCount = useMemo(
@@ -417,7 +432,11 @@ export function MonitoringDashboard({ publicMode = false }: { publicMode?: boole
           </div>
 
           <div className="space-y-6">
-            <CampusStatusMap buildings={snapshot.buildings} publicMode={publicMode} />
+            <CampusStatusMap
+              buildings={snapshot.buildings}
+              publicMode={publicMode}
+              onLayoutChange={setCampusMapLayout}
+            />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">

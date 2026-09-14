@@ -226,8 +226,7 @@ export default function ReportDetail() {
     }
   };
 
-  const toggleItem = async (itemId: number, checked: boolean) => {
-    const allIds = ((weekItems ?? []) as any[]).map((it: any) => it.id as number);
+  const toggleItem = async (itemId: number, checked: boolean, allIds: number[]) => {
     const current = selectedItemIds ?? allIds;
     const next = checked
       ? Array.from(new Set([...current, itemId]))
@@ -311,7 +310,14 @@ export default function ReportDetail() {
   const agg: any = aggregate ?? {};
   const entries: any[] = agg.entrySummaries ?? [];
   const risks: any[] = agg.risks ?? [];
-  const items: any[] = (weekItems ?? []) as any[];
+  const eligibleUserIds = new Set<number>(
+    Array.isArray(agg.eligibleUserIds)
+      ? agg.eligibleUserIds.filter((userId: unknown): userId is number => typeof userId === "number")
+      : entries.map((entry) => entry.userId).filter((userId) => typeof userId === "number"),
+  );
+  const items: any[] = ((weekItems ?? []) as any[]).filter((item) =>
+    eligibleUserIds.has(item.userId),
+  );
 
   // Group items per user for the per-contributor breakdown
   const itemsByUser: Record<number, any[]> = {};
@@ -449,7 +455,9 @@ export default function ReportDetail() {
 
       {/* Included in this export — preview */}
       {(() => {
-        const tasksIncluded = (selectedItemIds === null ? items.length : selectedItemIds.length)
+        const tasksIncluded = (selectedItemIds === null
+          ? items.length
+          : items.filter((item) => selectedItemIds.includes(item.id)).length)
           + customTasks.length;
         const ticketsList = (ticketsResponse as { tickets?: unknown[] } | undefined)?.tickets;
         const ticketsIncluded = Array.isArray(ticketsList) ? ticketsList.length : 0;
@@ -594,7 +602,9 @@ export default function ReportDetail() {
                         id={`item-${it.id}`}
                         checked={checked}
                         disabled={!canEdit}
-                        onCheckedChange={(v) => toggleItem(it.id, v === true)}
+                        onCheckedChange={(v) =>
+                          toggleItem(it.id, v === true, allIds)
+                        }
                         className="mt-0.5"
                       />
                       <label htmlFor={`item-${it.id}`} className="flex-1 cursor-pointer">

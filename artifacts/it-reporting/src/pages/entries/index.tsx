@@ -101,6 +101,9 @@ export default function Entries() {
                           {entry.ticketCount} ticket{entry.ticketCount !== 1 ? "s" : ""}
                         </Badge>
                       )}
+                      <Badge variant={entry.isSubmitted ? "default" : "secondary"}>
+                        {entry.isSubmitted ? "Submitted" : "Draft"}
+                      </Badge>
                     </div>
                     <p className="font-medium truncate">{entry.title}</p>
                     {entry.description && (

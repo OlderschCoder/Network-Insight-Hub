@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { useListLogItems } from "@workspace/api-client-react";
-import { ArrowLeft, ArrowUpRight, Ticket, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Ticket, ExternalLink, Send, Save } from "lucide-react";
 import { format, startOfISOWeek, addDays } from "date-fns";
 import { todayCentral } from "@/lib/dates";
 
@@ -61,6 +61,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+  const [submissionIntent, setSubmissionIntent] = useState<"draft" | "submit" | null>(null);
 
   // Allow ?weekOf=YYYY-MM-DD when arriving from Items page
   const urlParams = typeof window !== "undefined"
@@ -76,6 +77,8 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
   const [tickets, setTickets] = useState<ZTicket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [ticketsLoadedWeek, setTicketsLoadedWeek] = useState<string | null>(null);
+  const [ticketRefresh, setTicketRefresh] = useState(0);
 
   const {
     register,
@@ -114,32 +117,47 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
 
   useEffect(() => {
     if (!weekOf) return;
+    const controller = new AbortController();
+    setTickets([]);
     setTicketsLoading(true);
     setTicketsError(null);
+    setTicketsLoadedWeek(null);
     const token = localStorage.getItem("auth_token");
     fetch(
       `${import.meta.env.BASE_URL}api/zendesk/my-tickets?weekOf=${weekOf}`,
-      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
+      }
     )
       .then(async (r) => {
         const body = await r.json();
         if (!r.ok) {
           setTicketsError(body.message || body.error || "Failed to load");
-          setTickets([]);
         } else {
           setTickets(body.tickets ?? []);
+          setTicketsLoadedWeek(weekOf);
         }
       })
-      .catch((e) => setTicketsError(e.message))
-      .finally(() => setTicketsLoading(false));
-  }, [weekOf]);
+      .catch((e) => {
+        if (e.name !== "AbortError") setTicketsError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTicketsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [weekOf, ticketRefresh]);
+
+  const ticketsReady = ticketsLoadedWeek === weekOf && !ticketsLoading && !ticketsError;
 
   const weekDays = Array.from({ length: 7 }, (_, i) =>
     weekOf ? format(addDays(new Date(weekOf + "T00:00:00"), i), "yyyy-MM-dd") : ""
   );
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormData, isSubmitted: boolean) => {
     setSubmitting(true);
+    setSubmissionIntent(isSubmitted ? "submit" : "draft");
     const token = localStorage.getItem("auth_token");
     try {
       const url =
@@ -161,7 +179,8 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           entryDate: data.weekOf,
           challenges: data.challenges || undefined,
           supportNeeded: data.supportNeeded || undefined,
-          zendeskTicketIds: tickets.map((t) => t.id),
+          isSubmitted,
+          ...(ticketsReady ? { zendeskTicketIds: tickets.map((t) => t.id) } : {}),
         }),
       });
       if (!r.ok) {
@@ -175,6 +194,7 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
       alert(`Save failed: ${e.message}`);
     } finally {
       setSubmitting(false);
+      setSubmissionIntent(null);
     }
   };
 
@@ -193,9 +213,18 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form
+        onSubmit={handleSubmit((data) => onSubmit(data, Boolean(entry?.isSubmitted)))}
+        className="space-y-5"
+      >
         <Card>
           <CardContent className="pt-6 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Submission status</p>
+              <Badge variant={entry?.isSubmitted ? "default" : "secondary"}>
+                {entry?.isSubmitted ? "Submitted" : "Draft"}
+              </Badge>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="weekOf">Week of (Monday)</Label>
@@ -315,7 +344,17 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
               <p className="text-sm text-muted-foreground">Checking Zendesk...</p>
             )}
             {ticketsError && (
-              <p className="text-sm text-amber-500">Couldn't load: {ticketsError}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-amber-500">Couldn't load: {ticketsError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTicketRefresh((value) => value + 1)}
+                >
+                  Retry tickets
+                </Button>
+              </div>
             )}
             {!ticketsLoading && !ticketsError && tickets.length === 0 && (
               <p className="text-sm text-muted-foreground">
@@ -390,9 +429,33 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
-          <Button type="submit" disabled={submitting} className="flex-1">
-            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Weekly Log"}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={submitting}
+            onClick={() => void handleSubmit((data) => onSubmit(data, false))()}
+            className="flex-1"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {submissionIntent === "draft"
+              ? "Saving..."
+              : entry?.isSubmitted
+                ? "Return to Draft"
+                : "Save Draft"}
+          </Button>
+          <Button
+            type="button"
+            disabled={submitting || (!entry?.isSubmitted && !ticketsReady)}
+            onClick={() => void handleSubmit((data) => onSubmit(data, true))()}
+            className="flex-1"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {submissionIntent === "submit"
+              ? "Submitting..."
+              : entry?.isSubmitted
+                ? "Save Submitted Changes"
+                : "Submit Weekly Log"}
           </Button>
           <Link href={backHref}>
             <Button variant="outline" type="button">
@@ -400,6 +463,16 @@ export default function EntryForm({ mode, entry }: EntryFormProps) {
             </Button>
           </Link>
         </div>
+        {ticketsLoading && (
+          <p className="text-xs text-muted-foreground">
+            Submit will be available after this week's Zendesk tickets finish loading.
+          </p>
+        )}
+        {ticketsError && (
+          <p className="text-xs text-amber-500">
+            Save a draft and retry the Zendesk lookup before submitting, so resolved tickets are not omitted.
+          </p>
+        )}
       </form>
     </div>
   );

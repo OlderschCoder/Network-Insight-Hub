@@ -76,7 +76,7 @@ const firstRunSteps = [
     number: "03",
     title: "Finish the weekly loop",
     icon: FileCheck2,
-    body: "Generate and review your Weekly Log near week-end. The CIO uses submitted logs, risks, reviews, and resolved Zendesk work to assemble the department report.",
+    body: "Open your Weekly Log near week-end and wait for its resolved Zendesk tickets to finish loading. Save Draft keeps it private; Submit Weekly Log includes it in the department report. CIOs submit their own log first, then review the department report.",
     actions: [
       { label: "Open Weekly Log", href: "/entries" },
       { label: "Open Reports", href: "/reports" },

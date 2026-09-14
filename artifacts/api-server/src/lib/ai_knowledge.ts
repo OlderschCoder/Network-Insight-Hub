@@ -46,6 +46,11 @@ import {
 } from "./noc_probe";
 import { getFredFilePreview, listFredFiles } from "./fred_files";
 import {
+  fredPortMeasurementOutput,
+  hasObservedPortMeasurementIssue,
+  PORT_TELEMETRY_OBSERVATION_POLICY,
+} from "./port_telemetry_policy";
+import {
   upsertSwitchByHostname,
   upsertVlanByVlanId,
   previewSwitchByHostname,
@@ -3380,7 +3385,7 @@ export const QUERY_SWITCH_PORTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool
     function: {
       name: "query_switch_ports",
       description:
-        "Read current Port Map interface telemetry, including room/device descriptions, up/down state, learned endpoints, LLDP evidence, VLANs, errors, utilization, and optics. It can search across all switches for labels such as AA109. Use this for ports connected to phones/computers as well as switch links. Read-only.",
+        "Read current Port Map interface evidence, including room/device descriptions, up/down state, learned endpoints, LLDP evidence, VLANs, and observed errors, utilization, or optics. Uncollected measurements are null, never inferred. It can search across all switches for labels such as AA109. Read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -3501,12 +3506,7 @@ export async function executeQuerySwitchPorts(
       const hasIssue =
         (normalizedText(port.adminStatus) === "up" &&
           normalizedText(port.operStatus) !== "up") ||
-        (port.inErrors ?? 0) > 0 ||
-        (port.outErrors ?? 0) > 0 ||
-        (port.inDiscards ?? 0) > 0 ||
-        (port.outDiscards ?? 0) > 0 ||
-        (port.utilizationPct ?? 0) >= 80 ||
-        !["", "ok", "normal", "up"].includes(normalizedText(port.opticsStatus));
+        hasObservedPortMeasurementIssue(port);
       return (
         (!freeQuery || allHaystack.includes(freeQuery)) &&
         (!switchQuery || nodeHaystack.includes(switchQuery)) &&
@@ -3536,6 +3536,7 @@ export async function executeQuerySwitchPorts(
           confidence: link.confidence,
         };
       });
+      const measurements = fredPortMeasurementOutput(port);
       return {
         switch: node.hostname,
         managementIp: node.mgmtIp,
@@ -3558,15 +3559,10 @@ export async function executeQuerySwitchPorts(
         duplex: port.duplex,
         mediaType: port.mediaType,
         portchannel: port.portchannel,
-        errors: { in: port.inErrors ?? 0, out: port.outErrors ?? 0 },
-        discards: { in: port.inDiscards ?? 0, out: port.outDiscards ?? 0 },
-        utilizationPct: port.utilizationPct,
-        optics: {
-          status: port.opticsStatus,
-          rxPowerDbm: port.rxPowerDbm,
-          txPowerDbm: port.txPowerDbm,
-          temperatureC: port.temperatureC,
-        },
+        errors: measurements.errors,
+        discards: measurements.discards,
+        utilizationPct: measurements.utilizationPct,
+        optics: measurements.optics,
         configUpdatedAt: isoValue(port.configUpdatedAt),
         telemetryUpdatedAt: isoValue(port.telemetryUpdatedAt),
       };
@@ -3583,6 +3579,7 @@ export async function executeQuerySwitchPorts(
     returned: Math.min(detailed.length, limit),
     definition:
       "connected = operStatus up OR learned MAC count > 0 OR LLDP neighbor count > 0",
+    measurementPolicy: PORT_TELEMETRY_OBSERVATION_POLICY,
     ports: detailed.slice(0, limit),
   });
 }

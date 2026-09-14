@@ -57,12 +57,12 @@ export interface NocInterfaceObservation {
   allowedVlans?: number[];
   portMode?: string;
   portchannel?: string | null;
-  inErrors?: number;
-  outErrors?: number;
-  inDiscards?: number;
-  outDiscards?: number;
-  inOctets?: string;
-  outOctets?: string;
+  inErrors?: number | null;
+  outErrors?: number | null;
+  inDiscards?: number | null;
+  outDiscards?: number | null;
+  inOctets?: string | null;
+  outOctets?: string | null;
 }
 
 export interface NocLldpTargetResult {

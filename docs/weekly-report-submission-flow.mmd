@@ -1,0 +1,18 @@
+flowchart LR
+  T[To-do List] -->|complete work| C[Completed Work]
+  C --> L[My Work - Weekly Log]
+  Z[Zendesk solved tickets] -->|bounded solved-at week| L
+
+  L -->|Save Draft| D[(Draft weekly log)]
+  D -->|Edit and retry tickets| L
+  L -->|Submit Weekly Log| S[(Submitted weekly log)]
+
+  G[Legacy log updated before<br/>2026-09-14 17:30 UTC] -->|grandfathered without rewriting data| S
+  G -->|edited or returned to draft after cutover| D
+
+  S -->|weekly log and its owner's completed items| R[Status and Reporting - Weekly Reports]
+  X[Submitted logs from other staff] --> R
+  R --> F[Finalize, export, email,<br/>or publish to Zendesk]
+
+  CIO[CIO, including Tracy] -->|submits own contribution| L
+  CIO -->|curates department report| R

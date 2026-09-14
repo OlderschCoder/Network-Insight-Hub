@@ -2750,6 +2750,11 @@ components:
           type: integer
         contributorCount:
           type: integer
+        eligibleUserIds:
+          type: array
+          description: User IDs whose weekly logs satisfy the shared department-report submission policy.
+          items:
+            type: integer
         byRole:
           type: object
           additionalProperties:
@@ -2770,7 +2775,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Risk"
-      required: [weekOf, totalEntries, contributorCount]
+      required: [weekOf, totalEntries, contributorCount, eligibleUserIds]
 
     Risk:
       type: object
