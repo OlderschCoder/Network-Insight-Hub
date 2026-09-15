@@ -52,10 +52,14 @@ are independently observation-only:
 - A returned numeric zero is retained as an observed zero.
 - A missing or unsupported OID is stored and reported as `null` (rendered as a
   blank/em dash), never converted to zero.
-- Utilization requires two valid octet observations, a valid elapsed interval,
-  and a positive port speed observed in the current poll. A stored speed from
-  an older poll may remain visible as inventory context, but it is not reused
-  to manufacture a fresh utilization value. Otherwise utilization remains blank.
+- Utilization uses only 64-bit `ifHCInOctets` and `ifHCOutOctets`; it never
+  falls back to wrapping 32-bit counters. Each direction requires two valid
+  observations, a valid elapsed interval, and a newest-sample timestamp that
+  exactly matches the current interface table. Utilization also requires both
+  current directions and a positive port speed observed in the current poll. A
+  stored speed from an older poll may remain visible as inventory context, but
+  it is not reused to manufacture a fresh utilization value. Otherwise
+  utilization remains blank.
 - The current NOC SNMP profile does not collect optics/DOM. Link-up state,
   transceiver media type, speed, and a fresh port timestamp cannot substitute
   for received/transmit power, temperature, or optical alarm evidence.
@@ -72,6 +76,14 @@ interfaces remain visible but their live-only values stay blank. Only IF-MIB
 `ifType=6` rows become physical ports. The separate tunnel view reads the
 dedicated Phase 2 measurement and shows its observation time; an absent
 measurement is labeled unknown rather than treated as zero tunnels.
+Configured FortiGate VLAN subinterfaces come from the VLAN rows at the newest
+numeric `fortigateVlanSnapshotMarker` timestamp in the same `fortigate_vlan`
+table and join only to an exactly named physical parent. The marker and rows
+share one Telegraf table-build timestamp, so the API does not correlate
+independently timed measurements. That marker-backed live snapshot wins over a
+saved firewall VLAN value, including an empty “none reported” list when the
+current poll returns no VLAN rows or none for that parent. A missing or
+malformed marker or malformed current row leaves the live mapping unknown.
 
 ## Telemetry run history and delta
 

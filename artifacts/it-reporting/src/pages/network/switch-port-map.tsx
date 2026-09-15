@@ -54,6 +54,8 @@ type NetInterface = {
   lldpNeighborCount?: number;
   inErrors: number | null;
   outErrors: number | null;
+  inBps: number | null;
+  outBps: number | null;
   utilizationPct: number | null;
   rxPowerDbm: number | null;
   txPowerDbm: number | null;
@@ -90,6 +92,14 @@ function fmtSpeed(mbps: number | null): string {
   if (mbps >= 1_000_000) return `${mbps / 1_000_000}T`;
   if (mbps >= 1_000) return `${mbps / 1_000}G`;
   return `${mbps}M`;
+}
+
+function fmtRate(bps: number | null): string {
+  if (bps == null) return "not collected";
+  if (bps >= 1_000_000_000) return `${(bps / 1_000_000_000).toFixed(2)} Gbps`;
+  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(2)} Mbps`;
+  if (bps >= 1_000) return `${(bps / 1_000).toFixed(2)} Kbps`;
+  return `${bps} bps`;
 }
 
 function canonicalPort(raw: string): string {
@@ -243,8 +253,13 @@ export function TelemetrySwitchPortMap({
   const topologyOnlyLinks = localLinks.filter((entry) => !matchedLinkIds.has(entry.link.id));
   const upCount = physicalInterfaces.filter((iface) => iface.operStatus === "up").length;
   const adminDownCount = physicalInterfaces.filter((iface) => iface.adminStatus === "down").length;
+  const isFirewall = selectedSwitch?.nodeKind === "firewall";
   const missingFields = [
-    physicalInterfaces.every((iface) => iface.allowedVlans == null) ? "allowed VLAN lists" : null,
+    physicalInterfaces.every((iface) => iface.allowedVlans == null)
+      ? isFirewall
+        ? "configured VLAN subinterfaces"
+        : "allowed VLAN lists"
+      : null,
     physicalInterfaces.every((iface) => iface.inErrors == null && iface.outErrors == null) ? "error counters" : null,
     physicalInterfaces.every((iface) => iface.utilizationPct == null) ? "utilization" : null,
     physicalInterfaces.every((iface) => iface.rxPowerDbm == null && iface.txPowerDbm == null) ? "optics / DOM" : null,
@@ -324,8 +339,8 @@ export function TelemetrySwitchPortMap({
         <div className="border rounded-lg p-4 bg-white shadow-sm grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div><p className="text-xs text-muted-foreground uppercase">Interface</p><p className="font-mono font-bold">{detailInterface.interfaceName}</p><p className="text-xs">{detailInterface.description || "No description"}</p></div>
           <div><p className="text-xs text-muted-foreground uppercase">State</p><p>Admin <b>{detailInterface.adminStatus ?? "unknown"}</b></p><p>Oper <b>{detailInterface.operStatus ?? "unknown"}</b></p><p className="text-xs text-muted-foreground">{detailInterface.statusReason}</p></div>
-          <div><p className="text-xs text-muted-foreground uppercase">Layer 2</p><p>{detailInterface.portMode ?? "unknown mode"}</p><p>{detailInterface.nativeVlan != null ? `Native VLAN ${detailInterface.nativeVlan}` : "No native VLAN"}</p><p className="text-xs">{detailInterface.allowedVlans?.length ? `${detailInterface.allowedVlans.length} allowed VLANs` : "Allowed VLANs not collected"}</p></div>
-          <div><p className="text-xs text-muted-foreground uppercase">Traffic evidence</p><p>{fmtSpeed(detailInterface.speedMbps)} · {detailInterface.duplex ?? "duplex unknown"}</p><p>{detailInterface.macCount == null ? "Learned MACs not collected" : `${detailInterface.macCount} learned MACs`}</p><p>{detailInterface.lldpNeighborCount == null ? "LLDP neighbors not collected" : `${detailInterface.lldpNeighborCount} LLDP neighbors`}</p></div>
+          <div><p className="text-xs text-muted-foreground uppercase">{isFirewall ? "VLAN subinterfaces" : "Layer 2"}</p>{isFirewall ? <><p>{detailInterface.allowedVlans == null ? "Not collected" : detailInterface.allowedVlans.length ? `VLAN IDs ${detailInterface.allowedVlans.join(", ")}` : "None reported"}</p><p className="text-xs text-muted-foreground">Mapped to this physical parent</p></> : <><p>{detailInterface.portMode ?? "unknown mode"}</p><p>{detailInterface.nativeVlan != null ? `Native VLAN ${detailInterface.nativeVlan}` : "No native VLAN"}</p><p className="text-xs">{detailInterface.allowedVlans?.length ? `${detailInterface.allowedVlans.length} allowed VLANs` : "Allowed VLANs not collected"}</p></>}</div>
+          <div><p className="text-xs text-muted-foreground uppercase">Traffic evidence</p><p>{fmtSpeed(detailInterface.speedMbps)} · {detailInterface.duplex ?? "duplex unknown"}</p><p>In {fmtRate(detailInterface.inBps)} · Out {fmtRate(detailInterface.outBps)}</p><p>{detailInterface.utilizationPct == null ? "Utilization not collected" : `${detailInterface.utilizationPct}% utilization`}</p><p>{detailInterface.macCount == null ? "Learned MACs not collected" : `${detailInterface.macCount} learned MACs`}</p><p>{detailInterface.lldpNeighborCount == null ? "LLDP neighbors not collected" : `${detailInterface.lldpNeighborCount} LLDP neighbors`}</p></div>
           <div><p className="text-xs text-muted-foreground uppercase">Connected device</p>{detailLink ? <><p className="font-bold">{detailLink.neighbor?.hostname ?? "Unknown"}</p><p className="font-mono text-xs">{detailLink.remotePort}</p><Badge className={CRIT_BADGE[detailLink.neighbor?.criticality ?? ""]}>{detailLink.link.confidence.replace(/_/g, " ")}</Badge></> : detailInterface.operStatus === "up" ? <><p className="font-medium text-emerald-700">Endpoint / unmapped device</p><p className="text-xs text-muted-foreground">Phone, computer, AP, printer, or other edge device</p></> : detailInterface.operStatus === "down" || detailInterface.operStatus === "lowerLayerDown" || detailInterface.operStatus === "notPresent" ? <p className="text-muted-foreground">No active connection</p> : <p className="text-amber-700">Connection state not collected</p>}</div>
           <p className="col-span-2 md:col-span-5 text-[11px] text-muted-foreground">{detailInterface.telemetryUpdatedAt ? `Polled ${new Date(detailInterface.telemetryUpdatedAt).toLocaleString()}` : "No live telemetry timestamp"}{detailInterface.telemetryEvidence ? ` · ${detailInterface.telemetryEvidence}` : ""}</p>
         </div>

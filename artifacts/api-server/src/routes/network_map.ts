@@ -247,7 +247,10 @@ router.get("/ports", requireAuth, async (req: any, res) => {
           description: live.description ?? stored.description,
           portMode: stored.portMode,
           nativeVlan: stored.nativeVlan,
-          allowedVlans: stored.allowedVlans,
+          // Only a complete current FortiGate VLAN snapshot is authoritative,
+          // including [] when the marker-backed poll reports none for this
+          // parent. Do not make a saved baseline look like live collection.
+          allowedVlans: live.allowedVlans,
           portchannel: stored.portchannel,
           vpcId: stored.vpcId,
           configEvidence: stored.configEvidence,

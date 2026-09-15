@@ -1,3 +1,5 @@
+import { utilizationPercentFromCurrentPoll } from "./port_telemetry_policy";
+
 export type FortiGateInterfaceTelemetry = {
   name: string;
   description: string | null;
@@ -14,6 +16,10 @@ export type FortiGateInterfaceTelemetry = {
   outDiscards: number | null;
   inOctets: number | null;
   outOctets: number | null;
+  inBps: number | null;
+  outBps: number | null;
+  utilizationPct: number | null;
+  allowedVlans: number[] | null;
   observedAt: string | null;
   measurement: string;
 };
@@ -46,6 +52,7 @@ export type NetworkDeviceInfluxTelemetry = {
   interfaces: FortiGateInterfaceTelemetry[];
   tunnels: FortiGateTunnelTelemetry[];
   interfaceTelemetryAvailable: boolean;
+  vlanTelemetryAvailable: boolean;
   tunnelTelemetryAvailable: boolean;
   lastPolled: string | null;
 };
@@ -74,7 +81,7 @@ export function projectFortiGateInterfacesToPorts(
     mediaType: null,
     portMode: null,
     nativeVlan: null,
-    allowedVlans: null,
+    allowedVlans: iface.allowedVlans,
     portchannel: null,
     vpcId: null,
     macCount: null,
@@ -85,9 +92,9 @@ export function projectFortiGateInterfacesToPorts(
     outDiscards: iface.outDiscards,
     inOctets: iface.inOctets,
     outOctets: iface.outOctets,
-    inBps: null,
-    outBps: null,
-    utilizationPct: null,
+    inBps: iface.inBps,
+    outBps: iface.outBps,
+    utilizationPct: iface.utilizationPct,
     rxPowerDbm: null,
     txPowerDbm: null,
     temperatureC: null,
@@ -130,9 +137,18 @@ export function formatNetworkDeviceTelemetryForFred(
     for (const iface of telemetry.interfaces.slice(0, 100)) {
       lines.push(
         `  - ${iface.name}: admin=${iface.adminStatus ?? "unknown"}, oper=${iface.operStatus ?? "unknown"}, ` +
-          `inErrors=${iface.inErrors ?? "not collected"}, outErrors=${iface.outErrors ?? "not collected"}, observed=${iface.observedAt ?? "unknown"}`,
+          `inErrors=${iface.inErrors ?? "not collected"}, outErrors=${iface.outErrors ?? "not collected"}, ` +
+          `inBps=${iface.inBps ?? "not collected"}, outBps=${iface.outBps ?? "not collected"}, ` +
+          `utilization=${iface.utilizationPct == null ? "not collected" : `${iface.utilizationPct}%`}, ` +
+          `configuredVlanSubinterfaces=${iface.allowedVlans == null ? "not collected" : iface.allowedVlans.length ? iface.allowedVlans.join(",") : "none reported"}, ` +
+          `observed=${iface.observedAt ?? "unknown"}`,
       );
     }
+  }
+  if (!telemetry.vlanTelemetryAvailable) {
+    lines.push(
+      "- configured VLAN subinterfaces: complete current snapshot not collected",
+    );
   }
   if (!telemetry.tunnelTelemetryAvailable) {
     lines.push(
@@ -239,6 +255,32 @@ export function buildDeviceInterfacesFlux(
   // ifPhysAddress field is deliberately not queried because some devices emit
   // raw binary bytes that are not safe annotated CSV; MAC remains unknown.
   return `from(bucket: ${fluxString(bucket)}) |> range(start: -${minutes}m) |> filter(fn: (r) => ${hostFilter(host)}) |> filter(fn: (r) => contains(value: r._measurement, set: ${fluxSet(INTERFACE_MEASUREMENTS)})) |> filter(fn: (r) => contains(value: r._field, set: ${fluxSet(fields)})) |> group(columns: ["_measurement", "ifName", "_field"]) |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "sysName", "ifName", "ifIndex"])`;
+}
+
+export function buildDeviceInterfaceRatesFlux(
+  bucket: string,
+  host: string,
+  minutes = 5,
+): string {
+  const fields = ["ifHCInOctets", "ifHCOutOctets"];
+  // Return the two newest 64-bit absolute counter samples in separate typed
+  // tables. The API calculates the measured rate and rejects resets; Influx is
+  // not asked to fill gaps or turn a single counter value into utilization.
+  // Legacy 32-bit counters are deliberately excluded because an even number of
+  // wraps can look monotonic and silently understate traffic.
+  return `from(bucket: ${fluxString(bucket)}) |> range(start: -${minutes}m) |> filter(fn: (r) => ${hostFilter(host)}) |> filter(fn: (r) => contains(value: r._measurement, set: ${fluxSet(INTERFACE_MEASUREMENTS)})) |> filter(fn: (r) => contains(value: r._field, set: ${fluxSet(fields)})) |> group(columns: ["_measurement", "ifName", "_field"]) |> sort(columns: ["_time"]) |> tail(n: 2) |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "sysName", "ifName", "ifIndex"])`;
+}
+
+export function buildDeviceVlansFlux(
+  bucket: string,
+  host: string,
+  minutes = 5,
+): string {
+  // The marker is a fourth field in the same SNMP table as the VLAN rows, so
+  // Telegraf assigns it the table's exact timestamp. A marker is emitted only
+  // when that complete table build succeeds; marker-only therefore represents
+  // a successful empty table rather than an unattempted collection.
+  return `from(bucket: ${fluxString(bucket)}) |> range(start: -${minutes}m) |> filter(fn: (r) => ${hostFilter(host)}) |> filter(fn: (r) => r._measurement == "fortigate_vlan" and (r._field == "vlanId" or r._field == "fortigateVlanSnapshotMarker")) |> sort(columns: ["_time"]) |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "sysName", "vlanName", "physicalInterface"])`;
 }
 
 export function buildDeviceTunnelsFlux(
@@ -387,6 +429,8 @@ export function parseDeviceSummary(rows: Array<Record<string, string>>) {
 
 export function parseDeviceInterfaces(
   rows: Array<Record<string, string>>,
+  rateRows: Array<Record<string, string>> = [],
+  vlanSnapshot: FortiGateVlanSnapshot = emptyVlanSnapshot(),
 ): FortiGateInterfaceTelemetry[] {
   const interfaces = new Map<
     string,
@@ -423,10 +467,21 @@ export function parseDeviceInterfaces(
     existing.observedAt = latestIso(existing.observedAt, row._time || null);
   }
 
+  const rates = parseDeviceInterfaceRates(rateRows);
+
   return Array.from(interfaces, ([name, entry]) => {
     const field = (key: string) => entry.fields.get(key);
     const highSpeed = finiteNumber(field("ifHighSpeed"));
     const legacySpeed = finiteNumber(field("ifSpeed"));
+    const speedMbps =
+      highSpeed ?? (legacySpeed == null ? null : legacySpeed / 1_000_000);
+    const rate = rates.get(`${entry.measurement}\u0000${name}`);
+    const inBps = rate?.inObservedAt === entry.observedAt ? rate.inBps : null;
+    const outBps =
+      rate?.outObservedAt === entry.observedAt ? rate.outBps : null;
+    const allowedVlans = vlanSnapshot.complete
+      ? (vlanSnapshot.byPhysicalInterface.get(name.trim().toLowerCase()) ?? [])
+      : null;
     return {
       name,
       description: field("ifAlias") || field("ifDescr") || null,
@@ -442,14 +497,21 @@ export function parseDeviceInterfaces(
       macAddress: field("ifPhysAddress") || null,
       adminStatus: snmpAdminStatus(field("ifAdminStatus")),
       operStatus: snmpOperStatus(field("ifOperStatus")),
-      speedMbps:
-        highSpeed ?? (legacySpeed == null ? null : legacySpeed / 1_000_000),
+      speedMbps,
       inErrors: finiteNumber(field("ifInErrors")),
       outErrors: finiteNumber(field("ifOutErrors")),
       inDiscards: finiteNumber(field("ifInDiscards")),
       outDiscards: finiteNumber(field("ifOutDiscards")),
       inOctets: finiteNumber(field("ifHCInOctets") ?? field("ifInOctets")),
       outOctets: finiteNumber(field("ifHCOutOctets") ?? field("ifOutOctets")),
+      inBps,
+      outBps,
+      utilizationPct: utilizationPercentFromCurrentPoll({
+        observedSpeedMbps: speedMbps,
+        inBps,
+        outBps,
+      }),
+      allowedVlans,
       observedAt: entry.observedAt,
       measurement: entry.measurement,
     };
@@ -463,6 +525,183 @@ export function parseDeviceInterfaces(
     }
     return left.name.localeCompare(right.name, undefined, { numeric: true });
   });
+}
+
+export type FortiGateVlanSnapshot = {
+  complete: boolean;
+  observedAt: string | null;
+  byPhysicalInterface: Map<string, number[]>;
+};
+
+function emptyVlanSnapshot(): FortiGateVlanSnapshot {
+  return {
+    complete: false,
+    observedAt: null,
+    byPhysicalInterface: new Map(),
+  };
+}
+
+export function parseDeviceVlans(
+  rows: Array<Record<string, string>>,
+): FortiGateVlanSnapshot {
+  const markerRows = rows.filter(
+    (row) =>
+      row._measurement === "fortigate_vlan" &&
+      row._field === "fortigateVlanSnapshotMarker",
+  );
+  if (!markerRows.length) return emptyVlanSnapshot();
+
+  const markers = markerRows.map((row) => ({
+    row,
+    time: String(row._time || ""),
+    at: Date.parse(row._time || ""),
+  }));
+  if (markers.some((marker) => !Number.isFinite(marker.at))) {
+    return emptyVlanSnapshot();
+  }
+  markers.sort(
+    (left, right) => left.at - right.at || left.time.localeCompare(right.time),
+  );
+  const markerTime = markers.at(-1)?.time;
+  if (!markerTime) return emptyVlanSnapshot();
+  const currentMarkers = markers.filter((marker) => marker.time === markerTime);
+  if (
+    !currentMarkers.length ||
+    currentMarkers.some((marker) => finiteNumber(marker.row._value) == null)
+  ) {
+    return emptyVlanSnapshot();
+  }
+
+  const vlanRows = rows.filter(
+    (row) => row._measurement === "fortigate_vlan" && row._field === "vlanId",
+  );
+  if (vlanRows.some((row) => !Number.isFinite(Date.parse(row._time || "")))) {
+    return emptyVlanSnapshot();
+  }
+  const currentVlans = vlanRows.filter((row) => row._time === markerTime);
+
+  const byPhysicalInterface = new Map<string, Set<number>>();
+  for (const row of currentVlans) {
+    const vlanName = String(row.vlanName || "").trim();
+    const physicalInterface = String(row.physicalInterface || "")
+      .trim()
+      .toLowerCase();
+    const vlanId = finiteNumber(row._value);
+    if (
+      !vlanName ||
+      !physicalInterface ||
+      row._field !== "vlanId" ||
+      vlanId == null ||
+      !Number.isInteger(vlanId) ||
+      vlanId < 1 ||
+      vlanId > 4094
+    ) {
+      return emptyVlanSnapshot();
+    }
+    const ids = byPhysicalInterface.get(physicalInterface) ?? new Set<number>();
+    ids.add(vlanId);
+    byPhysicalInterface.set(physicalInterface, ids);
+  }
+
+  return {
+    complete: true,
+    observedAt: markerTime,
+    byPhysicalInterface: new Map(
+      Array.from(byPhysicalInterface, ([physicalInterface, ids]) => [
+        physicalInterface,
+        Array.from(ids).sort((left, right) => left - right),
+      ]),
+    ),
+  };
+}
+
+type CounterSample = { at: number; observedAt: string; value: bigint };
+
+type CounterRate = { bps: number | null; observedAt: string | null };
+
+function counterRateBps(samples: CounterSample[]): CounterRate {
+  const byTimestamp = new Map<number, CounterSample>();
+  for (const sample of samples) byTimestamp.set(sample.at, sample);
+  const ordered = Array.from(byTimestamp.values())
+    .sort((left, right) => left.at - right.at)
+    .slice(-2);
+  const newest = ordered.at(-1);
+  if (!newest) return { bps: null, observedAt: null };
+  if (ordered.length !== 2) {
+    return { bps: null, observedAt: newest.observedAt };
+  }
+  const [previous, current] = ordered;
+  const elapsedSeconds = (current.at - previous.at) / 1_000;
+  if (elapsedSeconds <= 0 || current.value < previous.value) {
+    return { bps: null, observedAt: current.observedAt };
+  }
+  const bps = (Number(current.value - previous.value) * 8) / elapsedSeconds;
+  return {
+    bps: Number.isFinite(bps) ? Math.round(bps) : null,
+    observedAt: current.observedAt,
+  };
+}
+
+function parseCounterSample(row: Record<string, string>): CounterSample | null {
+  const observedAt = String(row._time || "");
+  const at = Date.parse(observedAt);
+  const value = String(row._value ?? "").trim();
+  if (!Number.isFinite(at) || !/^\d+$/.test(value)) return null;
+  try {
+    return { at, observedAt, value: BigInt(value) };
+  } catch {
+    return null;
+  }
+}
+
+export function parseDeviceInterfaceRates(
+  rows: Array<Record<string, string>>,
+): Map<
+  string,
+  {
+    inBps: number | null;
+    inObservedAt: string | null;
+    outBps: number | null;
+    outObservedAt: string | null;
+  }
+> {
+  const groups = new Map<string, Map<string, CounterSample[]>>();
+  for (const row of rows) {
+    const name = String(row.ifName || "").trim();
+    const measurement = String(row._measurement || "").trim();
+    const field = String(row._field || "").trim();
+    if (
+      !name ||
+      !measurement ||
+      !["ifHCInOctets", "ifHCOutOctets"].includes(field)
+    ) {
+      continue;
+    }
+    const sample = parseCounterSample(row);
+    if (!sample) continue;
+    const key = `${measurement}\u0000${name}`;
+    const fields = groups.get(key) ?? new Map<string, CounterSample[]>();
+    const samples = fields.get(field) ?? [];
+    samples.push(sample);
+    fields.set(field, samples);
+    groups.set(key, fields);
+  }
+
+  return new Map(
+    Array.from(groups, ([key, fields]) => {
+      const inbound = counterRateBps(fields.get("ifHCInOctets") ?? []);
+      const outbound = counterRateBps(fields.get("ifHCOutOctets") ?? []);
+      return [
+        key,
+        {
+          inBps: inbound.bps,
+          inObservedAt: inbound.observedAt,
+          outBps: outbound.bps,
+          outObservedAt: outbound.observedAt,
+        },
+      ];
+    }),
+  );
 }
 
 export function parseDeviceTunnels(
@@ -573,13 +812,20 @@ export async function getNetworkDeviceInfluxTelemetry(
     interfaces: [],
     tunnels: [],
     interfaceTelemetryAvailable: false,
+    vlanTelemetryAvailable: false,
     tunnelTelemetryAvailable: false,
     lastPolled: null,
   };
   if (!config) return empty;
   const boundedMinutes = Math.max(5, Math.min(10_080, Math.floor(minutes)));
 
-  const [summaryResult, interfaceResult, tunnelResult] = await Promise.all([
+  const [
+    summaryResult,
+    interfaceResult,
+    interfaceRateResult,
+    vlanResult,
+    tunnelResult,
+  ] = await Promise.all([
     queryInflux(
       config,
       buildDeviceSummaryFlux(config.bucket, host, boundedMinutes),
@@ -590,6 +836,14 @@ export async function getNetworkDeviceInfluxTelemetry(
     ),
     queryInflux(
       config,
+      buildDeviceInterfaceRatesFlux(config.bucket, host, boundedMinutes),
+    ),
+    queryInflux(
+      config,
+      buildDeviceVlansFlux(config.bucket, host, boundedMinutes),
+    ),
+    queryInflux(
+      config,
       buildDeviceTunnelsFlux(config.bucket, host, boundedMinutes),
     ),
   ]);
@@ -597,25 +851,43 @@ export async function getNetworkDeviceInfluxTelemetry(
   const interfaceRows = interfaceResult.ok
     ? parseInfluxCsv(interfaceResult.csv)
     : [];
+  const interfaceRateRows = interfaceRateResult.ok
+    ? parseInfluxCsv(interfaceRateResult.csv)
+    : [];
+  const vlanRows = vlanResult.ok ? parseInfluxCsv(vlanResult.csv) : [];
   const tunnelRows = tunnelResult.ok ? parseInfluxCsv(tunnelResult.csv) : [];
   const summary = parseDeviceSummary(summaryRows);
-  const interfaces = parseDeviceInterfaces(interfaceRows);
+  const vlanSnapshot = vlanResult.ok
+    ? parseDeviceVlans(vlanRows)
+    : emptyVlanSnapshot();
+  const interfaces = parseDeviceInterfaces(
+    interfaceRows,
+    interfaceRateRows,
+    vlanSnapshot,
+  );
   const tunnels = parseDeviceTunnels(tunnelRows);
   const lastPolled = [
     summary.system.observedAt,
     summary.pingObservedAt,
+    vlanSnapshot.observedAt,
     ...interfaces.map((item) => item.observedAt),
     ...tunnels.map((item) => item.observedAt),
   ].reduce<string | null>((latest, value) => latestIso(latest, value), null);
 
   return {
     configured: true,
-    reachable: summaryResult.ok || interfaceResult.ok || tunnelResult.ok,
+    reachable:
+      summaryResult.ok ||
+      interfaceResult.ok ||
+      interfaceRateResult.ok ||
+      vlanResult.ok ||
+      tunnelResult.ok,
     host,
     ...summary,
     interfaces,
     tunnels,
     interfaceTelemetryAvailable: interfaceResult.ok && interfaces.length > 0,
+    vlanTelemetryAvailable: vlanResult.ok && vlanSnapshot.complete,
     tunnelTelemetryAvailable: tunnelResult.ok && tunnels.length > 0,
     lastPolled,
   };

@@ -2,9 +2,13 @@ flowchart LR
   C[Fresh console output] --> X[Evidence reconciliation]
   G[Stored known-good configuration] --> X
   F[Main and West FortiGate SNMP<br/>health, IF-MIB ports, Phase 2 tunnels] --> N[NOC Telegraf on 10.0.0.22]
+  FC[FortiGate configured<br/>VLAN subinterfaces] --> N
   N --> Q[(InfluxDB)]
   Q --> QT[Keep string and numeric<br/>Flux field tables separate]
-  QT --> T[Authenticated device telemetry API]
+  Q --> VS[Newest FortiGate VLAN table timestamp<br/>shared by rows and success marker]
+  QT --> RATE[Two monotonic 64-bit octet samples<br/>aligned to current interface timestamp]
+  RATE --> T[Authenticated device telemetry API<br/>measured bps and utilization]
+  VS --> T
   T --> P[Firewall Port Map]
   T --> V2[VPN tunnel status]
   T --> FR[Fred bounded evidence tools]
