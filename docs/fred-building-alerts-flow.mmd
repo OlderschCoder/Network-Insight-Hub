@@ -2,6 +2,8 @@ flowchart TD
   subgraph Evidence[Fresh monitoring evidence]
     NOC[NOC observation]
     Influx[Influx observation]
+    Phones[Complete assigned physical-phone evidence]
+    CallingUI[Authenticated Cisco Calling support<br/>complete inventory or explicit unavailable state]
   end
 
   subgraph Worker[Fred alert worker every 30 seconds]
@@ -10,6 +12,9 @@ flowchart TD
     Validate{Global topology unique?}
     Probe[Run one fresh monitoring probe cycle]
     Resolve[Validate and resolve observation<br/>NOC up/down, then Influx fallback]
+    PhoneComplete{Complete phone evidence<br/>for every enabled anchor?}
+    Corroborate{Main switch down and<br/>all assigned phones offline?}
+    Baseline{Healthy baseline already observed?}
     Unknown{Fresh up or down?}
     Cadence{Timestamp fits cadence?}
     Count[Update durable consecutive counters<br/>reset partial sequence after a long gap]
@@ -51,13 +56,22 @@ flowchart TD
   Validate -->|Yes| Probe
   Probe --> NOC
   Probe --> Influx
+  Probe --> Phones
+  Phones -. shared bounded Webex pagination .-> CallingUI
   NOC --> Resolve
   Influx --> Resolve
-  Resolve --> Unknown
+  Resolve --> Corroborate
+  Phones --> PhoneComplete
+  PhoneComplete -->|Yes| Corroborate
+  PhoneComplete -->|No: fail closed| Unknown
+  PhoneComplete -->|No: phone_evidence_incomplete| HealthState
+  Corroborate -->|Derived building observation| Unknown
   Unknown -->|No, stale, missing, or unknown| State
   Unknown -->|Yes| Cadence
   Cadence -->|Duplicate timestamp| State
-  Cadence -->|Usable or long-gap reset| Count
+  Cadence -->|Usable or long-gap reset| Baseline
+  Baseline -->|Cold-start down| State
+  Baseline -->|Healthy observed, or baseline exists| Count
   Count --> State
   Count --> Threshold
   Threshold -->|No| Exit

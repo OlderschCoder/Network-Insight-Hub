@@ -44,6 +44,7 @@ export const FredAlertHealthErrorCode = {
   anchor_seed_failed: "anchor_seed_failed",
   no_enabled_anchors: "no_enabled_anchors",
   sms_configuration_invalid: "sms_configuration_invalid",
+  phone_evidence_incomplete: "phone_evidence_incomplete",
   lease_lost: "lease_lost",
   tick_failed: "tick_failed",
   fallback_failed: "fallback_failed",
@@ -349,10 +350,18 @@ export interface ReportTicket {
 
 export interface ReportTicketsResponse {
   weekOf: string;
-  count: number;
-  configured?: boolean;
+  count: number | null;
+  configured: boolean;
   tickets: ReportTicket[];
 }
+
+export type AggregateReportSubmissionStatusItem = {
+  userId: number;
+  userName: string;
+  userRole: string;
+  entryCount: number;
+  isSubmitted: boolean;
+};
 
 export type AggregateReportByRole = { [key: string]: number };
 
@@ -421,6 +430,8 @@ export interface AggregateReport {
   contributorCount: number;
   /** User IDs whose weekly logs satisfy the shared department-report submission policy. */
   eligibleUserIds: number[];
+  /** Active reporting-team members and their weekly-log submission state, including users with no log row. */
+  submissionStatus: AggregateReportSubmissionStatusItem[];
   byRole?: AggregateReportByRole;
   byCategory?: AggregateReportByCategory;
   totalTickets?: number;
@@ -901,6 +912,69 @@ export interface CreateSwitchBody {
   configFile?: string;
   notes?: string;
   location?: string;
+}
+
+export interface NetworkDeviceSystemTelemetry {
+  uptime: number | null;
+  cpuUsagePct: number | null;
+  memoryUsagePct: number | null;
+  sessionCount: number | null;
+  observedAt: string | null;
+}
+
+export interface NetworkDeviceInterfaceTelemetry {
+  name: string;
+  description: string | null;
+  ifIndex: number | null;
+  ifType: number | null;
+  mtu: number | null;
+  macAddress: string | null;
+  adminStatus: string | null;
+  operStatus: string | null;
+  speedMbps: number | null;
+  inErrors: number | null;
+  outErrors: number | null;
+  inDiscards: number | null;
+  outDiscards: number | null;
+  inOctets: number | null;
+  outOctets: number | null;
+  observedAt: string | null;
+  measurement: string;
+}
+
+export type NetworkDeviceTunnelTelemetryStatus =
+  (typeof NetworkDeviceTunnelTelemetryStatus)[keyof typeof NetworkDeviceTunnelTelemetryStatus];
+
+export const NetworkDeviceTunnelTelemetryStatus = {
+  up: "up",
+  down: "down",
+  unknown: "unknown",
+} as const;
+
+export interface NetworkDeviceTunnelTelemetry {
+  index: string | null;
+  phase1: string;
+  phase2: string;
+  vdom: string | null;
+  status: NetworkDeviceTunnelTelemetryStatus;
+  inOctets: number | null;
+  outOctets: number | null;
+  observedAt: string | null;
+}
+
+export interface NetworkDeviceInfluxTelemetry {
+  configured: boolean;
+  reachable: boolean;
+  host: string;
+  system: NetworkDeviceSystemTelemetry;
+  pingLoss: number | null;
+  rtt: number | null;
+  pingObservedAt: string | null;
+  interfaces: NetworkDeviceInterfaceTelemetry[];
+  tunnels: NetworkDeviceTunnelTelemetry[];
+  interfaceTelemetryAvailable: boolean;
+  tunnelTelemetryAvailable: boolean;
+  lastPolled: string | null;
 }
 
 export interface NetworkLayoutPosition {

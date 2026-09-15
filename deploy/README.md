@@ -1,5 +1,10 @@
 # Deploy folder — copy-paste-free setup
 
+Before a release, run `pnpm run test:deploy`. This verifies that every required
+SQL artifact exists, that the deploy script rejects a missing artifact before
+applying any migration, and that the Fred building-alert schema precedes its
+healthy-baseline column.
+
 Everything needed to configure and roll out the SCCC IT Reporting Hub on the
 Azure VM, so we stop editing snippets by hand.
 

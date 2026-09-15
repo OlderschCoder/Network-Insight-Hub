@@ -32,10 +32,18 @@ editable data-flow diagram.
   to Influx rather than becoming outage evidence. True conflicts between
   independently normalized fresh observations remain `unknown`. The default
   freshness window is 90 seconds.
+- A building outage is derived from its explicit main/anchor switch and its
+  assigned physical phones. The building is `down` only when the anchor has a
+  fresh `down` and complete Webex evidence reports every assigned phone
+  offline. Child-switch failures remain individually visible but do not block
+  this building-connectivity test.
 - Missing, stale, future-dated, conflicting, or explicitly unknown evidence is
   `unknown`, never `down`. Unknown evidence resets a partial down or recovery
   count and cannot open or close an incident.
-- Three distinct consecutive fresh `down` observations open an incident. Two
+- Fred must first observe a fresh healthy state and durably records that
+  baseline. A cold start that sees only failures never opens an incident.
+  After the healthy baseline, three distinct consecutive fresh `down`
+  observations open an incident. Two
   distinct consecutive fresh `up` observations close it and send a recovery.
   Re-reading the same telemetry timestamp does not advance a counter. The
   pre-probe lease enforces cadence even when probes take different amounts of
@@ -160,6 +168,21 @@ lease-fence or lease-completion failures, invalid SMS configuration, tick
 failures, and fallback failures degrade readiness so external monitoring cannot
 mistake a broken alert path for a healthy one.
 
+Every enabled anchor must also have complete assigned physical-phone evidence
+on each active poll. A missing assignment, unmatched or unknown physical phone,
+incomplete Webex pagination, missing Webex configuration, or unavailable Webex
+request keeps building corroboration fail-closed and sets
+`fredAlerts.errorCode=phone_evidence_incomplete`. The health endpoint returns
+HTTP 503 without exposing the affected building, owner, device, provider
+payload, or underlying exception. Switch observations can still be persisted,
+but incomplete phone evidence cannot open a building-outage incident.
+
+The authenticated Cisco Calling support endpoint uses the same trusted,
+bounded Webex device paginator. If any page fails, repeats, exceeds the safety
+limit, or supplies an untrusted next-page URL, the support view discards the
+partial device rows and reports that totals and offline conclusions are
+unavailable. It must never present page-one counts as the complete inventory.
+
 ## First activation
 
 1. Deploy the code and database migration while
@@ -174,17 +197,21 @@ mistake a broken alert path for a healthy one.
    then enable that anchor row.
 4. Confirm that the NOC and Influx observations include timestamps and that
    stale or missing data resolves to `unknown`.
-5. Confirm Telnyx sender/profile assignment, messaging authorization, both
+5. Confirm every phone assignment maps to a physical Webex phone. Missing
+   assignments, non-phone devices, or incomplete Webex pagination must keep
+   corroboration `unknown`, never `down`.
+6. Confirm Telnyx sender/profile assignment, messaging authorization, both
    HTTPS callback routes, and the configured email fallback.
-6. Run the safe test below. Verify acceptance and the later final delivery
+7. Run the safe test below. Verify acceptance and the later final delivery
    status for both approved recipient roles; also inspect the redacted database
    audit.
-7. Restart the service with `FRED_ALERT_ENABLED=true`, then poll
+8. Restart the service with `FRED_ALERT_ENABLED=true`, then poll
    `GET /api/healthz`. Require HTTP 200 with `fredAlerts.state=ok`; if it remains
    HTTP 503, use the sanitized `fredAlerts.errorCode` to correct the startup or
    worker failure before enabling real alert traffic.
-8. Watch one full three-observation failure window plus one two-observation
-   recovery window without manipulating production network equipment.
+9. Watch one healthy observation, one full three-observation failure window,
+   plus one two-observation recovery window without manipulating production
+   network equipment.
 
 An anchor can be disabled independently at any time. Global enablement never
 overrides a disabled anchor, maintenance window, or mute.

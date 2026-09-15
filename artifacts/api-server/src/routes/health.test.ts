@@ -91,4 +91,23 @@ describe("health route Fred readiness", () => {
       errorCode: "configuration_invalid",
     });
   });
+
+  it("reports incomplete Webex phone evidence with only its sanitized code", async () => {
+    mocks.fredAlerts.mockReturnValue({
+      state: "degraded",
+      lastSuccessAt: null,
+      lastErrorAt: "2026-09-14T18:00:00.000Z",
+      errorCode: "phone_evidence_incomplete",
+    });
+
+    const response = await request(makeApp()).get("/api/healthz");
+
+    expect(response.status).toBe(503);
+    expect(response.body.fredAlerts).toEqual({
+      state: "degraded",
+      lastSuccessAt: null,
+      lastErrorAt: "2026-09-14T18:00:00.000Z",
+      errorCode: "phone_evidence_incomplete",
+    });
+  });
 });

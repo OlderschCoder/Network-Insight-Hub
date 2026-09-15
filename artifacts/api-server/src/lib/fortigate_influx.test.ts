@@ -1,0 +1,185 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildDeviceInterfacesFlux,
+  buildDeviceTunnelsFlux,
+  formatNetworkDeviceTelemetryForFred,
+  parseDeviceInterfaces,
+  parseDeviceSummary,
+  parseDeviceTunnels,
+  parseInfluxCsv,
+  projectFortiGateInterfacesToPorts,
+} from "./fortigate_influx";
+
+const annotated = `#group,false,false,false,false,false,false,false,false,false,false
+#datatype,string,long,dateTime:RFC3339,long,string,string,string,string,string,string
+#default,_result,,,,,,,,,
+,result,table,_time,_value,_field,_measurement,source,sysName,ifName,index,phase1,phase2,vdom
+,,0,2026-09-15T01:00:00Z,1,ifAdminStatus,fortigate_interface,172.25.0.1,WestCampus-Fortigate.sccc.edu,port1,1,,,
+,,0,2026-09-15T01:00:00Z,2,ifOperStatus,fortigate_interface,172.25.0.1,WestCampus-Fortigate.sccc.edu,port1,1,,,
+,,0,2026-09-15T01:00:00Z,98981,ifInErrors,fortigate_interface,172.25.0.1,WestCampus-Fortigate.sccc.edu,port1,1,,,
+,,0,2026-09-15T01:00:00Z,0,ifOutErrors,fortigate_interface,172.25.0.1,WestCampus-Fortigate.sccc.edu,port1,1,,,
+,,0,2026-09-15T01:00:00Z,1000,ifHighSpeed,fortigate_interface,172.25.0.1,WestCampus-Fortigate.sccc.edu,port1,1,,,
+,,1,2026-09-15T01:00:00Z,2,status,fortigate_vpn_tunnel,172.25.0.1,WestCampus-Fortigate.sccc.edu,,7.Azure.Azure-Phase2.0.14,Azure,Azure-Phase2,0
+,,1,2026-09-15T01:00:00Z,2048,inOctets,fortigate_vpn_tunnel,172.25.0.1,WestCampus-Fortigate.sccc.edu,,7.Azure.Azure-Phase2.0.14,Azure,Azure-Phase2,0
+`;
+
+describe("FortiGate Influx telemetry", () => {
+  it("parses quoted annotated CSV and exposes measured port counters", () => {
+    const csv = annotated.replace(
+      "WestCampus-Fortigate.sccc.edu,port1",
+      '"WestCampus-Fortigate.sccc.edu","port1"',
+    );
+    const rows = parseInfluxCsv(csv);
+    const ports = parseDeviceInterfaces(rows);
+
+    expect(ports).toHaveLength(1);
+    expect(ports[0]).toMatchObject({
+      name: "port1",
+      adminStatus: "up",
+      operStatus: "down",
+      speedMbps: 1000,
+      inErrors: 98981,
+      outErrors: 0,
+    });
+  });
+
+  it("normalizes official Fortinet tunnel status values", () => {
+    const tunnels = parseDeviceTunnels(parseInfluxCsv(annotated));
+
+    expect(tunnels).toEqual([
+      expect.objectContaining({
+        phase1: "Azure",
+        phase2: "Azure-Phase2",
+        vdom: "0",
+        index: "7.Azure.Azure-Phase2.0.14",
+        status: "up",
+        inOctets: 2048,
+      }),
+    ]);
+  });
+
+  it("builds bounded queries for live port and tunnel measurements", () => {
+    const interfaces = buildDeviceInterfacesFlux("telegraf", "172.25.0.1");
+    const tunnels = buildDeviceTunnelsFlux("telegraf", "192.168.1.1");
+
+    expect(interfaces).toContain('"fortigate_interface"');
+    expect(interfaces).toContain('r.source == "172.25.0.1"');
+    expect(tunnels).toContain('r._measurement == "fortigate_vpn_tunnel"');
+    expect(tunnels).toContain('r.source == "192.168.1.1"');
+  });
+
+  it("does not invent a physical firewall port when IF-MIB type is absent", () => {
+    const [port] = projectFortiGateInterfacesToPorts("node-1", [
+      {
+        name: "port1",
+        description: null,
+        ifIndex: 1,
+        ifType: null,
+        mtu: null,
+        macAddress: null,
+        adminStatus: "up",
+        operStatus: "up",
+        speedMbps: null,
+        inErrors: null,
+        outErrors: null,
+        inDiscards: null,
+        outDiscards: null,
+        inOctets: null,
+        outOctets: null,
+        observedAt: "2026-09-15T01:00:00Z",
+        measurement: "fortigate_interface",
+      },
+    ]);
+
+    expect(port).toMatchObject({
+      interfaceName: "port1",
+      isPhysical: false,
+      macCount: null,
+      lldpNeighborCount: null,
+      telemetryEvidence: "influx:fortigate_interface",
+    });
+  });
+
+  it("keeps SNMP and ping observation timestamps separate", () => {
+    const summary = parseDeviceSummary([
+      { _field: "fgSysCpuUsage", _value: "4", _time: "2026-09-15T01:00:00Z" },
+      {
+        _field: "percent_packet_loss",
+        _value: "0",
+        _time: "2026-09-15T01:04:00Z",
+      },
+    ]);
+
+    expect(summary.system.observedAt).toBe("2026-09-15T01:00:00Z");
+    expect(summary.pingObservedAt).toBe("2026-09-15T01:04:00Z");
+  });
+
+  it("tells Fred that absent tunnel evidence is unknown rather than zero", () => {
+    const text = formatNetworkDeviceTelemetryForFred(
+      {
+        configured: true,
+        reachable: true,
+        host: "172.25.0.1",
+        system: {
+          uptime: 100,
+          cpuUsagePct: 2,
+          memoryUsagePct: 30,
+          sessionCount: 1400,
+          observedAt: "2026-09-15T01:00:00Z",
+        },
+        pingLoss: null,
+        rtt: null,
+        pingObservedAt: null,
+        interfaces: [],
+        tunnels: [],
+        interfaceTelemetryAvailable: false,
+        tunnelTelemetryAvailable: false,
+        lastPolled: "2026-09-15T01:00:00Z",
+      },
+      60,
+    );
+
+    expect(text).toContain("tunnel telemetry not collected");
+    expect(text).toContain("do not interpret as zero tunnels");
+  });
+
+  it("gives Fred the composite tunnel index and VDOM needed to distinguish selectors", () => {
+    const text = formatNetworkDeviceTelemetryForFred(
+      {
+        configured: true,
+        reachable: true,
+        host: "172.25.0.1",
+        system: {
+          uptime: null,
+          cpuUsagePct: null,
+          memoryUsagePct: null,
+          sessionCount: null,
+          observedAt: "2026-09-15T01:00:00Z",
+        },
+        pingLoss: 0,
+        rtt: 1.2,
+        pingObservedAt: "2026-09-15T01:00:00Z",
+        interfaces: [],
+        tunnels: [
+          {
+            index: "7.Azure.Azure-Phase2.0.14",
+            phase1: "Azure",
+            phase2: "Azure-Phase2",
+            vdom: "0",
+            status: "up",
+            inOctets: 2048,
+            outOctets: 4096,
+            observedAt: "2026-09-15T01:00:00Z",
+          },
+        ],
+        interfaceTelemetryAvailable: false,
+        tunnelTelemetryAvailable: true,
+        lastPolled: "2026-09-15T01:00:00Z",
+      },
+      5,
+    );
+
+    expect(text).toContain("index=7.Azure.Azure-Phase2.0.14");
+    expect(text).toContain("vdom=0");
+  });
+});

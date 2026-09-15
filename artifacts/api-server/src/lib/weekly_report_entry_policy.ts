@@ -14,6 +14,14 @@ export type WeeklyReportEntryEligibility = {
   updatedAt?: Date | string | number | null;
 };
 
+export type WeeklyLogSubmissionStatus = {
+  userId: number;
+  userName: string;
+  userRole: string;
+  entryCount: number;
+  isSubmitted: boolean;
+};
+
 function timestamp(value: WeeklyReportEntryEligibility["updatedAt"]): number {
   if (value == null) return Number.NaN;
   const parsed =
@@ -41,6 +49,27 @@ export function includedWeeklyLogs<T extends WeeklyReportEntryEligibility>(
   entries: readonly T[],
 ): T[] {
   return entries.filter(isWeeklyLogIncludedInDepartmentReport);
+}
+
+/**
+ * Build the complete active-team checklist for a report week, including people
+ * who have no weekly-log row at all. Without the zero-entry rows, a missing CIO
+ * contribution is indistinguishable from someone outside the reporting team.
+ */
+export function weeklyLogSubmissionStatus<
+  U extends { id: number; name?: string | null; role?: string | null },
+  E extends WeeklyReportEntryEligibility & { userId: number },
+>(users: readonly U[], entries: readonly E[]): WeeklyLogSubmissionStatus[] {
+  return users.map((user) => {
+    const userEntries = entries.filter((entry) => entry.userId === user.id);
+    return {
+      userId: user.id,
+      userName: user.name ?? "Unknown",
+      userRole: user.role ?? "unknown",
+      entryCount: userEntries.length,
+      isSubmitted: userEntries.some(isWeeklyLogIncludedInDepartmentReport),
+    };
+  });
 }
 
 export function includedWeeklyLogUserIds<

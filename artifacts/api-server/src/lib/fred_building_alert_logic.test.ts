@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createEmptyFredBuildingAlertState,
+  deriveFredBuildingConnectivityObservation,
   evaluateFredBuildingAlerts,
   fredBuildingTargetKey,
   fredSwitchTargetKey,
@@ -41,7 +42,7 @@ function observation(
 function evaluate(
   now: string,
   observations: FredSwitchObservation[],
-  previousState: FredBuildingAlertState = createEmptyFredBuildingAlertState(),
+  previousState: FredBuildingAlertState = establishedState(),
 ) {
   return evaluateFredBuildingAlerts({
     now,
@@ -52,9 +53,111 @@ function evaluate(
   });
 }
 
+function establishedState(
+  targetTopology: readonly {
+    buildingId: string;
+    anchorSwitchId: string;
+    childSwitchIds: readonly string[];
+  }[] = topology,
+): FredBuildingAlertState {
+  const state = createEmptyFredBuildingAlertState();
+  const healthyTarget = () => ({
+    phase: "normal" as const,
+    baselineEstablished: true,
+    consecutiveFreshDowns: 0,
+    consecutiveFreshUps: 0,
+    downSequenceStartedAt: null,
+    activeIncidentId: null,
+    lastProcessedObservationAt: null,
+  });
+  for (const building of targetTopology) {
+    state.targets[fredBuildingTargetKey(building.buildingId)] = healthyTarget();
+    for (const switchId of building.childSwitchIds) {
+      state.targets[fredSwitchTargetKey(building.buildingId, switchId)] =
+        healthyTarget();
+    }
+  }
+  return state;
+}
+
 describe("Fred building alert evaluation", () => {
+  it("derives a building outage when the main switch and assigned phones are down", () => {
+    const now = "2026-09-13T12:00:00Z";
+    const allSwitchesDown = topology[0].childSwitchIds.map((switchId) =>
+      observation(switchId, "down", now),
+    );
+    allSwitchesDown.push(observation(topology[0].anchorSwitchId, "down", now));
+
+    expect(
+      deriveFredBuildingConnectivityObservation({
+        now,
+        topology: topology[0],
+        observations: allSwitchesDown,
+        phoneObservation: { status: "down", observedAt: now, source: "webex" },
+        config,
+      }).status,
+    ).toBe("down");
+
+    expect(
+      deriveFredBuildingConnectivityObservation({
+        now,
+        topology: topology[0],
+        observations: allSwitchesDown,
+        phoneObservation: { status: "up", observedAt: now, source: "webex" },
+        config,
+      }).status,
+    ).toBe("unknown");
+
+    expect(
+      deriveFredBuildingConnectivityObservation({
+        now,
+        topology: topology[0],
+        observations: allSwitchesDown,
+        config,
+      }).status,
+    ).toBe("unknown");
+
+    expect(
+      deriveFredBuildingConnectivityObservation({
+        now,
+        topology: topology[0],
+        observations: [
+          observation(topology[0].anchorSwitchId, "down", now),
+          observation(topology[0].childSwitchIds[0], "up", now),
+          observation(topology[0].childSwitchIds[1], "up", now),
+        ],
+        phoneObservation: { status: "down", observedAt: now, source: "webex" },
+        config,
+      }).status,
+    ).toBe("down");
+  });
+
+  it("uses an explicit connectivity-policy observation for building transitions", () => {
+    const now = "2026-09-13T12:00:00Z";
+    const result = evaluateFredBuildingAlerts({
+      now,
+      topology,
+      observations: [observation(topology[0].anchorSwitchId, "down", now)],
+      buildingObservations: [
+        {
+          buildingId: topology[0].buildingId,
+          status: "up",
+          observedAt: now,
+          source: "connectivity-policy",
+        },
+      ],
+      config,
+    });
+
+    expect(result.evaluations[0]).toMatchObject({
+      scope: "building",
+      effectiveStatus: "up",
+      phase: "normal",
+    });
+  });
+
   it("uses only the explicit anchor to determine building health", () => {
-    let state = createEmptyFredBuildingAlertState();
+    let state = establishedState();
     for (const at of [
       "2026-09-13T12:00:00Z",
       "2026-09-13T12:00:30Z",
@@ -218,8 +321,58 @@ describe("Fred building alert evaluation", () => {
     }
   });
 
-  it("requires three distinct fresh downs and emits one stable outage transition", () => {
+  it("does not alert from a cold start until a fresh healthy baseline is observed", () => {
     let state = createEmptyFredBuildingAlertState();
+    for (const at of [
+      "2026-09-13T12:00:00Z",
+      "2026-09-13T12:00:30Z",
+      "2026-09-13T12:01:00Z",
+    ]) {
+      const result = evaluate(
+        at,
+        [observation(topology[0].anchorSwitchId, "down", at)],
+        state,
+      );
+      state = result.state;
+      expect(result.transitions).toEqual([]);
+    }
+    expect(state.targets[fredBuildingTargetKey("tech-center")]).toMatchObject({
+      baselineEstablished: false,
+      consecutiveFreshDowns: 0,
+    });
+
+    const healthy = evaluate(
+      "2026-09-13T12:01:30Z",
+      [observation(topology[0].anchorSwitchId, "up", "2026-09-13T12:01:30Z")],
+      state,
+    );
+    expect(
+      healthy.state.targets[fredBuildingTargetKey("tech-center")],
+    ).toMatchObject({ baselineEstablished: true });
+
+    state = healthy.state;
+    let outage: ReturnType<typeof evaluate> | undefined;
+    for (const at of [
+      "2026-09-13T12:02:00Z",
+      "2026-09-13T12:02:30Z",
+      "2026-09-13T12:03:00Z",
+    ]) {
+      outage = evaluate(
+        at,
+        [observation(topology[0].anchorSwitchId, "down", at)],
+        state,
+      );
+      state = outage.state;
+    }
+    expect(outage?.transitions).toHaveLength(1);
+    expect(outage?.transitions[0]).toMatchObject({
+      kind: "outage",
+      scope: "building",
+    });
+  });
+
+  it("requires three distinct fresh downs and emits one stable outage transition", () => {
+    let state = establishedState();
     let outageResult: ReturnType<typeof evaluate> | undefined;
 
     for (const at of [
@@ -283,7 +436,7 @@ describe("Fred building alert evaluation", () => {
         childSwitchIds: [],
       },
     ];
-    let state = createEmptyFredBuildingAlertState();
+    let state = establishedState(collidingTopology);
     let transitions: ReturnType<
       typeof evaluateFredBuildingAlerts
     >["transitions"] = [];
@@ -316,7 +469,7 @@ describe("Fred building alert evaluation", () => {
         observation("anchor-one", "down", "2026-09-13T12:01:00Z"),
         observation("anchor-two", "down", "2026-09-13T12:01:00Z"),
       ],
-      previousState: createEmptyFredBuildingAlertState(),
+      previousState: establishedState(collidingTopology),
       config: { ...config, failureThreshold: 1 },
     });
     const replayAgain = evaluateFredBuildingAlerts({
@@ -326,7 +479,7 @@ describe("Fred building alert evaluation", () => {
         observation("anchor-one", "down", "2026-09-13T12:01:00Z"),
         observation("anchor-two", "down", "2026-09-13T12:01:00Z"),
       ],
-      previousState: createEmptyFredBuildingAlertState(),
+      previousState: establishedState(collidingTopology),
       config: { ...config, failureThreshold: 1 },
     });
     expect(replayAgain.transitions).toEqual(replay.transitions);
@@ -381,7 +534,7 @@ describe("Fred building alert evaluation", () => {
   });
 
   it("replays deterministically and recovers once after two distinct fresh ups", () => {
-    let state = createEmptyFredBuildingAlertState();
+    let state = establishedState();
     let outageId = "";
     for (const at of [
       "2026-09-13T12:00:00Z",
@@ -426,7 +579,7 @@ describe("Fred building alert evaluation", () => {
   });
 
   it("starts a new recovery sequence after a long observation gap", () => {
-    let state = createEmptyFredBuildingAlertState();
+    let state = establishedState();
     for (const at of [
       "2026-09-13T12:00:00Z",
       "2026-09-13T12:00:30Z",
@@ -465,7 +618,7 @@ describe("Fred building alert evaluation", () => {
   });
 
   it("suppresses child-switch outages while the building anchor is in outage", () => {
-    let state = createEmptyFredBuildingAlertState();
+    let state = establishedState();
     let result: ReturnType<typeof evaluate> | undefined;
 
     for (const at of [

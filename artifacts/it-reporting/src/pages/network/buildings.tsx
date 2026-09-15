@@ -116,7 +116,7 @@ interface CallingSupportSnapshot {
   };
   buildings: Array<{
     name: string;
-    healthColor: "green" | "amber" | "red" | "gray";
+    healthColor: "green" | "amber" | "red" | "unknown";
     monitoringStrategy: string;
     nodeCount: number;
     switchCount: number;
@@ -151,33 +151,40 @@ interface CampusStatusMapProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+export const BUILDING_HEALTH_LABELS = {
+  green: "All monitored switches online",
+  amber: "One or more switch issues; full outage not confirmed",
+  red: "Main switch and assigned phones offline",
+  unknown: "Evidence incomplete",
+} as const;
+
 const healthStyles: Record<string, { bg: string; border: string; ring: string; label: string; icon: ReactNode }> = {
   green: {
     bg: "bg-green-50 hover:bg-green-100",
     border: "border-green-400",
     ring: "ring-green-300",
-    label: "All systems up",
+    label: BUILDING_HEALTH_LABELS.green,
     icon: <Wifi className="h-5 w-5 text-green-600" />,
   },
   amber: {
     bg: "bg-amber-50 hover:bg-amber-100",
     border: "border-amber-400",
     ring: "ring-amber-300",
-    label: "Degraded",
+    label: BUILDING_HEALTH_LABELS.amber,
     icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
   },
   red: {
     bg: "bg-red-50 hover:bg-red-100",
     border: "border-red-400",
     ring: "ring-red-300",
-    label: "One or more devices down",
+    label: BUILDING_HEALTH_LABELS.red,
     icon: <WifiOff className="h-5 w-5 text-red-600" />,
   },
   unknown: {
     bg: "bg-gray-50 hover:bg-gray-100",
     border: "border-gray-300",
     ring: "ring-gray-200",
-    label: "Status unknown",
+    label: BUILDING_HEALTH_LABELS.unknown,
     icon: <Activity className="h-5 w-5 text-gray-400" />,
   },
 };
@@ -431,14 +438,11 @@ const callingHealthBadgeClass: Record<string, string> = {
   green: "bg-green-100 text-green-700 border-green-300",
   amber: "bg-amber-100 text-amber-700 border-amber-300",
   red: "bg-red-100 text-red-700 border-red-300",
-  gray: "bg-gray-100 text-gray-600 border-gray-300",
+  unknown: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
 const callingHealthLabel: Record<string, string> = {
-  green: "Network healthy",
-  amber: "Attention needed",
-  red: "Likely building issue",
-  gray: "No live data",
+  ...BUILDING_HEALTH_LABELS,
 };
 
 // ─── Grid View ────────────────────────────────────────────────────────────────
@@ -803,10 +807,10 @@ export function CampusStatusMap({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All mapped devices up</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more mapped devices degraded</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more mapped devices down</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live building match yet</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> {BUILDING_HEALTH_LABELS.green}</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> {BUILDING_HEALTH_LABELS.amber}</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> {BUILDING_HEALTH_LABELS.red}</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> {BUILDING_HEALTH_LABELS.unknown}</div>
         </div>
 
         <div ref={mapRef} className="relative overflow-hidden rounded-2xl border bg-[#dfe8d8]">
@@ -1069,10 +1073,10 @@ function BuildingsGrid() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All devices up</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more degraded</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more down</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live data</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> {BUILDING_HEALTH_LABELS.green}</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> {BUILDING_HEALTH_LABELS.amber}</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> {BUILDING_HEALTH_LABELS.red}</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> {BUILDING_HEALTH_LABELS.unknown}</div>
       </div>
 
       {/* Search */}
@@ -1226,8 +1230,8 @@ function BuildingsGrid() {
                             <span>{building.nodeCount} monitored nodes</span>
                           </div>
                         </div>
-                        <Badge variant="outline" className={callingHealthBadgeClass[building.healthColor] ?? callingHealthBadgeClass.gray}>
-                          {callingHealthLabel[building.healthColor] ?? callingHealthLabel.gray}
+                        <Badge variant="outline" className={callingHealthBadgeClass[building.healthColor] ?? callingHealthBadgeClass.unknown}>
+                          {callingHealthLabel[building.healthColor] ?? callingHealthLabel.unknown}
                         </Badge>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1288,7 +1292,9 @@ function BuildingsGrid() {
                     <div>
                       <div className="font-medium text-foreground">Offline Webex endpoints</div>
                       <div className="text-muted-foreground">
-                        {offlineWebexDevices.length > 0
+                        {callingSupport.queryError
+                          ? "Webex device inventory is unavailable, so no offline-device conclusion is shown."
+                          : offlineWebexDevices.length > 0
                           ? `${offlineWebexDevices.length} device(s) are offline in Webex and should be compared against the building matrix.`
                           : "No Webex devices are currently reported offline."}
                       </div>

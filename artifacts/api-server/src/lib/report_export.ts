@@ -21,10 +21,7 @@ import {
   includedWeeklyLogs,
   selectedItemsForIncludedWeeklyLogs,
 } from "./weekly_report_entry_policy";
-import {
-  zendeskSolvedTicketQuery,
-  zendeskSolvedWindow,
-} from "./zendesk_solved_window";
+import { fetchSolvedZendeskTickets } from "./zendesk_report_tickets";
 
 export type CloudInventorySnapshot = {
   configured: boolean;
@@ -143,57 +140,26 @@ async function fetchClosedTicketsForWeek(weekOf: string): Promise<{
   unassigned: number;
   total: number;
 }> {
-  const subdomain = process.env.ZENDESK_SUBDOMAIN;
-  const email = process.env.ZENDESK_EMAIL;
-  const token = process.env.ZENDESK_API_TOKEN;
-  if (!subdomain || !email || !token) {
+  const result = await fetchSolvedZendeskTickets(weekOf);
+  if (!result.configured) {
     return { configured: false, byUser: new Map(), unassigned: 0, total: 0 };
   }
-  const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
-  const group = process.env.ZENDESK_GROUP || "Onsite_it";
-
-  const solvedWindow = zendeskSolvedWindow(weekOf, weekOf);
-
-  try {
-    const all: any[] = [];
-    let nextUrl: string | null =
-      `https://${subdomain}.zendesk.com/api/v2/search.json?query=${encodeURIComponent(
-        zendeskSolvedTicketQuery(group, solvedWindow),
-      )}&per_page=100`;
-    let pages = 0;
-    while (nextUrl && pages < 10) {
-      const r = await fetch(nextUrl, {
-        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-      });
-      if (!r.ok) break;
-      const data: any = await r.json();
-      all.push(...(data.results ?? []));
-      nextUrl = data.next_page ?? null;
-      pages++;
-    }
-    const ids = Array.from(new Set(all.map((t) => t.assignee_id).filter(Boolean)));
-    const userMap = new Map<number, string>();
-    if (ids.length > 0) {
-      const r = await fetch(
-        `https://${subdomain}.zendesk.com/api/v2/users/show_many.json?ids=${ids.join(",")}`,
-        { headers: { Authorization: `Basic ${auth}` } },
+  const byUser = new Map<string, number>();
+  let unassigned = 0;
+  for (const ticket of result.tickets) {
+    if (!ticket.assigneeName) unassigned++;
+    else
+      byUser.set(
+        ticket.assigneeName,
+        (byUser.get(ticket.assigneeName) ?? 0) + 1,
       );
-      if (r.ok) {
-        const data: any = await r.json();
-        for (const u of data.users ?? []) userMap.set(u.id, u.name);
-      }
-    }
-    const byUser = new Map<string, number>();
-    let unassigned = 0;
-    for (const t of all) {
-      const name = t.assignee_id ? userMap.get(t.assignee_id) : null;
-      if (!name) unassigned++;
-      else byUser.set(name, (byUser.get(name) ?? 0) + 1);
-    }
-    return { configured: true, byUser, unassigned, total: all.length };
-  } catch {
-    return { configured: true, byUser: new Map(), unassigned: 0, total: 0 };
   }
+  return {
+    configured: true,
+    byUser,
+    unassigned,
+    total: result.count ?? result.tickets.length,
+  };
 }
 
 export async function gatherReportExportData(report: Report): Promise<ReportExportData> {

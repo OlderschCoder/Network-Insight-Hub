@@ -13,6 +13,10 @@ import crypto from "node:crypto";
 import { normalizeNetworkIdentityData, saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { computeTelemetryPortDelta } from "../lib/network_telemetry_delta";
 import { blankUncollectedPortMeasurements } from "../lib/port_telemetry_policy";
+import {
+  getNetworkDeviceInfluxTelemetry,
+  projectFortiGateInterfacesToPorts,
+} from "../lib/fortigate_influx";
 
 const router = Router();
 
@@ -223,7 +227,71 @@ router.get("/ports", requireAuth, async (req: any, res) => {
   if (!z.string().uuid().safeParse(nodeId).success) {
     return res.status(400).json({ error: "A valid nodeId is required" });
   }
-  const ports = await db.select().from(netPortsTable).where(eq(netPortsTable.nodeId, nodeId));
+  const [ports, nodes] = await Promise.all([
+    db.select().from(netPortsTable).where(eq(netPortsTable.nodeId, nodeId)),
+    db.select().from(netNodesTable).where(eq(netNodesTable.id, nodeId)),
+  ]);
+  const [node] = nodes;
+  if (node?.nodeKind === "firewall" && node.mgmtIp) {
+    const telemetry = await getNetworkDeviceInfluxTelemetry(node.mgmtIp);
+    const storedByName = new Map(
+      ports.map((port) => [port.interfaceName.trim().toLowerCase(), port]),
+    );
+    const livePorts = projectFortiGateInterfacesToPorts(nodeId, telemetry.interfaces)
+      .map((live) => {
+        const stored = storedByName.get(live.interfaceName.trim().toLowerCase());
+        if (!stored) return live;
+        return {
+          ...live,
+          id: stored.id,
+          description: live.description ?? stored.description,
+          portMode: stored.portMode,
+          nativeVlan: stored.nativeVlan,
+          allowedVlans: stored.allowedVlans,
+          portchannel: stored.portchannel,
+          vpcId: stored.vpcId,
+          configEvidence: stored.configEvidence,
+          configUpdatedAt: stored.configUpdatedAt,
+          createdAt: stored.createdAt,
+        };
+      });
+    const liveNames = new Set(
+      livePorts.map((port) => port.interfaceName.trim().toLowerCase()),
+    );
+    const storedOnly = ports
+      .filter((port) => !liveNames.has(port.interfaceName.trim().toLowerCase()))
+      .map((port) => ({
+        ...port,
+        adminStatus: null,
+        operStatus: null,
+        statusReason: null,
+        macCount: null,
+        lldpNeighborCount: null,
+        inErrors: null,
+        outErrors: null,
+        inDiscards: null,
+        outDiscards: null,
+        inOctets: null,
+        outOctets: null,
+        inBps: null,
+        outBps: null,
+        utilizationPct: null,
+        rxPowerDbm: null,
+        txPowerDbm: null,
+        temperatureC: null,
+        opticsStatus: null,
+        telemetryEvidence: null,
+        telemetryUpdatedAt: null,
+      }));
+    const mergedPorts = [...livePorts, ...storedOnly];
+    if (mergedPorts.length > 0) {
+      mergedPorts.sort((a, b) => {
+        if (a.ifIndex != null && b.ifIndex != null && a.ifIndex !== b.ifIndex) return a.ifIndex - b.ifIndex;
+        return a.interfaceName.localeCompare(b.interfaceName, undefined, { numeric: true });
+      });
+      return res.json(mergedPorts);
+    }
+  }
   ports.sort((a, b) => {
     if (a.ifIndex != null && b.ifIndex != null && a.ifIndex !== b.ifIndex) return a.ifIndex - b.ifIndex;
     return a.interfaceName.localeCompare(b.interfaceName, undefined, { numeric: true });

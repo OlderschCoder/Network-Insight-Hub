@@ -17,14 +17,16 @@ import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
 import { sendReportEmail } from "../lib/email";
 import { buildReportPdfBuffer, buildReportDocxBuffer, getCloudInventorySnapshot } from "../lib/report_export";
-import {
-  zendeskSolvedTicketQuery,
-  zendeskSolvedWindow,
-} from "../lib/zendesk_solved_window";
+import { fetchSolvedZendeskTickets } from "../lib/zendesk_report_tickets";
 import {
   includedWeeklyLogs,
   isWeeklyLogIncludedInDepartmentReport,
+  weeklyLogSubmissionStatus,
 } from "../lib/weekly_report_entry_policy";
+import {
+  isZendeskDashboardTeamMember,
+  zendeskDashboardTeamOrder,
+} from "../lib/zendesk_dashboard_team";
 
 const router = Router();
 
@@ -40,13 +42,22 @@ router.get("/aggregate", requireAuth, async (req: any, res) => {
   const { weekOf } = req.query;
   if (!weekOf) return res.status(400).json({ error: "weekOf required" });
 
-  const entries = (await db.select({
+  const allEntryRows = await db.select({
     entry: entriesTable,
     user: usersTable,
   }).from(entriesTable)
     .leftJoin(usersTable, eq(entriesTable.userId, usersTable.id))
-    .where(eq(entriesTable.weekOf, weekOf as string)))
+    .where(eq(entriesTable.weekOf, weekOf as string));
+  const entries = allEntryRows
     .filter(({ entry }) => isWeeklyLogIncludedInDepartmentReport(entry));
+
+  const reportingTeam = (await db.select().from(usersTable))
+    .filter(isZendeskDashboardTeamMember)
+    .sort((a, b) => zendeskDashboardTeamOrder(a.name) - zendeskDashboardTeamOrder(b.name));
+  const submissionStatus = weeklyLogSubmissionStatus(
+    reportingTeam,
+    allEntryRows.map(({ entry }) => entry),
+  );
 
   const risks = await db.select().from(risksTable).where(eq(risksTable.status, "open"));
 
@@ -79,6 +90,7 @@ router.get("/aggregate", requireAuth, async (req: any, res) => {
     totalEntries: entries.length,
     contributorCount: contributors.size,
     eligibleUserIds: [...contributors],
+    submissionStatus,
     byRole,
     byCategory,
     totalTickets,
@@ -144,66 +156,11 @@ router.get("/:id/tickets", requireAuth, async (req: any, res) => {
   const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Not found" });
 
-  const subdomain = process.env.ZENDESK_SUBDOMAIN;
-  const email = process.env.ZENDESK_EMAIL;
-  const token = process.env.ZENDESK_API_TOKEN;
-  if (!subdomain || !email || !token) {
-    return res.json({ weekOf: report.weekOf, count: 0, tickets: [], configured: false });
-  }
-  const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
-  const group = process.env.ZENDESK_GROUP || "Onsite_it";
-
-  let solvedWindow;
   try {
-    solvedWindow = zendeskSolvedWindow(report.weekOf, report.weekOf);
-  } catch {
-    return res.status(500).json({ error: "Report has an invalid weekOf date" });
-  }
-
-  try {
-    const all: any[] = [];
-    let nextUrl: string | null =
-      `https://${subdomain}.zendesk.com/api/v2/search.json?query=${encodeURIComponent(
-        zendeskSolvedTicketQuery(group, solvedWindow),
-      )}&per_page=100`;
-    let pages = 0;
-    while (nextUrl && pages < 10) {
-      const r = await fetch(nextUrl, {
-        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-      });
-      if (!r.ok) break;
-      const data: any = await r.json();
-      all.push(...(data.results ?? []));
-      nextUrl = data.next_page ?? null;
-      pages++;
-    }
-
-    // Resolve assignee names
-    const ids = Array.from(new Set(all.map((t) => t.assignee_id).filter(Boolean)));
-    const userMap = new Map<number, string>();
-    if (ids.length > 0) {
-      const r = await fetch(
-        `https://${subdomain}.zendesk.com/api/v2/users/show_many.json?ids=${ids.join(",")}`,
-        { headers: { Authorization: `Basic ${auth}` } },
-      );
-      if (r.ok) {
-        const data: any = await r.json();
-        for (const u of data.users ?? []) userMap.set(u.id, u.name);
-      }
-    }
-
+    const result = await fetchSolvedZendeskTickets(report.weekOf);
     return res.json({
       weekOf: report.weekOf,
-      count: all.length,
-      configured: true,
-      tickets: all.map((t) => ({
-        id: t.id,
-        subject: t.subject,
-        status: t.status,
-        assigneeName: t.assignee_id ? userMap.get(t.assignee_id) ?? null : null,
-        updatedAt: t.updated_at,
-        url: `https://${subdomain}.zendesk.com/agent/tickets/${t.id}`,
-      })),
+      ...result,
     });
   } catch (e: any) {
     return res.status(502).json({ error: "Zendesk API error", message: e.message });

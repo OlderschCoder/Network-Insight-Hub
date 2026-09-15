@@ -4,14 +4,25 @@ import { logger } from "./logger";
 import { isEmailConfigured, sendReportEmail } from "./email";
 import {
   createEmptyFredBuildingAlertState,
+  deriveFredBuildingConnectivityObservation,
   evaluateFredBuildingAlerts,
   fredBuildingTargetKey,
   fredSwitchTargetKey,
   type FredAlertTransition,
+  type FredBuildingObservation,
   type FredBuildingAlertState,
   type FredSwitchObservation,
   type FredTargetEvaluation,
 } from "./fred_building_alert_logic";
+import {
+  phoneConnectivityStatus,
+  type BuildingPhoneEvidence,
+} from "./building_health";
+import { getBuildingPhoneEvidence } from "./building_phone_evidence";
+import {
+  DEFAULT_AUTHORITATIVE_BUILDINGS,
+  getAuthoritativeBuildingName,
+} from "./building_assignment";
 import {
   describeFredTelnyxError,
   fredRecipientIdempotencyKey,
@@ -66,6 +77,7 @@ type PersistedStateRow = {
   scope: "building" | "switch";
   target_id: string;
   phase: "normal" | "outage";
+  baseline_established: boolean;
   consecutive_fresh_downs: number;
   consecutive_fresh_ups: number;
   down_sequence_started_at: Date | string | null;
@@ -113,6 +125,7 @@ export type FredAlertWorkerErrorCode =
   | "anchor_seed_failed"
   | "no_enabled_anchors"
   | "sms_configuration_invalid"
+  | "phone_evidence_incomplete"
   | "lease_lost"
   | "tick_failed"
   | "fallback_failed";
@@ -169,6 +182,48 @@ function setFredAlertWorkerDegraded(errorCode: FredAlertWorkerErrorCode): void {
     state: "degraded",
     lastErrorAt: new Date().toISOString(),
     errorCode,
+  };
+}
+
+export type FredBuildingPhoneEvidenceAssessment = {
+  observations: FredBuildingObservation[];
+  errorCode: "phone_evidence_incomplete" | null;
+};
+
+/**
+ * Convert Webex evidence into evaluator observations while separately
+ * reporting whether every enabled anchor has complete evidence. Incomplete or
+ * unavailable evidence stays absent/unknown for incident evaluation and also
+ * degrades worker readiness instead of allowing a healthy-looking cycle.
+ */
+export function assessFredBuildingPhoneEvidence(
+  anchors: readonly EnabledAnchor[],
+  evidenceByBuilding: ReadonlyMap<string, BuildingPhoneEvidence>,
+): FredBuildingPhoneEvidenceAssessment {
+  let completeForEveryAnchor = true;
+  const observations: FredBuildingObservation[] = [];
+
+  for (const anchor of anchors) {
+    const evidence = evidenceByBuilding.get(
+      getAuthoritativeBuildingName(
+        anchor.buildingName,
+        DEFAULT_AUTHORITATIVE_BUILDINGS,
+      ),
+    );
+    if (!evidence?.complete) completeForEveryAnchor = false;
+    if (!evidence) continue;
+
+    observations.push({
+      buildingId: anchor.buildingKey,
+      status: phoneConnectivityStatus(evidence),
+      observedAt: evidence.observedAt,
+      source: "webex",
+    });
+  }
+
+  return {
+    observations,
+    errorCode: completeForEveryAnchor ? null : "phone_evidence_incomplete",
   };
 }
 
@@ -449,6 +504,7 @@ async function loadPreviousState(
        scope,
        target_id,
        phase,
+       baseline_established,
        consecutive_fresh_downs,
        consecutive_fresh_ups,
        down_sequence_started_at,
@@ -466,6 +522,8 @@ async function loadPreviousState(
         : fredSwitchTargetKey(anchor.buildingKey, row.target_id);
     state.targets[key] = {
       phase: row.phase,
+      baselineEstablished:
+        row.phase === "outage" || Boolean(row.baseline_established),
       consecutiveFreshDowns: Number(row.consecutive_fresh_downs),
       consecutiveFreshUps: Number(row.consecutive_fresh_ups),
       downSequenceStartedAt: toIso(row.down_sequence_started_at),
@@ -647,6 +705,7 @@ async function persistState(
        target_name,
        phase,
        last_observed_status,
+       baseline_established,
        consecutive_fresh_downs,
        consecutive_fresh_ups,
        down_sequence_started_at,
@@ -655,22 +714,23 @@ async function persistState(
        last_transition_at,
        state_version
      ) VALUES (
-       $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz,
-       $10::uuid, $11::timestamptz,
-       CASE WHEN $12::boolean THEN now() ELSE NULL END,
+       $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz,
+       $11::uuid, $12::timestamptz,
+       CASE WHEN $13::boolean THEN now() ELSE NULL END,
        1
      )
      ON CONFLICT (building_anchor_id, scope, target_id) DO UPDATE SET
        target_name = excluded.target_name,
        phase = excluded.phase,
        last_observed_status = excluded.last_observed_status,
+       baseline_established = excluded.baseline_established,
        consecutive_fresh_downs = excluded.consecutive_fresh_downs,
        consecutive_fresh_ups = excluded.consecutive_fresh_ups,
        down_sequence_started_at = excluded.down_sequence_started_at,
        active_incident_id = excluded.active_incident_id,
        last_processed_observation_at = excluded.last_processed_observation_at,
        last_transition_at = CASE
-         WHEN $12::boolean THEN now()
+         WHEN $13::boolean THEN now()
          ELSE fred_building_alert_states.last_transition_at
        END,
        state_version = 1,
@@ -682,6 +742,7 @@ async function persistState(
       targetName(anchor, evaluation),
       target.phase,
       evaluation.effectiveStatus,
+      target.baselineEstablished,
       target.consecutiveFreshDowns,
       target.consecutiveFreshUps,
       target.downSequenceStartedAt,
@@ -730,6 +791,7 @@ async function queueSmsDeliveries(
 export async function evaluateAndPersist(
   anchors: readonly EnabledAnchor[],
   observations: readonly FredSwitchObservation[],
+  phoneObservations: readonly FredBuildingObservation[],
   runtime: FredAlertRuntimeConfig,
   telnyx: FredTelnyxConfig | null,
   lease: FredPollLease,
@@ -785,17 +847,41 @@ export async function evaluateAndPersist(
       const anchorObservations = observations.filter((item) =>
         switchIds.has(item.switchId),
       );
+      const topology = {
+        buildingId: anchor.buildingKey,
+        buildingName: anchor.buildingName,
+        anchorSwitchId: anchor.anchorSwitchId,
+        childSwitchIds: anchor.children.map((child) => child.switchId),
+      };
+      const phoneObservation = phoneObservations.find(
+        (item) => item.buildingId === anchor.buildingKey,
+      );
+      const buildingObservation = deriveFredBuildingConnectivityObservation({
+        now: new Date(),
+        topology,
+        observations: anchorObservations,
+        phoneObservation: phoneObservation
+          ? {
+              status: phoneObservation.status,
+              observedAt: phoneObservation.observedAt,
+              source: phoneObservation.source,
+            }
+          : undefined,
+        config: {
+          maxObservationAgeMs: runtime.maxObservationAgeMs,
+          maxObservationGapMs: Math.max(
+            runtime.maxObservationAgeMs,
+            runtime.pollIntervalMs * 3,
+          ),
+          failureThreshold: anchor.failureThreshold,
+          recoveryThreshold: anchor.recoveryThreshold,
+        },
+      });
       const result = evaluateFredBuildingAlerts({
         now: new Date(),
-        topology: [
-          {
-            buildingId: anchor.buildingKey,
-            buildingName: anchor.buildingName,
-            anchorSwitchId: anchor.anchorSwitchId,
-            childSwitchIds: anchor.children.map((child) => child.switchId),
-          },
-        ],
+        topology: [topology],
         observations: anchorObservations,
+        buildingObservations: [buildingObservation],
         previousState,
         config: {
           maxObservationAgeMs: runtime.maxObservationAgeMs,
@@ -1461,9 +1547,15 @@ export async function runFredBuildingAlertTick(): Promise<void> {
       })),
     ]);
     const observations = await getFredSwitchObservations(monitoringTargets);
+    const phoneEvidence = assessFredBuildingPhoneEvidence(
+      anchors,
+      await getBuildingPhoneEvidence(),
+    );
+    healthErrorCode ??= phoneEvidence.errorCode;
     const queued = await evaluateAndPersist(
       anchors,
       observations,
+      phoneEvidence.observations,
       runtime,
       telnyx,
       lease,

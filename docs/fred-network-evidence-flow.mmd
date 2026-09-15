@@ -1,7 +1,16 @@
 flowchart LR
   C[Fresh console output] --> X[Evidence reconciliation]
   G[Stored known-good configuration] --> X
-  T[Current telemetry and topology] --> M{Metric observed in current source?}
+  F[Main and West FortiGate SNMP<br/>health, IF-MIB ports, Phase 2 tunnels] --> N[NOC Telegraf on 10.0.0.22]
+  N --> Q[(InfluxDB)]
+  Q --> T[Authenticated device telemetry API]
+  T --> P[Firewall Port Map]
+  T --> V2[VPN tunnel status]
+  T --> FR[Fred bounded evidence tools]
+  P --> M
+  V2 --> M
+  FR --> M
+  M{Metric observed in current source?}
   M -->|Yes| V[Expose exact measured value]
   M -->|No| B[Return blank / not collected]
   V --> X

@@ -159,6 +159,11 @@ to a person.
 
 - **Network** — searchable reference for **switches and VLANs** (hostname, building, IP, model; VLAN ID, subnet, gateway).
 - **Network → Visualize** — the topology **diagram**. Node positions are saved and shared across the team.
+- Open a FortiGate node to see its measured **Port Map**, live CPU, memory,
+  sessions, and uptime, plus the dedicated **VPN Tunnels** tab. If the NOC poll
+  has not returned the required IF-MIB or Fortinet Phase 2 rows, Insights says
+  the evidence has not arrived; it does not turn missing data into zero ports,
+  zero tunnels, or a healthy status.
 
 ### Network Tools (network-admin roles only)
 

@@ -10,6 +10,9 @@ flowchart TD
     S --> SP[Switch Port Map landing view]
     SP --> P[Port evidence and connected peer]
     P --> L[Detailed link records]
+    C --> F[FortiGate node]
+    F --> FP[Measured firewall Port Map]
+    F --> VT[Measured Phase 2 VPN tunnels]
 ```
 
 Visualizer building containers are sized from their current children. Saved
@@ -62,6 +65,13 @@ are independently observation-only:
 
 Fred receives nulls plus this evidence policy and must say “not collected” or
 “unavailable” rather than infer a healthy value.
+
+FortiGate detail pages merge the NOC Telegraf/Influx rows with persisted port
+inventory by interface name. Current measured fields win; unmatched saved
+interfaces remain visible but their live-only values stay blank. Only IF-MIB
+`ifType=6` rows become physical ports. The separate tunnel view reads the
+dedicated Phase 2 measurement and shows its observation time; an absent
+measurement is labeled unknown rather than treated as zero tunnels.
 
 ## Telemetry run history and delta
 

@@ -17,6 +17,7 @@ vi.mock("./logger", () => ({
 
 import {
   acquireFredBuildingAlertPollLease,
+  assessFredBuildingPhoneEvidence,
   completeFredBuildingAlertPollLease,
   evaluateAndPersist,
   findFredFallbackCandidates,
@@ -115,6 +116,109 @@ describe("Fred worker startup health", () => {
   });
 });
 
+describe("Fred Webex phone-evidence health", () => {
+  const completeEvidence = {
+    total: 1,
+    online: 1,
+    offline: 0,
+    unknown: 0,
+    assignedOwners: 1,
+    matchedOwners: 1,
+    complete: true,
+    observedAt: "2026-09-14T18:00:00.000Z",
+  };
+
+  it("keeps the worker healthy only when every enabled anchor has complete evidence", () => {
+    const secondAnchor = {
+      ...anchor,
+      id: "anchor-2",
+      buildingKey: "student-union",
+      buildingName: "Student Union",
+      anchorSwitchId: "2",
+    };
+    const assessment = assessFredBuildingPhoneEvidence(
+      [anchor, secondAnchor],
+      new Map([
+        ["Industrial Technology Campus", completeEvidence],
+        [
+          "Student Union / Student Activities",
+          { ...completeEvidence, offline: 1, online: 0 },
+        ],
+      ]),
+    );
+
+    expect(assessment.errorCode).toBeNull();
+    expect(assessment.observations).toEqual([
+      expect.objectContaining({
+        buildingId: "technology-center",
+        status: "up",
+        source: "webex",
+      }),
+      expect.objectContaining({
+        buildingId: "student-union",
+        status: "down",
+        source: "webex",
+      }),
+    ]);
+  });
+
+  it("returns one sanitized degraded-health code when any enabled anchor is incomplete", () => {
+    const assessment = assessFredBuildingPhoneEvidence(
+      [anchor],
+      new Map([
+        [
+          "Industrial Technology Campus",
+          {
+            ...completeEvidence,
+            complete: false,
+            online: 0,
+            matchedOwners: 0,
+            unknown: 1,
+          },
+        ],
+      ]),
+    );
+
+    expect(assessment).toMatchObject({
+      errorCode: "phone_evidence_incomplete",
+      observations: [
+        {
+          buildingId: "technology-center",
+          status: "unknown",
+          observedAt: "2026-09-14T18:00:00.000Z",
+          source: "webex",
+        },
+      ],
+    });
+    expect(JSON.stringify(assessment)).not.toContain("Technology Center");
+  });
+
+  it("degrades and emits no phone observation when Webex evidence is unavailable", () => {
+    expect(assessFredBuildingPhoneEvidence([anchor], new Map())).toEqual({
+      observations: [],
+      errorCode: "phone_evidence_incomplete",
+    });
+  });
+
+  it("matches phone evidence to exact authoritative lettered buildings", () => {
+    const letteredAnchor = {
+      ...anchor,
+      id: "anchor-dorm-g",
+      buildingKey: "student-living-g",
+      buildingName: "Student Living G",
+    };
+    const assessment = assessFredBuildingPhoneEvidence(
+      [letteredAnchor],
+      new Map([["Student Living G", completeEvidence]]),
+    );
+
+    expect(assessment.errorCode).toBeNull();
+    expect(assessment.observations).toEqual([
+      expect.objectContaining({ buildingId: "student-living-g", status: "up" }),
+    ]);
+  });
+});
+
 describe("Fred durable poll lease", () => {
   it("claims with an expiry longer than one poll and an expired-row gate", async () => {
     const query = vi.fn(async (_text: string, values?: unknown[]) => ({
@@ -188,6 +292,7 @@ describe("Fred durable poll lease", () => {
 
     await expect(
       evaluateAndPersist(
+        [],
         [],
         [],
         {} as any,

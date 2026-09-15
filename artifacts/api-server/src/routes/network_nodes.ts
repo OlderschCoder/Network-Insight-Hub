@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, netNodesTable, netLinksTable, vlansTable, networkLayoutPositionsTable, azureVmsTable, networkSwitchesTable } from "@workspace/db";
+import { db, netNodesTable, netLinksTable, vlansTable, networkLayoutPositionsTable, azureVmsTable, networkSwitchesTable, fredBuildingAnchorsTable } from "@workspace/db";
 import { eq, or, ilike, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireCIO } from "./auth";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { parseFredNocPingManyResponse } from "../lib/fred_noc_ping_validation";
 import {
   DEFAULT_AUTHORITATIVE_BUILDINGS,
   getAssignedBuildingName,
+  getAuthoritativeBuildingName,
   getCanonicalBuildingName,
   normalizeBuildingKey,
 } from "../lib/building_assignment";
@@ -24,6 +25,11 @@ import {
   getBuildingVisibilityMutation,
   serializeBuildingMapLayoutRows,
 } from "../lib/building_map_layout";
+import { enabledMainSwitchIdsByBuilding, summarizeBuildingConnectivity } from "../lib/building_health";
+import { getBuildingPhoneEvidence } from "../lib/building_phone_evidence";
+import { selectFreshDeviceStatus } from "../lib/live_device_status";
+import { toPublicBuildingSummary } from "../lib/public_building_summary";
+import { getNetworkDeviceInfluxTelemetry } from "../lib/fortigate_influx";
 
 export { getCanonicalBuildingName } from "../lib/building_assignment";
 
@@ -122,14 +128,6 @@ const FORTIGATE_WAN_SYSNAMES = [
 const FORTIGATE_WAN_IF_NAMES = ["port25", "port9"] as const;
 
 type LiveStatus = "up" | "degraded" | "down" | "unknown";
-
-function mergeObservedStatuses(...values: Array<LiveStatus | undefined>): LiveStatus {
-  const observed = values.filter((value): value is LiveStatus => !!value && value !== "unknown");
-  if (observed.includes("up")) return "up";
-  if (observed.includes("degraded")) return "degraded";
-  if (observed.includes("down")) return "down";
-  return "unknown";
-}
 
 type NocDeviceObservation = {
   status: LiveStatus;
@@ -404,7 +402,7 @@ async function getBuildingMapLayoutPositions() {
 }
 
 export async function getBuildingSummaries() {
-  const [nodeRows, switchRows, vlanRows, azureHybridStatus] = await Promise.all([
+  const [nodeRows, switchRows, vlanRows, azureHybridStatus, phoneEvidenceByBuilding, anchorRows] = await Promise.all([
     db.select({
       building: netNodesTable.building,
       mgmtIp: netNodesTable.mgmtIp,
@@ -414,6 +412,7 @@ export async function getBuildingSummaries() {
       nodeKind: netNodesTable.nodeKind,
     }).from(netNodesTable),
     db.select({
+      id: networkSwitchesTable.id,
       building: networkSwitchesTable.building,
       mgmtIp: networkSwitchesTable.ipAddress,
       hostname: networkSwitchesTable.hostname,
@@ -422,6 +421,14 @@ export async function getBuildingSummaries() {
     }).from(networkSwitchesTable),
     db.select({ building: vlansTable.building }).from(vlansTable),
     getAzureHybridVmStatus(),
+    getBuildingPhoneEvidence(),
+    db.select({
+      buildingName: fredBuildingAnchorsTable.buildingName,
+      anchorSwitchId: fredBuildingAnchorsTable.anchorSwitchId,
+      enabled: fredBuildingAnchorsTable.enabled,
+    })
+      .from(fredBuildingAnchorsTable)
+      .where(eq(fredBuildingAnchorsTable.enabled, true)),
   ]);
   const liveStatuses = await getDeviceStatus(
     switchRows
@@ -436,6 +443,11 @@ export async function getBuildingSummaries() {
   const connectivityObjectMap: Record<string, number> = {};
   const vlanMap: Record<string, number> = {};
   const buildingStatuses: Record<string, LiveStatus[]> = {};
+  const switchStatusById = new Map<number, LiveStatus>();
+  const mainSwitchIdByBuilding = enabledMainSwitchIdsByBuilding(
+    anchorRows,
+    (name) => getAuthoritativeBuildingName(name, authoritativeBuildings),
+  );
 
   for (const node of nodeRows) {
     const canonical = getAssignedBuildingName(node.building, node.location, node.hostname);
@@ -460,10 +472,9 @@ export async function getBuildingSummaries() {
     const liveStatus = node.mgmtIp
       ? liveStatuses[normalizeTelemetryKey(node.mgmtIp)]
       : undefined;
-    buildingStatuses[canonical].push(
-      liveStatus
-        ?? (node.status === "online" ? "up" : node.status === "offline" ? "down" : "unknown"),
-    );
+    const observedStatus = liveStatus ?? "unknown";
+    buildingStatuses[canonical].push(observedStatus);
+    switchStatusById.set(node.id, observedStatus);
   }
 
   for (const vlan of vlanRows) {
@@ -477,7 +488,17 @@ export async function getBuildingSummaries() {
     const statuses = name === "Azure (Hybrid-VNet)"
       ? [azureHybridStatus]
       : (buildingStatuses[name] ?? []);
-    const healthColor = healthColorFromStatuses(statuses);
+    const phoneEvidence = phoneEvidenceByBuilding.get(name);
+    const mainSwitchId = mainSwitchIdByBuilding.get(name);
+    const connectivitySummary = summarizeBuildingConnectivity(
+      statuses,
+      phoneEvidence,
+      mainSwitchId,
+      switchStatusById,
+    );
+    const healthColor = classification.monitoringStrategy === "switch-probe"
+      ? connectivitySummary.healthColor
+      : healthColorFromStatuses(statuses);
 
     return {
       name,
@@ -489,6 +510,9 @@ export async function getBuildingSummaries() {
       influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
       category: classification.category,
       monitoringStrategy: classification.monitoringStrategy,
+      phoneEvidence: phoneEvidence ?? null,
+      mainSwitchConfigured: connectivitySummary.mainSwitchConfigured,
+      mainSwitchStatus: connectivitySummary.mainSwitchStatus,
     };
   });
 }
@@ -501,7 +525,10 @@ async function getDeviceStatus(hosts: string[]): Promise<Record<string, LiveStat
   ]);
   const requested = Array.from(new Set(hosts.filter(isMonitorableHost).map(normalizeTelemetryKey)));
   return Object.fromEntries(
-    requested.map((host) => [host, mergeObservedStatuses(heartbeat[host]?.status, nocStatus[host])]),
+    requested.map((host) => [host, selectFreshDeviceStatus({
+      nocStatus: nocStatus[host],
+      influx: heartbeat[host],
+    })]),
   );
 }
 
@@ -1148,7 +1175,8 @@ router.get("/public/buildings/map-layout", async (_req, res) => {
 
 router.get("/public/buildings", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  return res.json(await getBuildingSummaries());
+  const summaries = await getBuildingSummaries();
+  return res.json(summaries.map(toPublicBuildingSummary));
 });
 
 router.get("/public/monitoring/summary", async (_req, res) => {
@@ -1346,10 +1374,11 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   const authoritativeBuildings = await listAuthoritativeBuildings();
   const canonicalName = authoritativeBuildings.includes(name) ? name : getCanonicalBuildingName(name);
 
-  const [allNodes, allVlans, azureHybridStatus] = await Promise.all([
+  const [allNodes, allVlans, azureHybridStatus, buildingSummaries] = await Promise.all([
     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
     db.select().from(vlansTable).orderBy(vlansTable.building, vlansTable.vlanId),
     getAzureHybridVmStatus(),
+    getBuildingSummaries(),
   ]);
 
   const nodes = allNodes.filter((node) => getAssignedBuildingName(node.building, node.location, node.hostname) === canonicalName);
@@ -1386,7 +1415,8 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   const statuses = canonicalName === "Azure (Hybrid-VNet)"
     ? [azureHybridStatus]
     : hosts.map((host) => liveStatuses[normalizeTelemetryKey(host)] ?? "unknown");
-  const healthColor = healthColorFromStatuses(statuses);
+  const buildingSummary = buildingSummaries.find((building) => building.name === canonicalName);
+  const healthColor = buildingSummary?.healthColor ?? healthColorFromStatuses(statuses);
 
   return res.json({
     name: canonicalName,
@@ -1398,6 +1428,7 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
     category: classification.category,
     monitoringStrategy: classification.monitoringStrategy,
+    phoneEvidence: buildingSummary?.phoneEvidence ?? null,
   });
 });
 
@@ -1448,43 +1479,11 @@ from(bucket: "${INFLUX_BUCKET}")
 
 /** GET /network/influx/device/:host – single device detail from InfluxDB */
 router.get("/influx/device/:host", requireAuth, async (req, res) => {
-  const host = req.params.host;
-  if (!INFLUX_URL || !INFLUX_TOKEN) {
-    return res.json({ configured: false, host, metrics: null });
+  const host = String(req.params.host ?? "").trim();
+  if (!/^[A-Za-z0-9._:-]+$/.test(host)) {
+    return res.status(400).json({ error: "Invalid telemetry host" });
   }
-
-  const flux = `
-from(bucket: "${INFLUX_BUCKET}")
-  |> range(start: -15m)
-  |> filter(fn: (r) => r.source == "${host}" or r.agent_host == "${host}")
-  |> filter(fn: (r) =>
-      r._field == "percent_packet_loss" or
-      r._field == "average_response_ms" or
-      r._field == "uptime" or
-      r._field == "ifOperStatus"
-  )
-  |> last()
-  |> keep(columns: ["_measurement", "_field", "_value", "ifName", "_time"])
-`;
-  const csv = await queryInflux(flux);
-  if (!csv) return res.json({ configured: true, reachable: false, host, metrics: null });
-
-  const rows = parseCsv(csv);
-  const metrics: Record<string, any> = {};
-  const interfaces: Record<string, any> = {};
-
-  for (const r of rows) {
-    if (r._measurement === "ping") {
-      metrics[r._field] = r._value;
-    } else if (r._measurement === "interface" && r.ifName) {
-      if (!interfaces[r.ifName]) interfaces[r.ifName] = {};
-      interfaces[r.ifName][r._field] = r._value;
-    } else {
-      metrics[r._field] = r._value;
-    }
-  }
-
-  return res.json({ configured: true, reachable: true, host, metrics, interfaces, lastPolled: new Date().toISOString() });
+  return res.json(await getNetworkDeviceInfluxTelemetry(host));
 });
 
 export default router;

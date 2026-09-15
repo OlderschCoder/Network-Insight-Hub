@@ -182,6 +182,9 @@ export const fredBuildingAlertStatesTable = pgTable(
     lastObservedStatus: varchar("last_observed_status", { length: 40 })
       .notNull()
       .default("unknown"),
+    baselineEstablished: boolean("baseline_established")
+      .notNull()
+      .default(false),
     consecutiveFreshDowns: integer("consecutive_fresh_downs")
       .notNull()
       .default(0),

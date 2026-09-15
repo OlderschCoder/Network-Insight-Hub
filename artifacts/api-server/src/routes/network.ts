@@ -45,6 +45,12 @@ import { getBuildingSummaries, getCanonicalBuildingName } from "./network_nodes"
 import { findSwitchByIdentity, saveSwitchByIdentity } from "../lib/network_identity";
 import fs from "fs";
 import path from "path";
+import {
+  fetchAllWebexDevices,
+  isWebexSupportConfigured,
+  prepareWebexSupportDeviceInventory,
+  webexSupportFetch,
+} from "../lib/webex_support";
 
 const router = Router();
 
@@ -102,54 +108,6 @@ const WEBEX_DEVELOPER_AUDIT_EVENTS_URL = "https://developer.webex.com/admin/docs
 const WEBEX_EMERGENCY_CALLING_GUIDE_URL = "https://help.webex.com/en-us/article/av6oo3/Enhanced-Emergency-Calling-for-Webex-Calling";
 const WEBEX_E911_VLAN_MIN = 301;
 const WEBEX_E911_VLAN_MAX = 323;
-
-let webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
-
-async function refreshWebexSupportAccessToken(): Promise<boolean> {
-  const refreshToken = process.env.WEBEX_REFRESH_TOKEN;
-  const clientId = process.env.WEBEX_CLIENT_ID;
-  const clientSecret = process.env.WEBEX_CLIENT_SECRET;
-  if (!refreshToken || !clientId || !clientSecret) return false;
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-  });
-  const response = await fetch("https://webexapis.com/v1/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) return false;
-  const tokens = await response.json() as { access_token?: string; refresh_token?: string };
-  if (!tokens.access_token) return false;
-  webexSupportAccessToken = tokens.access_token;
-  if (tokens.refresh_token) process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
-  return true;
-}
-
-async function webexSupportFetch(pathname: string, retry = true): Promise<Response> {
-  if (!webexSupportAccessToken) webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
-  if (!webexSupportAccessToken && !(await refreshWebexSupportAccessToken())) {
-    throw new Error("Webex is not configured");
-  }
-  const requestUrl = pathname.startsWith("https://webexapis.com/v1/")
-    ? pathname
-    : `https://webexapis.com/v1${pathname}`;
-  const response = await fetch(requestUrl, {
-    headers: {
-      Authorization: `Bearer ${webexSupportAccessToken}`,
-      Accept: "application/json",
-    },
-    signal: AbortSignal.timeout(12000),
-  });
-  if (response.status === 401 && retry && await refreshWebexSupportAccessToken()) {
-    return webexSupportFetch(pathname, false);
-  }
-  return response;
-}
 
 type CallingPerson = {
   id: string;
@@ -287,10 +245,7 @@ router.get("/calling/support", requireAuth, async (_req: any, res) => {
       db.select().from(vlansTable).orderBy(vlansTable.vlanId),
     ]);
 
-    const webexConfigured = !!(
-      process.env.WEBEX_ACCESS_TOKEN ||
-      (process.env.WEBEX_REFRESH_TOKEN && process.env.WEBEX_CLIENT_ID && process.env.WEBEX_CLIENT_SECRET)
-    );
+    const webexConfigured = isWebexSupportConfigured();
 
     let webexQueryError: string | null = null;
     let phoneDirectoryQueryError: string | null = null;
@@ -306,31 +261,10 @@ router.get("/calling/support", requireAuth, async (_req: any, res) => {
 
     if (webexConfigured) {
       try {
-        const response = await webexSupportFetch("/devices?max=1000");
-        if (!response.ok) {
-          webexQueryError = `Webex device query failed (${response.status}).`;
-        } else {
-          const data = await response.json() as { items?: Array<Record<string, unknown>> };
-          webexDevices = (data.items ?? [])
-            .map((device) => {
-              const rawStatus = String(device.connectionStatus || device.status || "unknown").toLowerCase();
-              const status: "online" | "offline" | "unknown" =
-                rawStatus === "connected"
-                  ? "online"
-                  : rawStatus === "disconnected"
-                    ? "offline"
-                    : "unknown";
-              return {
-                id: String(device.id || ""),
-                name: String(device.displayName || device.name || "Unnamed device"),
-                product: String(device.product || device.type || "Unknown"),
-                status,
-                personId: String(device.personId || "").trim() || null,
-                workspaceId: String(device.workspaceId || "").trim() || null,
-              };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-        }
+        const collection = await fetchAllWebexDevices(webexSupportFetch);
+        const inventory = prepareWebexSupportDeviceInventory(collection);
+        webexDevices = inventory.devices;
+        webexQueryError = inventory.error;
       } catch (err: any) {
         webexQueryError = err?.message === "Webex is not configured" ? null : (err?.message || "Webex device query failed.");
       }

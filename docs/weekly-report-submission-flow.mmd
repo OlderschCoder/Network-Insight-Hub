@@ -1,7 +1,7 @@
 flowchart LR
   T[To-do List] -->|complete work| C[Completed Work]
   C --> L[My Work - Weekly Log]
-  Z[Zendesk solved tickets] -->|bounded solved-at week| L
+  Z[Zendesk solved tickets] -->|per-user bounded solved-at week| L
 
   L -->|Save Draft| D[(Draft weekly log)]
   D -->|Edit and retry tickets| L
@@ -12,6 +12,11 @@ flowchart LR
 
   S -->|weekly log and its owner's completed items| R[Status and Reporting - Weekly Reports]
   X[Submitted logs from other staff] --> R
+  A[Active reporting-team roster] --> Q[Submission checklist]
+  D -->|Draft not submitted| Q
+  S -->|Submitted| Q
+  Q -->|name every missing or draft teammate| R
+  Z -->|same group-wide count and per-assignee totals| R
   R --> F[Finalize, export, email,<br/>or publish to Zendesk]
 
   CIO[CIO, including Tracy] -->|submits own contribution| L

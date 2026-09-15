@@ -59,6 +59,20 @@ import {
   type PendingNetworkChange,
   type InventoryActor,
 } from "./inventory";
+import { isPhysicalPhoneLikeDevice } from "./building_phone_evidence";
+import {
+  DEFAULT_AUTHORITATIVE_BUILDINGS,
+  getAuthoritativeBuildingName,
+} from "./building_assignment";
+import {
+  fetchAllWebexDevices,
+  isWebexSupportConfigured,
+  webexSupportFetch,
+} from "./webex_support";
+import {
+  formatNetworkDeviceTelemetryForFred,
+  getNetworkDeviceInfluxTelemetry,
+} from "./fortigate_influx";
 
 export type { NetworkUpdate, PendingNetworkChange };
 
@@ -2546,7 +2560,9 @@ async function executeZendeskGetTicket(argsJson: string): Promise<string> {
         "GET",
         `tickets/${ticket_id}/conversation_log?sort=created_at&page%5Bsize%5D=100`,
       );
-      const entries = normalizeZendeskConversationLog(log.events || []).slice(-25);
+      const entries = normalizeZendeskConversationLog(log.events || []).slice(
+        -25,
+      );
       recent = entries
         .map(
           (entry) =>
@@ -2703,6 +2719,8 @@ type CallingBuildingEvidence = {
   offlinePhoneOwners: number;
   unknownPhoneOwners: number;
   noMatchedDevice: number;
+  complete: boolean;
+  allAssignedPhonesOffline: boolean;
   devices: Array<{
     name: string;
     product: string;
@@ -2711,18 +2729,14 @@ type CallingBuildingEvidence = {
   error?: string;
 };
 
-function looksLikeCallingPhone(name: string, product: string): boolean {
-  const value = `${name} ${product}`.toLowerCase();
-  return /(ip phone|desk phone|phone|mpp|ata|dect|vg3|vg4|cp[- ]?\d|(?:^|\D)(?:68|78|79|88|98)\d{2}(?:\D|$))/.test(
-    value,
-  );
-}
-
 async function getCallingBuildingEvidence(
   buildingName: string,
   includeDevices = true,
 ): Promise<CallingBuildingEvidence> {
-  const canonicalBuilding = getCanonicalBuildingName(buildingName);
+  const canonicalBuilding = getAuthoritativeBuildingName(
+    buildingName,
+    DEFAULT_AUTHORITATIVE_BUILDINGS,
+  );
   const empty: CallingBuildingEvidence = {
     configured: false,
     building: canonicalBuilding,
@@ -2732,24 +2746,18 @@ async function getCallingBuildingEvidence(
     offlinePhoneOwners: 0,
     unknownPhoneOwners: 0,
     noMatchedDevice: 0,
+    complete: false,
+    allAssignedPhonesOffline: false,
     devices: [],
   };
 
-  let response: Response;
-  try {
-    response = await webexFetch("/devices?max=1000");
-  } catch {
+  if (!isWebexSupportConfigured()) {
     return {
       ...empty,
       error: "Webex Calling device status is not configured.",
     };
   }
-  if (!response.ok)
-    return {
-      ...empty,
-      configured: true,
-      error: `Webex device query failed (${response.status}).`,
-    };
+  const collection = await fetchAllWebexDevices(webexSupportFetch);
 
   const assignmentResult = await db.execute(sql`
     SELECT "webex_person_id", "building"
@@ -2764,15 +2772,16 @@ async function getCallingBuildingEvidence(
     assignmentRows
       .filter(
         (row) =>
-          normalizedText(getCanonicalBuildingName(row.building)) ===
-          normalizedText(canonicalBuilding),
+          normalizedText(
+            getAuthoritativeBuildingName(
+              row.building,
+              DEFAULT_AUTHORITATIVE_BUILDINGS,
+            ),
+          ) === normalizedText(canonicalBuilding),
       )
       .map((row) => String(row.webex_person_id)),
   );
 
-  const data = (await response.json()) as {
-    items?: Array<Record<string, unknown>>;
-  };
   const byOwner = new Map<
     string,
     Array<{
@@ -2781,12 +2790,12 @@ async function getCallingBuildingEvidence(
       status: "online" | "offline" | "unknown";
     }>
   >();
-  for (const device of data.items ?? []) {
+  for (const device of collection.devices) {
     const ownerId = String(device.personId || device.workspaceId || "").trim();
     if (!ownerId || !owners.has(ownerId)) continue;
     const name = String(device.displayName || device.name || "Unnamed device");
     const product = String(device.product || device.type || "Unknown");
-    if (!looksLikeCallingPhone(name, product)) continue;
+    if (!isPhysicalPhoneLikeDevice(device)) continue;
     const rawStatus = normalizedText(
       device.connectionStatus || device.status || "unknown",
     );
@@ -2807,11 +2816,19 @@ async function getCallingBuildingEvidence(
   for (const devices of byOwner.values()) {
     if (devices.some((device) => device.status === "online"))
       onlinePhoneOwners += 1;
-    else if (devices.some((device) => device.status === "offline"))
+    else if (devices.every((device) => device.status === "offline"))
       offlinePhoneOwners += 1;
     else unknownPhoneOwners += 1;
   }
   const devices = Array.from(byOwner.values()).flat();
+  const complete = Boolean(
+    collection.complete &&
+    owners.size > 0 &&
+    byOwner.size === owners.size &&
+    unknownPhoneOwners === 0 &&
+    devices.length > 0 &&
+    devices.every((device) => device.status !== "unknown"),
+  );
   return {
     configured: true,
     building: canonicalBuilding,
@@ -2821,7 +2838,15 @@ async function getCallingBuildingEvidence(
     offlinePhoneOwners,
     unknownPhoneOwners,
     noMatchedDevice: Math.max(0, owners.size - byOwner.size),
+    complete,
+    allAssignedPhonesOffline: complete && offlinePhoneOwners === owners.size,
     devices: includeDevices ? devices.slice(0, 80) : [],
+    ...(!collection.complete
+      ? {
+          error:
+            "Webex returned incomplete device evidence; outage conclusions are disabled.",
+        }
+      : {}),
   };
 }
 
@@ -2920,20 +2945,26 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
     ? args.status
     : "all";
   const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
-  const [nodes, links, ports, configImports, telemetryRuns] = await Promise.all([
-    db.select().from(netNodesTable),
-    db.select().from(netLinksTable),
-    db.select().from(netPortsTable),
-    db
-      .select({
-        deviceName: deviceConfigsTable.deviceName,
-        filename: deviceConfigsTable.filename,
-        createdAt: deviceConfigsTable.createdAt,
-      })
-      .from(deviceConfigsTable)
-      .orderBy(desc(deviceConfigsTable.createdAt)),
-    db.select().from(networkTelemetryRunsTable).orderBy(desc(networkTelemetryRunsTable.importedAt)).limit(2),
-  ]);
+  const [nodes, links, ports, configImports, telemetryRuns] = await Promise.all(
+    [
+      db.select().from(netNodesTable),
+      db.select().from(netLinksTable),
+      db.select().from(netPortsTable),
+      db
+        .select({
+          deviceName: deviceConfigsTable.deviceName,
+          filename: deviceConfigsTable.filename,
+          createdAt: deviceConfigsTable.createdAt,
+        })
+        .from(deviceConfigsTable)
+        .orderBy(desc(deviceConfigsTable.createdAt)),
+      db
+        .select()
+        .from(networkTelemetryRunsTable)
+        .orderBy(desc(networkTelemetryRunsTable.importedAt))
+        .limit(2),
+    ],
+  );
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const physicalPorts = ports.filter((port) => port.isPhysical !== false);
   const activePorts = physicalPorts.filter(
@@ -2961,58 +2992,88 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
       const portConfigDates = nodePorts
         .map((port) => port.configUpdatedAt?.getTime())
         .filter((value): value is number => typeof value === "number");
-      const identity = normalizedText(node.hostname).replace(/\.sccc\.edu$/, "");
+      const identity = normalizedText(node.hostname).replace(
+        /\.sccc\.edu$/,
+        "",
+      );
       const importedConfig = configImports.find((item) => {
-        const device = normalizedText(item.deviceName).replace(/\.sccc\.edu$/, "");
+        const device = normalizedText(item.deviceName).replace(
+          /\.sccc\.edu$/,
+          "",
+        );
         const filename = normalizedText(item.filename);
         return device === identity || filename.includes(identity);
       });
-      const latestTelemetry = telemetryDates.length ? Math.max(...telemetryDates) : null;
-      const latestConfig = Math.max(
-        portConfigDates.length ? Math.max(...portConfigDates) : 0,
-        importedConfig?.createdAt?.getTime() ?? 0,
-      ) || null;
+      const latestTelemetry = telemetryDates.length
+        ? Math.max(...telemetryDates)
+        : null;
+      const latestConfig =
+        Math.max(
+          portConfigDates.length ? Math.max(...portConfigDates) : 0,
+          importedConfig?.createdAt?.getTime() ?? 0,
+        ) || null;
       return {
         hostname: node.hostname,
         building: getCanonicalBuildingName(node.building),
         managementIp: node.mgmtIp,
         physicalPorts: nodePorts.length,
-        latestTelemetryAt: latestTelemetry ? new Date(latestTelemetry).toISOString() : null,
-        telemetryState: latestTelemetry == null ? "never_collected" : latestTelemetry < telemetryCutoff ? "stale" : "current",
-        latestConfigAt: latestConfig ? new Date(latestConfig).toISOString() : null,
-        configState: latestConfig == null ? "not_imported" : latestConfig < configCutoff ? "stale" : "current",
+        latestTelemetryAt: latestTelemetry
+          ? new Date(latestTelemetry).toISOString()
+          : null,
+        telemetryState:
+          latestTelemetry == null
+            ? "never_collected"
+            : latestTelemetry < telemetryCutoff
+              ? "stale"
+              : "current",
+        latestConfigAt: latestConfig
+          ? new Date(latestConfig).toISOString()
+          : null,
+        configState:
+          latestConfig == null
+            ? "not_imported"
+            : latestConfig < configCutoff
+              ? "stale"
+              : "current",
       };
     });
-    const telemetryNeedsAttention = freshnessByNode.filter((item) => item.telemetryState !== "current");
-    const configNeedsAttention = freshnessByNode.filter((item) => item.configState !== "current");
+    const telemetryNeedsAttention = freshnessByNode.filter(
+      (item) => item.telemetryState !== "current",
+    );
+    const configNeedsAttention = freshnessByNode.filter(
+      (item) => item.configState !== "current",
+    );
     return boundedNetworkResult({
       source: "/network/map",
       generatedAt: new Date().toISOString(),
-      latestTelemetryRun: telemetryRuns[0] ? {
-        runId: telemetryRuns[0].runId,
-        generatedAt: isoValue(telemetryRuns[0].generatedAt),
-        importedAt: isoValue(telemetryRuns[0].importedAt),
-        collectionScope: telemetryRuns[0].collectionScope ?? "partial",
-        targetIps: telemetryRuns[0].targetIps ?? [],
-        scopePolicy: "A partial telemetry run updates only its explicit targets. Absence from any run is never evidence that another asset is stale, down, bad, missing, retired, or deleted. Never compare a scoped run count with campus inventory totals. Deletion and retirement require explicit authorized action.",
-        sourceRecords: telemetryRuns[0].sourceRecords,
-        successfulRecords: telemetryRuns[0].successfulRecords,
-        failedRecords: telemetryRuns[0].failedRecords,
-        appliedSwitches: telemetryRuns[0].appliedSwitches,
-        physicalPorts: telemetryRuns[0].physicalPorts,
-        changes: {
-          changedDevices: telemetryRuns[0].changedDevices,
-          downToUp: telemetryRuns[0].downToUp,
-          upToDown: telemetryRuns[0].upToDown,
-          administrative: telemetryRuns[0].adminChanges,
-          nativeVlan: telemetryRuns[0].vlanChanges,
-          descriptions: telemetryRuns[0].descriptionChanges,
-          added: telemetryRuns[0].portsAdded,
-          missing: telemetryRuns[0].portsMissing,
-        },
-        deviceDeltas: telemetryRuns[0].deviceDeltas,
-        failures: telemetryRuns[0].failures,
-      } : null,
+      latestTelemetryRun: telemetryRuns[0]
+        ? {
+            runId: telemetryRuns[0].runId,
+            generatedAt: isoValue(telemetryRuns[0].generatedAt),
+            importedAt: isoValue(telemetryRuns[0].importedAt),
+            collectionScope: telemetryRuns[0].collectionScope ?? "partial",
+            targetIps: telemetryRuns[0].targetIps ?? [],
+            scopePolicy:
+              "A partial telemetry run updates only its explicit targets. Absence from any run is never evidence that another asset is stale, down, bad, missing, retired, or deleted. Never compare a scoped run count with campus inventory totals. Deletion and retirement require explicit authorized action.",
+            sourceRecords: telemetryRuns[0].sourceRecords,
+            successfulRecords: telemetryRuns[0].successfulRecords,
+            failedRecords: telemetryRuns[0].failedRecords,
+            appliedSwitches: telemetryRuns[0].appliedSwitches,
+            physicalPorts: telemetryRuns[0].physicalPorts,
+            changes: {
+              changedDevices: telemetryRuns[0].changedDevices,
+              downToUp: telemetryRuns[0].downToUp,
+              upToDown: telemetryRuns[0].upToDown,
+              administrative: telemetryRuns[0].adminChanges,
+              nativeVlan: telemetryRuns[0].vlanChanges,
+              descriptions: telemetryRuns[0].descriptionChanges,
+              added: telemetryRuns[0].portsAdded,
+              missing: telemetryRuns[0].portsMissing,
+            },
+            deviceDeltas: telemetryRuns[0].deviceDeltas,
+            failures: telemetryRuns[0].failures,
+          }
+        : null,
       counts: {
         nodes: nodes.length,
         links: links.length,
@@ -3036,19 +3097,28 @@ export async function executeQueryNetworkMap(rawArgs: string): Promise<string> {
       }, {}),
       freshness: {
         rules: {
-          telemetry: "stale after 36 hours; expected from the telemetry JSON collector",
-          configuration: "stale after 90 days; refresh after every approved configuration change",
+          telemetry:
+            "stale after 36 hours; expected from the telemetry JSON collector",
+          configuration:
+            "stale after 90 days; refresh after every approved configuration change",
         },
         telemetry: {
           current: freshnessByNode.length - telemetryNeedsAttention.length,
-          stale: freshnessByNode.filter((item) => item.telemetryState === "stale").length,
-          neverCollected: freshnessByNode.filter((item) => item.telemetryState === "never_collected").length,
+          stale: freshnessByNode.filter(
+            (item) => item.telemetryState === "stale",
+          ).length,
+          neverCollected: freshnessByNode.filter(
+            (item) => item.telemetryState === "never_collected",
+          ).length,
           needsAttention: telemetryNeedsAttention,
         },
         configuration: {
           current: freshnessByNode.length - configNeedsAttention.length,
-          stale: freshnessByNode.filter((item) => item.configState === "stale").length,
-          notImported: freshnessByNode.filter((item) => item.configState === "not_imported").length,
+          stale: freshnessByNode.filter((item) => item.configState === "stale")
+            .length,
+          notImported: freshnessByNode.filter(
+            (item) => item.configState === "not_imported",
+          ).length,
           needsAttention: configNeedsAttention,
         },
       },
@@ -3875,51 +3945,6 @@ export const WEBEX_DEVICE_STATUS_TOOL: OpenAI.Chat.Completions.ChatCompletionToo
       },
     },
   };
-let webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
-async function refreshWebexAccessToken(): Promise<boolean> {
-  const refreshToken = process.env.WEBEX_REFRESH_TOKEN;
-  const clientId = process.env.WEBEX_CLIENT_ID;
-  const clientSecret = process.env.WEBEX_CLIENT_SECRET;
-  if (!refreshToken || !clientId || !clientSecret) return false;
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-  });
-  const response = await fetch("https://webexapis.com/v1/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) return false;
-  const tokens = (await response.json()) as {
-    access_token?: string;
-    refresh_token?: string;
-  };
-  if (!tokens.access_token) return false;
-  webexAccessToken = tokens.access_token;
-  if (tokens.refresh_token)
-    process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
-  return true;
-}
-async function webexFetch(path: string, retry = true): Promise<Response> {
-  if (!webexAccessToken)
-    webexAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
-  if (!webexAccessToken && !(await refreshWebexAccessToken()))
-    throw new Error("Webex is not configured");
-  const response = await fetch(`https://webexapis.com/v1${path}`, {
-    headers: {
-      Authorization: `Bearer ${webexAccessToken}`,
-      Accept: "application/json",
-    },
-    signal: AbortSignal.timeout(12000),
-  });
-  if (response.status === 401 && retry && (await refreshWebexAccessToken()))
-    return webexFetch(path, false);
-  return response;
-}
 async function executeWebexDeviceStatus(rawArgs: string): Promise<string> {
   const args = JSON.parse(rawArgs || "{}");
   const query = String(args.query || "")
@@ -3928,17 +3953,14 @@ async function executeWebexDeviceStatus(rawArgs: string): Promise<string> {
   const wanted = ["online", "offline"].includes(args.status)
     ? args.status
     : "all";
-  let response: Response;
-  try {
-    response = await webexFetch("/devices?max=1000");
-  } catch {
+  if (!isWebexSupportConfigured()) {
     return "Webex device monitoring is not configured yet.";
   }
-  if (!response.ok) return `Webex device query failed (${response.status}).`;
-  const data = (await response.json()) as {
-    items?: Array<Record<string, unknown>>;
-  };
-  const devices = (data.items || [])
+  const collection = await fetchAllWebexDevices(webexSupportFetch);
+  if (!collection.complete) {
+    return "Webex returned incomplete device evidence; try again before drawing an outage conclusion.";
+  }
+  const devices = collection.devices
     .map((device) => {
       const rawStatus = String(
         device.connectionStatus || device.status || "unknown",
@@ -3985,7 +4007,7 @@ export const QUERY_INFLUX_LAST_SEEN_TOOL: OpenAI.Chat.Completions.ChatCompletion
     function: {
       name: "query_influx_last_seen",
       description:
-        "Read monitoring data to report when a host was last seen and its latest ping loss/latency. Read-only.",
+        "Read bounded monitoring data for a host: last observation, ping loss/latency, FortiGate uptime/CPU/memory/sessions, measured interfaces, and Phase 2 VPN tunnel status when present. Defaults to the current five-minute window; request a longer window only for historical last-seen analysis. Read-only.",
       parameters: {
         type: "object",
         properties: {
@@ -4001,32 +4023,9 @@ async function executeQueryInfluxLastSeen(rawArgs: string): Promise<string> {
   const host = String(args.host || "").trim();
   if (!host || !/^[A-Za-z0-9._:-]+$/.test(host))
     return "Error: a valid hostname or IP is required.";
-  const base = process.env.INFLUXDB_URL?.replace(/\/$/, "");
-  const token = process.env.INFLUXDB_TOKEN;
-  const org = process.env.INFLUXDB_ORG || "SCCC";
-  const bucket = process.env.INFLUXDB_BUCKET || "telegraf";
-  if (!base || !token)
-    return "InfluxDB is not configured; set INFLUXDB_URL and a read-only INFLUXDB_TOKEN.";
-  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 60));
-  const flux = `from(bucket: "${bucket}") |> range(start: -${minutes}m) |> filter(fn: (r) => r.source == "${host}" or r.agent_host == "${host}" or r.host == "${host}") |> filter(fn: (r) => r._field == "percent_packet_loss" or r._field == "average_response_ms" or r._field == "rtt" or r._field == "uptime") |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "agent_host", "host"])`;
-  const res = await fetch(
-    `${base}/api/v2/query?org=${encodeURIComponent(org)}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${token}`,
-        "Content-Type": "application/vnd.flux",
-        Accept: "application/csv",
-      },
-      body: flux,
-      signal: AbortSignal.timeout(10000),
-    },
-  );
-  if (!res.ok) return `InfluxDB query failed (${res.status}).`;
-  const csv = await res.text();
-  return csv.trim()
-    ? `Latest telemetry for ${host}:\n${csv.slice(0, 6000)}`
-    : `No telemetry found for ${host} in the last ${minutes} minutes.`;
+  const minutes = Math.max(5, Math.min(10080, Number(args.minutes) || 5));
+  const telemetry = await getNetworkDeviceInfluxTelemetry(host, minutes);
+  return formatNetworkDeviceTelemetryForFred(telemetry, minutes);
 }
 export const GRAFANA_PANEL_LINK_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
   {
@@ -4233,19 +4232,27 @@ export const QUERY_FORMAL_ARCHITECTURE_TOOL: OpenAI.Chat.Completions.ChatComplet
     },
   };
 
-export const CREATE_FORMAL_EA_ACTIONS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "create_formal_ea_actions",
-    description: "CIO-only: create deduplicated My Tasks action items from the latest approved formal EA's verification, contradiction, quarantine, stale evidence, evidence gap, risk, single-point-of-failure, and remediation findings.",
-    parameters: {
-      type: "object",
-      properties: {
-        limit: { type: "integer", minimum: 1, maximum: 25, description: "Maximum new tasks to create, highest-priority first. Defaults to 10." },
+export const CREATE_FORMAL_EA_ACTIONS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
+  {
+    type: "function",
+    function: {
+      name: "create_formal_ea_actions",
+      description:
+        "CIO-only: create deduplicated My Tasks action items from the latest approved formal EA's verification, contradiction, quarantine, stale evidence, evidence gap, risk, single-point-of-failure, and remediation findings.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 25,
+            description:
+              "Maximum new tasks to create, highest-priority first. Defaults to 10.",
+          },
+        },
       },
     },
-  },
-};
+  };
 
 async function executeCreateFormalEaActions(
   rawArgs: string,
@@ -4275,15 +4282,32 @@ async function executeCreateFormalEaActions(
   for (const finding of result.rows ?? []) {
     if (created >= limit) break;
     const marker = `[formal-ea-finding:${finding.id}]`;
-    const existing: any = await db.execute(sql`SELECT 1 FROM log_items WHERE user_id = ${actor.id} AND notes LIKE ${`%${marker}%`} LIMIT 1`);
-    if (existing.rows?.length) { duplicates += 1; continue; }
-    const summary = String(finding.content || "Verify formal EA finding").replace(/\s+/g, " ").trim();
+    const existing: any = await db.execute(
+      sql`SELECT 1 FROM log_items WHERE user_id = ${actor.id} AND notes LIKE ${`%${marker}%`} LIMIT 1`,
+    );
+    if (existing.rows?.length) {
+      duplicates += 1;
+      continue;
+    }
+    const summary = String(finding.content || "Verify formal EA finding")
+      .replace(/\s+/g, " ")
+      .trim();
     const title = `EA ${finding.findingType}: ${summary}`.slice(0, 300);
     const notes = `${marker}\nFormal EA document ${finding.documentId}, version ${finding.version}; section ${finding.sectionNumber || "un-numbered"} — ${finding.heading}.\nPriority: ${finding.priority || "not assigned"}.\nVerify the finding with current authoritative evidence, record the source and timestamp, and document the resulting correction, retirement, quarantine, acceptance, or remediation decision.\n\nSource finding: ${finding.content}`;
-    await db.insert(logItemsTable).values({ userId: actor.id, title, category: "task", notes, itemDate, weekOf });
+    await db.insert(logItemsTable).values({
+      userId: actor.id,
+      title,
+      category: "task",
+      notes,
+      itemDate,
+      weekOf,
+    });
     created += 1;
   }
-  const remaining = Math.max(0, (result.rows?.length ?? 0) - created - duplicates);
+  const remaining = Math.max(
+    0,
+    (result.rows?.length ?? 0) - created - duplicates,
+  );
   return `Created ${created} formal EA action item(s) in My Tasks; skipped ${duplicates} duplicate(s); ${remaining} eligible finding(s) remain for review.`;
 }
 
@@ -4513,6 +4537,10 @@ export async function runChatWithMemory(
   let diagCalls = 0;
   const MAX_NETWORK_DATA_CALLS = 8;
   let networkDataCalls = 0;
+  const MAX_WEBEX_DATA_CALLS = 1;
+  let webexDataCalls = 0;
+  const MAX_INFLUX_DATA_CALLS = 4;
+  let influxDataCalls = 0;
   let evidenceCalls = 0;
   const evidenceToolNames = new Set(opts.evidencePolicy?.toolNames ?? []);
   // A fan-out sweep is hard-capped at one per chat turn regardless of the
@@ -4832,35 +4860,64 @@ export async function runChatWithMemory(
         call.type === "function" &&
         call.function.name === "webex_device_status"
       ) {
-        try {
-          resultText = await executeWebexDeviceStatus(call.function.arguments);
-        } catch (err) {
-          logger.error({ err }, "webex_device_status tool failed");
-          resultText = "Error: Webex device query failed";
+        if (
+          networkDataCalls >= MAX_NETWORK_DATA_CALLS ||
+          webexDataCalls >= MAX_WEBEX_DATA_CALLS
+        ) {
+          resultText = "Webex data query budget exhausted for this turn.";
+        } else {
+          networkDataCalls++;
+          webexDataCalls++;
+          try {
+            resultText = await executeWebexDeviceStatus(
+              call.function.arguments,
+            );
+          } catch (err) {
+            logger.error({ err }, "webex_device_status tool failed");
+            resultText = "Error: Webex device query failed";
+          }
         }
       } else if (
         call.type === "function" &&
         call.function.name === "cisco_calling_support"
       ) {
-        try {
-          resultText = await executeCiscoCallingSupport(
-            call.function.arguments,
-          );
-        } catch (err) {
-          logger.error({ err }, "cisco_calling_support tool failed");
-          resultText = "Error: Cisco Calling support query failed";
+        if (
+          networkDataCalls >= MAX_NETWORK_DATA_CALLS ||
+          webexDataCalls >= MAX_WEBEX_DATA_CALLS
+        ) {
+          resultText = "Webex data query budget exhausted for this turn.";
+        } else {
+          networkDataCalls++;
+          webexDataCalls++;
+          try {
+            resultText = await executeCiscoCallingSupport(
+              call.function.arguments,
+            );
+          } catch (err) {
+            logger.error({ err }, "cisco_calling_support tool failed");
+            resultText = "Error: Cisco Calling support query failed";
+          }
         }
       } else if (
         call.type === "function" &&
         call.function.name === "query_influx_last_seen"
       ) {
-        try {
-          resultText = await executeQueryInfluxLastSeen(
-            call.function.arguments,
-          );
-        } catch (err) {
-          logger.error({ err }, "query_influx_last_seen failed");
-          resultText = "Error: InfluxDB query failed";
+        if (
+          networkDataCalls >= MAX_NETWORK_DATA_CALLS ||
+          influxDataCalls >= MAX_INFLUX_DATA_CALLS
+        ) {
+          resultText = "InfluxDB query budget exhausted for this turn.";
+        } else {
+          networkDataCalls++;
+          influxDataCalls++;
+          try {
+            resultText = await executeQueryInfluxLastSeen(
+              call.function.arguments,
+            );
+          } catch (err) {
+            logger.error({ err }, "query_influx_last_seen failed");
+            resultText = "Error: InfluxDB query failed";
+          }
         }
       } else if (
         call.type === "function" &&
@@ -5200,11 +5257,14 @@ export async function runChatWithMemory(
         call.function.name === "manage_weekly_status_report"
       ) {
         try {
-          resultText = await executeManageWeeklyReport(call.function.arguments, {
-            id: opts.userId,
-            name: opts.userName,
-            role: userRole,
-          });
+          resultText = await executeManageWeeklyReport(
+            call.function.arguments,
+            {
+              id: opts.userId,
+              name: opts.userName,
+              role: userRole,
+            },
+          );
         } catch (err) {
           logger.error({ err }, "manage_weekly_status_report tool failed");
           resultText = "Error: weekly status report write failed";
@@ -5231,7 +5291,9 @@ export async function runChatWithMemory(
         call.function.name === "get_application_guidance"
       ) {
         try {
-          resultText = await executeApplicationGuidance(call.function.arguments);
+          resultText = await executeApplicationGuidance(
+            call.function.arguments,
+          );
         } catch (err) {
           logger.error({ err }, "get_application_guidance tool failed");
           resultText = "Error: application guidance lookup failed";

@@ -9,6 +9,15 @@ flowchart LR
     L[(Legacy building-hidden rows)] -->|translate name to overlay code| A
     A -->|GET no-store| B[Buildings CampusStatusMap]
     A -->|GET no-store once, share loaded layout| M[Monitoring map, green count, and overall status]
+    S[Fresh switch evidence<br/>NOC first, Influx up to 90 seconds] --> HP{Building health policy}
+    P[Complete Webex physical-phone evidence] --> HP
+    K[(Enabled explicit main-switch designation<br/>disabled candidates ignored)] --> HP
+    HP --> PS[/Public-safe status projection/]
+    HP --> AE[/Authenticated operational evidence/]
+    PS -->|Green all switches up| B
+    PS -->|Amber partial or incomplete| B
+    PS -->|Red main switch and phones down| B
+    PS --> M
     E -. save/reset event .-> B
     E -. same-tab or cross-tab refresh .-> M
     T[Focus, visibility, and 30-second refresh] -.-> B

@@ -1660,6 +1660,33 @@ paths:
                 properties:
                   ok:
                     type: boolean
+  /network/influx/device/{host}:
+    get:
+      operationId: getNetworkDeviceInfluxTelemetry
+      tags: [network]
+      summary: Read bounded live telemetry for one network device
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: host
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9._:-]+$"
+      responses:
+        "200":
+          description: Latest measured device telemetry in the five-minute interactive window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkDeviceInfluxTelemetry"
+        "400":
+          description: Invalid telemetry host
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /network/vlans:
     get:
       operationId: listVlans
@@ -2308,6 +2335,7 @@ components:
             - anchor_seed_failed
             - no_enabled_anchors
             - sms_configuration_invalid
+            - phone_evidence_incomplete
             - lease_lost
             - tick_failed
             - fallback_failed
@@ -2733,13 +2761,14 @@ components:
           type: string
         count:
           type: integer
+          nullable: true
         configured:
           type: boolean
         tickets:
           type: array
           items:
             $ref: "#/components/schemas/ReportTicket"
-      required: [weekOf, count, tickets]
+      required: [weekOf, count, configured, tickets]
 
     AggregateReport:
       type: object
@@ -2755,6 +2784,23 @@ components:
           description: User IDs whose weekly logs satisfy the shared department-report submission policy.
           items:
             type: integer
+        submissionStatus:
+          type: array
+          description: Active reporting-team members and their weekly-log submission state, including users with no log row.
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              userName:
+                type: string
+              userRole:
+                type: string
+              entryCount:
+                type: integer
+              isSubmitted:
+                type: boolean
+            required: [userId, userName, userRole, entryCount, isSubmitted]
         byRole:
           type: object
           additionalProperties:
@@ -2775,7 +2821,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Risk"
-      required: [weekOf, totalEntries, contributorCount, eligibleUserIds]
+      required:
+        [
+          weekOf,
+          totalEntries,
+          contributorCount,
+          eligibleUserIds,
+          submissionStatus,
+        ]
 
     Risk:
       type: object
@@ -3478,6 +3531,179 @@ components:
         location:
           type: string
       required: [hostname, building, ipAddress]
+
+    NetworkDeviceInfluxTelemetry:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        reachable:
+          type: boolean
+        host:
+          type: string
+        system:
+          $ref: "#/components/schemas/NetworkDeviceSystemTelemetry"
+        pingLoss:
+          type: number
+          nullable: true
+        rtt:
+          type: number
+          nullable: true
+        pingObservedAt:
+          type: string
+          format: date-time
+          nullable: true
+        interfaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkDeviceInterfaceTelemetry"
+        tunnels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkDeviceTunnelTelemetry"
+        interfaceTelemetryAvailable:
+          type: boolean
+        tunnelTelemetryAvailable:
+          type: boolean
+        lastPolled:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - configured
+        - reachable
+        - host
+        - system
+        - pingLoss
+        - rtt
+        - pingObservedAt
+        - interfaces
+        - tunnels
+        - interfaceTelemetryAvailable
+        - tunnelTelemetryAvailable
+        - lastPolled
+
+    NetworkDeviceSystemTelemetry:
+      type: object
+      properties:
+        uptime:
+          type: number
+          nullable: true
+        cpuUsagePct:
+          type: number
+          nullable: true
+        memoryUsagePct:
+          type: number
+          nullable: true
+        sessionCount:
+          type: number
+          nullable: true
+        observedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [uptime, cpuUsagePct, memoryUsagePct, sessionCount, observedAt]
+
+    NetworkDeviceInterfaceTelemetry:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ifIndex:
+          type: number
+          nullable: true
+        ifType:
+          type: number
+          nullable: true
+        mtu:
+          type: number
+          nullable: true
+        macAddress:
+          type: string
+          nullable: true
+        adminStatus:
+          type: string
+          nullable: true
+        operStatus:
+          type: string
+          nullable: true
+        speedMbps:
+          type: number
+          nullable: true
+        inErrors:
+          type: number
+          nullable: true
+        outErrors:
+          type: number
+          nullable: true
+        inDiscards:
+          type: number
+          nullable: true
+        outDiscards:
+          type: number
+          nullable: true
+        inOctets:
+          type: number
+          nullable: true
+        outOctets:
+          type: number
+          nullable: true
+        observedAt:
+          type: string
+          format: date-time
+          nullable: true
+        measurement:
+          type: string
+      required:
+        - name
+        - description
+        - ifIndex
+        - ifType
+        - mtu
+        - macAddress
+        - adminStatus
+        - operStatus
+        - speedMbps
+        - inErrors
+        - outErrors
+        - inDiscards
+        - outDiscards
+        - inOctets
+        - outOctets
+        - observedAt
+        - measurement
+
+    NetworkDeviceTunnelTelemetry:
+      type: object
+      properties:
+        index:
+          type: string
+          nullable: true
+        phase1:
+          type: string
+        phase2:
+          type: string
+        vdom:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [up, down, unknown]
+        inOctets:
+          type: number
+          nullable: true
+        outOctets:
+          type: number
+          nullable: true
+        observedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        [index, phase1, phase2, vdom, status, inOctets, outOctets, observedAt]
 
     NetworkLayoutPosition:
       type: object

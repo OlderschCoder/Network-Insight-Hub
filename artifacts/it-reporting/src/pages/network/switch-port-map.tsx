@@ -144,7 +144,7 @@ export function TelemetrySwitchPortMap({
   const [pinnedName, setPinnedName] = useState<string | null>(null);
   const switches = useMemo(
     () => nodes
-      .filter((node) => node.nodeKind === "switch" || node.nodeKind === "router")
+      .filter((node) => node.nodeKind === "switch" || node.nodeKind === "router" || node.nodeKind === "firewall")
       .sort((a, b) => a.hostname.localeCompare(b.hostname)),
     [nodes],
   );
@@ -250,7 +250,7 @@ export function TelemetrySwitchPortMap({
     physicalInterfaces.every((iface) => iface.rxPowerDbm == null && iface.txPowerDbm == null) ? "optics / DOM" : null,
   ].filter(Boolean) as string[];
 
-  if (!switches.length) return <div className="py-16 text-center text-muted-foreground">No switches in the Network Map yet.</div>;
+  if (!switches.length) return <div className="py-16 text-center text-muted-foreground">No supported network devices are in the Network Map yet.</div>;
 
   return (
     <div className="space-y-4">
@@ -276,7 +276,7 @@ export function TelemetrySwitchPortMap({
       {isLoading && <div className="py-12 flex items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading interface telemetry…</div>}
       {!isLoading && (isError || physicalInterfaces.length === 0) && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">No physical-interface telemetry has been imported for this switch.</p>
+          <p className="font-semibold">No physical-interface telemetry has been collected for this device.</p>
           <p className="text-xs mt-1">Topology links are preserved below, but the app will not invent a 24- or 48-port faceplate.</p>
         </div>
       )}
@@ -325,8 +325,8 @@ export function TelemetrySwitchPortMap({
           <div><p className="text-xs text-muted-foreground uppercase">Interface</p><p className="font-mono font-bold">{detailInterface.interfaceName}</p><p className="text-xs">{detailInterface.description || "No description"}</p></div>
           <div><p className="text-xs text-muted-foreground uppercase">State</p><p>Admin <b>{detailInterface.adminStatus ?? "unknown"}</b></p><p>Oper <b>{detailInterface.operStatus ?? "unknown"}</b></p><p className="text-xs text-muted-foreground">{detailInterface.statusReason}</p></div>
           <div><p className="text-xs text-muted-foreground uppercase">Layer 2</p><p>{detailInterface.portMode ?? "unknown mode"}</p><p>{detailInterface.nativeVlan != null ? `Native VLAN ${detailInterface.nativeVlan}` : "No native VLAN"}</p><p className="text-xs">{detailInterface.allowedVlans?.length ? `${detailInterface.allowedVlans.length} allowed VLANs` : "Allowed VLANs not collected"}</p></div>
-          <div><p className="text-xs text-muted-foreground uppercase">Traffic evidence</p><p>{fmtSpeed(detailInterface.speedMbps)} · {detailInterface.duplex ?? "duplex unknown"}</p><p>{detailInterface.macCount ?? 0} learned MACs</p><p>{detailInterface.lldpNeighborCount ?? 0} LLDP neighbors</p></div>
-          <div><p className="text-xs text-muted-foreground uppercase">Connected device</p>{detailLink ? <><p className="font-bold">{detailLink.neighbor?.hostname ?? "Unknown"}</p><p className="font-mono text-xs">{detailLink.remotePort}</p><Badge className={CRIT_BADGE[detailLink.neighbor?.criticality ?? ""]}>{detailLink.link.confidence.replace(/_/g, " ")}</Badge></> : detailInterface.operStatus === "up" ? <><p className="font-medium text-emerald-700">Endpoint / unmapped device</p><p className="text-xs text-muted-foreground">Phone, computer, AP, printer, or other edge device</p></> : <p className="text-muted-foreground">No active connection</p>}</div>
+          <div><p className="text-xs text-muted-foreground uppercase">Traffic evidence</p><p>{fmtSpeed(detailInterface.speedMbps)} · {detailInterface.duplex ?? "duplex unknown"}</p><p>{detailInterface.macCount == null ? "Learned MACs not collected" : `${detailInterface.macCount} learned MACs`}</p><p>{detailInterface.lldpNeighborCount == null ? "LLDP neighbors not collected" : `${detailInterface.lldpNeighborCount} LLDP neighbors`}</p></div>
+          <div><p className="text-xs text-muted-foreground uppercase">Connected device</p>{detailLink ? <><p className="font-bold">{detailLink.neighbor?.hostname ?? "Unknown"}</p><p className="font-mono text-xs">{detailLink.remotePort}</p><Badge className={CRIT_BADGE[detailLink.neighbor?.criticality ?? ""]}>{detailLink.link.confidence.replace(/_/g, " ")}</Badge></> : detailInterface.operStatus === "up" ? <><p className="font-medium text-emerald-700">Endpoint / unmapped device</p><p className="text-xs text-muted-foreground">Phone, computer, AP, printer, or other edge device</p></> : detailInterface.operStatus === "down" || detailInterface.operStatus === "lowerLayerDown" || detailInterface.operStatus === "notPresent" ? <p className="text-muted-foreground">No active connection</p> : <p className="text-amber-700">Connection state not collected</p>}</div>
           <p className="col-span-2 md:col-span-5 text-[11px] text-muted-foreground">{detailInterface.telemetryUpdatedAt ? `Polled ${new Date(detailInterface.telemetryUpdatedAt).toLocaleString()}` : "No live telemetry timestamp"}{detailInterface.telemetryEvidence ? ` · ${detailInterface.telemetryEvidence}` : ""}</p>
         </div>
       ) : <p className="text-xs text-muted-foreground text-center py-2">Hover or click a port for details</p>}
@@ -341,7 +341,7 @@ export function TelemetrySwitchPortMap({
       {physicalInterfaces.length > 0 && missingFields.length > 0 && (
         <div className="border border-amber-200 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 flex gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <div><p className="font-semibold">Still uncollected for this switch</p><p>{missingFields.join(", ")}. These stay blank rather than being inferred.</p></div>
+          <div><p className="font-semibold">Still uncollected for this device</p><p>{missingFields.join(", ")}. These stay blank rather than being inferred.</p></div>
         </div>
       )}
     </div>
@@ -368,10 +368,10 @@ export function SingleSwitchPortMap({ nodeId }: { nodeId: string }) {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   if (nodesLoading || linksLoading) {
-    return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading switch faceplate…</div>;
+    return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading device interfaces…</div>;
   }
   const selected = nodeById.get(nodeId);
-  if (!selected) return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This switch is not yet linked to the Port Map inventory.</div>;
+  if (!selected) return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">This device is not yet linked to the Port Map inventory.</div>;
 
   return <TelemetrySwitchPortMap nodes={[selected]} links={links} nodeById={nodeById} initialNodeId={nodeId} showSelector={false} />;
 }

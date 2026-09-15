@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -11,21 +11,55 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowLeft, Server, Activity, Pencil, Save, X, Trash2, Plus, RefreshCw,
-  Wifi, WifiOff, AlertTriangle, Cable, ChevronRight, Building2, Loader2,
+  ArrowLeft,
+  Server,
+  Activity,
+  Pencil,
+  Save,
+  X,
+  Trash2,
+  Plus,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  Cable,
+  ChevronRight,
+  Building2,
+  Loader2,
 } from "lucide-react";
 import { SingleSwitchPortMap } from "./switch-port-map";
 
@@ -76,14 +110,41 @@ interface NodeDetailData extends NetNode {
 }
 
 interface InfluxDeviceMetrics {
+  reachable: boolean;
+  system: {
+    uptime: number | null;
+    cpuUsagePct: number | null;
+    memoryUsagePct: number | null;
+    sessionCount: number | null;
+    observedAt: string | null;
+  };
   interfaces: Array<{
     name: string;
+    description: string | null;
     inOctets: number | null;
     outOctets: number | null;
+    inErrors: number | null;
+    outErrors: number | null;
+    adminStatus: string | null;
     operStatus: string | null;
+    observedAt: string | null;
+  }>;
+  tunnels: Array<{
+    index: string | null;
+    phase1: string;
+    phase2: string;
+    vdom: string | null;
+    status: "up" | "down" | "unknown";
+    inOctets: number | null;
+    outOctets: number | null;
+    observedAt: string | null;
   }>;
   pingLoss: number | null;
   rtt: number | null;
+  pingObservedAt: string | null;
+  interfaceTelemetryAvailable: boolean;
+  tunnelTelemetryAvailable: boolean;
+  lastPolled: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -95,13 +156,22 @@ function statusBadge(status: string) {
     down: "bg-red-100 text-red-800 border-red-300",
     unknown: "bg-gray-100 text-gray-600 border-gray-300",
   };
-  const icon = status === "up" ? <Wifi className="h-3 w-3 mr-1" />
-    : status === "down" ? <WifiOff className="h-3 w-3 mr-1" />
-    : status === "degraded" ? <AlertTriangle className="h-3 w-3 mr-1" />
-    : <Activity className="h-3 w-3 mr-1" />;
+  const icon =
+    status === "up" ? (
+      <Wifi className="h-3 w-3 mr-1" />
+    ) : status === "down" ? (
+      <WifiOff className="h-3 w-3 mr-1" />
+    ) : status === "degraded" ? (
+      <AlertTriangle className="h-3 w-3 mr-1" />
+    ) : (
+      <Activity className="h-3 w-3 mr-1" />
+    );
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium ${map[status] ?? map.unknown}`}>
-      {icon}{status}
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium ${map[status] ?? map.unknown}`}
+    >
+      {icon}
+      {status}
     </span>
   );
 }
@@ -120,7 +190,25 @@ function fmtBytes(bytes: number | null | undefined) {
   return `${bytes} B`;
 }
 
-const NODE_KINDS = ["switch", "router", "firewall", "ap", "server", "camera", "ups", "other"];
+function fmtSnmpUptime(ticks: number | null | undefined) {
+  if (typeof ticks !== "number" || !Number.isFinite(ticks)) return "—";
+  const totalSeconds = Math.max(0, Math.floor(ticks / 100));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  return `${days}d ${hours}h ${minutes}m`;
+}
+
+const NODE_KINDS = [
+  "switch",
+  "router",
+  "firewall",
+  "ap",
+  "server",
+  "camera",
+  "ups",
+  "other",
+];
 const CRITICALITY_LEVELS = ["critical", "high", "medium", "low"];
 const LINK_KINDS = ["ethernet", "fiber", "lag", "p2p", "uplink", "downlink"];
 const PORT_MODES = ["access", "trunk", "hybrid"];
@@ -136,9 +224,12 @@ export default function NodeDetail() {
 
   const [node, setNode] = useState<NodeDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [liveMetrics, setLiveMetrics] = useState<InfluxDeviceMetrics | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<InfluxDeviceMetrics | null>(
+    null,
+  );
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [influxConfigured, setInfluxConfigured] = useState(false);
+  const metricsRequestRef = useRef(0);
 
   // edit state
   const [editing, setEditing] = useState(false);
@@ -151,9 +242,18 @@ export default function NodeDetail() {
   // add link dialog
   const [addLinkOpen, setAddLinkOpen] = useState(false);
   const [newLink, setNewLink] = useState({
-    localPort: "", remotePort: "", linkKind: "ethernet", speedMbps: "",
-    portMode: "trunk", nativeVlan: "", allowedVlans: "", portchannel: "",
-    lldpPeerHostname: "", lldpPeerMgmtIp: "", confidence: "confirmed", evidenceRef: "",
+    localPort: "",
+    remotePort: "",
+    linkKind: "ethernet",
+    speedMbps: "",
+    portMode: "trunk",
+    nativeVlan: "",
+    allowedVlans: "",
+    portchannel: "",
+    lldpPeerHostname: "",
+    lldpPeerMgmtIp: "",
+    confidence: "confirmed",
+    evidenceRef: "",
     bNodeId: "",
   });
   const [addingLink, setAddingLink] = useState(false);
@@ -163,14 +263,18 @@ export default function NodeDetail() {
 
   // edit link
   const [editLinkId, setEditLinkId] = useState<string | null>(null);
-  const [editLinkFields, setEditLinkFields] = useState<Partial<EnrichedLink>>({});
+  const [editLinkFields, setEditLinkFields] = useState<Partial<EnrichedLink>>(
+    {},
+  );
 
   // ── Fetch node ──────────────────────────────────────────────────────────────
   const fetchNode = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
-      const r = await authFetch(`${API}/network/nodes/${id}`, { credentials: "include" });
+      const r = await authFetch(`${API}/network/nodes/${id}`, {
+        credentials: "include",
+      });
       if (!r.ok) throw new Error(await r.text());
       const data: NodeDetailData = await r.json();
       setNode(data);
@@ -191,7 +295,11 @@ export default function NodeDetail() {
         tags: Array.isArray(data.tags) ? data.tags : [],
       });
     } catch (e: any) {
-      toast({ title: "Failed to load node", description: e.message, variant: "destructive" });
+      toast({
+        title: "Failed to load node",
+        description: e.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -199,28 +307,87 @@ export default function NodeDetail() {
 
   // ── Fetch live metrics ───────────────────────────────────────────────────────
   const fetchMetrics = useCallback(async () => {
-    if (!node?.mgmtIp) return;
+    const requestId = ++metricsRequestRef.current;
+    const host = node?.mgmtIp;
+    setLiveMetrics(null);
+    setInfluxConfigured(false);
+    if (!host) {
+      setMetricsLoading(false);
+      return;
+    }
     setMetricsLoading(true);
     try {
-      const r = await authFetch(`${API}/network/influx/device/${encodeURIComponent(node.mgmtIp)}`, { credentials: "include" });
-      if (!r.ok) return;
+      const r = await authFetch(
+        `${API}/network/influx/device/${encodeURIComponent(host)}`,
+        { credentials: "include" },
+      );
+      if (!r.ok) throw new Error(`Live telemetry request failed (${r.status})`);
       const data = await r.json();
-      if (data.configured === false) { setInfluxConfigured(false); return; }
+      if (requestId !== metricsRequestRef.current) return;
+      if (data.configured === false) return;
       setInfluxConfigured(true);
       // Older/missing Influx series can omit fields entirely. Normalize the
       // response so a sparse telemetry sample never crashes the detail page.
       setLiveMetrics({
+        reachable: data.reachable === true,
+        system: {
+          uptime:
+            typeof data.system?.uptime === "number" ? data.system.uptime : null,
+          cpuUsagePct:
+            typeof data.system?.cpuUsagePct === "number"
+              ? data.system.cpuUsagePct
+              : null,
+          memoryUsagePct:
+            typeof data.system?.memoryUsagePct === "number"
+              ? data.system.memoryUsagePct
+              : null,
+          sessionCount:
+            typeof data.system?.sessionCount === "number"
+              ? data.system.sessionCount
+              : null,
+          observedAt:
+            typeof data.system?.observedAt === "string"
+              ? data.system.observedAt
+              : null,
+        },
         interfaces: Array.isArray(data.interfaces) ? data.interfaces : [],
-        pingLoss: typeof data.pingLoss === "number" && Number.isFinite(data.pingLoss) ? data.pingLoss : null,
-        rtt: typeof data.rtt === "number" && Number.isFinite(data.rtt) ? data.rtt : null,
+        tunnels: Array.isArray(data.tunnels) ? data.tunnels : [],
+        pingLoss:
+          typeof data.pingLoss === "number" && Number.isFinite(data.pingLoss)
+            ? data.pingLoss
+            : null,
+        rtt:
+          typeof data.rtt === "number" && Number.isFinite(data.rtt)
+            ? data.rtt
+            : null,
+        pingObservedAt:
+          typeof data.pingObservedAt === "string" ? data.pingObservedAt : null,
+        interfaceTelemetryAvailable: data.interfaceTelemetryAvailable === true,
+        tunnelTelemetryAvailable: data.tunnelTelemetryAvailable === true,
+        lastPolled:
+          typeof data.lastPolled === "string" ? data.lastPolled : null,
       });
+    } catch (error: any) {
+      if (requestId === metricsRequestRef.current) {
+        setLiveMetrics(null);
+        setInfluxConfigured(true);
+        toast({
+          title: "Live telemetry unavailable",
+          description: error?.message ?? "The device telemetry request failed.",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setMetricsLoading(false);
+      if (requestId === metricsRequestRef.current) setMetricsLoading(false);
     }
-  }, [node?.mgmtIp]);
+  }, [node?.mgmtIp, toast]);
 
-  useEffect(() => { fetchNode(); }, [fetchNode]);
-  useEffect(() => { if (node) fetchMetrics(); }, [node?.id]); // eslint-disable-line
+  useEffect(() => {
+    fetchNode();
+  }, [fetchNode]);
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
 
   // ── Save node ────────────────────────────────────────────────────────────────
   const saveNode = async () => {
@@ -231,7 +398,10 @@ export default function NodeDetail() {
       if (payload.tags == null) {
         payload.tags = [];
       } else if (typeof payload.tags === "string") {
-        payload.tags = (payload.tags as unknown as string).split(",").map((t: string) => t.trim()).filter(Boolean);
+        payload.tags = (payload.tags as unknown as string)
+          .split(",")
+          .map((t: string) => t.trim())
+          .filter(Boolean);
       }
       const r = await authFetch(`${API}/network/nodes/${id}`, {
         method: "PATCH",
@@ -244,7 +414,11 @@ export default function NodeDetail() {
       setEditing(false);
       fetchNode();
     } catch (e: any) {
-      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+      toast({
+        title: "Save failed",
+        description: e.message,
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -254,12 +428,19 @@ export default function NodeDetail() {
   const deleteNode = async () => {
     if (!id) return;
     try {
-      const r = await authFetch(`${API}/network/nodes/${id}`, { method: "DELETE", credentials: "include" });
+      const r = await authFetch(`${API}/network/nodes/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!r.ok) throw new Error(await r.text());
       toast({ title: "Node deleted" });
       navigate("/network");
     } catch (e: any) {
-      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+      toast({
+        title: "Delete failed",
+        description: e.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -293,14 +474,27 @@ export default function NodeDetail() {
       toast({ title: "Link added" });
       setAddLinkOpen(false);
       setNewLink({
-        localPort: "", remotePort: "", linkKind: "ethernet", speedMbps: "",
-        portMode: "trunk", nativeVlan: "", allowedVlans: "", portchannel: "",
-        lldpPeerHostname: "", lldpPeerMgmtIp: "", confidence: "confirmed", evidenceRef: "",
+        localPort: "",
+        remotePort: "",
+        linkKind: "ethernet",
+        speedMbps: "",
+        portMode: "trunk",
+        nativeVlan: "",
+        allowedVlans: "",
+        portchannel: "",
+        lldpPeerHostname: "",
+        lldpPeerMgmtIp: "",
+        confidence: "confirmed",
+        evidenceRef: "",
         bNodeId: "",
       });
       fetchNode();
     } catch (e: any) {
-      toast({ title: "Failed to add link", description: e.message, variant: "destructive" });
+      toast({
+        title: "Failed to add link",
+        description: e.message,
+        variant: "destructive",
+      });
     } finally {
       setAddingLink(false);
     }
@@ -309,13 +503,20 @@ export default function NodeDetail() {
   // ── Delete link ──────────────────────────────────────────────────────────────
   const deleteLink = async (linkId: string) => {
     try {
-      const r = await authFetch(`${API}/network/links/${linkId}`, { method: "DELETE", credentials: "include" });
+      const r = await authFetch(`${API}/network/links/${linkId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!r.ok) throw new Error(await r.text());
       toast({ title: "Link removed" });
       setDeleteLinkId(null);
       fetchNode();
     } catch (e: any) {
-      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+      toast({
+        title: "Delete failed",
+        description: e.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -334,7 +535,11 @@ export default function NodeDetail() {
       setEditLinkId(null);
       fetchNode();
     } catch (e: any) {
-      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+      toast({
+        title: "Update failed",
+        description: e.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -352,13 +557,20 @@ export default function NodeDetail() {
     return (
       <div className="p-6 text-center text-muted-foreground">
         Node not found.{" "}
-        <Link href="/network"><span className="text-primary underline cursor-pointer">Back to Network</span></Link>
+        <Link href="/network">
+          <span className="text-primary underline cursor-pointer">
+            Back to Network
+          </span>
+        </Link>
       </div>
     );
   }
 
   const canEdit = !!isCIO;
-  const tagsStr = Array.isArray(editFields.tags) ? (editFields.tags as string[]).join(", ") : editFields.tags ?? "";
+  const isFirewall = node.nodeKind === "firewall";
+  const tagsStr = Array.isArray(editFields.tags)
+    ? (editFields.tags as string[]).join(", ")
+    : (editFields.tags ?? "");
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -372,7 +584,9 @@ export default function NodeDetail() {
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
         {node.building && (
           <>
-            <Link href={`/network/buildings/${encodeURIComponent(node.building)}`}>
+            <Link
+              href={`/network/buildings/${encodeURIComponent(node.building)}`}
+            >
               <Button variant="ghost" size="sm" className="gap-1">
                 <Building2 className="h-4 w-4" /> {node.building}
               </Button>
@@ -382,29 +596,66 @@ export default function NodeDetail() {
         )}
         <div className="flex items-center gap-2 flex-1">
           <Server className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">{node.displayName || node.hostname}</h1>
-          <Badge variant="outline" className="capitalize">{node.nodeKind}</Badge>
+          <h1 className="text-2xl font-bold">
+            {node.displayName || node.hostname}
+          </h1>
+          <Badge variant="outline" className="capitalize">
+            {node.nodeKind}
+          </Badge>
           {statusBadge(node.liveStatus)}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchMetrics()} disabled={metricsLoading} className="gap-1">
-            <RefreshCw className={`h-4 w-4 ${metricsLoading ? "animate-spin" : ""}`} /> Refresh Status
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchMetrics()}
+            disabled={metricsLoading}
+            className="gap-1"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${metricsLoading ? "animate-spin" : ""}`}
+            />{" "}
+            Refresh Status
           </Button>
           {canEdit && !editing && (
-            <Button size="sm" onClick={() => setEditing(true)} className="gap-1">
+            <Button
+              size="sm"
+              onClick={() => setEditing(true)}
+              className="gap-1"
+            >
               <Pencil className="h-4 w-4" /> Edit
             </Button>
           )}
           {canEdit && editing && (
             <>
-              <Button size="sm" onClick={saveNode} disabled={saving} className="gap-1">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+              <Button
+                size="sm"
+                onClick={saveNode}
+                disabled={saving}
+                className="gap-1"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}{" "}
+                Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}><X className="h-4 w-4" /></Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditing(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </>
           )}
           {canEdit && (
-            <Button size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setConfirmDelete(true)}
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -415,8 +666,11 @@ export default function NodeDetail() {
         <TabsList>
           <TabsTrigger value="ports">Port Map</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="links">Link Records ({node.links.length})</TabsTrigger>
+          <TabsTrigger value="links">
+            Link Records ({node.links.length})
+          </TabsTrigger>
           <TabsTrigger value="live">Live Status</TabsTrigger>
+          {isFirewall && <TabsTrigger value="tunnels">VPN Tunnels</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="ports" className="mt-4">
@@ -428,67 +682,247 @@ export default function NodeDetail() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Identity */}
             <Card>
-              <CardHeader><CardTitle className="text-base">Identity</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base">Identity</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
-                <FieldRow label="Hostname" editing={editing}
+                <FieldRow
+                  label="Hostname"
+                  editing={editing}
                   view={node.hostname}
-                  edit={<Input value={editFields.hostname ?? ""} onChange={e => setEditFields(f => ({ ...f, hostname: e.target.value }))} />} />
-                <FieldRow label="Display Name" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.hostname ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          hostname: e.target.value,
+                        }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Display Name"
+                  editing={editing}
                   view={node.displayName ?? "—"}
-                  edit={<Input value={editFields.displayName ?? ""} onChange={e => setEditFields(f => ({ ...f, displayName: e.target.value }))} />} />
-                <FieldRow label="Kind" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.displayName ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          displayName: e.target.value,
+                        }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Kind"
+                  editing={editing}
                   view={<span className="capitalize">{node.nodeKind}</span>}
                   edit={
-                    <Select value={editFields.nodeKind ?? ""} onValueChange={v => setEditFields(f => ({ ...f, nodeKind: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{NODE_KINDS.map(k => <SelectItem key={k} value={k} className="capitalize">{k}</SelectItem>)}</SelectContent>
+                    <Select
+                      value={editFields.nodeKind ?? ""}
+                      onValueChange={(v) =>
+                        setEditFields((f) => ({ ...f, nodeKind: v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NODE_KINDS.map((k) => (
+                          <SelectItem key={k} value={k} className="capitalize">
+                            {k}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
-                  } />
-                <FieldRow label="Vendor" editing={editing}
+                  }
+                />
+                <FieldRow
+                  label="Vendor"
+                  editing={editing}
                   view={node.vendor ?? "—"}
-                  edit={<Input value={editFields.vendor ?? ""} onChange={e => setEditFields(f => ({ ...f, vendor: e.target.value }))} />} />
-                <FieldRow label="Model" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.vendor ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, vendor: e.target.value }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Model"
+                  editing={editing}
                   view={node.model ?? "—"}
-                  edit={<Input value={editFields.model ?? ""} onChange={e => setEditFields(f => ({ ...f, model: e.target.value }))} />} />
+                  edit={
+                    <Input
+                      value={editFields.model ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, model: e.target.value }))
+                      }
+                    />
+                  }
+                />
               </CardContent>
             </Card>
 
             {/* Location & Role */}
             <Card>
-              <CardHeader><CardTitle className="text-base">Location & Role</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base">Location & Role</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
-                <FieldRow label="Management IP" editing={editing}
+                <FieldRow
+                  label="Management IP"
+                  editing={editing}
                   view={node.mgmtIp ?? "—"}
-                  edit={<Input value={editFields.mgmtIp ?? ""} onChange={e => setEditFields(f => ({ ...f, mgmtIp: e.target.value }))} placeholder="10.x.x.x" />} />
-                <FieldRow label="Building" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.mgmtIp ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, mgmtIp: e.target.value }))
+                      }
+                      placeholder="10.x.x.x"
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Building"
+                  editing={editing}
                   view={node.building ?? "—"}
-                  edit={<Input value={editFields.building ?? ""} onChange={e => setEditFields(f => ({ ...f, building: e.target.value }))} />} />
-                <FieldRow label="Location" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.building ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          building: e.target.value,
+                        }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Location"
+                  editing={editing}
                   view={node.location ?? "—"}
-                  edit={<Input value={editFields.location ?? ""} onChange={e => setEditFields(f => ({ ...f, location: e.target.value }))} placeholder="IDF closet, rack 3" />} />
-                <FieldRow label="Role" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.location ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          location: e.target.value,
+                        }))
+                      }
+                      placeholder="IDF closet, rack 3"
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Role"
+                  editing={editing}
                   view={node.role ?? "—"}
-                  edit={<Input value={editFields.role ?? ""} onChange={e => setEditFields(f => ({ ...f, role: e.target.value }))} />} />
-                <FieldRow label="Function" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.role ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, role: e.target.value }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Function"
+                  editing={editing}
                   view={node.function ?? "—"}
-                  edit={<Input value={editFields.function ?? ""} onChange={e => setEditFields(f => ({ ...f, function: e.target.value }))} />} />
-                <FieldRow label="Criticality" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.function ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          function: e.target.value,
+                        }))
+                      }
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Criticality"
+                  editing={editing}
                   view={node.criticality ?? "—"}
                   edit={
-                    <Select value={editFields.criticality ?? ""} onValueChange={v => setEditFields(f => ({ ...f, criticality: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{CRITICALITY_LEVELS.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
+                    <Select
+                      value={editFields.criticality ?? ""}
+                      onValueChange={(v) =>
+                        setEditFields((f) => ({ ...f, criticality: v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CRITICALITY_LEVELS.map((c) => (
+                          <SelectItem key={c} value={c} className="capitalize">
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
-                  } />
-                <FieldRow label="Tags" editing={editing}
+                  }
+                />
+                <FieldRow
+                  label="Tags"
+                  editing={editing}
                   view={node.tags?.length ? node.tags.join(", ") : "—"}
-                  edit={<Input value={tagsStr} onChange={e => setEditFields(f => ({ ...f, tags: e.target.value as any }))} placeholder="tag1, tag2" />} />
-                <FieldRow label="Status" editing={editing}
+                  edit={
+                    <Input
+                      value={tagsStr}
+                      onChange={(e) =>
+                        setEditFields((f) => ({
+                          ...f,
+                          tags: e.target.value as any,
+                        }))
+                      }
+                      placeholder="tag1, tag2"
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Status"
+                  editing={editing}
                   view={node.status ?? "—"}
-                  edit={<Input value={editFields.status ?? ""} onChange={e => setEditFields(f => ({ ...f, status: e.target.value }))} placeholder="active, decommissioned..." />} />
-                <FieldRow label="Notes" editing={editing}
+                  edit={
+                    <Input
+                      value={editFields.status ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, status: e.target.value }))
+                      }
+                      placeholder="active, decommissioned..."
+                    />
+                  }
+                />
+                <FieldRow
+                  label="Notes"
+                  editing={editing}
                   view={node.notes ?? "—"}
-                  edit={<Textarea rows={5} value={editFields.notes ?? ""} onChange={e => setEditFields(f => ({ ...f, notes: e.target.value }))} placeholder="Purpose, replacement history, dependencies, or other inventory notes" />} />
+                  edit={
+                    <Textarea
+                      rows={5}
+                      value={editFields.notes ?? ""}
+                      onChange={(e) =>
+                        setEditFields((f) => ({ ...f, notes: e.target.value }))
+                      }
+                      placeholder="Purpose, replacement history, dependencies, or other inventory notes"
+                    />
+                  }
+                />
               </CardContent>
             </Card>
           </div>
@@ -498,10 +932,16 @@ export default function NodeDetail() {
         <TabsContent value="links" className="mt-4 space-y-3">
           <div className="flex justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              {node.links.length === 0 ? "No links recorded." : `${node.links.length} link${node.links.length !== 1 ? "s" : ""}`}
+              {node.links.length === 0
+                ? "No links recorded."
+                : `${node.links.length} link${node.links.length !== 1 ? "s" : ""}`}
             </p>
             {canEdit && (
-              <Button size="sm" onClick={() => setAddLinkOpen(true)} className="gap-1">
+              <Button
+                size="sm"
+                onClick={() => setAddLinkOpen(true)}
+                className="gap-1"
+              >
                 <Plus className="h-4 w-4" /> Add Link
               </Button>
             )}
@@ -526,42 +966,90 @@ export default function NodeDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {node.links.map(link => (
+                  {node.links.map((link) => (
                     <TableRow key={link.id}>
-                      <TableCell className="font-mono text-xs">{link.localPort ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{link.remotePort ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {link.localPort ?? "—"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {link.remotePort ?? "—"}
+                      </TableCell>
                       <TableCell>
                         {link.peerNode ? (
                           <Link href={`/network/nodes/${link.peerNode.id}`}>
                             <span
                               className="block truncate text-primary underline cursor-pointer text-xs"
-                              title={link.peerNode.displayName || link.peerNode.hostname}
+                              title={
+                                link.peerNode.displayName ||
+                                link.peerNode.hostname
+                              }
                             >
-                              {link.peerNode.displayName || link.peerNode.hostname}
+                              {link.peerNode.displayName ||
+                                link.peerNode.hostname}
                             </span>
                           </Link>
                         ) : link.lldpPeerHostname ? (
-                          <span className="block truncate text-xs text-muted-foreground" title={link.lldpPeerHostname}>
+                          <span
+                            className="block truncate text-xs text-muted-foreground"
+                            title={link.lldpPeerHostname}
+                          >
                             {link.lldpPeerHostname}
                           </span>
-                        ) : "—"}
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
-                      <TableCell><Badge variant="outline" className="text-xs capitalize">{link.linkKind ?? "—"}</Badge></TableCell>
-                      <TableCell className="text-xs">{fmtSpeed(link.speedMbps)}</TableCell>
-                      <TableCell><Badge variant="secondary" className="text-xs capitalize">{link.portMode ?? "—"}</Badge></TableCell>
-                      <TableCell className="text-xs">{link.nativeVlan ?? "—"}</TableCell>
-                      <TableCell className="text-xs max-w-[160px] truncate" title={link.allowedVlans ?? ""}>{link.allowedVlans ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{link.portchannel ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {link.linkKind ?? "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {fmtSpeed(link.speedMbps)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className="text-xs capitalize"
+                        >
+                          {link.portMode ?? "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {link.nativeVlan ?? "—"}
+                      </TableCell>
+                      <TableCell
+                        className="text-xs max-w-[160px] truncate"
+                        title={link.allowedVlans ?? ""}
+                      >
+                        {link.allowedVlans ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {link.portchannel ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <ConfidenceBadge c={link.confidence} />
                       </TableCell>
                       {canEdit && (
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditLinkId(link.id); setEditLinkFields({ ...link }); }}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditLinkId(link.id);
+                                setEditLinkFields({ ...link });
+                              }}
+                            >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteLinkId(link.id)}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => setDeleteLinkId(link.id)}
+                            >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -577,19 +1065,24 @@ export default function NodeDetail() {
 
         {/* ── Live Status Tab ── */}
         <TabsContent value="live" className="mt-4">
-          {!influxConfigured ? (
+          {metricsLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !influxConfigured ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
                 <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">InfluxDB not configured</p>
-                <p className="text-sm mt-1">Set INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG env vars on the server.<br />
-                  Live status will activate once the polling server (10.0.0.22) is reachable.</p>
+                <p className="text-sm mt-1">
+                  Set INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG env vars on the
+                  server.
+                  <br />
+                  Live status will activate once the polling server (10.0.0.22)
+                  is reachable.
+                </p>
               </CardContent>
             </Card>
-          ) : metricsLoading ? (
-            <div className="flex items-center justify-center h-40">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
           ) : !liveMetrics ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
@@ -598,54 +1091,174 @@ export default function NodeDetail() {
             </Card>
           ) : (
             <div className="space-y-4">
+              {!liveMetrics.reachable && (
+                <Card className="border-amber-300 bg-amber-50">
+                  <CardContent className="py-4 text-sm text-amber-900">
+                    InfluxDB is configured, but its current device query did not
+                    complete. Live values are unknown.
+                  </CardContent>
+                </Card>
+              )}
               {/* Ping summary */}
               <div className="grid grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="py-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Ping Loss</p>
-                    <p className="text-2xl font-bold">{liveMetrics.pingLoss !== null ? `${liveMetrics.pingLoss}%` : "—"}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Ping Loss
+                    </p>
+                    <p className="text-2xl font-bold">
+                      {liveMetrics.pingLoss !== null
+                        ? `${liveMetrics.pingLoss}%`
+                        : "—"}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="py-4 text-center">
                     <p className="text-xs text-muted-foreground mb-1">RTT</p>
-                    <p className="text-2xl font-bold">{typeof liveMetrics.rtt === "number" && Number.isFinite(liveMetrics.rtt) ? `${liveMetrics.rtt.toFixed(1)} ms` : "—"}</p>
+                    <p className="text-2xl font-bold">
+                      {typeof liveMetrics.rtt === "number" &&
+                      Number.isFinite(liveMetrics.rtt)
+                        ? `${liveMetrics.rtt.toFixed(1)} ms`
+                        : "—"}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="py-4 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Status</p>
-                    <div className="flex justify-center mt-1">{statusBadge(node.liveStatus)}</div>
+                    <div className="flex justify-center mt-1">
+                      {statusBadge(node.liveStatus)}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
+              {isFirewall && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">CPU</p>
+                      <p className="text-2xl font-bold">
+                        {liveMetrics.system.cpuUsagePct != null
+                          ? `${liveMetrics.system.cpuUsagePct}%`
+                          : "—"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Memory
+                      </p>
+                      <p className="text-2xl font-bold">
+                        {liveMetrics.system.memoryUsagePct != null
+                          ? `${liveMetrics.system.memoryUsagePct}%`
+                          : "—"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Sessions
+                      </p>
+                      <p className="text-2xl font-bold">
+                        {liveMetrics.system.sessionCount?.toLocaleString() ??
+                          "—"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        SNMP Uptime
+                      </p>
+                      <p className="text-xl font-bold">
+                        {fmtSnmpUptime(liveMetrics.system.uptime)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              {isFirewall && liveMetrics.system.observedAt && (
+                <p className="text-xs text-muted-foreground">
+                  System telemetry observed:{" "}
+                  {new Date(liveMetrics.system.observedAt).toLocaleString()}
+                </p>
+              )}
+
               {/* Interface table */}
               {liveMetrics.interfaces.length > 0 && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base flex items-center gap-2"><Cable className="h-4 w-4" /> Interfaces</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Cable className="h-4 w-4" /> Interfaces
+                    </CardTitle>
+                  </CardHeader>
                   <CardContent className="p-0">
                     <div className="rounded-md overflow-x-auto">
                       <Table className="table-fixed min-w-[520px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[12rem]">Interface</TableHead>
-                            <TableHead className="w-[8rem]">Oper Status</TableHead>
+                            <TableHead className="w-[12rem]">
+                              Interface
+                            </TableHead>
+                            <TableHead className="w-[8rem]">
+                              Oper Status
+                            </TableHead>
+                            <TableHead className="w-[8rem]">Errors</TableHead>
                             <TableHead className="w-[8rem]">In</TableHead>
                             <TableHead className="w-[8rem]">Out</TableHead>
+                            <TableHead className="w-[11rem]">
+                              Observed
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {liveMetrics.interfaces.map(iface => (
+                          {liveMetrics.interfaces.map((iface) => (
                             <TableRow key={iface.name}>
-                              <TableCell className="font-mono text-xs">{iface.name}</TableCell>
-                              <TableCell>
-                                {iface.operStatus === "1" || iface.operStatus === "up"
-                                  ? <span className="text-green-600 text-xs font-medium">up</span>
-                                  : <span className="text-red-500 text-xs font-medium">down</span>}
+                              <TableCell className="font-mono text-xs">
+                                {iface.name}
                               </TableCell>
-                              <TableCell className="text-xs">{fmtBytes(iface.inOctets)}</TableCell>
-                              <TableCell className="text-xs">{fmtBytes(iface.outOctets)}</TableCell>
+                              <TableCell>
+                                {iface.operStatus === "1" ||
+                                iface.operStatus === "up" ? (
+                                  <span className="text-green-600 text-xs font-medium">
+                                    up
+                                  </span>
+                                ) : iface.operStatus === "2" ||
+                                  iface.operStatus === "down" ||
+                                  iface.operStatus === "lowerLayerDown" ||
+                                  iface.operStatus === "notPresent" ? (
+                                  <span className="text-red-500 text-xs font-medium">
+                                    {iface.operStatus === "2"
+                                      ? "down"
+                                      : iface.operStatus}
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-700 text-xs font-medium">
+                                    {iface.operStatus ?? "unknown"}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {iface.inErrors == null &&
+                                iface.outErrors == null
+                                  ? "—"
+                                  : `In ${iface.inErrors ?? "—"} / Out ${iface.outErrors ?? "—"}`}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {fmtBytes(iface.inOctets)}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {fmtBytes(iface.outOctets)}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {iface.observedAt
+                                  ? new Date(iface.observedAt).toLocaleString()
+                                  : "—"}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -654,9 +1267,139 @@ export default function NodeDetail() {
                   </CardContent>
                 </Card>
               )}
+              {liveMetrics.lastPolled && (
+                <p className="text-xs text-muted-foreground">
+                  Newest telemetry:{" "}
+                  {new Date(liveMetrics.lastPolled).toLocaleString()}
+                </p>
+              )}
             </div>
           )}
         </TabsContent>
+
+        {isFirewall && (
+          <TabsContent value="tunnels" className="mt-4 space-y-4">
+            {metricsLoading ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : !influxConfigured ? (
+              <Card>
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  InfluxDB is not configured, so VPN tunnel state is unknown.
+                </CardContent>
+              </Card>
+            ) : !liveMetrics?.tunnelTelemetryAvailable ? (
+              <Card className="border-amber-300 bg-amber-50">
+                <CardContent className="py-8 text-center text-amber-900">
+                  <p className="font-semibold">
+                    VPN tunnel telemetry has not arrived from the NOC collector.
+                  </p>
+                  <p className="text-sm mt-1">
+                    That means unknown—not zero tunnels. The page will populate
+                    after a successful FortiGate Phase 2 poll.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground">Up</p>
+                      <p className="text-2xl font-bold text-green-700">
+                        {
+                          liveMetrics.tunnels.filter(
+                            (tunnel) => tunnel.status === "up",
+                          ).length
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground">Down</p>
+                      <p className="text-2xl font-bold text-red-700">
+                        {
+                          liveMetrics.tunnels.filter(
+                            (tunnel) => tunnel.status === "down",
+                          ).length
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-muted-foreground">Unknown</p>
+                      <p className="text-2xl font-bold text-slate-700">
+                        {
+                          liveMetrics.tunnels.filter(
+                            (tunnel) => tunnel.status === "unknown",
+                          ).length
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      FortiGate Phase 2 selectors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-x-auto">
+                    <Table className="min-w-[880px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Phase 1</TableHead>
+                          <TableHead>Phase 2</TableHead>
+                          <TableHead>Selector index</TableHead>
+                          <TableHead>VDOM</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>In</TableHead>
+                          <TableHead>Out</TableHead>
+                          <TableHead>Observed</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {liveMetrics.tunnels.map((tunnel) => (
+                          <TableRow
+                            key={`${tunnel.vdom ?? ""}:${tunnel.phase1}:${tunnel.phase2}:${tunnel.index ?? ""}`}
+                          >
+                            <TableCell className="font-mono text-xs">
+                              {tunnel.phase1}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {tunnel.phase2}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {tunnel.index ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {tunnel.vdom ?? "—"}
+                            </TableCell>
+                            <TableCell>{statusBadge(tunnel.status)}</TableCell>
+                            <TableCell className="text-xs">
+                              {fmtBytes(tunnel.inOctets)}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {fmtBytes(tunnel.outOctets)}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {tunnel.observedAt
+                                ? new Date(tunnel.observedAt).toLocaleString()
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Delete Node Dialog ── */}
@@ -665,12 +1408,16 @@ export default function NodeDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {node.hostname}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the node and all its links. This cannot be undone.
+              This will permanently delete the node and all its links. This
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteNode} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={deleteNode}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -678,15 +1425,23 @@ export default function NodeDetail() {
       </AlertDialog>
 
       {/* ── Delete Link Dialog ── */}
-      <AlertDialog open={!!deleteLinkId} onOpenChange={o => !o && setDeleteLinkId(null)}>
+      <AlertDialog
+        open={!!deleteLinkId}
+        onOpenChange={(o) => !o && setDeleteLinkId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this link?</AlertDialogTitle>
-            <AlertDialogDescription>This link record will be permanently deleted.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This link record will be permanently deleted.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteLinkId && deleteLink(deleteLinkId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={() => deleteLinkId && deleteLink(deleteLinkId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -698,92 +1453,198 @@ export default function NodeDetail() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Link from {node.hostname}</DialogTitle>
-            <DialogDescription>Record a physical or logical connection from this device.</DialogDescription>
+            <DialogDescription>
+              Record a physical or logical connection from this device.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
             <div className="space-y-1">
               <Label>Local Port</Label>
-              <Input placeholder="GigabitEthernet0/1" value={newLink.localPort}
-                onChange={e => setNewLink(l => ({ ...l, localPort: e.target.value }))} />
+              <Input
+                placeholder="GigabitEthernet0/1"
+                value={newLink.localPort}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, localPort: e.target.value }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Remote Port</Label>
-              <Input placeholder="Gi0/24" value={newLink.remotePort}
-                onChange={e => setNewLink(l => ({ ...l, remotePort: e.target.value }))} />
+              <Input
+                placeholder="Gi0/24"
+                value={newLink.remotePort}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, remotePort: e.target.value }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Link Kind</Label>
-              <Select value={newLink.linkKind} onValueChange={v => setNewLink(l => ({ ...l, linkKind: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{LINK_KINDS.map(k => <SelectItem key={k} value={k} className="capitalize">{k}</SelectItem>)}</SelectContent>
+              <Select
+                value={newLink.linkKind}
+                onValueChange={(v) =>
+                  setNewLink((l) => ({ ...l, linkKind: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LINK_KINDS.map((k) => (
+                    <SelectItem key={k} value={k} className="capitalize">
+                      {k}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Speed (Mbps)</Label>
-              <Input placeholder="1000" type="number" value={newLink.speedMbps}
-                onChange={e => setNewLink(l => ({ ...l, speedMbps: e.target.value }))} />
+              <Input
+                placeholder="1000"
+                type="number"
+                value={newLink.speedMbps}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, speedMbps: e.target.value }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Port Mode</Label>
-              <Select value={newLink.portMode} onValueChange={v => setNewLink(l => ({ ...l, portMode: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PORT_MODES.map(m => <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>)}</SelectContent>
+              <Select
+                value={newLink.portMode}
+                onValueChange={(v) =>
+                  setNewLink((l) => ({ ...l, portMode: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PORT_MODES.map((m) => (
+                    <SelectItem key={m} value={m} className="capitalize">
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Native VLAN</Label>
-              <Input placeholder="1" type="number" value={newLink.nativeVlan}
-                onChange={e => setNewLink(l => ({ ...l, nativeVlan: e.target.value }))} />
+              <Input
+                placeholder="1"
+                type="number"
+                value={newLink.nativeVlan}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, nativeVlan: e.target.value }))
+                }
+              />
             </div>
             <div className="col-span-2 space-y-1">
               <Label>Allowed VLANs</Label>
-              <Input placeholder="1,10,100-200,500" value={newLink.allowedVlans}
-                onChange={e => setNewLink(l => ({ ...l, allowedVlans: e.target.value }))} />
+              <Input
+                placeholder="1,10,100-200,500"
+                value={newLink.allowedVlans}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, allowedVlans: e.target.value }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Port-Channel</Label>
-              <Input placeholder="Po1" value={newLink.portchannel}
-                onChange={e => setNewLink(l => ({ ...l, portchannel: e.target.value }))} />
+              <Input
+                placeholder="Po1"
+                value={newLink.portchannel}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, portchannel: e.target.value }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Confidence</Label>
-              <Select value={newLink.confidence} onValueChange={v => setNewLink(l => ({ ...l, confidence: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CONFIDENCE_LEVELS.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
+              <Select
+                value={newLink.confidence}
+                onValueChange={(v) =>
+                  setNewLink((l) => ({ ...l, confidence: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONFIDENCE_LEVELS.map((c) => (
+                    <SelectItem key={c} value={c} className="capitalize">
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Peer Hostname (LLDP)</Label>
-              <Input placeholder="sw-core-01" value={newLink.lldpPeerHostname}
-                onChange={e => setNewLink(l => ({ ...l, lldpPeerHostname: e.target.value }))} />
+              <Input
+                placeholder="sw-core-01"
+                value={newLink.lldpPeerHostname}
+                onChange={(e) =>
+                  setNewLink((l) => ({
+                    ...l,
+                    lldpPeerHostname: e.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Peer Mgmt IP</Label>
-              <Input placeholder="10.x.x.x" value={newLink.lldpPeerMgmtIp}
-                onChange={e => setNewLink(l => ({ ...l, lldpPeerMgmtIp: e.target.value }))} />
+              <Input
+                placeholder="10.x.x.x"
+                value={newLink.lldpPeerMgmtIp}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, lldpPeerMgmtIp: e.target.value }))
+                }
+              />
             </div>
             <div className="col-span-2 space-y-1">
               <Label>Peer Node ID (if known)</Label>
-              <Input placeholder="UUID of peer node in this system" value={newLink.bNodeId}
-                onChange={e => setNewLink(l => ({ ...l, bNodeId: e.target.value }))} />
+              <Input
+                placeholder="UUID of peer node in this system"
+                value={newLink.bNodeId}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, bNodeId: e.target.value }))
+                }
+              />
             </div>
             <div className="col-span-2 space-y-1">
               <Label>Evidence Reference</Label>
-              <Input placeholder="LLDP capture 2025-06-01, config backup" value={newLink.evidenceRef}
-                onChange={e => setNewLink(l => ({ ...l, evidenceRef: e.target.value }))} />
+              <Input
+                placeholder="LLDP capture 2025-06-01, config backup"
+                value={newLink.evidenceRef}
+                onChange={(e) =>
+                  setNewLink((l) => ({ ...l, evidenceRef: e.target.value }))
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddLinkOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setAddLinkOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={addLink} disabled={addingLink} className="gap-1">
-              {addingLink ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add Link
+              {addingLink ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}{" "}
+              Add Link
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* ── Edit Link Dialog ── */}
-      <Dialog open={!!editLinkId} onOpenChange={o => !o && setEditLinkId(null)}>
+      <Dialog
+        open={!!editLinkId}
+        onOpenChange={(o) => !o && setEditLinkId(null)}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Link</DialogTitle>
@@ -791,57 +1652,138 @@ export default function NodeDetail() {
           <div className="grid grid-cols-2 gap-3 py-2">
             <div className="space-y-1">
               <Label>Local Port</Label>
-              <Input value={editLinkFields.localPort ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, localPort: e.target.value }))} />
+              <Input
+                value={editLinkFields.localPort ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    localPort: e.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Remote Port</Label>
-              <Input value={editLinkFields.remotePort ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, remotePort: e.target.value }))} />
+              <Input
+                value={editLinkFields.remotePort ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    remotePort: e.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Speed (Mbps)</Label>
-              <Input type="number" value={editLinkFields.speedMbps ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, speedMbps: e.target.value ? Number(e.target.value) : null }))} />
+              <Input
+                type="number"
+                value={editLinkFields.speedMbps ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    speedMbps: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Port Mode</Label>
-              <Select value={editLinkFields.portMode ?? ""} onValueChange={v => setEditLinkFields(f => ({ ...f, portMode: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PORT_MODES.map(m => <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>)}</SelectContent>
+              <Select
+                value={editLinkFields.portMode ?? ""}
+                onValueChange={(v) =>
+                  setEditLinkFields((f) => ({ ...f, portMode: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PORT_MODES.map((m) => (
+                    <SelectItem key={m} value={m} className="capitalize">
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Native VLAN</Label>
-              <Input type="number" value={editLinkFields.nativeVlan ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, nativeVlan: e.target.value ? Number(e.target.value) : null }))} />
+              <Input
+                type="number"
+                value={editLinkFields.nativeVlan ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    nativeVlan: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Confidence</Label>
-              <Select value={editLinkFields.confidence ?? ""} onValueChange={v => setEditLinkFields(f => ({ ...f, confidence: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CONFIDENCE_LEVELS.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
+              <Select
+                value={editLinkFields.confidence ?? ""}
+                onValueChange={(v) =>
+                  setEditLinkFields((f) => ({ ...f, confidence: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONFIDENCE_LEVELS.map((c) => (
+                    <SelectItem key={c} value={c} className="capitalize">
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="col-span-2 space-y-1">
               <Label>Allowed VLANs</Label>
-              <Input value={editLinkFields.allowedVlans ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, allowedVlans: e.target.value }))} />
+              <Input
+                value={editLinkFields.allowedVlans ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    allowedVlans: e.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Port-Channel</Label>
-              <Input value={editLinkFields.portchannel ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, portchannel: e.target.value }))} />
+              <Input
+                value={editLinkFields.portchannel ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    portchannel: e.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="space-y-1">
               <Label>Evidence Reference</Label>
-              <Input value={editLinkFields.evidenceRef ?? ""}
-                onChange={e => setEditLinkFields(f => ({ ...f, evidenceRef: e.target.value }))} />
+              <Input
+                value={editLinkFields.evidenceRef ?? ""}
+                onChange={(e) =>
+                  setEditLinkFields((f) => ({
+                    ...f,
+                    evidenceRef: e.target.value,
+                  }))
+                }
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditLinkId(null)}>Cancel</Button>
-            <Button onClick={saveLink} className="gap-1"><Save className="h-4 w-4" /> Save</Button>
+            <Button variant="ghost" onClick={() => setEditLinkId(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveLink} className="gap-1">
+              <Save className="h-4 w-4" /> Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -852,8 +1794,16 @@ export default function NodeDetail() {
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function FieldRow({
-  label, editing, view, edit,
-}: { label: string; editing: boolean; view: React.ReactNode; edit: React.ReactNode }) {
+  label,
+  editing,
+  view,
+  edit,
+}: {
+  label: string;
+  editing: boolean;
+  view: React.ReactNode;
+  edit: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -870,7 +1820,9 @@ function ConfidenceBadge({ c }: { c: string | null }) {
     unknown: "bg-gray-100 text-gray-600 border-gray-300",
   };
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded border text-xs font-medium ${map[c ?? "unknown"] ?? map.unknown}`}>
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded border text-xs font-medium ${map[c ?? "unknown"] ?? map.unknown}`}
+    >
       {c ?? "unknown"}
     </span>
   );

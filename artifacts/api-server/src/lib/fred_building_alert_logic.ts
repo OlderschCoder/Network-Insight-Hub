@@ -13,6 +13,13 @@ export type FredSwitchObservation = {
   source?: string;
 };
 
+export type FredBuildingObservation = {
+  buildingId: string;
+  status: FredObservationStatus;
+  observedAt: string;
+  source?: string;
+};
+
 export type FredBuildingTopology = {
   buildingId: string;
   buildingName: string;
@@ -22,6 +29,8 @@ export type FredBuildingTopology = {
 
 export type FredTargetAlertState = {
   phase: FredAlertPhase;
+  /** True only after this target has supplied a fresh healthy observation. */
+  baselineEstablished: boolean;
   consecutiveFreshDowns: number;
   consecutiveFreshUps: number;
   downSequenceStartedAt: string | null;
@@ -86,6 +95,7 @@ export type EvaluateFredBuildingAlertsInput = {
   now: string | number | Date;
   topology: readonly FredBuildingTopology[];
   observations: readonly FredSwitchObservation[];
+  buildingObservations?: readonly FredBuildingObservation[];
   previousState?: FredBuildingAlertState;
   config?: Partial<FredBuildingAlertConfig>;
 };
@@ -147,6 +157,7 @@ export function createEmptyFredBuildingAlertState(): FredBuildingAlertState {
 function createEmptyTargetState(): FredTargetAlertState {
   return {
     phase: "normal",
+    baselineEstablished: false,
     consecutiveFreshDowns: 0,
     consecutiveFreshUps: 0,
     downSequenceStartedAt: null,
@@ -242,7 +253,13 @@ function clonePreviousState(
     if (value.phase === "outage" && !value.activeIncidentId) {
       throw new Error(`Outage target ${key} is missing activeIncidentId`);
     }
-    targets[key] = { ...value };
+    targets[key] = {
+      ...value,
+      // State written before the baseline field existed is intentionally
+      // treated as unproven unless it already represents an active incident.
+      baselineEstablished:
+        value.phase === "outage" || Boolean(value.baselineEstablished),
+    };
   }
   return { version: FRED_BUILDING_ALERT_STATE_VERSION, targets };
 }
@@ -436,6 +453,69 @@ export function resolveFredSwitchObservation(input: {
   );
 }
 
+export function deriveFredBuildingConnectivityObservation(input: {
+  now: string | number | Date;
+  topology: FredBuildingTopology;
+  observations: readonly FredSwitchObservation[];
+  phoneObservation?: Omit<FredBuildingObservation, "buildingId">;
+  config?: Partial<FredBuildingAlertConfig>;
+}): FredBuildingObservation {
+  const nowMs = parseNow(input.now);
+  const config = resolveConfig(input.config);
+  const observationsBySwitchId = indexObservations(input.observations);
+  const switchIds = [
+    input.topology.anchorSwitchId,
+    ...input.topology.childSwitchIds,
+  ];
+  const switches = switchIds.map((switchId) =>
+    resolveObservation(switchId, observationsBySwitchId, nowMs, config),
+  );
+  const phone = input.phoneObservation
+    ? resolveObservation(
+        input.topology.buildingId,
+        indexObservations([
+          {
+            switchId: input.topology.buildingId,
+            ...input.phoneObservation,
+          },
+        ]),
+        nowMs,
+        config,
+      )
+    : null;
+
+  const anchor = switches[0];
+  const phoneFreshDown = phone?.reason === "fresh" && phone.status === "down";
+  const observedTimes = (items: readonly FredResolvedSwitchObservation[]) =>
+    items
+      .map((item) => item.observedAtMs)
+      .filter(
+        (value): value is number => value != null && Number.isFinite(value),
+      );
+
+  let status: FredObservationStatus = "unknown";
+  let observedAtMs = nowMs;
+  // A building outage follows the operator-designated main/anchor switch.
+  // Child switches may remain reachable by an alternate path and must not
+  // prevent the main-switch-plus-phones connectivity rule from firing.
+  if (anchor.reason === "fresh" && anchor.status === "down" && phoneFreshDown) {
+    status = "down";
+    observedAtMs = Math.min(
+      ...observedTimes([anchor, phone as FredResolvedSwitchObservation]),
+    );
+  } else if (anchor.reason === "fresh" && anchor.status === "up") {
+    status = "up";
+    observedAtMs = anchor.observedAtMs ?? nowMs;
+  }
+
+  return {
+    buildingId: input.topology.buildingId,
+    status,
+    observedAt: new Date(observedAtMs).toISOString(),
+    source: "connectivity-policy",
+  };
+}
+
 function incidentIdFor(
   target: TargetDescriptor,
   downSequenceStartedAt: string,
@@ -530,7 +610,14 @@ function evaluateTarget(
       if (state.phase === "normal") state.downSequenceStartedAt = null;
     }
     state.lastProcessedObservationAt = observationAt;
-    if (state.phase === "normal" && observation.status === "down") {
+    if (observation.status === "up") {
+      state.baselineEstablished = true;
+    }
+    if (
+      state.phase === "normal" &&
+      observation.status === "down" &&
+      state.baselineEstablished
+    ) {
       state.consecutiveFreshDowns += 1;
       state.consecutiveFreshUps = 0;
       state.downSequenceStartedAt ??= observationAt;
@@ -613,6 +700,7 @@ function suppressTarget(
       : Number.NEGATIVE_INFINITY;
     if (observation.observedAtMs > previousObservationMs) {
       state.lastProcessedObservationAt = observation.observedAt;
+      if (observation.status === "up") state.baselineEstablished = true;
     }
   }
 
@@ -644,6 +732,14 @@ export function evaluateFredBuildingAlerts(
 
   const state = clonePreviousState(input.previousState);
   const observationsBySwitchId = indexObservations(input.observations);
+  const buildingObservationsById = indexObservations(
+    (input.buildingObservations ?? []).map((observation) => ({
+      switchId: observation.buildingId,
+      status: observation.status,
+      observedAt: observation.observedAt,
+      source: observation.source,
+    })),
+  );
   const transitions: FredAlertTransition[] = [];
   const evaluations: FredTargetEvaluation[] = [];
   const suppressedSwitchIds: string[] = [];
@@ -658,15 +754,24 @@ export function evaluateFredBuildingAlerts(
       targetKey: fredBuildingTargetKey(building.buildingId),
       anchorSwitchId: building.anchorSwitchId,
     };
+    const buildingObservation =
+      input.buildingObservations === undefined
+        ? resolveObservation(
+            building.anchorSwitchId,
+            observationsBySwitchId,
+            nowMs,
+            config,
+          )
+        : resolveObservation(
+            building.buildingId,
+            buildingObservationsById,
+            nowMs,
+            config,
+          );
     const buildingResult = evaluateTarget(
       buildingTarget,
       state.targets[buildingTarget.targetKey] ?? createEmptyTargetState(),
-      resolveObservation(
-        building.anchorSwitchId,
-        observationsBySwitchId,
-        nowMs,
-        config,
-      ),
+      buildingObservation,
       nowMs,
       config,
     );

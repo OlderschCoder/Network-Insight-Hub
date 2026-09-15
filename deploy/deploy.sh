@@ -12,11 +12,18 @@
 set -euo pipefail
 
 SRC="${SRC:-$HOME/Network-Insight-Hub}"
-DEST="/opt/sccc-it"
+DEST="${DEST:-/opt/sccc-it}"
 FRONTEND_SUB="artifacts/it-reporting/dist/public"
 BACKEND_SUB="artifacts/api-server/dist"
 SEEDS_SRC="$SRC/artifacts/api-server/src/seeds"
 MIGRATION_DIR="$SRC/lib/db/migrations"
+REQUIRED_MIGRATIONS=(
+  "add_ai_knowledge_scope.sql"
+  "add_device_configs.sql"
+  "add_incident_rooms.sql"
+  "add_fred_building_alerts.sql"
+  "add_fred_building_alert_baseline.sql"
+)
 
 SKIP_IMPORT=false
 DRY_RUN_IMPORT=false
@@ -67,19 +74,24 @@ if [ -z "$DB_URL" ]; then
   echo "   ERROR: DATABASE_URL not found — refusing to deploy without schema validation" >&2
   exit 1
 else
-  for sql_file in \
-    "$MIGRATION_DIR/add_ai_knowledge_scope.sql" \
-    "$MIGRATION_DIR/add_device_configs.sql" \
-    "$MIGRATION_DIR/add_incident_rooms.sql" \
-    "$MIGRATION_DIR/add_fred_building_alerts.sql"
-  do
-    if [ -f "$sql_file" ]; then
-      echo "   Applying $(basename $sql_file)..."
-      # Stop the release if any statement fails. Continuing after a partial or
-      # rejected schema change can start application code against the wrong
-      # database contract.
-      psql -X "$DB_URL" -v ON_ERROR_STOP=1 -f "$sql_file"
+  # Validate the complete schema contract before applying anything. A missing
+  # checked-out artifact must fail the release rather than silently launching
+  # new application code against an older database shape.
+  for migration_name in "${REQUIRED_MIGRATIONS[@]}"; do
+    sql_file="$MIGRATION_DIR/$migration_name"
+    if [ ! -f "$sql_file" ]; then
+      echo "   ERROR: required migration is missing: $sql_file" >&2
+      exit 1
     fi
+  done
+
+  for migration_name in "${REQUIRED_MIGRATIONS[@]}"; do
+    sql_file="$MIGRATION_DIR/$migration_name"
+    echo "   Applying $migration_name..."
+    # Stop the release if any statement fails. Continuing after a partial or
+    # rejected schema change can start application code against the wrong
+    # database contract.
+    psql -X "$DB_URL" -v ON_ERROR_STOP=1 -f "$sql_file"
   done
 fi
 

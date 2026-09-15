@@ -6,6 +6,7 @@ import {
   includedWeeklyLogs,
   isWeeklyLogIncludedInDepartmentReport,
   selectedItemsForIncludedWeeklyLogs,
+  weeklyLogSubmissionStatus,
   weeklyLogOwnerWeekKey,
 } from "./weekly_report_entry_policy";
 
@@ -114,5 +115,51 @@ describe("department weekly-report entry policy", () => {
     expect(
       eligibleOwnerWeeks.has(weeklyLogOwnerWeekKey(10, "2026-09-14")),
     ).toBe(false);
+  });
+
+  it("keeps active teammates with no weekly log visible as missing", () => {
+    const status = weeklyLogSubmissionStatus(
+      [
+        { id: 1, name: "Tracy Example", role: "cio" },
+        { id: 2, name: "Mark Example", role: "cio" },
+        { id: 3, name: "Maria Example", role: "helpdesk" },
+      ],
+      [
+        {
+          userId: 2,
+          isSubmitted: true,
+          updatedAt: "2026-09-15T12:00:00Z",
+        },
+        {
+          userId: 3,
+          isSubmitted: false,
+          updatedAt: "2026-09-15T12:00:00Z",
+        },
+      ],
+    );
+
+    expect(status).toEqual([
+      {
+        userId: 1,
+        userName: "Tracy Example",
+        userRole: "cio",
+        entryCount: 0,
+        isSubmitted: false,
+      },
+      {
+        userId: 2,
+        userName: "Mark Example",
+        userRole: "cio",
+        entryCount: 1,
+        isSubmitted: true,
+      },
+      {
+        userId: 3,
+        userName: "Maria Example",
+        userRole: "helpdesk",
+        entryCount: 1,
+        isSubmitted: false,
+      },
+    ]);
   });
 });

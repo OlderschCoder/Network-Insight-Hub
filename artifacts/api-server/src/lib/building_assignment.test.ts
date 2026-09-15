@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_AUTHORITATIVE_BUILDINGS,
   getAssignedBuildingName,
+  getAuthoritativeBuildingName,
   getCanonicalBuildingName,
 } from "./building_assignment";
 
@@ -22,5 +23,26 @@ describe("Mansions building assignment", () => {
     expect(getAssignedBuildingName("Student Living Center", "SLC151", "SWA-SLC151")).toBe(
       "Student Living Center",
     );
+  });
+
+  it.each(["Tech Building A", "Student Living G"])(
+    "preserves the exact authoritative anchor name %s",
+    (buildingName) => {
+      expect(
+        getAuthoritativeBuildingName(
+          buildingName,
+          DEFAULT_AUTHORITATIVE_BUILDINGS,
+        ),
+      ).toBe(buildingName);
+    },
+  );
+
+  it("still resolves legacy anchor aliases to an authoritative name", () => {
+    expect(
+      getAuthoritativeBuildingName(
+        "Student Living A&B",
+        DEFAULT_AUTHORITATIVE_BUILDINGS,
+      ),
+    ).toBe("Mansions");
   });
 });

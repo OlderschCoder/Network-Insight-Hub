@@ -35,6 +35,27 @@ export function normalizeBuildingKey(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+/**
+ * Preserve an exact authoritative display name before applying legacy alias
+ * canonicalization. Lettered dorm/tech buildings are separate map entities
+ * even though older inventory labels may roll up to a campus grouping.
+ */
+export function getAuthoritativeBuildingName(
+  rawBuilding: string,
+  authoritativeBuildings: readonly string[],
+): string {
+  const key = normalizeBuildingKey(rawBuilding);
+  const exact = authoritativeBuildings.find(
+    (name) => normalizeBuildingKey(name) === key,
+  );
+  if (exact) return exact;
+
+  const canonical = getCanonicalBuildingName(rawBuilding);
+  return authoritativeBuildings.find(
+    (name) => normalizeBuildingKey(name) === normalizeBuildingKey(canonical),
+  ) ?? canonical;
+}
+
 export function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
   const original = rawBuilding?.trim();
   if (!original) return "Unknown Building";
