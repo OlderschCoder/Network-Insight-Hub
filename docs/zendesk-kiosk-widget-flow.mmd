@@ -6,5 +6,6 @@ flowchart LR
     WidgetKey -->|"Unset"| Default["Public SCCC widget key"]
     Default --> Snippet
     WidgetKey -->|"Explicitly empty"| Disabled["Widget disabled"]
-    Snippet --> Assets["static.zdassets.com"]
-    Assets --> Support["Zendesk support widget"]
+    Snippet --> Policy["CSP permits zdassets, zendesk, zopim, and Sentry"]
+    Policy --> Assets["Zendesk assets and websocket"]
+    Assets --> Support["Bottom-right Zendesk launcher"]

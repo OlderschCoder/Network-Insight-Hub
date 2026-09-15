@@ -403,6 +403,9 @@ Core configuration includes:
 - Public OnlineKiosk pages load the SCCC Zendesk Web Widget by default. Set
   `ZENDESK_WIDGET_KEY` to override its public widget key or to an empty value to
   disable it. No Zendesk API credential is exposed to the browser.
+  The OnlineKiosk CSP explicitly permits Zendesk/Zopim assets, frames, images,
+  and websocket connections. Verify the rendered **Open messaging window**
+  launcher rather than checking only for the snippet tag.
 - Report feeds: configured Banner/EUP, MFA/TAP, kiosk, and activity-feed paths
 - Assisted identity recovery: `IDENTITY_RECOVERY_BROKER_URL`, shared HMAC key
   file paths on Insights and OnlineKiosk, allowed caller IP, and public kiosk URL

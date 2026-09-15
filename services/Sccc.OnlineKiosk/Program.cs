@@ -37,7 +37,7 @@ app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     context.Response.Headers.ContentSecurityPolicy =
-        "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'";
+        "default-src 'self' https://*.zdassets.com https://*.zendesk.com https://*.zopim.com https://*.ingest.*.sentry.io wss://*.zendesk.com wss://*.zopim.com; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' https://*.zdassets.com https://*.zendesk.com https://*.zopim.com; img-src 'self' data: https://v2assets.zopim.io https://static.zdassets.com https://*.zendesk.com; font-src 'self' data: https://*.zdassets.com; frame-src https://*.zendesk.com https://*.zopim.com; connect-src 'self' https://*.zdassets.com https://*.zendesk.com https://*.zopim.com https://*.ingest.*.sentry.io wss://*.zendesk.com wss://*.zopim.com";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     context.Response.Headers.XContentTypeOptions = "nosniff";
     context.Response.Headers.XFrameOptions = "DENY";
