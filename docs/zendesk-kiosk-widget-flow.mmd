@@ -1,0 +1,10 @@
+flowchart LR
+    Visitor["OnlineKiosk visitor"] --> Kiosk["/online-kiosk and result pages"]
+    Kiosk --> Renderer["Shared server-side Page renderer"]
+    Renderer --> WidgetKey{"ZENDESK_WIDGET_KEY configured?"}
+    WidgetKey -->|"Override"| Snippet["script#ze-snippet"]
+    WidgetKey -->|"Unset"| Default["Public SCCC widget key"]
+    Default --> Snippet
+    WidgetKey -->|"Explicitly empty"| Disabled["Widget disabled"]
+    Snippet --> Assets["static.zdassets.com"]
+    Assets --> Support["Zendesk support widget"]

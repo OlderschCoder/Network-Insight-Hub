@@ -84,12 +84,19 @@ On the OnlineKiosk host:
 ADMIN_RECOVERY_ALLOWED_IP=10.0.0.44
 ADMIN_RECOVERY_HMAC_KEY_PATH=/etc/sccc-identity-recovery.key
 ONLINE_KIOSK_PUBLIC_BASE_URL=https://app-server2.centralus.cloudapp.azure.com
+# Optional override. The public SCCC widget key is used when this is unset.
+ZENDESK_WIDGET_KEY=f7fc8059-ca06-40d4-a674-474e58641188
 ```
 
 Generate one high-entropy key, install the same value on both hosts in the
 listed path, and restrict it to root plus the relevant service group. Never put
 the value in Git, an environment template, shell output, or Fred Memory. Restart
 both services after configuration changes.
+
+OnlineKiosk renders the requester-facing Zendesk Web Widget on every page from
+the shared page renderer, including `/online-kiosk`, validation failures, and
+successful reset instructions. The value is a public embed identifier, not a
+Zendesk API token. See [zendesk-kiosk-widget-flow.mmd](zendesk-kiosk-widget-flow.mmd).
 
 ## Deployment and rollback
 

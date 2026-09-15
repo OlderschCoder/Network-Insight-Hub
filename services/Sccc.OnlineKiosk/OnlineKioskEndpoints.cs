@@ -537,15 +537,24 @@ internal static class OnlineKioskEndpoints
     private static IResult Page(string title, string body, IConfiguration cfg, int status = 200)
     {
         string phone = cfg["SUPPORT_PHONE"] ?? "620-417-1200";
+        string widget = ZendeskWidget(cfg["ZENDESK_WIDGET_KEY"]);
         string html = $"""
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>{H(title)} · SCCC</title><style>{Css}</style></head><body>
         <header><a href="/online-kiosk"><b>SCCC</b><span>OnlineKiosk</span></a><a href="mailto:itech@sccc.edu">itech@sccc.edu</a></header>
         <main>{body}</main>
         <a class="support" href="tel:{H(phone)}">☎ Call IT Support<br><small>{H(phone)}</small></a>
-        <footer>Seward County Community College · SCCC IT</footer></body></html>
+        <footer>Seward County Community College · SCCC IT</footer>{widget}</body></html>
         """;
         return new HtmlPageResult(html, status, noStore: true);
+    }
+
+    internal static string ZendeskWidget(string? configuredKey)
+    {
+        string widgetKey = configuredKey ?? "f7fc8059-ca06-40d4-a674-474e58641188";
+        return string.IsNullOrWhiteSpace(widgetKey)
+            ? ""
+            : $"<script id='ze-snippet' src='https://static.zdassets.com/ekr/snippet.js?key={H(widgetKey)}'></script>";
     }
 
     private const string Css = """
