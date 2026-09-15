@@ -32,6 +32,14 @@ The API reads these dedicated measurements:
 - `fortigate_vpn_tunnel` for Phase 1/Phase 2 identity, Fortinet status, and
   in/out octets.
 
+Interface queries keep each Flux field in its typed result table through CSV
+parsing. Names and descriptions are strings while state and counters are
+numeric; combining them into one Flux table creates a schema collision and
+must be treated as a failed query, never as an empty port map.
+The API does not request the binary SNMP `ifPhysAddress` value because raw
+octets are not safe annotated CSV; a missing MAC address therefore stays
+unknown instead of risking a partially parsed port map.
+
 Tunnel rows use Telegraf's composite SNMP `index` tag as their measured row
 identity. Fortinet's Phase 2 index object is not directly readable and is not
 invented as a separate field.

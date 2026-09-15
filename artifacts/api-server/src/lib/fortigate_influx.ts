@@ -219,7 +219,6 @@ export function buildDeviceInterfacesFlux(
     "ifDescr",
     "ifType",
     "ifMtu",
-    "ifPhysAddress",
     "ifAdminStatus",
     "ifOperStatus",
     "ifHighSpeed",
@@ -233,7 +232,13 @@ export function buildDeviceInterfacesFlux(
     "ifInOctets",
     "ifOutOctets",
   ];
-  return `from(bucket: ${fluxString(bucket)}) |> range(start: -${minutes}m) |> filter(fn: (r) => ${hostFilter(host)}) |> filter(fn: (r) => contains(value: r._measurement, set: ${fluxSet(INTERFACE_MEASUREMENTS)})) |> filter(fn: (r) => contains(value: r._field, set: ${fluxSet(fields)})) |> group(columns: ["_measurement", "ifName", "_field"]) |> last() |> group() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "sysName", "ifName", "ifIndex"])`;
+  // Keep each field in its own Flux table. Interface identity fields are
+  // strings while counters and statuses are numeric; merging them with a
+  // trailing group() causes InfluxDB to reject the result with a schema
+  // collision before the CSV parser can consume it. The SNMP octet-string
+  // ifPhysAddress field is deliberately not queried because some devices emit
+  // raw binary bytes that are not safe annotated CSV; MAC remains unknown.
+  return `from(bucket: ${fluxString(bucket)}) |> range(start: -${minutes}m) |> filter(fn: (r) => ${hostFilter(host)}) |> filter(fn: (r) => contains(value: r._measurement, set: ${fluxSet(INTERFACE_MEASUREMENTS)})) |> filter(fn: (r) => contains(value: r._field, set: ${fluxSet(fields)})) |> group(columns: ["_measurement", "ifName", "_field"]) |> last() |> keep(columns: ["_time", "_measurement", "_field", "_value", "source", "sysName", "ifName", "ifIndex"])`;
 }
 
 export function buildDeviceTunnelsFlux(

@@ -3,7 +3,8 @@ flowchart LR
   G[Stored known-good configuration] --> X
   F[Main and West FortiGate SNMP<br/>health, IF-MIB ports, Phase 2 tunnels] --> N[NOC Telegraf on 10.0.0.22]
   N --> Q[(InfluxDB)]
-  Q --> T[Authenticated device telemetry API]
+  Q --> QT[Keep string and numeric<br/>Flux field tables separate]
+  QT --> T[Authenticated device telemetry API]
   T --> P[Firewall Port Map]
   T --> V2[VPN tunnel status]
   T --> FR[Fred bounded evidence tools]

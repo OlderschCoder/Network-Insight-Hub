@@ -64,6 +64,8 @@ describe("FortiGate Influx telemetry", () => {
 
     expect(interfaces).toContain('"fortigate_interface"');
     expect(interfaces).toContain('r.source == "172.25.0.1"');
+    expect(interfaces).not.toContain("|> last() |> group()");
+    expect(interfaces).not.toContain('"ifPhysAddress"');
     expect(tunnels).toContain('r._measurement == "fortigate_vpn_tunnel"');
     expect(tunnels).toContain('r.source == "192.168.1.1"');
   });
