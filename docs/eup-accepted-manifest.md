@@ -27,7 +27,8 @@ have one fresh verifier result that proves all of the following:
 - `UserNameVerified` and `IdentityLinkVerified` are literal `true`;
 - `ExpectedUserNameSource` is `live_ethos_banner_username`;
 - live `PersonId` equals `ExpectedPersonId` and the accepted monitor person;
-- expected, live-profile, and accepted-monitor EID/UDC identifiers agree; and
+- expected, live-profile, and accepted-monitor EID/UDC identifiers are
+  well-formed GUIDs and agree; and
 - the live verifier row is no more than 15 minutes old.
 
 Names, `EntraUpn`, `CollegeEmail`, directory attributes, and `CanvasLogin` are

@@ -15,7 +15,7 @@ sequenceDiagram
     else Request is authenticated
         A->>M: Read accepted cohort and observations
         A->>B: Read fresh live Banner username and person EID proof
-        A->>A: Join unique Banner ID, username, person, and EID
+        A->>A: Join unique Banner ID, username, person, and GUID-shaped EID
         Note over A: Never derive or truncate BannerUserName<br/>CanvasLogin remains observation or null
         alt Sources stale or no usable authority
             A-->>W: 503 Manifest unavailable

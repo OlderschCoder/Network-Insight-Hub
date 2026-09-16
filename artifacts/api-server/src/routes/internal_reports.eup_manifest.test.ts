@@ -252,6 +252,20 @@ describe("GET /api/internal/eup-accepted-manifest", () => {
     });
   });
 
+  it("fails closed when the claimed EID/UDC is not a GUID", async () => {
+    await writeSources(
+      [monitorStudent({ UdcIdentifier: "not-a-guid" })],
+      [
+        verificationAccount({
+          ExpectedUdcIdentifier: "not-a-guid",
+          ProfileUdcIdentifier: "not-a-guid",
+        }),
+      ],
+    );
+
+    expect((await getManifest()).response.status).toBe(503);
+  });
+
   it("fails closed when a verified Banner username has more than one owner", async () => {
     const secondPersonId = "22222222-3333-4444-8555-666666666666";
     const secondUdcIdentifier = "BBBB2222-CCCC-4DDD-8EEE-FFFFFFFFFFFF";

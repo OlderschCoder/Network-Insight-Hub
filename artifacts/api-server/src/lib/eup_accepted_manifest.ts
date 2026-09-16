@@ -95,7 +95,13 @@ function normalizedPersonId(value: unknown): string | null {
 
 function normalizedUdcIdentifier(value: unknown): string | null {
   const candidate = exactString(value);
-  return candidate ? candidate.toUpperCase() : null;
+  if (!candidate) return null;
+  const normalized = candidate.toUpperCase();
+  return /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(
+    normalized,
+  )
+    ? normalized
+    : null;
 }
 
 function countValues(values: Iterable<string | null>): Map<string, number> {
