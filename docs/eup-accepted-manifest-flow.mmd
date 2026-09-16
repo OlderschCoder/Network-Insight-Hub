@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    participant W as EntraCloudCon 10.0.0.15
+    participant A as Network Insight API 10.0.0.44
+    participant M as Accepted monitor
+    participant B as Banner verifier
+
+    W->>W: Read protected shared key
+    W->>A: GET manifest with request timestamp and HMAC
+    A->>A: Require source IP, Host, no XFF, fresh request HMAC
+    alt Network guard fails
+        A-->>W: 404 Not found
+    else Request authentication fails
+        A-->>W: 401 Invalid authentication
+    else Request is authenticated
+        A->>M: Read accepted cohort and observations
+        A->>B: Read fresh live Banner username and person EID proof
+        A->>A: Join unique Banner ID, username, person, and EID
+        Note over A: Never derive or truncate BannerUserName<br/>CanvasLogin remains observation or null
+        alt Sources stale or no usable authority
+            A-->>W: 503 Manifest unavailable
+        else At least one row is usable
+            A->>A: Serialize exact schema v2 UTF-8 body
+            A->>A: SHA-256 body and HMAC request time plus response time plus hash
+            A-->>W: Raw body plus signed response headers
+            W->>W: Verify freshness, body hash, and HMAC before JSON parsing
+            W->>W: Recheck schema, row freshness, linkage, uniqueness, observations
+        end
+    end

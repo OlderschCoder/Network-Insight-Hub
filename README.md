@@ -161,6 +161,10 @@ as a parallel sign-in path.
 - Provides an internal application directory for shared operational systems.
 - Presents the Banner/Ethos EUP provisioning report, operating procedure, and
   deployment change history produced by the associated provisioning services.
+- Publishes the source-restricted, request-and-response-authenticated
+  [EUP accepted-student manifest](docs/eup-accepted-manifest.md). Its exact
+  verified Banner username is the sole login authority; email, name, Entra,
+  directory, and Canvas values remain observations and cannot supply a fallback.
 - Provides authorized student-access, password-reset, MFA/TAP, and kiosk report
   views when their source feeds are installed.
 - Lets authorized CIO and help-desk staff ask Fred to prepare a ten-minute,
