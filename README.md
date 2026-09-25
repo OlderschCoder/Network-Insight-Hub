@@ -90,6 +90,12 @@ as a parallel sign-in path.
 - Records switch and VLAN changes in an audit trail with actor, timestamp,
   source, action, and field-level before/after values. Authorized updates can be
   rolled back, and the rollback creates another audit record.
+- Keeps the maintained switch inventory and its matching topology node in sync
+  when an authorized person changes a building. Imported telemetry may report a
+  building disagreement, but it cannot relocate an assigned asset.
+- Retires a maintained physical switch through one confirmed, attributed
+  operation that removes its topology projections while preserving detached
+  configuration backups and the deletion audit.
 - Supports maintenance notes and exportable switch/VLAN maintenance history.
 - Provides a **Cisco Webex Phones** workspace for the phone directory, live
   device status, building assignments, and E-911 health; the menu and IT Apps
@@ -291,6 +297,9 @@ The following boundaries are intentional and important:
   bounded, typed tools with known targets and limits.
 - Fred does **not** make an inferred inventory change. A write requires an
   explicit user statement or verified returned evidence and the required role.
+- Timer-driven camera/background analysis is observation-only and receives a
+  fail-closed allow-list of passive evidence tools; it cannot probe, collect,
+  save memory, create work, or change inventory.
 - Fred does **not** automatically modify VM records, firewall policies,
   wireless controllers, telephony systems, physical port configuration, or
   upstream SaaS data when no authorized write tool exists.

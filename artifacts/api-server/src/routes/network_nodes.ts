@@ -1,12 +1,78 @@
 import { Router } from "express";
 import { db, netNodesTable, netLinksTable, vlansTable, networkLayoutPositionsTable, azureVmsTable, networkSwitchesTable } from "@workspace/db";
 import { eq, or, ilike, and, inArray, sql } from "drizzle-orm";
-import { requireAuth } from "./auth";
+import { requireAuth, requireNetworkAdmin } from "./auth";
 import { z } from "zod";
-import { saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
+import {
+  findSwitchByIdentity,
+  saveNetLinkByIdentity,
+  saveNetNodeByIdentity,
+  saveSwitchByIdentity,
+} from "../lib/network_identity";
+import {
+  diffFields,
+  recordInventoryAudit,
+  SWITCH_AUDIT_FIELDS,
+  type InventoryActor,
+} from "../lib/inventory";
 import { pingManyViaNoc } from "../lib/noc_probe";
+import {
+  healthColorFromNetworkStatuses,
+  mergeNetworkStatusObservations,
+  resolveNetworkStatus,
+  resolveNetworkStatusEvidence,
+  statusFromNocProbe,
+  summarizeNetworkStatusEvidence,
+  type NetworkLiveStatus,
+  type NetworkStatusObservation,
+  type ResolvedNetworkStatus,
+} from "../lib/network_status";
+import { hasMaintainedBuildingAssignment } from "../lib/network_building_policy";
 
 const router = Router();
+
+function requestActor(req: any): InventoryActor {
+  return { id: req.user?.id ?? null, name: req.user?.name ?? req.user?.email ?? null };
+}
+
+async function syncMaintainedSwitchFromNode(
+  previousNode: typeof netNodesTable.$inferSelect | null,
+  node: typeof netNodesTable.$inferSelect,
+  req: any,
+): Promise<void> {
+  if (!["switch", "firewall"].includes(node.nodeKind) || !node.mgmtIp) return;
+
+  const before = previousNode
+    ? await findSwitchByIdentity({
+      hostname: previousNode.hostname,
+      ipAddress: previousNode.mgmtIp,
+    })
+    : null;
+  const existing = before ?? await findSwitchByIdentity({
+    hostname: node.hostname,
+    ipAddress: node.mgmtIp,
+  });
+  const result = await saveSwitchByIdentity({
+    hostname: node.hostname,
+    building: getCanonicalBuildingName(node.building),
+    ipAddress: node.mgmtIp,
+    model: node.model,
+    status: node.status,
+    configFile: existing?.configFile,
+    notes: node.notes,
+    location: node.location,
+  }, existing?.id);
+
+  await recordInventoryAudit({
+    entityType: "switch",
+    entityId: result.row.id,
+    entityLabel: result.row.hostname,
+    action: result.action === "created" ? "create" : "update",
+    source: "manual",
+    actor: requestActor(req),
+    changes: diffFields(existing, result.row, SWITCH_AUDIT_FIELDS),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // InfluxDB helpers (stubbed until server is inside the SCCC network)
@@ -18,7 +84,10 @@ const INFLUX_BUCKET = process.env.INFLUXDB_BUCKET ?? "telegraf";
 const BUILDING_OVERLAY_PREFIX = "building-overlay:";
 const BUILDING_MASTER_PREFIX = "building-master:";
 const NOC_REACHABILITY_CACHE_MS = 30_000;
-const nocReachabilityCache = new Map<string, { status: LiveStatus; expiresAt: number }>();
+const nocReachabilityCache = new Map<
+  string,
+  NetworkStatusObservation & { expiresAt: number }
+>();
 const DEFAULT_AUTHORITATIVE_BUILDINGS = [
   "Agriculture",
   "Allied Health",
@@ -50,53 +119,6 @@ const DEFAULT_AUTHORITATIVE_BUILDINGS = [
   "Student Union / Student Activities",
   "West Campus",
 ] as const;
-const BUILDING_MONITOR_IPS: Record<string, string[]> = {
-  Agriculture: ["192.168.2.195"],
-  "Allied Health": ["192.168.2.44", "192.168.2.216"],
-  "Baseball Field": ["192.168.2.27"],
-  Cosmetology: ["192.168.2.171"],
-  "Epworth ALC": ["192.168.2.24"],
-  Hobble: [
-    "10.70.1.1",
-    "10.70.34.1",
-    "10.80.33.1",
-    "192.168.1.1",
-    "192.168.2.1",
-    "192.168.2.70",
-    "192.168.2.71",
-    "192.168.2.197",
-    "192.168.2.199",
-    "192.168.2.201",
-    "192.168.2.202",
-    "192.168.252.173",
-  ],
-  Humanities: ["10.70.89.1"],
-  "Industrial Technology Campus": [
-    "192.168.2.72",
-    "192.168.2.73",
-    "192.168.2.178",
-    "192.168.2.186",
-    "192.168.2.187",
-    "192.168.2.188",
-    "192.168.2.189",
-    "192.168.2.190",
-  ],
-  "Maintenance Building": ["192.168.2.205"],
-  "Sharp Champion Center": ["192.168.2.203"],
-  "Softball Field": ["192.168.2.204"],
-  "Student Health Center": ["192.168.2.212"],
-  "Student Living Center": [
-    "192.168.2.175",
-    "192.168.2.179",
-    "192.168.2.180",
-    "192.168.2.181",
-    "192.168.2.182",
-    "192.168.2.183",
-    "192.168.2.184",
-  ],
-  "Student Union / Student Activities": ["192.168.2.194", "192.168.2.200", "192.168.252.46"],
-  "West Campus": ["172.25.0.2", "172.25.0.3"],
-};
 const CAMPUS_BACKBONE_INTERFACES = [
   { sysName: "sw-aa144-A24.sccc.edu", ifName: "Ethernet1/20" }, // SLC1151
   { sysName: "sw-aa144-A24.sccc.edu", ifName: "Ethernet1/22" }, // COS109
@@ -128,17 +150,11 @@ const FORTIGATE_WAN_SYSNAMES = [
 ] as const;
 const FORTIGATE_WAN_IF_NAMES = ["port25", "port9"] as const;
 
-type LiveStatus = "up" | "degraded" | "down" | "unknown";
+type LiveStatus = NetworkLiveStatus;
 
-function mergeObservedStatuses(...values: Array<LiveStatus | undefined>): LiveStatus {
-  const observed = values.filter((value): value is LiveStatus => !!value && value !== "unknown");
-  if (observed.includes("up")) return "up";
-  if (observed.includes("degraded")) return "degraded";
-  if (observed.includes("down")) return "down";
-  return "unknown";
-}
-
-async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveStatus>> {
+async function getNocDeviceStatus(
+  hosts: string[],
+): Promise<Record<string, NetworkStatusObservation>> {
   const requested = Array.from(new Set(hosts.filter(isMonitorableHost).map(normalizeTelemetryKey)));
   if (requested.length === 0) return {};
 
@@ -153,12 +169,15 @@ async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveS
         missing.map((target) => ({ target })),
         { count: 1, timeoutMs: 30_000 },
       );
+      const observedAt = new Date().toISOString();
       const expiresAt = Date.now() + NOC_REACHABILITY_CACHE_MS;
       for (const observation of response.results ?? []) {
         nocReachabilityCache.set(normalizeTelemetryKey(observation.target), {
-          // A completed negative ping is down evidence. A probe execution
-          // error is not; leave it unknown so another source can decide.
-          status: observation.error ? "unknown" : observation.reachable ? "up" : "down",
+          // A positive answer proves reachability. A negative result from this
+          // one monitoring vantage can also mean routing, ACL, or probe-path
+          // failure, so leave it unknown for other evidence to resolve.
+          status: statusFromNocProbe(observation.reachable, observation.error),
+          lastObservedAt: observation.reachable ? observedAt : null,
           expiresAt,
         });
       }
@@ -169,7 +188,12 @@ async function getNocDeviceStatus(hosts: string[]): Promise<Record<string, LiveS
   }
 
   return Object.fromEntries(
-    requested.map((host) => [host, nocReachabilityCache.get(host)?.status ?? "unknown"]),
+    requested.map((host) => {
+      const cached = nocReachabilityCache.get(host);
+      return [host, cached
+        ? { status: cached.status, lastObservedAt: cached.lastObservedAt }
+        : { status: "unknown" as const, lastObservedAt: null }];
+    }),
   );
 }
 
@@ -267,34 +291,42 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
     "student union": "Student Union / Student Activities",
     "student union gym 208 sugymcam": "Student Union / Student Activities",
     "student living center slc151": "Student Living Center",
+    "student living f": "Student Living F",
+    "student living g": "Student Living G",
+    "student living h": "Student Living H",
+    "student living j": "Student Living J",
+    "student living r": "Student Living R",
+    "student living s": "Student Living S",
+    "student living t": "Student Living T",
     "student life ab": "Student Living Center",
     "student life de": "Student Living Center",
     "swa slab": "Student Living Center",
     "swa slcde": "Student Living Center",
-    "student living slg": "Student Living Center",
-    "student living slh": "Student Living Center",
-    "student living slj": "Student Living Center",
-    "student living slr": "Student Living Center",
-    "student living sls": "Student Living Center",
-    "student living slt": "Student Living Center",
-    "tech ta107": "Industrial Technology Campus",
-    "tech tt103": "Industrial Technology Campus",
-    "tech t122 mgmt": "Industrial Technology Campus",
-    "tech t122 svi": "Industrial Technology Campus",
-    "tech b141": "Industrial Technology Campus",
-    "tech d201": "Industrial Technology Campus",
+    "student living slg": "Student Living G",
+    "student living slh": "Student Living H",
+    "student living slj": "Student Living J",
+    "student living slr": "Student Living R",
+    "student living sls": "Student Living S",
+    "student living slt": "Student Living T",
+    "tech ta107": "Tech Building A",
+    "tech tt103": "Tech Building T",
+    "tech t122 mgmt": "Tech Building T",
+    "tech t122 svi": "Tech Building T",
+    "tech b141": "Tech Building B",
+    "tech d201": "Tech Building D",
     "tech core 3": "Industrial Technology Campus",
     "tech core 4": "Industrial Technology Campus",
     "tech building": "Industrial Technology Campus",
-    "tech building b": "Industrial Technology Campus",
-    "tech building d": "Industrial Technology Campus",
-    "tech building f": "Industrial Technology Campus",
-    "tech building t": "Industrial Technology Campus",
+    "tech building a": "Tech Building A",
+    "tech building b": "Tech Building B",
+    "tech building d": "Tech Building D",
+    "tech building f": "Student Living F",
+    "tech building t": "Tech Building T",
     "technology": "Industrial Technology Campus",
-    "technology a": "Industrial Technology Campus",
-    "technology b": "Industrial Technology Campus",
-    "technology d": "Industrial Technology Campus",
-    "technology t": "Industrial Technology Campus",
+    "technology a": "Tech Building A",
+    "technology b": "Tech Building B",
+    "technology d": "Tech Building D",
+    "technology t": "Tech Building T",
     "west campus": "West Campus",
   };
   if (exactMatches[key]) return exactMatches[key];
@@ -347,9 +379,9 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
   return original;
 }
 
-function getBuildingMonitorHosts(buildingName: string, fallbackHosts: string[]): string[] {
-  const monitors = BUILDING_MONITOR_IPS[buildingName];
-  if (monitors?.length) return monitors;
+function getBuildingMonitorHosts(_buildingName: string, fallbackHosts: string[]): string[] {
+  // Building assignments belong to maintained inventory. Hard-coded targets
+  // had drifted and made summary and detail views evaluate different devices.
   return Array.from(new Set(fallbackHosts.filter(Boolean)));
 }
 
@@ -362,7 +394,7 @@ function mapAzureVmStatus(status: string | null | undefined): LiveStatus {
   return "unknown";
 }
 
-async function getAzureHybridVmStatus(): Promise<LiveStatus> {
+async function getAzureHybridVmEvidence(): Promise<NetworkStatusObservation> {
   const rows = await db
     .select({
       status: azureVmsTable.status,
@@ -372,7 +404,7 @@ async function getAzureHybridVmStatus(): Promise<LiveStatus> {
     .from(azureVmsTable)
     .where(ilike(azureVmsTable.name, "mfs0"));
 
-  if (rows.length === 0) return "unknown";
+  if (rows.length === 0) return { status: "unknown", lastObservedAt: null };
 
   const preferred = [...rows].sort((a, b) => {
     const sourceDiff = Number(b.source === "azure") - Number(a.source === "azure");
@@ -380,19 +412,17 @@ async function getAzureHybridVmStatus(): Promise<LiveStatus> {
     return (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0);
   })[0];
 
-  return mapAzureVmStatus(preferred.status);
+  return {
+    status: mapAzureVmStatus(preferred.status),
+    lastObservedAt: preferred.updatedAt?.toISOString() ?? null,
+  };
 }
 
-function healthColorFromStatuses(
-  statuses: LiveStatus[],
-): "green" | "amber" | "red" | "unknown" {
-  if (statuses.length === 0) return "unknown";
-  if (statuses.every((status) => status === "up")) return "green";
-  if (statuses.every((status) => status === "down")) return "red";
-  if (statuses.includes("up") || statuses.includes("degraded")) return "amber";
-  if (statuses.includes("down")) return "red";
-  return "unknown";
+async function getAzureHybridVmStatus(): Promise<LiveStatus> {
+  return (await getAzureHybridVmEvidence()).status;
 }
+
+const healthColorFromStatuses = healthColorFromNetworkStatuses;
 
 type BuildingCategory = "campus-building" | "remote-site" | "cloud" | "connectivity";
 type MonitoringStrategy = "switch-probe" | "control-plane" | "none";
@@ -475,6 +505,13 @@ async function listAuthoritativeBuildings(): Promise<string[]> {
 }
 
 function getAssignedBuildingName(building: string | null | undefined, location?: string | null, hostname?: string | null): string {
+  // A maintained building assignment is authoritative. Hostname/location
+  // heuristics are only a discovery fallback for unassigned legacy records;
+  // they must never relocate an already assigned asset.
+  if (hasMaintainedBuildingAssignment(building)) {
+    return getCanonicalBuildingName(building);
+  }
+
   const hint = normalizeBuildingKey(`${location ?? ""} ${hostname ?? ""}`);
   if (/\btech core\b/.test(hint)) return "Industrial Technology Campus";
   const lettered: Array<[RegExp, string]> = [
@@ -513,7 +550,7 @@ async function getBuildingMapLayoutPositions() {
 }
 
 export async function getBuildingSummaries() {
-  const [nodeRows, switchRows, vlanRows, azureHybridStatus] = await Promise.all([
+  const [nodeRows, switchRows, vlanRows, azureHybridEvidence] = await Promise.all([
     db.select({
       building: netNodesTable.building,
       mgmtIp: netNodesTable.mgmtIp,
@@ -527,12 +564,13 @@ export async function getBuildingSummaries() {
       mgmtIp: networkSwitchesTable.ipAddress,
       hostname: networkSwitchesTable.hostname,
       status: networkSwitchesTable.status,
+      lastSeen: networkSwitchesTable.lastSeen,
       location: networkSwitchesTable.location,
     }).from(networkSwitchesTable),
     db.select({ building: vlansTable.building }).from(vlansTable),
-    getAzureHybridVmStatus(),
+    getAzureHybridVmEvidence(),
   ]);
-  const liveStatuses = await getDeviceStatus(
+  const liveStatusEvidence = await getDeviceStatusEvidence(
     switchRows
       .map((row) => row.mgmtIp)
       .filter(isMonitorableHost),
@@ -544,7 +582,7 @@ export async function getBuildingSummaries() {
   const deviceMap: Record<string, number> = {};
   const connectivityObjectMap: Record<string, number> = {};
   const vlanMap: Record<string, number> = {};
-  const buildingStatuses: Record<string, LiveStatus[]> = {};
+  const buildingStatusEvidence: Record<string, ResolvedNetworkStatus[]> = {};
 
   for (const node of nodeRows) {
     const canonical = getAssignedBuildingName(node.building, node.location, node.hostname);
@@ -565,14 +603,16 @@ export async function getBuildingSummaries() {
   for (const node of switchRows) {
     const canonical = getAssignedBuildingName(node.building, node.location, node.hostname);
     if (!authoritativeBuildingSet.has(canonical)) continue;
-    if (!buildingStatuses[canonical]) buildingStatuses[canonical] = [];
-    const liveStatus = node.mgmtIp
-      ? liveStatuses[normalizeTelemetryKey(node.mgmtIp)]
+    if (!buildingStatusEvidence[canonical]) buildingStatusEvidence[canonical] = [];
+    const observed = node.mgmtIp
+      ? liveStatusEvidence[normalizeTelemetryKey(node.mgmtIp)]
       : undefined;
-    buildingStatuses[canonical].push(
-      liveStatus
-        ?? (node.status === "online" ? "up" : node.status === "offline" ? "down" : "unknown"),
-    );
+    buildingStatusEvidence[canonical].push(resolveNetworkStatusEvidence(
+      observed?.status,
+      observed?.lastObservedAt,
+      node.status,
+      node.lastSeen,
+    ));
   }
 
   for (const vlan of vlanRows) {
@@ -583,10 +623,17 @@ export async function getBuildingSummaries() {
 
   return authoritativeBuildings.map((name) => {
     const classification = getBuildingClassification(name);
-    const statuses = name === "Azure (Hybrid-VNet)"
-      ? [azureHybridStatus]
-      : (buildingStatuses[name] ?? []);
+    const evidence = name === "Azure (Hybrid-VNet)"
+      ? [resolveNetworkStatusEvidence(
+        undefined,
+        null,
+        azureHybridEvidence.status,
+        azureHybridEvidence.lastObservedAt,
+      )]
+      : (buildingStatusEvidence[name] ?? []);
+    const statuses = evidence.map((item) => item.status);
     const healthColor = healthColorFromStatuses(statuses);
+    const evidenceSummary = summarizeNetworkStatusEvidence(evidence);
 
     return {
       name,
@@ -595,6 +642,7 @@ export async function getBuildingSummaries() {
       connectivityObjectCount: connectivityObjectMap[name] ?? 0,
       vlanCount: vlanMap[name] ?? 0,
       healthColor,
+      ...evidenceSummary,
       influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
       category: classification.category,
       monitoringStrategy: classification.monitoringStrategy,
@@ -602,15 +650,33 @@ export async function getBuildingSummaries() {
   });
 }
 
-/** Returns only observed device status; missing telemetry remains unknown. */
-async function getDeviceStatus(hosts: string[]): Promise<Record<string, LiveStatus>> {
+/** Returns observed status with its collection time; missing telemetry remains unknown. */
+async function getDeviceStatusEvidence(
+  hosts: string[],
+): Promise<Record<string, NetworkStatusObservation>> {
   const [heartbeat, nocStatus] = await Promise.all([
     getDeviceHeartbeat(hosts),
     getNocDeviceStatus(hosts),
   ]);
   const requested = Array.from(new Set(hosts.filter(isMonitorableHost).map(normalizeTelemetryKey)));
   return Object.fromEntries(
-    requested.map((host) => [host, mergeObservedStatuses(heartbeat[host]?.status, nocStatus[host])]),
+    requested.map((host) => [host, mergeNetworkStatusObservations(
+      heartbeat[host]
+        ? {
+          status: heartbeat[host].status,
+          lastObservedAt: heartbeat[host].lastSeen,
+        }
+        : undefined,
+      nocStatus[host],
+    )]),
+  );
+}
+
+/** Compatibility view for callers that only need the resolved observation. */
+async function getDeviceStatus(hosts: string[]): Promise<Record<string, LiveStatus>> {
+  const evidence = await getDeviceStatusEvidence(hosts);
+  return Object.fromEntries(
+    Object.entries(evidence).map(([host, observation]) => [host, observation.status]),
   );
 }
 
@@ -816,11 +882,10 @@ export async function getMonitoringSnapshot(publicMode = false) {
   const heartbeatHosts = nodes
     .map((node) => node.mgmtIp)
     .filter(isMonitorableHost);
-  const [influxReachable, trend, heartbeat, combinedStatuses] = await Promise.all([
+  const [influxReachable, trend, combinedEvidence] = await Promise.all([
     isInfluxReachable(),
     getPingTrend(6),
-    getDeviceHeartbeat(heartbeatHosts),
-    getDeviceStatus(heartbeatHosts),
+    getDeviceStatusEvidence(heartbeatHosts),
   ]);
 
   const [campusBackboneLoadBps, firewallThroughput] = await Promise.all([
@@ -830,23 +895,22 @@ export async function getMonitoringSnapshot(publicMode = false) {
 
   const nodesWithStatus = nodes.map((node) => {
     const inventoryClass = "building-device";
-    const live = node.mgmtIp
-      ? heartbeat[normalizeTelemetryKey(node.mgmtIp)]
+    const observed = node.mgmtIp
+      ? combinedEvidence[normalizeTelemetryKey(node.mgmtIp)]
       : undefined;
-    const combinedStatus = node.mgmtIp
-      ? combinedStatuses[normalizeTelemetryKey(node.mgmtIp)]
-      : undefined;
+    const resolved = resolveNetworkStatusEvidence(
+      observed?.status,
+      observed?.lastObservedAt,
+      node.status,
+      node.lastSeen,
+    );
     return {
       ...node,
-      canonicalBuilding: getCanonicalBuildingName(node.building),
+      canonicalBuilding: getAssignedBuildingName(node.building, node.location, node.hostname),
       inventoryClass,
-      liveStatus: combinedStatus
-        ?? (node.status === "online"
-          ? "up" as LiveStatus
-          : node.status === "offline"
-            ? "down" as LiveStatus
-            : "unknown" as LiveStatus),
-      lastSeen: live?.lastSeen ?? node.lastSeen?.toISOString() ?? null,
+      liveStatus: resolved.status,
+      statusSource: resolved.source,
+      lastSeen: resolved.lastObservedAt,
     };
   });
 
@@ -862,13 +926,22 @@ export async function getMonitoringSnapshot(publicMode = false) {
           .filter((node) => node.canonicalBuilding === name)
           .map((node) => node.mgmtIp)
           .filter(isMonitorableHost),
-      ).map((host) => heartbeat[normalizeTelemetryKey(host)]?.status ?? "unknown");
+      ).map((host) => combinedEvidence[normalizeTelemetryKey(host)]?.status ?? "unknown");
+
+    const evidence = nodesWithStatus
+      .filter((node) => node.canonicalBuilding === name)
+      .map((node) => ({
+        status: node.liveStatus,
+        source: node.statusSource,
+        lastObservedAt: node.lastSeen,
+      }));
 
     return {
       name,
       nodeCount,
       vlanCount,
       healthColor: healthColorFromStatuses(statuses),
+      ...summarizeNetworkStatusEvidence(evidence),
       category: classification.category,
       monitoringStrategy: classification.monitoringStrategy,
     };
@@ -963,6 +1036,10 @@ export async function getMonitoringSnapshot(publicMode = false) {
       nodeCount: building.nodeCount,
       vlanCount: building.vlanCount,
       healthColor: building.healthColor,
+      observedCount: building.observedCount,
+      fallbackCount: building.fallbackCount,
+      unknownCount: building.unknownCount,
+      lastObservedAt: building.lastObservedAt,
       category: building.category,
       monitoringStrategy: building.monitoringStrategy,
     })),
@@ -1017,10 +1094,11 @@ router.get("/nodes", requireAuth, async (req: any, res) => {
 });
 
 /** POST /network/nodes – create a node */
-router.post("/nodes", requireAuth, async (req: any, res) => {
+router.post("/nodes", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = nodeInsertSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
   const result = await saveNetNodeByIdentity(parsed.data);
+  await syncMaintainedSwitchFromNode(null, result.row, req);
   return res.status(result.action === "created" ? 201 : 200).json(result.row);
 });
 
@@ -1066,18 +1144,23 @@ router.get("/nodes/:id", requireAuth, async (req, res) => {
   // Live status from InfluxDB (best-effort)
   let liveStatus: "up" | "degraded" | "down" | "unknown" = "unknown";
   if (node.mgmtIp) {
-    const statuses = await getDeviceStatus([node.mgmtIp, node.hostname]);
-    liveStatus =
+    const [statuses, inventory] = await Promise.all([
+      getDeviceStatus([node.mgmtIp, node.hostname]),
+      findSwitchByIdentity({ hostname: node.hostname, ipAddress: node.mgmtIp }),
+    ]);
+    liveStatus = resolveNetworkStatus(
       statuses[normalizeTelemetryKey(node.mgmtIp ?? "")] ??
-      statuses[normalizeTelemetryKey(node.hostname)] ??
-      "unknown";
+        statuses[normalizeTelemetryKey(node.hostname)],
+      inventory?.status ?? node.status,
+      inventory?.lastSeen,
+    );
   }
 
   return res.json({ ...node, links: enrichedLinks, liveStatus });
 });
 
 /** PATCH /network/nodes/:id – update node fields */
-router.patch("/nodes/:id", requireAuth, async (req: any, res) => {
+router.patch("/nodes/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const { id } = req.params;
   const parsed = nodePatchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1099,12 +1182,24 @@ router.patch("/nodes/:id", requireAuth, async (req: any, res) => {
     status: parsed.data.status ?? existing.status,
     notes: parsed.data.notes ?? existing.notes,
   }, id);
+  await syncMaintainedSwitchFromNode(existing, result.row, req);
   return res.json(result.row);
 });
 
 /** DELETE /network/nodes/:id */
-router.delete("/nodes/:id", requireAuth, async (req, res) => {
+router.delete("/nodes/:id", requireAuth, requireNetworkAdmin, async (req, res) => {
   const { id } = req.params;
+  const [node] = await db.select().from(netNodesTable).where(eq(netNodesTable.id, id));
+  if (!node) return res.status(404).json({ error: "Not found" });
+  const inventory = ["switch", "firewall"].includes(node.nodeKind)
+    ? await findSwitchByIdentity({ hostname: node.hostname, ipAddress: node.mgmtIp })
+    : null;
+  if (inventory) {
+    return res.status(409).json({
+      error: "This is a maintained physical asset. Retire or remove its switch inventory record before deleting its topology node.",
+      switchId: inventory.id,
+    });
+  }
   await db.delete(netNodesTable).where(eq(netNodesTable.id, id));
   return res.json({ ok: true });
 });
@@ -1135,7 +1230,7 @@ const linkInsertSchema = z.object({
 const linkPatchSchema = linkInsertSchema.partial().omit({ aNodeId: true, bNodeId: true });
 
 /** POST /network/nodes/:id/links – add a link from this node */
-router.post("/nodes/:id/links", requireAuth, async (req: any, res) => {
+router.post("/nodes/:id/links", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const { id } = req.params;
   const parsed = linkInsertSchema.safeParse({ ...req.body, aNodeId: req.body.aNodeId ?? id });
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1144,7 +1239,7 @@ router.post("/nodes/:id/links", requireAuth, async (req: any, res) => {
 });
 
 /** PATCH /network/links/:id – update a link */
-router.patch("/links/:id", requireAuth, async (req: any, res) => {
+router.patch("/links/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const { id } = req.params;
   const parsed = linkPatchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1172,7 +1267,7 @@ router.patch("/links/:id", requireAuth, async (req: any, res) => {
 });
 
 /** DELETE /network/links/:id */
-router.delete("/links/:id", requireAuth, async (req, res) => {
+router.delete("/links/:id", requireAuth, requireNetworkAdmin, async (req, res) => {
   const { id } = req.params;
   await db.delete(netLinksTable).where(eq(netLinksTable.id, id));
   return res.json({ ok: true });
@@ -1209,7 +1304,7 @@ router.get("/buildings/map-layout", requireAuth, async (_req, res) => {
   return res.json(await getBuildingMapLayoutPositions());
 });
 
-router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
+router.put("/buildings/map-layout", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = buildingOverlayPutSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1245,7 +1340,7 @@ router.put("/buildings/map-layout", requireAuth, async (req: any, res) => {
   return res.json({ saved: values.length });
 });
 
-router.delete("/buildings/map-layout", requireAuth, async (req, res) => {
+router.delete("/buildings/map-layout", requireAuth, requireNetworkAdmin, async (req, res) => {
   const parsed = z.object({
     codes: z.array(z.string().trim().min(1).max(20)).optional(),
   }).safeParse(req.body ?? {});
@@ -1272,7 +1367,7 @@ router.delete("/buildings/map-layout", requireAuth, async (req, res) => {
   return res.json({ ok: true, removed: ids.length });
 });
 
-router.post("/buildings", requireAuth, async (req: any, res) => {
+router.post("/buildings", requireAuth, requireNetworkAdmin, async (req: any, res) => {
   const parsed = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
@@ -1302,17 +1397,26 @@ router.get("/buildings", requireAuth, async (_req, res) => {
 });
 
 /** PATCH /network/buildings/:name – authoritative rename across devices and VLANs */
-router.patch("/buildings/:name", requireAuth, async (req, res) => {
+router.patch("/buildings/:name", requireAuth, requireNetworkAdmin, async (req, res) => {
   const currentName = decodeURIComponent(req.params.name).trim();
   const parsed = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
   const newName = parsed.data.name;
   const currentExplicitId = explicitBuildingNodeId(currentName);
   const newExplicitId = explicitBuildingNodeId(newName);
+  const switchesBefore = await db
+    .select()
+    .from(networkSwitchesTable)
+    .where(ilike(networkSwitchesTable.building, currentName));
 
-  await db.transaction(async (tx) => {
+  const switchesAfter = await db.transaction(async (tx) => {
     await tx.update(netNodesTable).set({ building: newName, updatedAt: new Date() }).where(ilike(netNodesTable.building, currentName));
-    await tx.update(vlansTable).set({ building: newName, updatedAt: new Date() }).where(ilike(vlansTable.building, currentName));
+    const renamedSwitches = await tx
+      .update(networkSwitchesTable)
+      .set({ building: newName, updatedAt: new Date() })
+      .where(ilike(networkSwitchesTable.building, currentName))
+      .returning();
+    await tx.update(vlansTable).set({ building: newName }).where(ilike(vlansTable.building, currentName));
     const [existingExplicit] = await tx
       .select()
       .from(networkLayoutPositionsTable)
@@ -1329,12 +1433,26 @@ router.patch("/buildings/:name", requireAuth, async (req, res) => {
         .onConflictDoNothing();
       await tx.delete(networkLayoutPositionsTable).where(eq(networkLayoutPositionsTable.nodeId, currentExplicitId));
     }
+    return renamedSwitches;
   });
+
+  for (const renamed of switchesAfter) {
+    const before = switchesBefore.find((candidate) => candidate.id === renamed.id) ?? null;
+    await recordInventoryAudit({
+      entityType: "switch",
+      entityId: renamed.id,
+      entityLabel: renamed.hostname,
+      action: "update",
+      source: "manual",
+      actor: requestActor(req),
+      changes: diffFields(before, renamed, SWITCH_AUDIT_FIELDS),
+    });
+  }
 
   return res.json({ oldName: currentName, name: newName });
 });
 
-router.delete("/buildings/:name", requireAuth, async (req, res) => {
+router.delete("/buildings/:name", requireAuth, requireNetworkAdmin, async (req, res) => {
   const rawName = decodeURIComponent(req.params.name).trim();
   const canonicalName = getCanonicalBuildingName(rawName);
   const [allNodes, allVlans] = await Promise.all([
@@ -1362,9 +1480,10 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   const authoritativeBuildings = await listAuthoritativeBuildings();
   const canonicalName = authoritativeBuildings.includes(name) ? name : getCanonicalBuildingName(name);
 
-  const [allNodes, allVlans, azureHybridStatus] = await Promise.all([
+  const [allNodes, allVlans, allSwitches, azureHybridStatus] = await Promise.all([
     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
     db.select().from(vlansTable).orderBy(vlansTable.building, vlansTable.vlanId),
+    db.select().from(networkSwitchesTable),
     getAzureHybridVmStatus(),
   ]);
 
@@ -1388,21 +1507,47 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     nodes.map((n) => n.mgmtIp).filter(isMonitorableHost),
   );
   const classification = getBuildingClassification(canonicalName);
-  const liveStatuses = hosts.length ? await getDeviceStatus(hosts) : {};
+  const liveStatusEvidence = hosts.length ? await getDeviceStatusEvidence(hosts) : {};
   const monitoredHosts = new Set(hosts.map(normalizeTelemetryKey));
 
-  const nodesWithStatus = nodes.map((n) => ({
-    ...n,
-    inventoryClass: isConnectivityObjectNode(n, canonicalName) ? "connectivity-object" : "building-device",
-    liveStatus: isMonitorableHost(n.mgmtIp) && monitoredHosts.has(normalizeTelemetryKey(n.mgmtIp))
-      ? (liveStatuses[normalizeTelemetryKey(n.mgmtIp)] ?? "unknown")
-      : "unknown",
-  }));
+  const nodesWithStatus = nodes.map((n) => {
+    const inventory = allSwitches.find((candidate) =>
+      (n.mgmtIp && candidate.ipAddress === n.mgmtIp) ||
+      normalizeTelemetryKey(candidate.hostname) === normalizeTelemetryKey(n.hostname),
+    );
+    const observed = isMonitorableHost(n.mgmtIp) && monitoredHosts.has(normalizeTelemetryKey(n.mgmtIp))
+      ? liveStatusEvidence[normalizeTelemetryKey(n.mgmtIp)]
+      : undefined;
+    const resolved = resolveNetworkStatusEvidence(
+      observed?.status,
+      observed?.lastObservedAt,
+      inventory?.status ?? n.status,
+      inventory?.lastSeen,
+    );
+    return {
+      ...n,
+      inventoryClass: isConnectivityObjectNode(n, canonicalName) ? "connectivity-object" : "building-device",
+      liveStatus: resolved.status,
+      statusSource: resolved.source,
+      lastObservedAt: resolved.lastObservedAt,
+    };
+  });
 
   const statuses = canonicalName === "Azure (Hybrid-VNet)"
     ? [azureHybridStatus]
-    : hosts.map((host) => liveStatuses[normalizeTelemetryKey(host)] ?? "unknown");
+    : nodesWithStatus
+      .filter((node) => node.inventoryClass !== "connectivity-object")
+      .map((node) => node.liveStatus);
   const healthColor = healthColorFromStatuses(statuses);
+  const evidenceSummary = summarizeNetworkStatusEvidence(
+    nodesWithStatus
+      .filter((node) => node.inventoryClass !== "connectivity-object")
+      .map((node) => ({
+        status: node.liveStatus,
+        source: node.statusSource,
+        lastObservedAt: node.lastObservedAt,
+      })),
+  );
 
   return res.json({
     name: canonicalName,
@@ -1411,6 +1556,7 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     vlans,
     links,
     healthColor,
+    ...evidenceSummary,
     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
     category: classification.category,
     monitoringStrategy: classification.monitoringStrategy,

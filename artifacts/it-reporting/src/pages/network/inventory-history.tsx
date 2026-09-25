@@ -18,7 +18,7 @@ interface InventoryAuditRow {
   entityType: "switch" | "vlan";
   entityId: number;
   entityLabel: string;
-  action: "create" | "update" | "rollback";
+  action: "create" | "update" | "delete" | "rollback";
   source: "manual" | "chat_ai";
   actorId: number | null;
   actorName: string | null;
@@ -118,7 +118,7 @@ export function InventoryHistory() {
   return (
     <div className="space-y-2">
       {rows.map((row) => {
-        const canRollback = row.action !== "create" && row.changes.length > 0;
+        const canRollback = (row.action === "update" || row.action === "rollback") && row.changes.length > 0;
         return (
           <Card key={row.id}>
             <CardContent className="py-3 px-4 space-y-2">

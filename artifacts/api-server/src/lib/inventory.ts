@@ -463,8 +463,14 @@ export async function rollbackInventoryChange(
     .where(eq(inventoryAuditTable.id, auditId));
   if (!entry) return { ok: false, error: "Audit entry not found.", status: 404 };
 
-  if (entry.action === "create") {
-    return { ok: false, error: "A record creation cannot be rolled back — delete the record instead.", status: 400 };
+  if (entry.action === "create" || entry.action === "delete") {
+    return {
+      ok: false,
+      error: entry.action === "delete"
+        ? "A deleted asset cannot be reconstructed from an inventory audit entry. Restore it from an approved inventory source."
+        : "A record creation cannot be rolled back — delete the record instead.",
+      status: 400,
+    };
   }
   const changes = Array.isArray(entry.changes) ? entry.changes : [];
   if (changes.length === 0) {

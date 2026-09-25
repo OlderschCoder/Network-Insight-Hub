@@ -29,7 +29,11 @@ interface BuildingSummary {
   nodeCount: number;
   vlanCount: number;
   healthColor: "green" | "amber" | "red" | "unknown";
-  influxConfigured: boolean;
+  influxConfigured?: boolean;
+  observedCount?: number;
+  fallbackCount?: number;
+  unknownCount?: number;
+  lastObservedAt?: string | null;
 }
 
 interface NetNodeSummary {
@@ -45,6 +49,8 @@ interface NetNodeSummary {
   criticality: string | null;
   status: string | null;
   liveStatus: "up" | "degraded" | "down" | "unknown";
+  statusSource?: "observed" | "fallback" | "unknown";
+  lastObservedAt?: string | null;
 }
 
 interface VlanSummary {
@@ -64,6 +70,10 @@ interface BuildingDetail {
   links: any[];
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  observedCount?: number;
+  fallbackCount?: number;
+  unknownCount?: number;
+  lastObservedAt?: string | null;
 }
 
 interface OverlayPosition {
@@ -141,31 +151,54 @@ const healthStyles: Record<string, { bg: string; border: string; ring: string; l
     bg: "bg-green-50 hover:bg-green-100",
     border: "border-green-400",
     ring: "ring-green-300",
-    label: "All systems up",
+    label: "All observed devices up",
     icon: <Wifi className="h-5 w-5 text-green-600" />,
   },
   amber: {
     bg: "bg-amber-50 hover:bg-amber-100",
     border: "border-amber-400",
     ring: "ring-amber-300",
-    label: "Degraded",
+    label: "Observed degradation",
     icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
   },
   red: {
     bg: "bg-red-50 hover:bg-red-100",
     border: "border-red-400",
     ring: "ring-red-300",
-    label: "One or more devices down",
+    label: "Observed device down",
     icon: <WifiOff className="h-5 w-5 text-red-600" />,
   },
   unknown: {
     bg: "bg-gray-50 hover:bg-gray-100",
     border: "border-gray-300",
     ring: "ring-gray-200",
-    label: "Status unknown",
+    label: "No current observation",
     icon: <Activity className="h-5 w-5 text-gray-400" />,
   },
 };
+
+function formatObservationTime(value?: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function buildingEvidenceLabel(building?: Partial<BuildingSummary> | null): string {
+  if (!building) return "No device observation";
+  const parts: string[] = [];
+  const observedAt = formatObservationTime(building.lastObservedAt);
+  if (observedAt) parts.push(`Last observed ${observedAt}`);
+  if ((building.observedCount ?? 0) > 0) parts.push(`${building.observedCount} recent`);
+  if ((building.fallbackCount ?? 0) > 0) parts.push(`${building.fallbackCount} snapshot`);
+  if ((building.unknownCount ?? 0) > 0) parts.push(`${building.unknownCount} unobserved`);
+  return parts.join(" · ") || "No device observation";
+}
 
 type CampusOverlay = {
   code: string;
@@ -559,6 +592,10 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             x: overlay.x,
             y: overlay.y,
             healthColor: match?.healthColor ?? "unknown",
+            currentObservation:
+              (match?.observedCount ?? 0) > 0 &&
+              (match?.fallbackCount ?? 0) === 0 &&
+              (match?.unknownCount ?? 0) === 0,
           };
         }),
     [buildingByCode, visibleOverlays],
@@ -571,7 +608,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           <div>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Building2 className="h-5 w-5 text-primary" />
-              Live Campus Status Map
+              Campus Status Map
             </CardTitle>
           </div>
           {canEditMap && (
@@ -597,7 +634,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Building codes are matched to the campus map and colored by current building health.
+          Building colors summarize the latest available observations; timestamps and coverage distinguish recent checks from saved snapshots.
         </p>
         {editMode && (
           <p className="text-xs text-muted-foreground">
@@ -607,10 +644,10 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All mapped devices up</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more mapped devices degraded</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more mapped devices down</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live building match yet</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All observed devices up</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Observed degradation</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Observed device down</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No current observation</div>
         </div>
 
         <div ref={mapRef} className="relative overflow-hidden rounded-2xl border bg-[#dfe8d8]">
@@ -625,7 +662,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           `}</style>
           <img
             src={`${import.meta.env.BASE_URL}network/campus-map.png`}
-            alt="SCCC campus map with live building status overlays"
+            alt="SCCC campus map with timestamped building status overlays"
             className="block w-full"
             draggable={false}
           />
@@ -644,14 +681,17 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
               stroke="#22c55e"
               strokeWidth="0.44"
               strokeLinecap="round"
-              strokeDasharray="1.2 0.8"
-              className="campus-fiber-live"
+              strokeOpacity="0.85"
             />
             {(() => {
               const westCampus = overlays.find((overlay) => overlay.code === "WEST");
-              const westHealth = buildingByCode.get("WEST")?.healthColor ?? "unknown";
+              const westEvidence = buildingByCode.get("WEST");
+              const westHealth = westEvidence?.healthColor ?? "unknown";
               const westColor = lineColorForHealth(westHealth);
-              const westLive = westHealth === "green";
+              const westLive = westHealth === "green" &&
+                (westEvidence?.observedCount ?? 0) > 0 &&
+                (westEvidence?.fallbackCount ?? 0) === 0 &&
+                (westEvidence?.unknownCount ?? 0) === 0;
               if (!westCampus) return null;
               return (
                 <g>
@@ -678,7 +718,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             })()}
             {fiberLines.map((line) => {
               const color = lineColorForHealth(line.healthColor);
-              const isLive = line.healthColor === "green";
+              const isLive = line.healthColor === "green" && line.currentObservation;
               const controlX = (line.x + HOBBLE_FIBER_HUB.x) / 2;
               const controlY = Math.min(line.y, HOBBLE_FIBER_HUB.y) - 3.5;
               return (
@@ -717,7 +757,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
               <div
                 className={`absolute z-10 ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                 style={{ left: `${overlay.x}%`, top: `${overlay.y}%` }}
-                title={`${match?.name ?? overlay.buildingName} — ${style.label}`}
+                title={`${match?.name ?? overlay.buildingName} — ${style.label} — ${buildingEvidenceLabel(match)}`}
                 onPointerDown={(event) => beginDrag(event, overlay.code)}
               >
                 <div className="relative">
@@ -752,6 +792,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                       {match?.name ?? overlay.buildingName}
                     </div>
                     <div className="mt-0.5 text-[9px] font-medium leading-tight text-slate-700">{style.label}</div>
+                    <div className="mt-0.5 text-[8px] leading-tight text-slate-600">{buildingEvidenceLabel(match)}</div>
                   </div>}
                 </div>
               </div>
@@ -873,10 +914,10 @@ function BuildingsGrid() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All devices up</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more degraded</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more down</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live data</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All observed devices up</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Observed degradation</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Observed device down</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No current observation</div>
       </div>
 
       {/* Search */}
@@ -893,7 +934,7 @@ function BuildingsGrid() {
         <div>
           <h2 id="building-status-heading" className="text-xl font-semibold">Start with a building</h2>
           <p className="text-sm text-muted-foreground">
-            Select a status card to drill into that building's switches, monitored devices, VLANs, and live health.
+            Select a status card to drill into that building's switches, monitored devices, VLANs, and latest timestamped evidence.
           </p>
         </div>
         {sorted.length === 0 ? (
@@ -922,6 +963,7 @@ function BuildingsGrid() {
                       <div>
                         <p className="text-sm font-bold leading-tight text-slate-950">{b.name}</p>
                         <p className="mt-0.5 text-xs font-medium text-slate-700">{style.label}</p>
+                        <p className="mt-1 text-[11px] text-slate-600">{buildingEvidenceLabel(b)}</p>
                       </div>
                       <div className="flex gap-2 mt-auto pt-1">
                         <span className="text-xs text-slate-600">
@@ -1256,6 +1298,7 @@ function BuildingDetailView({ name }: { name: string }) {
             : detail.healthColor === "red" ? "bg-red-100 text-red-700 border-red-300"
             : "bg-gray-100 text-gray-600 border-gray-300"
           }`}>{style.label}</span>
+          <span className="text-xs text-muted-foreground">{buildingEvidenceLabel(detail)}</span>
         </div>
         {canEdit && !editingName && (
           <>

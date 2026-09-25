@@ -247,7 +247,6 @@ export function TelemetrySwitchPortMap({
     physicalInterfaces.every((iface) => iface.allowedVlans == null) ? "allowed VLAN lists" : null,
     physicalInterfaces.every((iface) => iface.inErrors == null && iface.outErrors == null) ? "error counters" : null,
     physicalInterfaces.every((iface) => iface.utilizationPct == null) ? "utilization" : null,
-    physicalInterfaces.every((iface) => iface.rxPowerDbm == null && iface.txPowerDbm == null) ? "optics / DOM" : null,
   ].filter(Boolean) as string[];
 
   if (!switches.length) return <div className="py-16 text-center text-muted-foreground">No switches in the Network Map yet.</div>;

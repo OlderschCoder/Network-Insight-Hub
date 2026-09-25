@@ -65,6 +65,8 @@ type NetLink = {
   lastVerifiedAt: string;
   evidenceRef: string | null;
   notes: string | null;
+  lldpPeerHostname?: string | null;
+  lldpPeerMgmtIp?: string | null;
   isStale?: boolean;
 };
 
@@ -196,7 +198,11 @@ export default function NetworkMapPage() {
   }, [links, linkSearch, nodeById]);
 
   const deleteMutNode = useMutation({
-    mutationFn: (id: string) => apiReq("DELETE", `/api/network-map/nodes/${id}`),
+    mutationFn: (node: NetNode) => apiReq(
+      "DELETE",
+      `/api/network-map/nodes/${node.id}`,
+      { confirmation: `CONFIRM DELETE switch ${node.hostname}` },
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/network-map/nodes"] });
       qc.invalidateQueries({ queryKey: ["/api/network-map/links"] });
@@ -518,7 +524,9 @@ export default function NetworkMapPage() {
                               size="icon"
                               className="h-7 w-7 text-destructive"
                               onClick={() => {
-                                if (confirm(`Delete ${node.hostname}?`)) deleteMutNode.mutate(node.id);
+                                if (confirm(`Delete ${node.hostname}? This retires matching inventory and topology records.`)) {
+                                  deleteMutNode.mutate(node);
+                                }
                               }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

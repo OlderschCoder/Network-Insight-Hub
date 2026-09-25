@@ -1307,7 +1307,13 @@ function ChatTab({
       const res = await fetch(`${API_BASE}/status-report/chat`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ messages: liveMessages, lookbackDays, previewInventory: false, uploadedFileIds: [] }),
+        body: JSON.stringify({
+          messages: liveMessages,
+          lookbackDays,
+          previewInventory: true,
+          observationOnly: true,
+          uploadedFileIds: [],
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

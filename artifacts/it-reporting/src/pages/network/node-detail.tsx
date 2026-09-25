@@ -252,11 +252,32 @@ export default function NodeDetail() {
 
   // ── Delete node ──────────────────────────────────────────────────────────────
   const deleteNode = async () => {
-    if (!id) return;
+    if (!id || !node) return;
     try {
-      const r = await authFetch(`${API}/network/nodes/${id}`, { method: "DELETE", credentials: "include" });
-      if (!r.ok) throw new Error(await r.text());
-      toast({ title: "Node deleted" });
+      const retirement = await authFetch(`${API}/network/switches/by-node/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ confirmation: `CONFIRM DELETE switch ${node.hostname}` }),
+      });
+      if (!retirement.ok) {
+        const result = await retirement.json().catch(() => null);
+        // Non-switch topology objects have no maintained inventory record. Keep
+        // their existing topology-only removal path, while physical switches go
+        // through the unified audited retirement transaction above.
+        if (retirement.status === 404 && result?.code === "NO_MAINTAINED_SWITCH") {
+          const topologyOnly = await authFetch(`${API}/network/nodes/${id}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+          if (!topologyOnly.ok) throw new Error(await topologyOnly.text());
+          toast({ title: "Topology node deleted" });
+          navigate("/network");
+          return;
+        }
+        throw new Error(result?.error ?? `Delete failed (${retirement.status})`);
+      }
+      toast({ title: "Switch retired", description: "Inventory and matching topology records were removed; configuration backups were preserved." });
       navigate("/network");
     } catch (e: any) {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
@@ -665,7 +686,7 @@ export default function NodeDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {node.hostname}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the node and all its links. This cannot be undone.
+              For a maintained switch, this retires its inventory record and removes all matching topology nodes, ports, links, and routing adjacency records in one audited transaction. Configuration backups remain preserved. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -12,6 +12,8 @@ import { isIP } from "node:net";
 import crypto from "node:crypto";
 import { normalizeNetworkIdentityData, saveNetLinkByIdentity, saveNetNodeByIdentity } from "../lib/network_identity";
 import { computeTelemetryPortDelta } from "../lib/network_telemetry_delta";
+import { reconcileTelemetryBuilding } from "../lib/network_building_policy";
+import { retireNetworkAsset } from "../lib/network_asset_retirement";
 
 const router = Router();
 
@@ -144,6 +146,33 @@ router.patch("/nodes/:id", requireAuth, requireNetworkAdmin, async (req: any, re
 });
 
 router.delete("/nodes/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const [existing] = await db
+    .select()
+    .from(netNodesTable)
+    .where(eq(netNodesTable.id, req.params.id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  if (["switch", "firewall"].includes(existing.nodeKind)) {
+    const result = await retireNetworkAsset({
+      nodeId: existing.id,
+      confirmation: req.body?.confirmation,
+      actor: {
+        id: req.user?.id ?? null,
+        name: req.user?.name ?? req.user?.email ?? null,
+      },
+    });
+    if (result.status === "confirmation_required") {
+      return res.status(409).json({
+        error: "Explicit switch retirement confirmation is required",
+        code: "CONFIRMATION_REQUIRED",
+        confirmation: result.confirmation,
+      });
+    }
+    if (result.status === "deleted") return res.json({ ok: true, ...result });
+    if (result.status === "not_found") return res.status(404).json({ error: "Not found" });
+    // A topology-only physical node has no maintained inventory to retire.
+  }
+
   const [node] = await db
     .delete(netNodesTable)
     .where(eq(netNodesTable.id, req.params.id))
@@ -450,6 +479,16 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       ? allInventory.find((sw) => sw.ipAddress === sourceNode!.mgmtIp)
       : null
   ) ?? preliminaryInventory;
+  const {
+    authoritativeBuilding,
+    reportedBuilding,
+    maintainedBuildingConflict,
+    buildingConflict,
+  } = reconcileTelemetryBuilding(
+    sourceNode?.building,
+    inventory?.building,
+    telemetry.building,
+  );
   if (/svi/i.test(sourceHostname) || sourceNode?.nodeKind === "svi" || sourceNode?.role === "svi") {
     const aliasPreview = {
       dryRun,
@@ -461,7 +500,10 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       matchedNodeId: sourceNode?.id ?? null,
       matchedNodeHostname: sourceNode?.hostname ?? inventory?.hostname ?? null,
       matchedNodeMgmtIp: sourceNode?.mgmtIp ?? inventory?.ipAddress ?? null,
-      building: telemetry.building ?? sourceNode?.building ?? inventory?.building ?? null,
+      building: authoritativeBuilding,
+      reportedBuilding,
+      maintainedBuildingConflict,
+      buildingConflict,
       nodeWillBeCreated: false,
       physicalInterfaces: 0,
       logicalInterfacesIgnored: telemetry.interfaces.length,
@@ -474,13 +516,11 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
 
     await db.update(netNodesTable).set({
       status: "online",
-      building: telemetry.building ?? sourceNode.building,
       updatedAt: new Date(),
     }).where(eq(netNodesTable.id, sourceNode.id));
     if (inventory) {
       await db.update(networkSwitchesTable).set({
         status: "online",
-        building: telemetry.building ?? inventory.building,
         lastSeen: polledAt,
         updatedAt: new Date(),
       }).where(eq(networkSwitchesTable.id, inventory.id));
@@ -559,7 +599,10 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     matchedNodeId: sourceNode?.id ?? null,
     matchedNodeHostname: sourceNode?.hostname ?? inventory?.hostname ?? null,
     matchedNodeMgmtIp: sourceNode?.mgmtIp ?? inventory?.ipAddress ?? null,
-    building: telemetry.building ?? sourceNode?.building ?? inventory?.building ?? null,
+    building: authoritativeBuilding,
+    reportedBuilding,
+    maintainedBuildingConflict,
+    buildingConflict,
     nodeWillBeCreated: !sourceNode,
     isInitialBaseline,
     physicalInterfaces: physicalInterfaces.length,
@@ -580,40 +623,45 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       vendor: telemetry.device?.vendor ?? telemetryVendor(telemetry.device_type),
       model: collectedModel ?? inventory!.model?.slice(0, 80) ?? null,
       mgmtIp: inventory!.ipAddress,
-      building: telemetry.building ?? inventory!.building,
+      building: inventory!.building,
       location: inventory!.location ?? null,
       role: "access",
       criticality: "medium",
       status: "online",
       notes: inventory!.notes ?? null,
     });
+    if (!result.row) {
+      return res.status(500).json({ error: "Could not create the matched Network Map node." });
+    }
     sourceNode = result.row;
-    nodeCandidates.push(sourceNode);
+    nodeCandidates.push(result.row);
+  }
+
+  const importedNode = sourceNode;
+  if (!importedNode) {
+    return res.status(500).json({ error: "Could not resolve the telemetry source node." });
   }
 
   const nodeUpdates: Record<string, unknown> = { status: "online", updatedAt: new Date() };
   if (inventory) {
     nodeUpdates.displayName = inventory.hostname;
-    nodeUpdates.building = telemetry.building ?? inventory.building;
-    nodeUpdates.model = collectedModel ?? inventory.model?.slice(0, 80) ?? sourceNode.model;
-    nodeUpdates.location = inventory.location ?? sourceNode.location;
-    nodeUpdates.mgmtIp = sourceNode.mgmtIp && sourceNode.mgmtIp !== "0.0.0.0"
-      ? sourceNode.mgmtIp
+    nodeUpdates.model = collectedModel ?? inventory.model?.slice(0, 80) ?? importedNode.model;
+    nodeUpdates.location = inventory.location ?? importedNode.location;
+    nodeUpdates.mgmtIp = importedNode.mgmtIp && importedNode.mgmtIp !== "0.0.0.0"
+      ? importedNode.mgmtIp
       : inventory.ipAddress;
-  } else if (!sourceNode.mgmtIp || sourceNode.mgmtIp === "0.0.0.0") {
+  } else if (!importedNode.mgmtIp || importedNode.mgmtIp === "0.0.0.0") {
     nodeUpdates.mgmtIp = telemetry.switch_ip;
   }
-  if (!sourceNode.vendor || telemetry.device?.vendor) {
+  if (!importedNode.vendor || telemetry.device?.vendor) {
     nodeUpdates.vendor = telemetry.device?.vendor ?? telemetryVendor(telemetry.device_type);
   }
-  if (telemetry.building) nodeUpdates.building = telemetry.building;
   if (collectedModel) nodeUpdates.model = collectedModel;
-  await db.update(netNodesTable).set(nodeUpdates).where(eq(netNodesTable.id, sourceNode.id));
+  await db.update(netNodesTable).set(nodeUpdates).where(eq(netNodesTable.id, importedNode.id));
 
   if (inventory) {
     await db.update(networkSwitchesTable).set({
       status: "online",
-      building: telemetry.building ?? inventory.building,
       model: telemetry.device?.model ?? inventory.model,
       lastSeen: polledAt,
       updatedAt: new Date(),
@@ -631,7 +679,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
       ? iface.mode
       : null;
     const values: any = {
-      nodeId: sourceNode.id,
+      nodeId: importedNode.id,
       interfaceName: iface.port.trim(),
       isPhysical: true,
       description,
@@ -676,10 +724,10 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
   for (const neighbor of telemetry.lldp_neighbors) {
     if (!neighbor.local_port || !neighbor.port_id) continue;
     const neighborNode = resolveNeighbor(neighbor);
-    if (!neighborNode || neighborNode.id === sourceNode.id) continue;
+    if (!neighborNode || neighborNode.id === importedNode.id) continue;
     const localInterface = interfaceByPort.get(telemetryPort(neighbor.local_port));
     await saveNetLinkByIdentity({
-      aNodeId: sourceNode.id,
+      aNodeId: importedNode.id,
       aPort: neighbor.local_port,
       bNodeId: neighborNode.id,
       bPort: neighbor.port_id,
@@ -698,7 +746,7 @@ router.post("/import/telemetry/switch", requireTelemetryImporter, async (req: an
     preview.linksUpserted++;
   }
 
-  return res.json({ ...preview, dryRun: false, matchedNodeId: sourceNode.id });
+  return res.json({ ...preview, dryRun: false, matchedNodeId: importedNode.id });
 });
 
 // ──────────────────────────────────────────────────────────────

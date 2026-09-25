@@ -180,61 +180,71 @@ export async function findSwitchByIdentity(
   return rows.find((row: any) => row.id !== input.excludeId && normalizeHostname(row.hostname) === hostnameKey) ?? null;
 }
 
+async function mergeSwitchRowsWithClient(
+  client: any,
+  primaryId: number,
+  duplicateIds: number[],
+  overrides: Record<string, unknown> = {},
+) {
+  if (duplicateIds.length === 0) return null;
+  const rows = await client.select().from(networkSwitchesTable).where(
+    or(
+      eq(networkSwitchesTable.id, primaryId),
+      ...duplicateIds.map((id) => eq(networkSwitchesTable.id, id)),
+    ),
+  );
+  const primary = rows.find((row: any) => row.id === primaryId);
+  if (!primary) throw new Error("Primary switch row not found during merge.");
+  const duplicates = rows.filter((row: any) => row.id !== primaryId);
+  const merged = {
+    hostname: normalizeHostname(String(overrides.hostname ?? primary.hostname ?? "")) || normalizeHostname(primary.hostname),
+    building: pickFirstMeaningful(String(overrides.building ?? ""), primary.building, ...duplicates.map((row: any) => row.building)) ?? primary.building,
+    ipAddress: pickFirstMeaningful(
+      String(overrides.ipAddress ?? ""),
+      hasAuthoritativeIp(primary.ipAddress) ? primary.ipAddress : null,
+      ...duplicates.map((row: any) => (hasAuthoritativeIp(row.ipAddress) ? row.ipAddress : null)),
+      primary.ipAddress,
+      ...duplicates.map((row: any) => row.ipAddress),
+    ) ?? primary.ipAddress,
+    model: pickFirstMeaningful(String(overrides.model ?? ""), primary.model, ...duplicates.map((row: any) => row.model)),
+    status: mergeStatus([String(overrides.status ?? ""), primary.status, ...duplicates.map((row: any) => row.status)]) ?? primary.status,
+    configFile: pickFirstMeaningful(String(overrides.configFile ?? ""), primary.configFile, ...duplicates.map((row: any) => row.configFile)),
+    notes: mergeNotes([String(overrides.notes ?? ""), primary.notes, ...duplicates.map((row: any) => row.notes)]),
+    location: pickFirstMeaningful(String(overrides.location ?? ""), primary.location, ...duplicates.map((row: any) => row.location)),
+    maintenanceLog: [
+      ...new Map(
+        [...(Array.isArray(primary.maintenanceLog) ? primary.maintenanceLog : []), ...duplicates.flatMap((row: any) => (Array.isArray(row.maintenanceLog) ? row.maintenanceLog : []))]
+          .filter((entry: any) => entry?.id)
+          .map((entry: any) => [entry.id, entry]),
+      ).values(),
+    ],
+    updatedAt: new Date(),
+  };
+
+  const [updated] = await client
+    .update(networkSwitchesTable)
+    .set(merged)
+    .where(eq(networkSwitchesTable.id, primaryId))
+    .returning();
+
+  await client.update(deviceConfigsTable).set({ switchId: primaryId }).where(inArray(deviceConfigsTable.switchId, duplicateIds));
+  await client
+    .update(inventoryAuditTable)
+    .set({ entityId: primaryId, entityLabel: updated.hostname })
+    .where(and(eq(inventoryAuditTable.entityType, "switch"), inArray(inventoryAuditTable.entityId, duplicateIds)));
+  await client.delete(networkSwitchesTable).where(inArray(networkSwitchesTable.id, duplicateIds));
+  return updated;
+}
+
 export async function mergeSwitchRows(
   primaryId: number,
   duplicateIds: number[],
   overrides: Record<string, unknown> = {},
 ) {
   if (duplicateIds.length === 0) return null;
-  return db.transaction(async (tx: any) => {
-    const rows = await tx.select().from(networkSwitchesTable).where(
-      or(
-        eq(networkSwitchesTable.id, primaryId),
-        ...duplicateIds.map((id) => eq(networkSwitchesTable.id, id)),
-      ),
-    );
-    const primary = rows.find((row: any) => row.id === primaryId);
-    if (!primary) throw new Error("Primary switch row not found during merge.");
-    const duplicates = rows.filter((row: any) => row.id !== primaryId);
-    const merged = {
-      hostname: normalizeHostname(String(overrides.hostname ?? primary.hostname ?? "")) || normalizeHostname(primary.hostname),
-      building: pickFirstMeaningful(String(overrides.building ?? ""), primary.building, ...duplicates.map((row: any) => row.building)) ?? primary.building,
-      ipAddress: pickFirstMeaningful(
-        String(overrides.ipAddress ?? ""),
-        hasAuthoritativeIp(primary.ipAddress) ? primary.ipAddress : null,
-        ...duplicates.map((row: any) => (hasAuthoritativeIp(row.ipAddress) ? row.ipAddress : null)),
-        primary.ipAddress,
-        ...duplicates.map((row: any) => row.ipAddress),
-      ) ?? primary.ipAddress,
-      model: pickFirstMeaningful(String(overrides.model ?? ""), primary.model, ...duplicates.map((row: any) => row.model)),
-      status: mergeStatus([String(overrides.status ?? ""), primary.status, ...duplicates.map((row: any) => row.status)]) ?? primary.status,
-      configFile: pickFirstMeaningful(String(overrides.configFile ?? ""), primary.configFile, ...duplicates.map((row: any) => row.configFile)),
-      notes: mergeNotes([String(overrides.notes ?? ""), primary.notes, ...duplicates.map((row: any) => row.notes)]),
-      location: pickFirstMeaningful(String(overrides.location ?? ""), primary.location, ...duplicates.map((row: any) => row.location)),
-      maintenanceLog: [
-        ...new Map(
-          [...(Array.isArray(primary.maintenanceLog) ? primary.maintenanceLog : []), ...duplicates.flatMap((row: any) => (Array.isArray(row.maintenanceLog) ? row.maintenanceLog : []))]
-            .filter((entry: any) => entry?.id)
-            .map((entry: any) => [entry.id, entry]),
-        ).values(),
-      ],
-      updatedAt: new Date(),
-    };
-
-    const [updated] = await tx
-      .update(networkSwitchesTable)
-      .set(merged)
-      .where(eq(networkSwitchesTable.id, primaryId))
-      .returning();
-
-    await tx.update(deviceConfigsTable).set({ switchId: primaryId }).where(inArray(deviceConfigsTable.switchId, duplicateIds));
-    await tx
-      .update(inventoryAuditTable)
-      .set({ entityId: primaryId, entityLabel: updated.hostname })
-      .where(and(eq(inventoryAuditTable.entityType, "switch"), inArray(inventoryAuditTable.entityId, duplicateIds)));
-    await tx.delete(networkSwitchesTable).where(inArray(networkSwitchesTable.id, duplicateIds));
-    return updated;
-  });
+  return db.transaction((tx: any) =>
+    mergeSwitchRowsWithClient(tx, primaryId, duplicateIds, overrides),
+  );
 }
 
 export async function saveSwitchByIdentity(
@@ -249,6 +259,7 @@ export async function saveSwitchByIdentity(
     location?: string | null;
   },
   existingId?: number | null,
+  client: any = db,
 ) {
   const hostname = normalizeHostname(input.hostname);
   if (!hostname) throw new Error("hostname is required");
@@ -264,19 +275,24 @@ export async function saveSwitchByIdentity(
   };
 
   const current = existingId != null
-    ? (await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, existingId)))[0] ?? null
+    ? (await client.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, existingId)))[0] ?? null
     : null;
   if (existingId != null && !current) throw new Error("Switch not found");
 
-  const match = await findSwitchByIdentity({ hostname, ipAddress: payload.ipAddress, excludeId: existingId ?? null });
+  const match = await findSwitchByIdentity(
+    { hostname, ipAddress: payload.ipAddress, excludeId: existingId ?? null },
+    client,
+  );
   if (current && match && match.id !== current.id) {
-    const merged = await mergeSwitchRows(match.id, [current.id], payload);
+    const merged = client === db
+      ? await mergeSwitchRows(match.id, [current.id], payload)
+      : await mergeSwitchRowsWithClient(client, match.id, [current.id], payload);
     return { row: merged, action: "merged" as const };
   }
 
   const target = match ?? current;
   if (target) {
-    const [row] = await db
+    const [row] = await client
       .update(networkSwitchesTable)
       .set({
         hostname,
@@ -294,7 +310,7 @@ export async function saveSwitchByIdentity(
     return { row, action: match ? "merged" as const : "updated" as const };
   }
 
-  const [row] = await db.insert(networkSwitchesTable).values({
+  const [row] = await client.insert(networkSwitchesTable).values({
     hostname,
     building: payload.building ?? "Unassigned",
     ipAddress: payload.ipAddress ?? "unknown",

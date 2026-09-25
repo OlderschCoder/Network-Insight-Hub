@@ -22,6 +22,10 @@ import {
   type ZendeskConversationLogEvent,
 } from "./zendesk_conversation_log";
 import {
+  inventoryPreviewEnabled,
+  isFredToolAllowed,
+} from "./fred_chat_safety";
+import {
   executeApplicationGuidance,
   executeManageAfterAction,
   executeManageTeamTodo,
@@ -32,6 +36,7 @@ import {
   executeZendeskSolveTickets,
   fredApplicationToolsForRole,
 } from "./fred_application_actions";
+import { hasActionablePortIssue } from "./network_port_health";
 import { pingHost, testNetConnection, pingHosts } from "./net_diag";
 import {
   getBuildingSummaries,
@@ -2589,16 +2594,16 @@ async function executeZendeskSearchTickets(argsJson: string): Promise<string> {
 
 async function executeZendeskAddComment(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
-  if (!cfg) return "Zendesk is not configured on this server.";
-  const { ticket_id, body, public: isPublic, confirmed } = JSON.parse(argsJson);
-  if (confirmed !== true)
-    return "Confirmation required. Show the exact reply or internal note, then ask the user to confirm before posting it.";
-  if (!body?.trim()) return "Error: comment body is required.";
   const controls = await readZendeskSupervisionConfig();
   if (!controls.fredEnabled)
     return "Fred's Zendesk actions are turned off by a supervisor.";
   if (isPublic && !controls.repliesEnabled)
     return "Zendesk public replies are turned off by a supervisor.";
+  if (!cfg) return "Zendesk is not configured on this server.";
+  const { ticket_id, body, public: isPublic, confirmed } = JSON.parse(argsJson);
+  if (confirmed !== true)
+    return "Confirmation required. Show the exact reply or internal note, then ask the user to confirm before posting it.";
+  if (!body?.trim()) return "Error: comment body is required.";
   try {
     if (isPublic) {
       const { ticket } = await zdeskFetch<{
@@ -2619,13 +2624,13 @@ async function executeZendeskAddComment(argsJson: string): Promise<string> {
 
 async function executeZendeskUpdateTicket(argsJson: string): Promise<string> {
   const cfg = zdeskConfig();
+  if (!(await readZendeskSupervisionConfig()).fredEnabled)
+    return "Fred's Zendesk actions are turned off by a supervisor.";
   if (!cfg) return "Zendesk is not configured on this server.";
   const { ticket_id, subject, status, assignee_email, priority, confirmed } =
     JSON.parse(argsJson);
   if (confirmed !== true)
     return "Confirmation required. Show the exact ticket fields and values, then ask the user to confirm before updating them.";
-  if (!(await readZendeskSupervisionConfig()).fredEnabled)
-    return "Fred's Zendesk actions are turned off by a supervisor.";
   const update: Record<string, unknown> = {};
   if (subject?.trim()) update.subject = subject.trim();
   if (status) update.status = status;
@@ -3409,7 +3414,7 @@ export const QUERY_SWITCH_PORTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool
           issuesOnly: {
             type: "boolean",
             description:
-              "Only return ports with state mismatch, errors, discards, high utilization, or optics alarms.",
+              "Only return actionable ports: expected service down, errors, discards, high utilization, or an explicit optics alarm. Ordinary unused access ports and missing DOM are excluded.",
           },
           limit: {
             type: "integer",
@@ -3497,15 +3502,25 @@ export async function executeQuerySwitchPorts(
         normalizedText(port.operStatus) === "up" ||
         (port.macCount ?? 0) > 0 ||
         (port.lldpNeighborCount ?? 0) > 0;
-      const hasIssue =
-        (normalizedText(port.adminStatus) === "up" &&
-          normalizedText(port.operStatus) !== "up") ||
-        (port.inErrors ?? 0) > 0 ||
-        (port.outErrors ?? 0) > 0 ||
-        (port.inDiscards ?? 0) > 0 ||
-        (port.outDiscards ?? 0) > 0 ||
-        (port.utilizationPct ?? 0) >= 80 ||
-        !["", "ok", "normal", "up"].includes(normalizedText(port.opticsStatus));
+      const hasIssue = hasActionablePortIssue({
+        adminStatus: port.adminStatus,
+        operStatus: port.operStatus,
+        inErrors: port.inErrors,
+        outErrors: port.outErrors,
+        inDiscards: port.inDiscards,
+        outDiscards: port.outDiscards,
+        utilizationPct: port.utilizationPct,
+        opticsStatus: port.opticsStatus,
+        hasTopologyLink: knownLinks.length > 0,
+        lldpNeighborCount: port.lldpNeighborCount,
+        macCount: port.macCount,
+        expectedService:
+          normalizedText(port.portMode) === "trunk" ||
+          Boolean(port.portchannel) ||
+          (typeof port.nativeVlan === "number" &&
+            port.nativeVlan >= 301 && port.nativeVlan <= 323) ||
+          /\b(?:phone|voice|voip|e911)\b/i.test(port.description ?? ""),
+      });
       return (
         (!freeQuery || allHaystack.includes(freeQuery)) &&
         (!switchQuery || nodeHaystack.includes(switchQuery)) &&
@@ -4477,6 +4492,8 @@ export async function runChatWithMemory(
     allowTaskCapture?: boolean;
     /** When true, inventory upserts are staged as pending changes instead of applied. */
     previewInventory?: boolean;
+    /** Withhold every mutating tool and any tool that starts a collection run. */
+    readOnly?: boolean;
     /** When present, operational questions must collect this evidence before answering. */
     evidencePolicy?: {
       toolNames: string[];
@@ -4500,7 +4517,10 @@ export async function runChatWithMemory(
   const pendingNetworkChanges: PendingNetworkChange[] = [];
   const userRole = opts.userRole ?? null;
   const allowTaskCapture = opts.allowTaskCapture !== false;
-  const preview = opts.previewInventory === true;
+  const readOnly = opts.readOnly === true;
+  // Fail closed: an omitted preview flag stages inventory changes instead of
+  // applying them. A caller must explicitly opt into direct writes.
+  const preview = inventoryPreviewEnabled(opts.previewInventory);
   const inventoryCtx: InventoryToolCtx = {
     userRole,
     actor: { id: opts.userId, name: opts.userName ?? null },
@@ -4568,7 +4588,11 @@ export async function runChatWithMemory(
           ZENDESK_UPDATE_TICKET_TOOL,
         ]
       : []),
-  ];
+  ].filter(
+    (tool) =>
+      tool.type !== "function" ||
+      isFredToolAllowed(tool.function.name, readOnly),
+  );
 
   const done = (reply: string) => ({
     reply,
@@ -4615,7 +4639,12 @@ export async function runChatWithMemory(
       if (call.type === "function" && evidenceToolNames.has(call.function.name))
         evidenceCalls++;
 
-      if (call.type === "function" && call.function.name === "save_memory") {
+      if (
+        call.type === "function" &&
+        !isFredToolAllowed(call.function.name, readOnly)
+      ) {
+        resultText = "Tool unavailable in observation-only mode.";
+      } else if (call.type === "function" && call.function.name === "save_memory") {
         try {
           const outcome = await executeSaveMemory(
             call.function.arguments,

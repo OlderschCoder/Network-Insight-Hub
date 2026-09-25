@@ -730,7 +730,8 @@ router.post("/chat", requireAuth, async (req: Request, res: Response) => {
       messages: chatMessages = [],
       conversationCheckpoint = "",
       lookbackDays: rawLookback = 90,
-      previewInventory = false,
+      previewInventory = true,
+      observationOnly = false,
       uploadedFileIds = [],
       unacceptableReview = false,
       rotateModel = false,
@@ -1131,11 +1132,14 @@ Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 
     const authRole = (req as any).user?.role ?? null;
-    const allowTaskCapture = true; // all roles — Fred captures work and delegates tasks for the whole team
+    const allowTaskCapture = observationOnly !== true;
 
     const routineAI = getFredAI(rotateModel === true ? "deep" : "routine");
     const correctionInstruction = unacceptableReview === true
       ? `\n\n# Unacceptable-response correction\nThe user rejected the previous response. Review this thread, the available evidence, and your purpose. Determine whether you are helping reach resolution or creating delay through repetition, unsupported assumptions, unnecessary diagnostics, documentation demands, or refusal. Do not defend the rejected response. State the mistake in one sentence, then provide the shortest useful next action using evidence already available. Do not repeat completed checks or request information already supplied.${rotateModel === true ? " This is an independent replacement from a rotated model." : ""}`
+      : "";
+    const observationInstruction = observationOnly === true
+      ? `\n\n# Observation-only request\nAnalyze only the supplied observation and return a concise answer. This request is non-persistent: do not save memory, create tasks, update inventory or architecture, modify Zendesk, or start telemetry collection. Read-only evidence tools may be used only when needed to interpret the observation.`
       : "";
     const {
       reply,
@@ -1148,14 +1152,19 @@ ${JSON.stringify(context, null, 2)}`;
       model: routineAI.model,
       maxCompletionTokens: 1400,
       messages: [
-        { role: "system", content: systemPrompt + correctionInstruction },
+        {
+          role: "system",
+          content:
+            systemPrompt + correctionInstruction + observationInstruction,
+        },
         ...boundedChatMessages,
       ],
       userId: (req as any).user?.id ?? null,
       userRole: authRole,
       userName: (req as any).user?.name ?? null,
       allowTaskCapture,
-      previewInventory: previewInventory === true,
+      previewInventory: previewInventory !== false,
+      readOnly: observationOnly === true,
       evidencePolicy,
     });
 

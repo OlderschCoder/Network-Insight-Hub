@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   db,
+  inventoryAuditTable,
+  netNodesTable,
   networkSwitchesTable,
   vlansTable,
   networkLayoutPositionsTable,
@@ -33,6 +35,7 @@ import {
   type InventoryActor,
 } from "../lib/inventory";
 import { buildInventoryHealth } from "../lib/inventory_health";
+import { retireNetworkAsset } from "../lib/network_asset_retirement";
 import {
   getLockStatus,
   acquireLock,
@@ -43,13 +46,102 @@ import {
 } from "../lib/layout_governance";
 import { getBuildingSummaries, getCanonicalBuildingName } from "./network_nodes";
 import { findSwitchByIdentity, saveSwitchByIdentity } from "../lib/network_identity";
+import { selectTopologyNodesForMaintainedSwitch } from "../lib/network_building_assignment";
 import fs from "fs";
 import path from "path";
 
 const router = Router();
 
 function reqActor(req: any): InventoryActor {
-  return { id: req.user?.id ?? null, name: req.user?.name ?? null };
+  return {
+    id: req.user?.id ?? null,
+    name: req.user?.name ?? req.user?.email ?? null,
+  };
+}
+
+type MaintainedSwitchInput = {
+  hostname: string;
+  building: string;
+  ipAddress: string;
+  model?: string | null;
+  status?: string | null;
+  configFile?: string | null;
+  notes?: string | null;
+  location?: string | null;
+};
+
+/**
+ * Save the maintained inventory row and its topology building assignment as
+ * one unit. The inventory record owns the assignment; topology is selected by
+ * management IP first and normalized hostname only as a fallback.
+ */
+async function saveMaintainedSwitchWithTopologySync(
+  input: MaintainedSwitchInput,
+  actor: InventoryActor,
+  existingId?: number,
+) {
+  return db.transaction(async (tx: any) => {
+    const canonicalInput = {
+      ...input,
+      building: getCanonicalBuildingName(input.building),
+    };
+    const before = existingId != null
+      ? (await tx
+        .select()
+        .from(networkSwitchesTable)
+        .where(eq(networkSwitchesTable.id, existingId)))[0] ?? null
+      : await findSwitchByIdentity(
+        {
+          hostname: canonicalInput.hostname,
+          ipAddress: canonicalInput.ipAddress,
+        },
+        tx,
+      );
+    if (existingId != null && !before) throw new Error("Switch not found");
+
+    const result = await saveSwitchByIdentity(
+      canonicalInput,
+      existingId,
+      tx,
+    );
+    const sw = result.row;
+    if (!sw) throw new Error("Switch save returned no inventory row");
+
+    const nodes = await tx.select().from(netNodesTable);
+    const matchingNodes = selectTopologyNodesForMaintainedSwitch(
+      nodes,
+      before,
+      sw,
+    );
+    const nodesToSync = matchingNodes.filter(
+      (node) => node.building !== sw.building,
+    );
+    for (const node of nodesToSync) {
+      await tx
+        .update(netNodesTable)
+        .set({ building: sw.building, updatedAt: new Date() })
+        .where(eq(netNodesTable.id, node.id));
+    }
+
+    const changes = diffFields(before, sw, SWITCH_AUDIT_FIELDS);
+    if (changes.length > 0) {
+      await tx.insert(inventoryAuditTable).values({
+        entityType: "switch",
+        entityId: sw.id,
+        entityLabel: sw.hostname.slice(0, 255),
+        action: result.action === "created" ? "create" : "update",
+        source: "manual",
+        actorId: actor.id ?? undefined,
+        actorName: actor.name ?? undefined,
+        changes,
+      });
+    }
+
+    return {
+      ...result,
+      topologyNodesSynced: nodesToSync.map((node) => node.id),
+    };
+  });
 }
 
 const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
@@ -555,18 +647,19 @@ router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
-  const before = await findSwitchByIdentity({ hostname: parsed.data.hostname, ipAddress: parsed.data.ipAddress });
-  const result = await saveSwitchByIdentity(parsed.data);
+  const result = await saveMaintainedSwitchWithTopologySync(
+    parsed.data,
+    reqActor(req),
+  );
   const sw = result.row;
-  await recordInventoryAudit({
-    entityType: "switch",
-    entityId: sw.id,
-    entityLabel: sw.hostname,
-    action: result.action === "created" ? "create" : "update",
-    source: "manual",
-    actor: reqActor(req),
-    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
-  });
+  req.log?.info(
+    {
+      switchId: sw.id,
+      topologyNodeIds: result.topologyNodesSynced,
+      actor: req.user?.email,
+    },
+    "Maintained switch and topology building synchronized",
+  );
   return res.status(result.action === "created" ? 201 : 200).json(withCanonicalSwitchBuilding(sw));
 });
 
@@ -593,27 +686,90 @@ router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any,
   if (!parsed.success) return res.status(400).json({ error: "Validation error" });
   const [before] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
   if (!before) return res.status(404).json({ error: "Not found" });
-  const result = await saveSwitchByIdentity({
-    hostname: parsed.data.hostname ?? before.hostname,
-    building: parsed.data.building ?? before.building,
-    ipAddress: parsed.data.ipAddress ?? before.ipAddress,
-    model: parsed.data.model ?? before.model,
-    status: parsed.data.status ?? before.status,
-    configFile: parsed.data.configFile ?? before.configFile,
-    notes: parsed.data.notes ?? before.notes,
-    location: parsed.data.location ?? before.location,
-  }, id);
+  const result = await saveMaintainedSwitchWithTopologySync(
+    {
+      hostname: parsed.data.hostname ?? before.hostname,
+      building: parsed.data.building ?? before.building,
+      ipAddress: parsed.data.ipAddress ?? before.ipAddress,
+      model: parsed.data.model ?? before.model,
+      status: parsed.data.status ?? before.status,
+      configFile: parsed.data.configFile ?? before.configFile,
+      notes: parsed.data.notes ?? before.notes,
+      location: parsed.data.location ?? before.location,
+    },
+    reqActor(req),
+    id,
+  );
   const sw = result.row;
-  await recordInventoryAudit({
-    entityType: "switch",
-    entityId: sw.id,
-    entityLabel: sw.hostname,
-    action: "update",
-    source: "manual",
-    actor: reqActor(req),
-    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
-  });
+  req.log?.info(
+    {
+      switchId: sw.id,
+      topologyNodeIds: result.topologyNodesSynced,
+      actor: req.user?.email,
+    },
+    "Maintained switch and topology building synchronized",
+  );
   return res.json(withCanonicalSwitchBuilding(sw));
+});
+
+const switchDeleteSchema = z.object({
+  confirmation: z.string().optional(),
+});
+
+function sendNetworkAssetRetirementResult(res: any, result: Awaited<ReturnType<typeof retireNetworkAsset>>) {
+  if (result.status === "not_found") {
+    return res.status(404).json({ error: "Switch or topology node not found", code: "NOT_FOUND" });
+  }
+  if (result.status === "no_maintained_switch") {
+    return res.status(404).json({
+      error: "No maintained switch inventory record matches this topology node",
+      code: "NO_MAINTAINED_SWITCH",
+      nodeId: result.nodeId,
+    });
+  }
+  if (result.status === "confirmation_required") {
+    return res.status(409).json({
+      error: "Explicit switch retirement confirmation is required",
+      code: "CONFIRMATION_REQUIRED",
+      switchId: result.switchId,
+      hostname: result.hostname,
+      confirmation: result.confirmation,
+    });
+  }
+  return res.json({ ok: true, ...result });
+}
+
+// Keep this more-specific route before /switches/:id so a topology detail page
+// can retire the maintained switch and every matching topology projection in one
+// attributed transaction.
+router.delete("/switches/by-node/:nodeId", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const nodeId = z.string().uuid().safeParse(req.params.nodeId);
+  const body = switchDeleteSchema.safeParse(req.body ?? {});
+  if (!nodeId.success || !body.success) {
+    return res.status(400).json({ error: "Validation error" });
+  }
+  const result = await retireNetworkAsset({
+    nodeId: nodeId.data,
+    confirmation: body.data.confirmation,
+    actor: reqActor(req),
+  });
+  req.log?.info({ result, actor: req.user?.email }, "Network asset retirement requested by topology node");
+  return sendNetworkAssetRetirementResult(res, result);
+});
+
+router.delete("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = z.coerce.number().int().positive().safeParse(req.params.id);
+  const body = switchDeleteSchema.safeParse(req.body ?? {});
+  if (!id.success || !body.success) {
+    return res.status(400).json({ error: "Validation error" });
+  }
+  const result = await retireNetworkAsset({
+    switchId: id.data,
+    confirmation: body.data.confirmation,
+    actor: reqActor(req),
+  });
+  req.log?.info({ result, actor: req.user?.email }, "Maintained network switch retirement requested");
+  return sendNetworkAssetRetirementResult(res, result);
 });
 
 router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) => {
@@ -1202,7 +1358,7 @@ Guidelines for your answers:
         userRole: authRole,
         userName: req.user?.name ?? null,
         allowTaskCapture,
-        previewInventory: parsed.data.previewInventory === true,
+        previewInventory: parsed.data.previewInventory !== false,
       });
 
     const reply = rawReply.trim() || "(no response)";
