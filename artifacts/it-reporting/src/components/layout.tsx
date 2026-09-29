@@ -318,6 +318,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     group.items.some((item) => activeItem?.href === item.href),
   );
   const appLabel = activeGroup?.label ?? "Status & Reporting";
+  const isFredWorkspace = location === "/ai-report";
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -483,9 +484,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:px-6 md:py-5">
           {children}
         </div>
-        <footer className="border-t border-border px-6 py-4">
-          <Signature />
-        </footer>
+        {!isFredWorkspace && (
+          <footer className="border-t border-border px-6 py-4">
+            <Signature />
+          </footer>
+        )}
       </main>
 
       <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />

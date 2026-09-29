@@ -32,6 +32,7 @@ import bannerDocumentsRouter from "./banner_documents";
 import mfaTapActivityRouter from "./mfa_tap_activity";
 import learnRouter from "./learn";
 import teamTodosRouter from "./team_todos";
+import printersRouter from "./printers";
 
 const router: IRouter = Router();
 
@@ -58,6 +59,7 @@ router.use("/analytics", analyticsRouter);
 router.use("/ai-knowledge", aiKnowledgeRouter);
 router.use("/cio-shadow-notes", cioShadowNotesRouter);
 router.use("/fred-files", fredFilesRouter);
+router.use("/network/printers", printersRouter);
 router.use("/network/configs", deviceConfigsRouter);
 router.use("/network", networkNodesRouter);
 router.use("/incidents", incidentsRouter);
