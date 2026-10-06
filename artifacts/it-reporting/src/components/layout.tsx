@@ -27,6 +27,7 @@ import { ZendeskAlerts } from "@/components/ZendeskAlerts";
 import { ZendeskChatWidget } from "@/components/ZendeskChatWidget";
 import { useEffect, useState } from "react";
 import { findActiveItem, getNavGroups } from "@/config/nav";
+import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -309,9 +310,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       ? stored === "dark"
       : window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
-    user?.role ?? "",
-  );
+  const canNetworkTools = canUseNetworkTools(user);
   const navGroups = getNavGroups(isCIO, canNetworkTools);
   const activeItem = findActiveItem(navGroups, location);
   const activeGroup = navGroups.find((group) =>

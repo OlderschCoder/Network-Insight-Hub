@@ -25,6 +25,9 @@ export const usersTable = pgTable("users", {
   zendeskEmail: varchar("zendesk_email", { length: 255 }),
   // Team-wide to-do managers can assign and manage work for every active user.
   canManageTodos: boolean("can_manage_todos").notNull().default(false),
+  // Scoped access to the Network Tools workspace (firewall whitelist, printer
+  // setup, and approved equipment add/remove script generators).
+  canUseNetworkTools: boolean("can_use_network_tools").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   // Break-glass flag: ONLY accounts with this set may use local email/password
   // login (and password reset). All other users must sign in via Entra SSO.

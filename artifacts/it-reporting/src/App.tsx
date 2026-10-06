@@ -63,6 +63,7 @@ import AnalyticsPage from "@/pages/analytics/index";
 import DesignSystem from "@/pages/design-system/index";
 import Banner from "@/pages/banner/index";
 import LearnPage from "@/pages/learn/index";
+import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,11 +87,13 @@ function rememberPostLoginRedirect() {
 function ProtectedRoute({
   component: Component,
   adminOnly = false,
+  networkToolsOnly = false,
 }: {
   component: React.ComponentType;
   adminOnly?: boolean;
+  networkToolsOnly?: boolean;
 }) {
-  const { isAuthenticated, isLoading, isCIO } = useAuth();
+  const { isAuthenticated, isLoading, isCIO, user } = useAuth();
   const [, setLocation] = useLocation();
 
   if (isLoading) {
@@ -113,6 +116,17 @@ function ProtectedRoute({
         <h2 className="text-2xl font-bold">Access Denied</h2>
         <p className="text-muted-foreground mt-2">
           You need CIO privileges to view this page.
+        </p>
+      </div>
+    );
+  }
+
+  if (networkToolsOnly && !canUseNetworkTools(user)) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">
+          You need Network Tools access to view this page.
         </p>
       </div>
     );
@@ -284,7 +298,7 @@ function Router() {
       />
       <Route
         path="/network/tools"
-        component={() => <ProtectedRoute component={NetworkTools} />}
+        component={() => <ProtectedRoute component={NetworkTools} networkToolsOnly />}
       />
       <Route
         path="/network/map"

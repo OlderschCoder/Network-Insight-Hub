@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requireNetworkAdmin } from "./auth";
+import { requireAuth, requireNetworkToolsAccess } from "./auth";
 import {
   PRINT_SERVER,
   PrinterManagementError,
@@ -33,7 +33,7 @@ function sendPrinterManagementError(res: any, error: unknown) {
 }
 
 /** GET /api/network/printers/drivers – exact drivers registered on PRNTSP2. */
-router.get("/drivers", requireAuth, requireNetworkAdmin, async (_req, res) => {
+router.get("/drivers", requireAuth, requireNetworkToolsAccess, async (_req, res) => {
   try {
     const drivers = await listPrinterDrivers();
     return res.json({ configured: true, printServer: PRINT_SERVER, drivers });
@@ -43,7 +43,7 @@ router.get("/drivers", requireAuth, requireNetworkAdmin, async (_req, res) => {
 });
 
 /** POST /api/network/printers – idempotently create/update a shared RAW TCP/9100 queue. */
-router.post("/", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+router.post("/", requireAuth, requireNetworkToolsAccess, async (req: any, res) => {
   try {
     const result = await installPrinter(req.body);
     req.log?.info?.(

@@ -92,6 +92,7 @@ export interface User {
   department?: string;
   jobTitle?: string | null;
   canManageTodos?: boolean;
+  canUseNetworkTools?: boolean;
   isActive?: boolean;
   createdAt?: string;
 }
@@ -132,6 +133,7 @@ export interface UpdateUserBody {
   role?: UpdateUserBodyRole;
   department?: string;
   isActive?: boolean;
+  canUseNetworkTools?: boolean;
 }
 
 export type EntryCategory = (typeof EntryCategory)[keyof typeof EntryCategory];

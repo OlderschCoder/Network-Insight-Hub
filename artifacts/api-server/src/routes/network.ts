@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import type { MaintenanceLogEntry } from "@workspace/db";
 import { eq, and, or, ilike, desc, inArray, sql } from "drizzle-orm";
-import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
+import { requireAuth, requireCIO, requireNetworkAdmin, requireNetworkToolsAccess } from "./auth";
 import {
   getFortiGateConfig,
   whitelistUrl,
@@ -832,7 +832,7 @@ router.delete("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: an
 
 // ----- FortiGate website whitelist (Network Tool) -----
 
-router.get("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+router.get("/whitelist", requireAuth, requireNetworkToolsAccess, async (req: any, res) => {
   const cfg = getFortiGateConfig();
   if (!cfg) {
     return res.json({ configured: false, host: null, profile: null, entries: [] });
@@ -849,7 +849,7 @@ router.get("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res)
   }
 });
 
-router.post("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+router.post("/whitelist", requireAuth, requireNetworkToolsAccess, async (req: any, res) => {
   const schema = z.object({
     url: z.string().min(1).max(500),
     action: z.enum(["exempt", "allow", "monitor"]).optional(),

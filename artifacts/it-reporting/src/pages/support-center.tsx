@@ -28,6 +28,8 @@ import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/authFetch";
+import { useAuth } from "@/context/AuthContext";
+import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 import {
   SectionEyebrow,
   StatusDot,
@@ -110,6 +112,7 @@ function statusHealth(status: string): PortalHealth {
 }
 
 export default function SupportCenter() {
+  const { user } = useAuth();
   const [, navigate] = useLocation();
   const confirm = useConfirm();
   const { toast } = useToast();
@@ -421,7 +424,9 @@ export default function SupportCenter() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-2 p-4">
-            {diagnosticTools.map(({ label, description, href, icon: Icon }) => (
+            {diagnosticTools
+              .filter(({ href }) => href !== "/network/tools" || canUseNetworkTools(user))
+              .map(({ label, description, href, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -433,7 +438,7 @@ export default function SupportCenter() {
                   {description}
                 </p>
               </Link>
-            ))}
+              ))}
           </CardContent>
         </Card>
 

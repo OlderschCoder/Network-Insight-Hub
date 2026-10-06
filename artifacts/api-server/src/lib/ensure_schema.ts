@@ -821,6 +821,19 @@ export async function ensureSchema(): Promise<void> {
     logger.error({ err }, "Failed to ensure team to-do schema");
   }
 
+  // Network Tools access is narrower than the network-engineer role. It lets
+  // selected staff use the firewall whitelist, printer setup, and approved
+  // equipment scripts without granting switch, VLAN, or topology write access.
+  try {
+    await db.execute(sql`
+      ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "can_use_network_tools" boolean DEFAULT false NOT NULL
+    `);
+    logger.info("Ensured users.can_use_network_tools column exists");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure Network Tools permission column");
+  }
+
   // Product engagement is distinct from work records. A task assignment or PIR
   // proves ownership/contribution, not that the assignee signed in or viewed a
   // page. This event stream captures only authenticated page views, bounded

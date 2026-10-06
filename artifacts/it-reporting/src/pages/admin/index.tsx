@@ -113,6 +113,19 @@ export default function Admin() {
     }
   };
 
+  const handleNetworkToolsToggle = async (userId: number, currentAccess: boolean) => {
+    try {
+      await updateMutation.mutateAsync({
+        id: userId,
+        data: { canUseNetworkTools: !currentAccess },
+      });
+      await refreshUsers();
+      toast({ title: currentAccess ? "Network Tools access removed" : "Network Tools access granted" });
+    } catch {
+      toast({ title: "Failed to update Network Tools access", variant: "destructive" });
+    }
+  };
+
   const handleSaveDetails = async (userId: number) => {
     const details = editingDetails[userId];
     if (!details) return;
@@ -291,6 +304,20 @@ export default function Admin() {
                         disabled={updateMutation.isPending}
                       >
                         Save
+                      </Button>
+                    )}
+
+                    {["cio", "network", "network_engineer"].includes(user.role ?? "") ? (
+                      <Badge variant="outline">Network Tools via role</Badge>
+                    ) : (
+                      <Button
+                        variant={user.canUseNetworkTools ? "default" : "outline"}
+                        size="sm"
+                        data-testid={`button-network-tools-${user.id}`}
+                        onClick={() => handleNetworkToolsToggle(user.id, user.canUseNetworkTools === true)}
+                        disabled={updateMutation.isPending}
+                      >
+                        Network Tools {user.canUseNetworkTools ? "On" : "Off"}
                       </Button>
                     )}
 

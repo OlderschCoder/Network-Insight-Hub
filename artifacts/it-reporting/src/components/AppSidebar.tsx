@@ -23,13 +23,12 @@ import { Logo } from "@/components/system";
 import { useAuth } from "@/context/AuthContext";
 import { getNavGroups, isNavItemActive } from "@/config/nav";
 import { AppModeSwitcher, UserAvatar } from "@/components/portal-ui";
+import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 
 export function AppSidebar() {
   const { isCIO, user } = useAuth();
   const [location] = useLocation();
-  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
-    user?.role ?? "",
-  );
+  const canNetworkTools = canUseNetworkTools(user);
   const groups = getNavGroups(isCIO, canNetworkTools);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};

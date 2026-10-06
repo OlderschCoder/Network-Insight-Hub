@@ -67,6 +67,7 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
       role: z.enum(["cio", "helpdesk", "network", "security", "network_engineer", "security_engineer", "staff"]).optional(),
       department: z.string().optional(),
       isActive: z.boolean().optional(),
+      canUseNetworkTools: z.boolean().optional(),
     });
   } else {
     schema = z.object({

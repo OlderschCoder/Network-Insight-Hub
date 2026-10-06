@@ -2378,6 +2378,8 @@ components:
           nullable: true
         canManageTodos:
           type: boolean
+        canUseNetworkTools:
+          type: boolean
         isActive:
           type: boolean
         createdAt:
@@ -2437,6 +2439,8 @@ components:
         department:
           type: string
         isActive:
+          type: boolean
+        canUseNetworkTools:
           type: boolean
 
     Entry:

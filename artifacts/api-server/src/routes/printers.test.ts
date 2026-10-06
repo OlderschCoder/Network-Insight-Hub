@@ -12,12 +12,19 @@ vi.mock("./auth", () => ({
     if (req.headers.authorization !== "Bearer test") {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    req.user = { id: 42, role: req.headers["x-test-role"] ?? "helpdesk" };
+    req.user = {
+      id: 42,
+      role: req.headers["x-test-role"] ?? "helpdesk",
+      canUseNetworkTools: req.headers["x-test-network-tools"] === "true",
+    };
     next();
   },
-  requireNetworkAdmin(req: any, res: any, next: any) {
-    if (!["cio", "network", "network_engineer"].includes(req.user?.role)) {
-      return res.status(403).json({ error: "Network administrator access required" });
+  requireNetworkToolsAccess(req: any, res: any, next: any) {
+    if (
+      !req.user?.canUseNetworkTools &&
+      !["cio", "network", "network_engineer"].includes(req.user?.role)
+    ) {
+      return res.status(403).json({ error: "Network Tools access required" });
     }
     next();
   },
@@ -50,12 +57,23 @@ describe("printer routes", () => {
     bridge.installPrinter.mockReset();
   });
 
-  it("requires both authentication and the network-administrator role", async () => {
+  it("requires authentication and Network Tools access", async () => {
     expect((await request(makeApp()).get("/api/network/printers/drivers")).status).toBe(401);
     expect((await request(makeApp())
       .get("/api/network/printers/drivers")
       .set("Authorization", "Bearer test")
       .set("x-test-role", "helpdesk")).status).toBe(403);
+  });
+
+  it("accepts a scoped Network Tools grant for help desk staff", async () => {
+    bridge.listPrinterDrivers.mockResolvedValue(["SHARP BP-50C26 PCL6"]);
+    const response = await request(makeApp())
+      .get("/api/network/printers/drivers")
+      .set("Authorization", "Bearer test")
+      .set("x-test-role", "helpdesk")
+      .set("x-test-network-tools", "true");
+
+    expect(response.status).toBe(200);
   });
 
   it("returns the live fixed-server driver catalog", async () => {

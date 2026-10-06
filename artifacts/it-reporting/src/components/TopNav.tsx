@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 import { getNavGroups, isNavItemActive, type NavGroup } from "@/config/nav";
 import {
   DropdownMenu,
@@ -116,9 +117,7 @@ function GroupMenu({ group, location }: { group: NavGroup; location: string }) {
 export function TopNav() {
   const { isCIO, user } = useAuth();
   const [location] = useLocation();
-  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
-    user?.role ?? "",
-  );
+  const canNetworkTools = canUseNetworkTools(user);
   const groups = getNavGroups(isCIO, canNetworkTools);
 
   return (

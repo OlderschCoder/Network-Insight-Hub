@@ -66,6 +66,7 @@ export const LoginResponse = zod.object({
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
     canManageTodos: zod.boolean().optional(),
+    canUseNetworkTools: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -103,6 +104,7 @@ export const EntraExchangeResponse = zod.object({
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
     canManageTodos: zod.boolean().optional(),
+    canUseNetworkTools: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -128,6 +130,7 @@ export const GetMeResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
+  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -181,6 +184,7 @@ export const ListUsersResponseItem = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
+  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -206,6 +210,7 @@ export const GetUserResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
+  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -229,6 +234,7 @@ export const UpdateUserBody = zod.object({
     .optional(),
   department: zod.string().optional(),
   isActive: zod.boolean().optional(),
+  canUseNetworkTools: zod.boolean().optional(),
 });
 
 export const UpdateUserResponse = zod.object({
@@ -247,6 +253,7 @@ export const UpdateUserResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
+  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
