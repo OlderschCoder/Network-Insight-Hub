@@ -12,9 +12,9 @@ failed records remain in the run audit and the final state becomes
 closed.
 
 The two firewalls are polled continuously by Telegraf on `10.0.0.22` (60-second
-SNMP inputs). The nightly run uses Fred's service-token readback to verify that
-both approved firewalls have recent interface telemetry. A firewall warning is
-recorded without discarding healthy switch updates.
+SNMP inputs). The nightly run uses a read-only InfluxDB token on that same host
+to verify that both approved firewalls have recent interface telemetry. A
+firewall warning is recorded without discarding healthy switch updates.
 
 Operational files:
 

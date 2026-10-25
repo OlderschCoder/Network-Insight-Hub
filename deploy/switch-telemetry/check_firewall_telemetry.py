@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from datetime import datetime, timedelta, timezone
+import io
 import json
 import os
 from pathlib import Path
@@ -14,10 +16,6 @@ import urllib.request
 
 
 SCHEMA = "sccc.network.firewall_telemetry.status.v1"
-DEFAULT_ENDPOINT = (
-    "https://app-server2.centralus.cloudapp.azure.com/"
-    "api/network-map/telemetry/firewalls/status"
-)
 APPROVED_HOSTS = {"192.168.1.1", "172.25.0.1"}
 
 
@@ -79,32 +77,81 @@ def evaluate(payload: object, *, now: datetime, max_age_minutes: int) -> dict:
     }
 
 
+def query_influx(url: str, token: str, org: str, flux: str) -> list[dict]:
+    request = urllib.request.Request(
+        f"{url.rstrip('/')}/api/v2/query?org={urllib.parse.quote(org)}",
+        data=flux.encode("utf-8"),
+        headers={
+            "Authorization": f"Token {token}",
+            "Content-Type": "application/vnd.flux",
+            "Accept": "application/csv",
+            "User-Agent": "SCCC-Switch-Telemetry/1.1",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        lines = [line for line in response.read().decode("utf-8").splitlines() if line and not line.startswith("#")]
+    return list(csv.DictReader(io.StringIO("\n".join(lines)))) if lines else []
+
+
+def read_firewall_status(*, url: str, token: str, org: str, bucket: str) -> dict:
+    host_filter = " or ".join(f'r.source == "{host}"' for host in sorted(APPROVED_HOSTS))
+    base = (
+        f'from(bucket: "{bucket}") |> range(start: -10m) '
+        f'|> filter(fn: (r) => r._measurement == "interface" '
+        f'and r._field == "ifHCInOctets" and ({host_filter})) '
+        '|> group(columns: ["source"]) '
+    )
+    last_rows = query_influx(
+        url,
+        token,
+        org,
+        base + '|> last() |> keep(columns: ["source", "_time", "_value"])',
+    )
+    count_rows = query_influx(
+        url,
+        token,
+        org,
+        base + '|> distinct(column: "ifName") |> count()',
+    )
+    last_by_host = {str(row.get("source") or ""): row.get("_time") for row in last_rows}
+    count_by_host = {
+        str(row.get("source") or ""): int(row.get("_value") or 0)
+        for row in count_rows
+    }
+    return {
+        "firewalls": [
+            {
+                "host": host,
+                "configured": True,
+                "reachable": host in last_by_host,
+                "lastPolled": last_by_host.get(host),
+                "interfaceTelemetryAvailable": count_by_host.get(host, 0) > 0,
+                "interfaceCount": count_by_host.get(host, 0),
+            }
+            for host in sorted(APPROVED_HOSTS)
+        ]
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify fresh telemetry for both approved FortiGates")
     parser.add_argument("--result", type=Path, required=True)
     parser.add_argument("--max-age-minutes", type=int, default=10)
     args = parser.parse_args()
 
-    token = os.environ.get("SWITCH_TELEMETRY_TOKEN", "").strip()
-    endpoint = os.environ.get("FIREWALL_TELEMETRY_STATUS_URL", DEFAULT_ENDPOINT).strip()
-    parsed_endpoint = urllib.parse.urlparse(endpoint)
-    if not token or parsed_endpoint.scheme.lower() != "https" or not parsed_endpoint.hostname:
-        raise SystemExit("A service token and absolute HTTPS firewall status URL are required")
+    url = os.environ.get("INFLUXDB_URL", "").strip()
+    token = os.environ.get("INFLUXDB_TOKEN", "").strip()
+    org = os.environ.get("INFLUXDB_ORG", "SCCC").strip()
+    bucket = os.environ.get("INFLUXDB_BUCKET", "telegraf").strip()
+    parsed_url = urllib.parse.urlparse(url)
+    if not token or parsed_url.scheme.lower() not in {"http", "https"} or not parsed_url.hostname:
+        raise SystemExit("A read-only InfluxDB URL and token are required")
 
-    request = urllib.request.Request(
-        endpoint,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-            "User-Agent": "SCCC-Switch-Telemetry/1.1",
-        },
-        method="GET",
-    )
     now = datetime.now(timezone.utc)
     try:
-        with urllib.request.urlopen(request, timeout=45) as response:
-            payload = json.load(response)
-    except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+        payload = read_firewall_status(url=url, token=token, org=org, bucket=bucket)
+    except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, ValueError) as exc:
         payload = {"error": exc.__class__.__name__}
 
     result = evaluate(payload, now=now, max_age_minutes=args.max_age_minutes)

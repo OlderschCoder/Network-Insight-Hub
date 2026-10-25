@@ -3,9 +3,10 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from audit_switch_telemetry import audit
-from check_firewall_telemetry import evaluate
+from check_firewall_telemetry import evaluate, read_firewall_status
 from publish_switch_telemetry import validate_aggregate
 
 
@@ -65,6 +66,27 @@ class AuditorTests(unittest.TestCase):
 
 
 class FirewallStatusTests(unittest.TestCase):
+    @patch("check_firewall_telemetry.query_influx")
+    def test_builds_status_from_last_sample_and_interface_counts(self, query):
+        query.side_effect = [
+            [
+                {"source": "192.168.1.1", "_time": "2026-10-25T13:10:14Z"},
+                {"source": "172.25.0.1", "_time": "2026-10-25T13:10:11Z"},
+            ],
+            [
+                {"source": "192.168.1.1", "_value": "65"},
+                {"source": "172.25.0.1", "_value": "17"},
+            ],
+        ]
+        payload = read_firewall_status(
+            url="http://127.0.0.1:8086",
+            token="not-a-real-token",
+            org="SCCC",
+            bucket="telegraf",
+        )
+        self.assertEqual([item["interfaceCount"] for item in payload["firewalls"]], [17, 65])
+        self.assertEqual(query.call_count, 2)
+
     def test_accepts_both_fresh_firewalls(self):
         now = datetime(2026, 10, 25, 13, 10, tzinfo=timezone.utc)
         payload = {
