@@ -22,6 +22,10 @@ param(
     [string]$FredOrigin,
     [string]$AgentSourceDirectory,
     [string]$ExternalProbeOrigin,
+    [switch]$PublishInventory,
+    [string]$WorkerCredentialPath,
+    [ValidatePattern('^[A-Fa-f0-9]{40}$')]
+    [string]$SignerThumbprint,
     [switch]$PermitSustained,
     [string[]]$ProvisionComputerName = @()
 )
@@ -91,7 +95,8 @@ if (-not $resolvedOu.DistinguishedName.EndsWith(',' + $adDomain.DistinguishedNam
     throw 'The workstation OU must belong to the authenticated AD domain.'
 }
 $objects = @(Get-ADComputer -Filter * -SearchBase $resolvedOu.DistinguishedName -SearchScope Subtree `
-    -Properties DNSHostName, Enabled, ObjectGUID -ErrorAction Stop)
+    -Properties DNSHostName, Enabled, ObjectGUID, OperatingSystem, userAccountControl -ErrorAction Stop |
+    Where-Object { $_.OperatingSystem -notmatch 'Server' -and -not ([int]$_.userAccountControl -band 8192) })
 if ($objects.Count -eq 0) { throw 'Empty AD roster; refusing to replace the trusted inventory.' }
 
 $rows = @($objects | Sort-Object Name | ForEach-Object {
@@ -133,6 +138,31 @@ if ($PSCmdlet.ShouldProcess($absoluteOutput, 'Write complete AD diagnostics inve
     }
 }
 
+if ($PublishInventory) {
+    $origin = Assert-HttpsOrigin $FredOrigin
+    $token = [Environment]::GetEnvironmentVariable('BUILDING_DIAGNOSTICS_WORKER_TOKEN', 'Process')
+    if ($WorkerCredentialPath) {
+        Assert-NoReparsePath $WorkerCredentialPath
+        Assert-PrivateDirectory (Split-Path -Parent ([IO.Path]::GetFullPath($WorkerCredentialPath)))
+        $credentialAcl = Get-Acl -LiteralPath $WorkerCredentialPath
+        foreach ($rule in $credentialAcl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+            if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin @('S-1-5-18','S-1-5-32-544')) { throw 'Worker credential must be private to SYSTEM and Administrators.' }
+        }
+        Add-Type -AssemblyName System.Security
+        $token = [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect(
+            [IO.File]::ReadAllBytes($WorkerCredentialPath), $null, [Security.Cryptography.DataProtectionScope]::LocalMachine))
+    }
+    if (-not $token -or $token.Length -lt 32 -or $token -match '\s') { throw 'A protected dedicated worker credential is required.' }
+    try {
+        if ($PSCmdlet.ShouldProcess($origin, 'Publish complete workstation AD inventory; preserve network evidence')) {
+            $body = @{ snapshotComplete = $true; adObservedAt = $snapshot.adObservedAt; adComputers = $rows }
+            $null = Invoke-RestMethod -Method Post -Uri ($origin + '/api/building-diagnostics/ad-inventory') `
+                -Headers @{ Authorization = 'Bearer ' + $token } -ContentType 'application/json' `
+                -Body ($body | ConvertTo-Json -Depth 8 -Compress) -MaximumRedirection 0 -TimeoutSec 30
+            Write-Output ('Published {0} AD workstations; no endpoint was enrolled or started.' -f $rows.Count)
+        }
+    } finally { $token = $null }
+}
 if ($ProvisionComputerName.Count -eq 0) {
     if ($snapshotWritten) { Write-Output ('Exported complete AD roster with {0} computers. No computer was provisioned.' -f $rows.Count) }
     else { Write-Output ('Read {0} AD computers. No inventory file was written and no computer was provisioned.' -f $rows.Count) }
@@ -147,6 +177,7 @@ if (-not $workerToken -or $workerToken.Length -lt 32 -or $workerToken -match '\s
 }
 $headers = @{ Authorization = 'Bearer ' + $workerToken }
 $requiredAgentFiles = @('Install-DiagnosticsAgent.ps1', 'Invoke-DiagnosticsAgent.ps1', 'Sccc.Diagnostics.psm1', 'ExternalProbe.dll')
+if (-not $SignerThumbprint) { throw 'The reviewed helper signer thumbprint is required for provisioning.' }
 foreach ($fileName in $requiredAgentFiles) {
     if (-not $AgentSourceDirectory -or -not (Test-Path -LiteralPath (Join-Path $AgentSourceDirectory $fileName) -PathType Leaf)) {
         throw 'AgentSourceDirectory must contain the separately reviewed diagnostics installer, module, and runner.'
@@ -170,7 +201,7 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
         # authenticates the AD hostname; local checks protect stale object/name.
         $identity = Invoke-Command -Session $session -ScriptBlock {
             $system = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
-            $parentPath = Join-Path $env:ProgramData 'SCCC'
+            $parentPath = Join-Path $env:ProgramData 'SCCC-Diagnostics'
             if (Test-Path -LiteralPath $parentPath) {
                 if ((Get-Item -LiteralPath $parentPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
                     throw 'SCCC application parent cannot be a reparse point.'
@@ -189,13 +220,13 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
                     }
                 }
             }
-            $stagingPath = Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning'
+            $stagingPath = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning'
             if ((Test-Path -LiteralPath $stagingPath) -and
                 ((Get-Item -LiteralPath $stagingPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
                 throw 'Diagnostics provisioning directory cannot be a reparse point.'
             }
             [pscustomobject]@{ ComputerName = $env:COMPUTERNAME; Domain = $system.Domain; Joined = $system.PartOfDomain
-                AlreadyConfigured = (Test-Path -LiteralPath (Join-Path $env:ProgramData 'SCCC\Diagnostics\config.json')) }
+                AlreadyConfigured = (Test-Path -LiteralPath (Join-Path $env:ProgramData 'SCCC-Diagnostics\Agent\config.json')) }
         }
         if (-not $identity.Joined -or $identity.ComputerName -ine $computer.Name -or
             $identity.Domain -ine $adDomain.DNSRoot) { throw 'Kerberos pilot identity did not match its AD object.' }
@@ -208,7 +239,7 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
             computerName = $computer.Name; domain = $adDomain.DNSRoot; externalProbeOrigin = $externalOrigin; permitSustained = [bool]$PermitSustained }
         Invoke-Command -Session $session -ArgumentList ($deviceConfig | ConvertTo-Json -Compress) -ScriptBlock {
             param([string]$ConfigJson)
-            $directory = Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning'
+            $directory = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning'
             if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
             $acl = New-Object Security.AccessControl.DirectorySecurity
             $acl.SetAccessRuleProtection($true, $false)
@@ -231,14 +262,14 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
             Set-Acl -LiteralPath $path -AclObject $fileAcl
             $null = $ConfigJson
         } | Out-Null
-        $remoteStagingDirectory = Invoke-Command -Session $session -ScriptBlock { Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning' }
+        $remoteStagingDirectory = Invoke-Command -Session $session -ScriptBlock { Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning' }
         foreach ($fileName in $requiredAgentFiles) {
             Copy-Item -LiteralPath (Join-Path $AgentSourceDirectory $fileName) -Destination (Join-Path $remoteStagingDirectory $fileName) -ToSession $session
         }
-        Invoke-Command -Session $session -ArgumentList $adDomain.DNSRoot -ScriptBlock {
-            param([string]$ExpectedDomain)
-            $directory = Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning'
-            & (Join-Path $directory 'Install-DiagnosticsAgent.ps1') -ProvisioningFile (Join-Path $directory 'device.json') -ExpectedDomain $ExpectedDomain
+        Invoke-Command -Session $session -ArgumentList $adDomain.DNSRoot,$SignerThumbprint -ScriptBlock {
+            param([string]$ExpectedDomain, [string]$ExpectedSigner)
+            $directory = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning'
+            & (Join-Path $directory 'Install-DiagnosticsAgent.ps1') -ProvisioningFile (Join-Path $directory 'device.json') -ExpectedDomain $ExpectedDomain -SignerThumbprint $ExpectedSigner
             if (-not $?) { throw 'Diagnostics staging failed.' }
         } | Out-Null
         Write-Output ('Provisioned and staged diagnostics only for ' + $computer.Name + '; its task remains disabled.')
@@ -246,7 +277,7 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
         $credential = $null
         $deviceConfig = $null
         Invoke-Command -Session $session -ScriptBlock {
-            $path = Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning\device.json'
+            $path = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning\device.json'
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
         } -ErrorAction SilentlyContinue | Out-Null
         Remove-PSSession -Session $session
