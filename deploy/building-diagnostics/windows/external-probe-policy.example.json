@@ -1,0 +1,5 @@
+{
+  "externalProbeOrigin": "https://markb855.sg-host.com",
+  "permitSustained": false,
+  "note": "Policy fields for a protected provisioning record; this is not a device credential or an active configuration. The temporary hostname can be changed only after reviewing and configuring the same HTTPS origin on Fred."
+}

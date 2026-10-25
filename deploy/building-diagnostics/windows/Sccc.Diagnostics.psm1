@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$script:AgentVersion = '1.0.0'
+$script:AgentVersion = '1.1.0'
 $script:MaximumTransferBytes = 32MB
 
 function Get-DiagnosticsServerOrigin {
@@ -86,19 +86,29 @@ function Read-DiagnosticsConfig {
     try { $token = [Text.Encoding]::UTF8.GetString($clearBytes) }
     finally { [Array]::Clear($clearBytes, 0, $clearBytes.Length) }
     if ($token -cnotmatch '^sccc-diag\.[A-Za-z0-9_-]{43}$') { throw 'Invalid independent diagnostics credential.' }
-    return [pscustomobject]@{ ServerOrigin = $origin; DeviceId = $deviceId; DeviceToken = $token; Domain = [string]$config.domain }
+    $externalOrigin = ''
+    $permitSustained = $false
+    if ($config.PSObject.Properties['externalProbeOrigin'] -and $config.externalProbeOrigin) { $externalOrigin = Get-DiagnosticsServerOrigin -ServerUrl ([string]$config.externalProbeOrigin); if (-not ([Uri]$externalOrigin).IsDefaultPort) { throw 'External probe requires HTTPS port 443.' } }
+    if ($config.PSObject.Properties['permitSustained']) { $permitSustained = $config.permitSustained -eq $true }
+    return [pscustomobject]@{ ServerOrigin = $origin; DeviceId = $deviceId; DeviceToken = $token; Domain = [string]$config.domain; ExternalProbeOrigin = $externalOrigin; PermitSustained = $permitSustained }
 }
 
 function Test-DiagnosticsJob {
     param([Parameter(Mandatory = $true)]$Job, [Parameter(Mandatory = $true)][string]$DeviceId,
-        [Parameter(Mandatory = $true)][string]$DeviceToken, [DateTimeOffset]$Now = [DateTimeOffset]::UtcNow)
+        [Parameter(Mandatory = $true)][string]$DeviceToken, [DateTimeOffset]$Now = [DateTimeOffset]::UtcNow,
+        [string]$ExternalProbeOrigin = '', [bool]$PermitSustained = $false)
     $id = [Guid]::Empty
     if (-not [Guid]::TryParse([string]$Job.id, [ref]$id)) { throw 'Invalid diagnostics job identity.' }
     $expires = [DateTimeOffset]::Parse([string]$Job.expiresAt, [Globalization.CultureInfo]::InvariantCulture)
     if ($expires -le $Now -or $expires -gt $Now.AddMinutes(5)) { throw 'Diagnostics job expiry is outside the permitted window.' }
+    $type = 'fred'
+    if ($Job.PSObject.Properties['type']) { $type = [string]$Job.type }
+    $external = $type -in @('external-quick', 'external-sustained')
+    if ($type -notin @('fred', 'external-quick', 'external-sustained')) { throw 'Unknown diagnostics job type.' }
+    $maximum = if ($external) { 1GB } else { $script:MaximumTransferBytes }
     foreach ($field in @('downloadBytes', 'uploadBytes')) {
         $value = 0L
-        if (-not [long]::TryParse([string]$Job.$field, [ref]$value) -or $value -lt 0 -or $value -gt $script:MaximumTransferBytes) {
+        if (-not [long]::TryParse([string]$Job.$field, [ref]$value) -or $value -lt 0 -or $value -gt $maximum) {
             throw 'Diagnostics transfer exceeds the permitted byte budget.'
         }
     }
@@ -107,6 +117,18 @@ function Test-DiagnosticsJob {
         throw 'Diagnostics ping count is outside the permitted range.'
     }
     $canonical = '{0}|{1}|{2}|{3}|{4}|{5}' -f [string]$Job.id, $DeviceId, [string]$Job.expiresAt, [string]$Job.downloadBytes, [string]$Job.uploadBytes, [string]$Job.pingCount
+    $targetOrigin = ''; $seconds = 30
+    if ($external) {
+        if (-not $ExternalProbeOrigin -or $Job.proofVersion -ne 2) { throw 'External probing is not configured for this device.' }
+        $targetOrigin = Get-DiagnosticsServerOrigin -ServerUrl ([string]$Job.targetOrigin)
+        if (-not ([Uri]$targetOrigin).IsDefaultPort) { throw 'External probe requires HTTPS port 443.' }
+        if ($targetOrigin -cne $ExternalProbeOrigin -or [long]$Job.uploadBytes -ne 0 -or $pingCount -ne 1) { throw 'External target does not match the protected device configuration.' }
+        $seconds = 0
+        if (-not [int]::TryParse([string]$Job.timeoutSeconds, [ref]$seconds) -or $seconds -lt 1 -or
+            ($type -eq 'external-quick' -and ($seconds -gt 30 -or [long]$Job.downloadBytes -ne 5MB)) -or
+            ($type -eq 'external-sustained' -and (-not $PermitSustained -or $seconds -gt 180 -or [long]$Job.downloadBytes -lt 1))) { throw 'External job exceeds its local permission or limits.' }
+        $canonical = 'v2|{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}' -f [string]$Job.id, $DeviceId, [string]$Job.expiresAt, $type, [string]$Job.targetOrigin, [string]$Job.downloadBytes, [string]$Job.uploadBytes, [string]$Job.pingCount, [string]$Job.timeoutSeconds
+    }
     $proof = [string]$Job.proof
     if ($proof -cnotmatch '^[A-Za-z0-9_-]{43}$') { throw 'Missing or invalid diagnostics job proof.' }
     $key = [Text.Encoding]::UTF8.GetBytes($DeviceToken)
@@ -119,7 +141,7 @@ function Test-DiagnosticsJob {
         if ($difference -ne 0) { throw 'Diagnostics job proof does not match this device and byte budget.' }
     } finally { $hmac.Dispose(); [Array]::Clear($key, 0, $key.Length) }
     # No additional URLs or commands from the server are interpreted.
-    return [pscustomobject]@{ Id = $id.ToString(); ExpiresAt = $expires; DownloadBytes = [long]$Job.downloadBytes; UploadBytes = [long]$Job.uploadBytes; PingCount = $pingCount }
+    return [pscustomobject]@{ Id = $id.ToString(); ExpiresAt = $expires; DownloadBytes = [long]$Job.downloadBytes; UploadBytes = [long]$Job.uploadBytes; PingCount = $pingCount; Type = $type; TargetOrigin = $targetOrigin; TimeoutSeconds = $seconds }
 }
 
 function Get-DiagnosticsMbps {
@@ -228,6 +250,7 @@ function Get-DiagnosticsPresence {
         agentVersion = $script:AgentVersion; interfaces = $interfaces
     }
     if ($computer.UserName) { $presence.loggedOnUser = [string]$computer.UserName }
+    if ($Config.PSObject.Properties['ExternalProbeOrigin'] -and $Config.ExternalProbeOrigin) { $presence.capabilities = @('external-probe-v2') }
     return $presence
 }
 
@@ -263,8 +286,9 @@ function Invoke-DiagnosticsJson {
 }
 
 function Invoke-DiagnosticsMeasurement {
-    param($Client, [string]$Origin, [string]$DeviceId, [string]$DeviceToken, $Job)
-    $validated = Test-DiagnosticsJob -Job $Job -DeviceId $DeviceId -DeviceToken $DeviceToken
+    param($Client, [string]$Origin, [string]$DeviceId, [string]$DeviceToken, $Job, [string]$ExternalProbeOrigin = '', [bool]$PermitSustained = $false)
+    $validated = Test-DiagnosticsJob -Job $Job -DeviceId $DeviceId -DeviceToken $DeviceToken -ExternalProbeOrigin $ExternalProbeOrigin -PermitSustained $PermitSustained
+    if ($validated.Type -ne 'fred') { return Invoke-DiagnosticsExternalMeasurement -Client $Client -Origin $Origin -DeviceId $DeviceId -Validated $validated }
     $prefix = $Origin + '/api/building-diagnostics/agent/'
     $result = @{ deviceId = $DeviceId; jobId = $validated.Id; downloadBytes = 0L; uploadBytes = 0L }
     $times = @()
@@ -337,6 +361,91 @@ function Invoke-DiagnosticsMeasurement {
         $result.error = 'bounded_measurement_failed'
     }
     return $result
+}
+
+function Import-DiagnosticsExternalEngine {
+    # Production never compiles or executes an unsigned .cs file. The release
+    # package includes a signed DLL, verified again before loading.
+    if ('Sccc.Diagnostics.ExternalProbe' -as [type]) { return }
+    $path = Join-Path $PSScriptRoot 'ExternalProbe.dll'
+    Test-DiagnosticsProtectedPath -Path $path
+    $signature = Get-AuthenticodeSignature -LiteralPath $path
+    if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate -or
+        $signature.SignerCertificate.Subject -cne 'CN=Seward County Community College, O=Seward County Community College, L=Liberal, S=Kansas, C=US') { throw 'External probe engine must have a valid timestamped SCCC signature.' }
+    [void][Reflection.Assembly]::LoadFrom($path)
+}
+
+function Get-DiagnosticsActiveAdapter {
+    param([string]$LocalAddress)
+    if (-not $LocalAddress) { return $null }
+    try {
+        $address = Get-NetIPAddress -IPAddress $LocalAddress -ErrorAction Stop | Select-Object -First 1
+        $adapter = Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Object { $_.ifIndex -eq $address.InterfaceIndex } | Select-Object -First 1
+        if (-not $adapter) { return $null }
+        $ip = Get-NetIPConfiguration -InterfaceIndex $address.InterfaceIndex -ErrorAction SilentlyContinue
+        $kind = 'other'
+        if ([int]$adapter.NdisPhysicalMedium -in @(1,9)) { $kind = 'wifi' }
+        elseif ([int]$adapter.NdisPhysicalMedium -eq 14 -or [int]$adapter.MediaType -eq 0) { $kind = 'ethernet' }
+        $result = @{ interfaceAlias = ([string]$adapter.Name).Substring(0, [Math]::Min(120, ([string]$adapter.Name).Length)); kind = $kind; localIp = $LocalAddress; subnetPrefixLength = [int]$address.PrefixLength }
+        $mac = ($adapter.MacAddress -replace '-', ':').ToLowerInvariant()
+        if ($mac -match '^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$') { $result.mac = $mac }
+        $gateways = @()
+        if ($ip) { $gateways = @(if ($LocalAddress.Contains(':')) { @($ip.IPv6DefaultGateway) } else { @($ip.IPv4DefaultGateway) }) }
+        if ($ip -and $gateways.Count -gt 0 -and $gateways[0]) { $result.gateway = ([string]$gateways[0].NextHop -split '%')[0] }
+        if ($kind -eq 'wifi') {
+            $association = @(Get-DiagnosticsWifiAssociation | Where-Object { $_.InterfaceGuid -ieq ([Guid]$adapter.InterfaceGuid).ToString() } | Select-Object -First 1)
+            if ($association.Count -gt 0) { $result.bssid = [string]$association[0].Bssid; if ($association[0].Ssid) { $result.ssid = [string]$association[0].Ssid } }
+        }
+        return $result
+    } catch { return $null }
+}
+
+function Invoke-DiagnosticsExternalMeasurement {
+    param($Client, [string]$Origin, [string]$DeviceId, $Validated)
+    Import-DiagnosticsExternalEngine
+    $cancel = New-Object Threading.CancellationTokenSource
+    $statusResponse = $null
+    $cancelReason = 'cancelled'
+    try {
+        $task = [Sccc.Diagnostics.ExternalProbe]::Start($Validated.TargetOrigin, $Validated.Type, $Validated.DownloadBytes, $Validated.TimeoutSeconds, $cancel.Token)
+        while (-not $task.Wait(2000)) {
+            if ([DateTimeOffset]::UtcNow -ge $Validated.ExpiresAt) { $cancelReason = 'job_expired'; $cancel.Cancel(); break }
+            # Only the Fred client has a bearer. The external TLS engine has no
+            # credential parameter and connects directly to the pinned target.
+            $statusRequest = $null; $statusTimeout = $null; $statusStream = $null
+            try {
+                $statusTimeout = New-Object Threading.CancellationTokenSource
+                $statusTimeout.CancelAfter(5000)
+                $statusRequest = New-Object Net.Http.HttpRequestMessage([Net.Http.HttpMethod]::Get, ($Origin + '/api/building-diagnostics/agent/jobs/' + $Validated.Id))
+                $statusResponse = $Client.SendAsync($statusRequest, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $statusTimeout.Token).GetAwaiter().GetResult()
+                [void]$statusResponse.EnsureSuccessStatusCode()
+                if ($statusResponse.Content.Headers.ContentLength -gt 4096) { throw 'Oversized job status.' }
+                $statusStream = $statusResponse.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+                $statusBuffer = New-Object byte[] 4097
+                $statusBytes = 0
+                while (($read = $statusStream.ReadAsync($statusBuffer, $statusBytes, (4097 - $statusBytes), $statusTimeout.Token).GetAwaiter().GetResult()) -gt 0) {
+                    $statusBytes += $read
+                    if ($statusBytes -gt 4096) { throw 'Oversized job status.' }
+                }
+                $statusText = [Text.Encoding]::UTF8.GetString($statusBuffer, 0, $statusBytes)
+                $status = $statusText | ConvertFrom-Json
+                if ($status.status -ne 'running') { $cancel.Cancel(); break }
+            } catch { $cancelReason = 'control_plane_unavailable'; $cancel.Cancel(); break }
+            finally { if ($statusStream) { $statusStream.Dispose() }; if ($statusResponse) { $statusResponse.Dispose(); $statusResponse = $null }; if ($statusRequest) { $statusRequest.Dispose() }; if ($statusTimeout) { $statusTimeout.Dispose() } }
+        }
+        $measurement = $task.GetAwaiter().GetResult()
+        if ($measurement.failure -eq 'cancelled') { $measurement.failure = $cancelReason }
+        $external = @{}
+        foreach ($field in $measurement.GetType().GetFields()) {
+            $value = $field.GetValue($measurement)
+            if ($null -ne $value -and -not ($value -is [string] -and $value.Length -eq 0)) { $external[$field.Name] = $value }
+        }
+        $adapter = Get-DiagnosticsActiveAdapter -LocalAddress $measurement.localAddress
+        if ($adapter) { $external.activeAdapter = $adapter }
+        $result = @{ deviceId = $DeviceId; jobId = $Validated.Id; external = $external }
+        if ($measurement.failure) { $result.error = [string]$measurement.failure }
+        return $result
+    } finally { $cancel.Cancel(); $cancel.Dispose(); if ($statusResponse) { $statusResponse.Dispose() } }
 }
 
 Export-ModuleMember -Function Get-DiagnosticsServerOrigin, Test-DiagnosticsProtectedPath, Set-DiagnosticsProtectedAcl, Test-DiagnosticsParentPath, Read-DiagnosticsConfig, Test-DiagnosticsJob, Get-DiagnosticsMbps, Get-DiagnosticsPresence, New-DiagnosticsHttpClient, Invoke-DiagnosticsJson, Invoke-DiagnosticsMeasurement

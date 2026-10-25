@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import { requireAuth, requireNetworkAdmin } from "./auth";
-import { jobProof, MAX_TRANSFER_BYTES, secretsEqual, TARGET_LABEL } from "../lib/building_diagnostics";
+import { externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
 
 const text = z.string().trim().min(1).max(120);
@@ -19,11 +19,20 @@ const inventorySchema = z.object({
 }).strict();
 const checkInSchema = z.object({
   deviceId: guid, computerName: text, adDomain: text, adJoined: z.boolean(), uptimeSeconds: z.number().finite().nonnegative(), agentVersion: z.string().max(40), loggedOnUser: text.optional(),
+  capabilities: z.array(z.literal("external-probe-v2")).max(1).optional(),
   interfaces: z.array(z.object({ mac, ipAddresses: z.array(z.string().ip()).max(16), gateway: z.string().ip().optional(), kind: z.enum(["ethernet", "wifi", "other"]), bssid: mac.optional(), ssid: z.string().max(64).optional(), linkMbps: z.number().finite().nonnegative().max(1_000_000).optional() }).strict()).max(16),
 }).strict();
 const metric = z.number().finite().nonnegative().max(1_000_000).optional();
-const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional() }).strict().refine((r) => !!r.error || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
-const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional() }).strict().refine((v) => !!v.deviceIds || !!v.building, "Select devices or a building");
+const phaseMs = z.number().finite().min(0).max(195_000).nullable().optional();
+const externalResultSchema = z.object({
+  type: z.enum(["external-quick", "external-sustained"]), targetOrigin: z.string().url().max(255), path: z.enum(["/probe-5mb.bin", "/probe-1gb.bin"]),
+  timestamp, dnsMs: phaseMs, tcpConnectMs: phaseMs, tlsMs: phaseMs, ttfbMs: phaseMs,
+  httpStatus: z.union([z.literal(0), z.number().int().min(100).max(599)]), bytesReceived: z.number().int().min(0).max(SUSTAINED_OBJECT_BYTES), elapsedMs: z.number().finite().min(0).max(195_000), mbps: metric,
+  remoteAddress: z.string().ip().optional(), localAddress: z.string().ip().optional(), dnsAddresses: z.array(z.string().ip()).max(16).optional(), failure: z.string().min(1).max(120).optional(),
+  activeAdapter: z.object({ interfaceAlias: text.optional(), kind: z.enum(["ethernet", "wifi", "other"]).optional(), mac: mac.optional(), localIp: z.string().ip().optional(), subnetPrefixLength: z.number().int().min(0).max(128).optional(), gateway: z.string().ip().optional(), ssid: z.string().max(64).optional(), bssid: mac.optional() }).strict().optional(),
+}).strict();
+const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional(), external: externalResultSchema.optional() }).strict().refine((r) => !!r.error || !!r.external || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
+const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional(), type: z.enum(["fred", "external-quick", "external-sustained"]).optional(), maxBytes: z.number().int().min(5_242_880).max(SUSTAINED_OBJECT_BYTES).optional(), scheduledAt: timestamp.optional(), sustainedConfirmed: z.boolean().optional() }).strict().refine((v) => !!v.deviceIds || !!v.building, "Select devices or a building");
 const credentialActionSchema = z.object({ reason: z.string().trim().min(3).max(300) }).strict();
 
 function bearer(req: any): string { const value = req.headers.authorization; return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : ""; }
@@ -46,7 +55,7 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   };
   router.get("/overview", requireAuth, requireNetworkAdmin, async (_req, res) => {
     const config = flags();
-    if (!config.enabled) return res.json({ ...config, devices: [], buildings: [], jobs: [], inventoryUpdatedAt: null, targetLabel: TARGET_LABEL });
+    if (!config.enabled) return res.json({ ...config, devices: [], buildings: [], jobs: [], inventoryUpdatedAt: null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() });
     return res.json({ ...config, ...await store.overview() });
   });
   router.post("/inventory", enabledOnly, workerOnly, async (req, res) => {
@@ -70,6 +79,7 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
     return res.json(await store.rotate(parse(guid, req.params.deviceId), reason, actor(req)));
   });
   router.post("/jobs", enabledOnly, requireAuth, requireNetworkAdmin, async (req: any, res) => res.status(202).json(await store.queue(parse(queueSchema, req.body), `Fred user ${req.user.id}`)));
+  router.post("/jobs/:jobId/cancel", enabledOnly, requireAuth, requireNetworkAdmin, async (req: any, res) => res.json(await store.cancel(parse(guid, req.params.jobId), parse(credentialActionSchema, req.body).reason, `Fred user ${req.user.id}`)));
   router.get("/reports", enabledOnly, workerOnly, async (req, res) => {
     const after = typeof req.query.after === "string" ? req.query.after : "0";
     const limit = Number(req.query.limit ?? 100);
@@ -84,6 +94,7 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
     const job = await store.checkIn(input, flags().schedulerEnabled);
     return res.json({ ok: true, job: job ? { ...job, proof: jobProof(bearer(req), input.deviceId, job) } : null });
   });
+  router.get("/agent/jobs/:jobId", async (req: any, res) => res.json(await store.jobStatus(req.diagnosticDevice.deviceId, parse(guid, req.params.jobId))));
   router.get("/agent/ping/:jobId", async (req: any, res) => {
     await store.transfer(req.diagnosticDevice.deviceId, parse(guid, req.params.jobId), "ping");
     return res.json({ ok: true });

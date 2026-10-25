@@ -21,6 +21,8 @@ param(
     [string]$OutputPath,
     [string]$FredOrigin,
     [string]$AgentSourceDirectory,
+    [string]$ExternalProbeOrigin,
+    [switch]$PermitSustained,
     [string[]]$ProvisionComputerName = @()
 )
 
@@ -137,12 +139,14 @@ if ($ProvisionComputerName.Count -eq 0) {
     return
 }
 $origin = Assert-HttpsOrigin $FredOrigin
+$externalOrigin = if ($ExternalProbeOrigin) { Assert-HttpsOrigin $ExternalProbeOrigin } else { '' }
+if ($PermitSustained -and -not $externalOrigin) { throw 'Sustained opt-in requires an explicitly reviewed external HTTPS origin.' }
 $workerToken = [Environment]::GetEnvironmentVariable('BUILDING_DIAGNOSTICS_WORKER_TOKEN', 'Process')
 if (-not $workerToken -or $workerToken.Length -lt 32 -or $workerToken -match '\s') {
     throw 'A dedicated worker credential must already be present in the protected operator environment.'
 }
 $headers = @{ Authorization = 'Bearer ' + $workerToken }
-$requiredAgentFiles = @('Install-DiagnosticsAgent.ps1', 'Invoke-DiagnosticsAgent.ps1', 'Sccc.Diagnostics.psm1')
+$requiredAgentFiles = @('Install-DiagnosticsAgent.ps1', 'Invoke-DiagnosticsAgent.ps1', 'Sccc.Diagnostics.psm1', 'ExternalProbe.dll')
 foreach ($fileName in $requiredAgentFiles) {
     if (-not $AgentSourceDirectory -or -not (Test-Path -LiteralPath (Join-Path $AgentSourceDirectory $fileName) -PathType Leaf)) {
         throw 'AgentSourceDirectory must contain the separately reviewed diagnostics installer, module, and runner.'
@@ -201,7 +205,7 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
             -Headers $headers -ContentType 'application/json' -Body ($body | ConvertTo-Json) -MaximumRedirection 0 -TimeoutSec 30
         if (-not $credential.deviceId -or -not $credential.deviceToken) { throw 'Fred did not return a device-only credential.' }
         $deviceConfig = @{ serverUrl = $origin; deviceId = [string]$credential.deviceId; deviceToken = [string]$credential.deviceToken
-            computerName = $computer.Name; domain = $adDomain.DNSRoot }
+            computerName = $computer.Name; domain = $adDomain.DNSRoot; externalProbeOrigin = $externalOrigin; permitSustained = [bool]$PermitSustained }
         Invoke-Command -Session $session -ArgumentList ($deviceConfig | ConvertTo-Json -Compress) -ScriptBlock {
             param([string]$ConfigJson)
             $directory = Join-Path $env:ProgramData 'SCCC\DiagnosticsProvisioning'

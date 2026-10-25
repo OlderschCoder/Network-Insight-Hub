@@ -18,6 +18,7 @@ if ($identity.User.Value -ne 'S-1-5-18') { throw 'The diagnostics agent must run
 $mutex = New-Object Threading.Mutex($false, 'Global\SCCC.Diagnostics.Agent.v1')
 $locked = $false
 $client = $null
+$seenJobs = New-Object 'Collections.Generic.Dictionary[string,DateTimeOffset]'
 try {
     try { $locked = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked = $true }
     if (-not $locked) { exit 0 }
@@ -27,7 +28,11 @@ try {
             $presence = Get-DiagnosticsPresence -Config $config
             $response = Invoke-DiagnosticsJson -Client $client -Origin $config.ServerOrigin -Path '/agent/check-in' -Body $presence
             if ($response.job) {
-                $result = Invoke-DiagnosticsMeasurement -Client $client -Origin $config.ServerOrigin -DeviceId $config.DeviceId -DeviceToken $config.DeviceToken -Job $response.job
+                foreach ($jobId in @($seenJobs.Keys)) { if ($seenJobs[$jobId] -lt [DateTimeOffset]::UtcNow) { [void]$seenJobs.Remove($jobId) } }
+                $validated = Test-DiagnosticsJob -Job $response.job -DeviceId $config.DeviceId -DeviceToken $config.DeviceToken -ExternalProbeOrigin $config.ExternalProbeOrigin -PermitSustained $config.PermitSustained
+                if ($seenJobs.ContainsKey($validated.Id) -or $seenJobs.Count -ge 256) { throw 'Diagnostics job was already consumed or replay cache limit reached.' }
+                $seenJobs.Add($validated.Id, $validated.ExpiresAt)
+                $result = Invoke-DiagnosticsMeasurement -Client $client -Origin $config.ServerOrigin -DeviceId $config.DeviceId -DeviceToken $config.DeviceToken -Job $response.job -ExternalProbeOrigin $config.ExternalProbeOrigin -PermitSustained $config.PermitSustained
                 [void](Invoke-DiagnosticsJson -Client $client -Origin $config.ServerOrigin -Path '/agent/results' -Body $result)
             }
         } catch {

@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 const now = new Date().toISOString();
 const device = (id: string, building: string, kind = "network-confirmed") => ({
   deviceId: id, adObjectGuid: `ad-${id}`, enrolled: true, computerName: `PC-${id}`, adVerified: true, online: true,
-  lastCheckIn: now, agentVersion: "1.0.0", loggedOnUser: "SCCC\\fixture",
+  lastCheckIn: now, agentVersion: "1.1.0", loggedOnUser: "SCCC\\fixture", capabilities: ["external-probe-v2"],
   location: { building, kind, source: kind === "assigned" ? "desk-phone" : "switch", observedAt: now },
   lastResult: null,
 });
@@ -16,14 +16,14 @@ const snapshot = {
   jobs: [],
 };
 
-async function mockPortal(page: import("@playwright/test").Page, role = "network") {
+async function mockPortal(page: import("@playwright/test").Page, role = "network", externalConfigured = false) {
   await page.addInitScript(() => localStorage.setItem("auth_token", "fixture-session"));
   const queued: string[][] = [];
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
     if (path.endsWith("/auth/me")) body = { id: 1, name: "Fixture", email: "fixture@example.invalid", role, isActive: true };
-    else if (path.endsWith("/building-diagnostics/overview")) body = snapshot;
+    else if (path.endsWith("/building-diagnostics/overview")) body = { ...snapshot, externalProbe: { configured: externalConfigured, origin: externalConfigured ? "https://probe.example.invalid" : null, quickBytes: 5242880, sustainedEnabled: externalConfigured, dailyBudgetBytes: 1073741824 } };
     else if (path.endsWith("/building-diagnostics/jobs")) { queued.push(route.request().postDataJSON().deviceIds); body = { queued: queued[queued.length - 1].length }; }
     else if (path.includes("/todos") || path.includes("/notifications")) body = [];
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
@@ -46,6 +46,25 @@ test("shows missing measurements honestly and selects only network-confirmed bui
   expect(queued).toHaveLength(1);
   expect(queued[0]).toContain("c");
   expect(queued[0].filter(id => ["a", "b"].includes(id))).toHaveLength(1);
+});
+
+test("defaults configured external checks to quick and requires explicit scheduled sustained consent", async ({ page }) => {
+  await mockPortal(page, "network", true);
+  await page.goto("/network/diagnostics");
+  await expect(page.getByLabel("Measurement type")).toHaveValue("external-quick");
+  await page.getByLabel("Measurement type").selectOption("external-sustained");
+  await page.getByRole("checkbox", { name: "Select PC-a", exact: true }).check();
+  await expect(page.getByRole("button", { name: "Measure selected (1)", exact: true })).toBeDisabled();
+  await page.getByLabel("Approve sustained data use").check();
+  await expect(page.getByRole("button", { name: "Measure selected (1)", exact: true })).toBeEnabled();
+  await page.getByRole("checkbox", { name: "Select PC-b", exact: true }).check();
+  await expect(page.getByRole("button", { name: "Measure selected (2)", exact: true })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "Select PC-b", exact: true }).uncheck();
+  const submitted = page.waitForRequest(request => request.url().endsWith("/building-diagnostics/jobs") && request.method() === "POST");
+  await page.getByRole("button", { name: "Measure selected (1)", exact: true }).click();
+  const payload = (await submitted).postDataJSON();
+  expect(payload).toMatchObject({ type: "external-sustained", deviceIds: ["a"], sustainedConfirmed: true, maxBytes: 67108864 });
+  expect(Date.parse(payload.scheduledAt)).toBeGreaterThan(Date.now());
 });
 
 test("does not fetch inventory or offer measurements to a helpdesk user", async ({ page }) => {

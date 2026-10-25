@@ -20,7 +20,16 @@ if ($provisioning.computerName -ine $computer.Name) { throw 'Provisioning record
 if ($provisioning.domain -ine $ExpectedDomain) { throw 'Provisioning domain does not match.' }
 $token = [string]$provisioning.deviceToken
 if ($token -cnotmatch '^sccc-diag\.[A-Za-z0-9_-]{43}$') { throw 'Invalid independent diagnostics credential.' }
-$sourceFiles = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1')
+$sourceFiles = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll')
+foreach ($name in $sourceFiles) { if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $name) -PathType Leaf)) { throw 'The complete reviewed diagnostics release is required, including ExternalProbe.dll.' } }
+$externalOrigin = ''
+$permitSustained = $false
+if ($provisioning.PSObject.Properties['externalProbeOrigin'] -and $provisioning.externalProbeOrigin) { $externalOrigin = Get-DiagnosticsServerOrigin -ServerUrl ([string]$provisioning.externalProbeOrigin); if (-not ([Uri]$externalOrigin).IsDefaultPort) { throw 'External probe requires HTTPS port 443.' } }
+if ($provisioning.PSObject.Properties['permitSustained']) {
+    if ($provisioning.permitSustained -isnot [bool]) { throw 'permitSustained must be an explicit boolean.' }
+    $permitSustained = $provisioning.permitSustained
+}
+if ($permitSustained -and -not $externalOrigin) { throw 'Sustained permission requires the protected external origin.' }
 if ($Activate) {
     if ($SignerThumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Activation requires the approved SCCC signing-certificate thumbprint.' }
     foreach ($name in $sourceFiles) {
@@ -56,7 +65,7 @@ try {
     $cipher = [Security.Cryptography.ProtectedData]::Protect($tokenBytes,
         [Text.Encoding]::UTF8.GetBytes('SCCC.Diagnostics.v1:' + $deviceId), [Security.Cryptography.DataProtectionScope]::LocalMachine)
     $config = @{ schemaVersion = 1; serverUrl = $origin; deviceId = $deviceId; computerName = [string]$computer.Name;
-        domain = $ExpectedDomain; protectedDeviceToken = [Convert]::ToBase64String($cipher) }
+        domain = $ExpectedDomain; protectedDeviceToken = [Convert]::ToBase64String($cipher); externalProbeOrigin = $externalOrigin; permitSustained = $permitSustained }
     $configPath = Join-Path $destination 'config.json'
     [IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
     Set-DiagnosticsProtectedAcl -Path $configPath

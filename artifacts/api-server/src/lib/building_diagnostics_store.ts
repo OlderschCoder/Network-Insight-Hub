@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { chooseCandidates, fresh, JOB_MS, newToken, ONLINE_MS, PING_COUNT, resolveLocation, TARGET_LABEL, tokenHash, TRANSFER_BYTES, type Assignment, type Heartbeat, type Observation } from "./building_diagnostics";
+import { chooseCandidates, externalProbeConfig, fresh, JOB_MS, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, type Assignment, type Heartbeat, type JobType, type Observation, type QueueInput } from "./building_diagnostics";
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
@@ -23,6 +23,13 @@ export function ensureDiagnosticsSchema() {
       download_complete boolean NOT NULL DEFAULT false, upload_started_at timestamptz,
       upload_received_bytes integer, ping_count integer NOT NULL DEFAULT 0,
       download_bytes integer NOT NULL, upload_bytes integer NOT NULL);
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'fred';
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS target_origin text;
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS timeout_seconds integer NOT NULL DEFAULT 30;
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS scheduled_at timestamptz NOT NULL DEFAULT now();
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS cancelled_reason text;
+    ALTER TABLE building_diagnostics_jobs DROP CONSTRAINT IF EXISTS building_diagnostics_jobs_status_check;
+    ALTER TABLE building_diagnostics_jobs ADD CONSTRAINT building_diagnostics_jobs_status_check CHECK(status IN ('queued','running','complete','expired','cancelled'));
     CREATE INDEX IF NOT EXISTS building_diagnostics_jobs_device ON building_diagnostics_jobs(device_id,created_at DESC);
     CREATE TABLE IF NOT EXISTS building_diagnostics_reports (
       id bigserial PRIMARY KEY, job_id uuid NOT NULL UNIQUE REFERENCES building_diagnostics_jobs(id),
@@ -81,6 +88,7 @@ async function snapshot(client: Client = pool) {
       adVerified: adMatch(inv, d) && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: currentHeartbeat && !d.revoked_at,
       lastCheckIn: iso(d.last_check_in), agentVersion: heartbeat.agentVersion ?? null,
       loggedOnUser: heartbeat.loggedOnUser ?? null, interfaces: heartbeat.interfaces, location,
+      capabilities: heartbeat.capabilities ?? [],
       lastTestAt: iso(d.last_test_at), lastResult: d.report_id ? { id: String(d.report_id), recordedAt: iso(d.recorded_at), ...d.report_data } : null };
   });
   const enrolledIds = new Set(enrolled.map((d) => d.adObjectGuid.toLowerCase()));
@@ -89,12 +97,13 @@ async function snapshot(client: Client = pool) {
     enrolled.push({ deviceId: null, enrolled: false, revoked: false, computerName: a.computerName, adObjectGuid: a.adObjectGuid, adDomain: a.domain,
       adVerified: a.enabled && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: false,
       lastCheckIn: null, agentVersion: null, loggedOnUser: null, interfaces: [],
+      capabilities: [],
       location: { building: null, kind: "unknown", source: null, observedAt: null }, lastTestAt: null, lastResult: null });
   }
   return { inv, devices: enrolled };
 }
 async function expire(client: Client) {
-  await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE status IN ('queued','running') AND expires_at<=now()");
+  await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE status IN ('queued','running','cancelled') AND expires_at<=now()");
 }
 export const diagnosticsStore = {
   async ingest(data: Inventory) {
@@ -125,7 +134,7 @@ export const diagnosticsStore = {
     return transaction(async (client) => {
       const result = await client.query("UPDATE building_diagnostics_devices SET revoked_at=now(),revoked_by=$2,revoked_reason=$3 WHERE id=$1 RETURNING id", [deviceId, actor, reason]);
       if (!result.rowCount) throw new DiagnosticsError(404, "Unknown diagnostics device");
-      await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE device_id=$1 AND status IN ('queued','running')", [deviceId]);
+      await client.query("UPDATE building_diagnostics_jobs SET status=CASE WHEN status='running' THEN 'cancelled' ELSE 'expired' END WHERE device_id=$1 AND status IN ('queued','running')", [deviceId]);
       await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason) VALUES($1,'revoke',$2,$3)", [deviceId, actor, reason]);
       return { ok: true, deviceId, revoked: true };
     });
@@ -142,7 +151,7 @@ export const diagnosticsStore = {
       // The immutable AD GUID allows an operator to recover after a legitimate rename;
       // the current name/domain come solely from the trusted directory snapshot.
       await client.query("UPDATE building_diagnostics_devices SET token_hash=$2,computer_name=$3,domain=$4,revoked_at=NULL,revoked_by=NULL,revoked_reason=NULL,rotated_at=now() WHERE id=$1", [deviceId, tokenHash(deviceToken), adObject.computerName, adObject.domain]);
-      await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE device_id=$1 AND status IN ('queued','running')", [deviceId]);
+      await client.query("UPDATE building_diagnostics_jobs SET status=CASE WHEN status='running' THEN 'cancelled' ELSE 'expired' END WHERE device_id=$1 AND status IN ('queued','running')", [deviceId]);
       await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason) VALUES($1,'rotate',$2,$3)", [deviceId, actor, reason]);
       return { deviceId, deviceToken };
     });
@@ -159,7 +168,7 @@ export const diagnosticsStore = {
     await ensureDiagnosticsSchema();
     await expire(pool);
     const { inv, devices } = await snapshot();
-    const jobs = (await pool.query(`SELECT j.*,d.computer_name FROM building_diagnostics_jobs j JOIN building_diagnostics_devices d ON d.id=j.device_id ORDER BY j.created_at DESC LIMIT 100`)).rows.map((j) => ({ id: j.id, deviceId: j.device_id, computerName: j.computer_name, building: j.building, status: j.status, createdAt: iso(j.created_at), expiresAt: iso(j.expires_at), requestedBy: j.requested_by }));
+    const jobs = (await pool.query(`SELECT j.*,d.computer_name FROM building_diagnostics_jobs j JOIN building_diagnostics_devices d ON d.id=j.device_id ORDER BY j.created_at DESC LIMIT 100`)).rows.map((j) => ({ id: j.id, deviceId: j.device_id, computerName: j.computer_name, building: j.building, status: j.status, type: j.type, targetOrigin: j.target_origin, downloadBytes: j.download_bytes, scheduledAt: iso(j.scheduled_at), createdAt: iso(j.created_at), expiresAt: iso(j.expires_at), requestedBy: j.requested_by }));
     // Buildings with no enrolled endpoint must remain visible as missing coverage.
     const catalog = (await pool.query("SELECT DISTINCT trim(building) AS building FROM net_nodes WHERE trim(building)<>''")).rows;
     const allBuildings = new Set([...catalog.map((b) => String(b.building)), ...inv.observations.map((o) => o.building), ...inv.userBuildingAssignments.map((a) => a.building)]);
@@ -167,12 +176,22 @@ export const diagnosticsStore = {
     const buildings = [...allBuildings].sort().map((building) => {
       const members = devices.filter((d) => d.location.building === building), r = recent.find((r) => r.building === building);
       const lastResult = r ? { id: String(r.id), recordedAt: iso(r.recorded_at), ...r.data } : null;
-      return { building, onlineDevices: members.filter((d) => d.online).length, eligibleDevices: members.filter((d) => d.online && d.adVerified && d.location.kind === "network-confirmed").length, lastResult, noCurrentMeasurement: !r || !!r.data.error || r.data.downloadMbps === null || r.data.uploadMbps === null || !fresh(iso(r.recorded_at), Date.now(), 12 * 60 * 60_000) };
+      return { building, onlineDevices: members.filter((d) => d.online).length, eligibleDevices: members.filter((d) => d.online && d.adVerified && d.location.kind === "network-confirmed").length, lastResult, noCurrentMeasurement: !r || !!r.data.error || r.data.downloadMbps === null || (!r.data.external && r.data.uploadMbps === null) || !fresh(iso(r.recorded_at), Date.now(), 12 * 60 * 60_000) };
     });
-    return { devices, buildings, jobs, inventoryUpdatedAt: inv.updatedAt, adObservedAt: inv.adObservedAt || null, targetLabel: TARGET_LABEL };
+    return { devices, buildings, jobs, inventoryUpdatedAt: inv.updatedAt, adObservedAt: inv.adObservedAt || null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() };
   },
-  async queue(input: { deviceIds?: string[]; building?: string }, actor: string, automatic = false) {
+  async queue(input: QueueInput, actor: string, automatic = false) {
     await ensureDiagnosticsSchema();
+    const type: JobType = input.type ?? "fred", config = externalProbeConfig();
+    const external = type !== "fred";
+    const sustained = type === "external-sustained";
+    const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : new Date();
+    if (!Number.isFinite(scheduledAt.getTime()) || (input.scheduledAt && (scheduledAt.getTime() < Date.now() || scheduledAt.getTime() > Date.now() + 24 * 60 * 60_000))) throw new DiagnosticsError(400, "Schedule must be within the next 24 hours");
+    if (external && (automatic || !config.origin || !input.deviceIds?.length || input.building)) throw new DiagnosticsError(409, "External tests require a configured probe and explicitly selected computers");
+    if (sustained && (!config.sustainedEnabled || input.sustainedConfirmed !== true || input.deviceIds?.length !== 1 || !input.scheduledAt || scheduledAt.getTime() < Date.now() + 60_000)) throw new DiagnosticsError(409, "Sustained test requires enablement, one selected computer, explicit confirmation and a schedule at least one minute ahead");
+    const bytes = type === "fred" ? TRANSFER_BYTES : sustained ? (input.maxBytes ?? 64 * 1024 * 1024) : QUICK_BYTES;
+    if (!Number.isSafeInteger(bytes) || bytes < QUICK_BYTES || bytes > SUSTAINED_OBJECT_BYTES || (input.maxBytes !== undefined && !sustained)) throw new DiagnosticsError(400, "Invalid external byte budget");
+    const timeout = sustained ? 180 : 30;
     return transaction(async (client) => {
       await expire(client);
       if (automatic) {
@@ -183,13 +202,22 @@ export const diagnosticsStore = {
       const recent = (await client.query("SELECT building,max(created_at) AS tested_at FROM building_diagnostics_jobs WHERE building IS NOT NULL AND status IN ('running','complete') GROUP BY building")).rows;
       const enrolled = devices.filter((d) => !!d.deviceId).map((d) => ({ ...d, deviceId: d.deviceId! }));
       let selected = automatic ? chooseCandidates(enrolled, new Map(recent.map((r) => [r.building, new Date(r.tested_at).getTime()]))) : enrolled.filter((d) => (input.deviceIds?.includes(d.deviceId) || (input.building && d.location.building === input.building)) && d.online && d.adVerified);
+      if (external && selected.some((d) => !d.capabilities.includes("external-probe-v2"))) throw new DiagnosticsError(409, "Selected computer does not support external probe jobs");
       const pending = (await client.query("SELECT device_id,building FROM building_diagnostics_jobs WHERE status IN ('queued','running')")).rows;
       selected = selected.filter((d) => !pending.some((p) => p.device_id === d.deviceId || (automatic && p.building === d.location.building))).slice(0, Math.max(0, 100 - pending.length));
+      if (external && selected.length) {
+        // Reserve against the execution window, including cancellations. The
+        // symmetric window is deliberately conservative for future schedules.
+        const used = (await client.query("SELECT coalesce(sum(download_bytes),0) AS bytes FROM building_diagnostics_jobs WHERE type<>'fred' AND ((scheduled_at>$1::timestamptz-interval '24 hours' AND scheduled_at<$1::timestamptz+interval '24 hours') OR claimed_at>now()-interval '24 hours')", [scheduledAt.toISOString()])).rows[0];
+        if (Number(used.bytes) + bytes * selected.length > config.dailyBudgetBytes) throw new DiagnosticsError(429, "External tests exceed the rolling 24-hour data budget");
+        const interval = sustained ? "24 hours" : "15 minutes";
+        if ((await client.query(`SELECT id FROM building_diagnostics_jobs WHERE device_id=ANY($1::uuid[]) AND type=$2 AND (created_at>now()-interval '${interval}' OR claimed_at>$3::timestamptz-interval '${interval}' OR (scheduled_at>$3::timestamptz-interval '${interval}' AND scheduled_at<$3::timestamptz+interval '${interval}')) LIMIT 1`, [selected.map((d) => d.deviceId), type, scheduledAt.toISOString()])).rowCount) throw new DiagnosticsError(429, "Selected computer was already scheduled within the external test frequency limit");
+      }
       const ids: string[] = [];
       for (let i = 0; i < selected.length; i++) {
         const d = selected[i]!, id = randomUUID();
         // Queue lifetime allows serial execution; each claim receives a new two-minute lease.
-        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes) VALUES($1,$2,$3,'queued',$4,now()+interval '30 minutes',$5,$5)", [id, d.deviceId, d.location.kind === "network-confirmed" ? d.location.building : null, actor, TRANSFER_BYTES]);
+        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+interval '30 minutes',$6,$7,$8,$9,$10,$5)", [id, d.deviceId, d.location.kind === "network-confirmed" ? d.location.building : null, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, external ? config.origin : null, timeout]);
         ids.push(id);
       }
       return { queued: ids.length, jobIds: ids };
@@ -201,25 +229,47 @@ export const diagnosticsStore = {
     return transaction(async (client) => {
       await expire(client);
       // Serialize all load tests, including across API processes.
-      if ((await client.query("SELECT id FROM building_diagnostics_jobs WHERE status='running' LIMIT 1")).rowCount) return null;
+      if ((await client.query("SELECT id FROM building_diagnostics_jobs WHERE status='running' OR (status='cancelled' AND claimed_at IS NOT NULL AND expires_at>now()) LIMIT 1")).rowCount) return null;
       // A 30-second cooldown separates transfer runs even if results arrive quickly.
       if ((await client.query("SELECT id FROM building_diagnostics_reports WHERE recorded_at>now()-interval '30 seconds' LIMIT 1")).rowCount) return null;
-      const j = (await client.query("SELECT * FROM building_diagnostics_jobs WHERE device_id=$1 AND status='queued' ORDER BY created_at LIMIT 1 FOR UPDATE", [input.deviceId])).rows[0];
+      const j = (await client.query("SELECT * FROM building_diagnostics_jobs WHERE device_id=$1 AND status='queued' AND scheduled_at<=now() AND (type='fred' OR $2::boolean) ORDER BY created_at LIMIT 1 FOR UPDATE", [input.deviceId, input.capabilities?.includes("external-probe-v2") ?? false])).rows[0];
       if (!j) return null;
       const { inv, devices } = await snapshot(client), current = devices.find((d) => d.deviceId === input.deviceId);
       if (!fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000) || !current?.adVerified || (j.building !== null && (current.location.kind !== "network-confirmed" || current.location.building !== j.building))) {
         await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE id=$1", [j.id]); return null;
       }
-      const expiresAt = new Date(Date.now() + JOB_MS).toISOString();
+      const config = externalProbeConfig();
+      if (j.type !== "fred" && (j.target_origin !== config.origin || (j.type === "external-sustained" && !config.sustainedEnabled))) { await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE id=$1", [j.id]); return null; }
+      if (j.type !== "fred") {
+        const used = (await client.query("SELECT coalesce(sum(download_bytes),0) AS bytes FROM building_diagnostics_jobs WHERE type<>'fred' AND claimed_at>now()-interval '24 hours'")).rows[0];
+        if (Number(used.bytes) + j.download_bytes > config.dailyBudgetBytes) return null;
+        const interval = j.type === "external-sustained" ? "24 hours" : "15 minutes";
+        if ((await client.query(`SELECT id FROM building_diagnostics_jobs WHERE id<>$1 AND device_id=$2 AND type=$3 AND claimed_at>now()-interval '${interval}' LIMIT 1`, [j.id, input.deviceId, j.type])).rowCount) return null;
+      }
+      const expiresAt = new Date(Date.now() + (j.type === "external-sustained" ? 5 * 60_000 : JOB_MS)).toISOString();
       await client.query("UPDATE building_diagnostics_jobs SET status='running',claimed_at=now(),expires_at=$2 WHERE id=$1", [j.id, expiresAt]);
-      return { id: j.id, expiresAt, downloadBytes: j.download_bytes, uploadBytes: j.upload_bytes, pingCount: PING_COUNT };
+      return { id: j.id, expiresAt, downloadBytes: j.download_bytes, uploadBytes: j.upload_bytes, pingCount: j.type === "fred" ? PING_COUNT : 1, ...(j.type === "fred" ? {} : { proofVersion: 2, type: j.type as JobType, targetOrigin: j.target_origin, timeoutSeconds: j.timeout_seconds }) };
     });
+  },
+  async cancel(jobId: string, reason: string, actor: string) {
+    await ensureDiagnosticsSchema();
+    return transaction(async (client) => {
+      const j = (await client.query("UPDATE building_diagnostics_jobs SET status='cancelled',cancelled_reason=$2 WHERE id=$1 AND status IN ('queued','running') RETURNING *", [jobId, reason])).rows[0];
+      if (!j) throw new DiagnosticsError(409, "Job is unknown or already finished");
+      await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason) VALUES($1,'cancel-job',$2,$3)", [j.device_id, actor, `${jobId}: ${reason}`]);
+      return { ok: true, id: jobId, status: "cancelled", leaseHeldUntil: j.claimed_at ? iso(j.expires_at) : null };
+    });
+  },
+  async jobStatus(deviceId: string, jobId: string) {
+    const j = (await pool.query("SELECT id,status,expires_at FROM building_diagnostics_jobs WHERE id=$1 AND device_id=$2", [jobId, deviceId])).rows[0];
+    if (!j) throw new DiagnosticsError(404, "Unknown device job");
+    return { id: j.id, status: Date.parse(j.expires_at) <= Date.now() && ["running", "queued", "cancelled"].includes(j.status) ? "expired" : j.status, expiresAt: iso(j.expires_at) };
   },
   async transfer(deviceId: string, jobId: string, kind: "ping" | "download" | "upload") {
     const column = kind === "ping" ? "ping_count=ping_count+1" : `${kind}_started_at=now()`;
     const condition = kind === "ping" ? `ping_count<${PING_COUNT}` : `${kind}_started_at IS NULL`;
     const remaining = kind === "ping" ? "now()" : "now()+interval '20 seconds'";
-    const result = await pool.query(`UPDATE building_diagnostics_jobs SET ${column} WHERE id=$1 AND device_id=$2 AND status='running' AND expires_at>${remaining} AND ${condition} RETURNING download_bytes,upload_bytes`, [jobId, deviceId]);
+    const result = await pool.query(`UPDATE building_diagnostics_jobs SET ${column} WHERE id=$1 AND device_id=$2 AND type='fred' AND status='running' AND expires_at>${remaining} AND ${condition} RETURNING download_bytes,upload_bytes`, [jobId, deviceId]);
     if (!result.rows[0]) throw new DiagnosticsError(409, "Invalid, expired, or already used job operation");
     return { downloadBytes: result.rows[0].download_bytes, uploadBytes: result.rows[0].upload_bytes };
   },
@@ -229,8 +279,23 @@ export const diagnosticsStore = {
   },
   async result(deviceId: string, input: any) {
     return transaction(async (client) => {
-      const j = (await client.query("SELECT * FROM building_diagnostics_jobs WHERE id=$1 AND device_id=$2 AND status='running' AND expires_at>now() FOR UPDATE", [input.jobId, deviceId])).rows[0];
+      const j = (await client.query("SELECT * FROM building_diagnostics_jobs WHERE id=$1 AND device_id=$2 AND status IN ('running','cancelled') AND expires_at>now() FOR UPDATE", [input.jobId, deviceId])).rows[0];
       if (!j) throw new DiagnosticsError(409, "Invalid, expired, or already completed job");
+      if (j.type !== "fred") {
+        const e = input.external;
+        const path = j.type === "external-quick" ? "/probe-5mb.bin" : "/probe-1gb.bin";
+        const failure = e?.failure || input.error || (j.status === "cancelled" ? "cancelled" : null);
+        if (!e || e.type !== j.type || e.targetOrigin !== j.target_origin || e.path !== path || !Number.isSafeInteger(e.bytesReceived) || e.bytesReceived < 0 || e.bytesReceived > j.download_bytes || !Number.isFinite(e.elapsedMs) || e.elapsedMs < 0 || e.elapsedMs > (j.timeout_seconds + 15) * 1000 || !fresh(e.timestamp, Date.now(), 10 * 60_000)) throw new DiagnosticsError(409, "External result does not match its authorized job");
+        if (!failure && (e.bytesReceived !== j.download_bytes || e.elapsedMs <= 0 || ![200, 206].includes(e.httpStatus))) throw new DiagnosticsError(409, "Successful external result requires the complete bounded download");
+        const mbps = e.elapsedMs > 0 ? Math.round(e.bytesReceived * 8 / (e.elapsedMs * 1000) * 1000) / 1000 : null;
+        const external = { ...e, mbps, ...(failure ? { failure } : {}) };
+        const data = { downloadMbps: failure ? null : mbps, uploadMbps: null, latencyMs: null, requestLossPercent: null, error: failure, downloadBytes: e.bytesReceived, uploadBytes: 0, type: j.type, external, targetLabel: `External HTTPS path (${j.target_origin})`, provenance: "authenticated endpoint external HTTPS measurement; no server-side transfer receipt; does not certify link capacity" };
+        const report = (await client.query("INSERT INTO building_diagnostics_reports(job_id,device_id,building,data) VALUES($1,$2,$3,$4) RETURNING id", [j.id, deviceId, j.building, JSON.stringify(data)])).rows[0];
+        await client.query("UPDATE building_diagnostics_jobs SET status='complete' WHERE id=$1", [j.id]);
+        return { ok: true, reportId: String(report.id) };
+      }
+      if (input.external) throw new DiagnosticsError(409, "Fred job cannot report an external measurement");
+      if (j.status === "cancelled" && !input.error) throw new DiagnosticsError(409, "Cancelled job requires a cancellation result");
       if (!input.error && (!j.download_complete || j.upload_received_bytes !== j.upload_bytes || input.downloadBytes !== j.download_bytes || input.uploadBytes !== j.upload_bytes || input.requestLossPercent < (PING_COUNT - j.ping_count) * 100 / PING_COUNT)) throw new DiagnosticsError(409, "Server transfer receipts do not match this result");
       const data = { downloadMbps: input.error ? null : input.downloadMbps ?? null, uploadMbps: input.error ? null : input.uploadMbps ?? null, latencyMs: input.latencyMs ?? null, requestLossPercent: input.requestLossPercent ?? null, serverPingReceipts: j.ping_count, scheduledProbeCount: PING_COUNT, error: input.error ?? null, downloadBytes: input.downloadBytes ?? 0, uploadBytes: input.uploadBytes ?? 0, targetLabel: TARGET_LABEL, provenance: "authenticated endpoint measurement; server transfer receipts; not uplink capacity", requestLossKind: "HTTPS request failures" };
       const report = (await client.query("INSERT INTO building_diagnostics_reports(job_id,device_id,building,data) VALUES($1,$2,$3,$4) RETURNING id", [j.id, deviceId, j.building, JSON.stringify(data)])).rows[0];

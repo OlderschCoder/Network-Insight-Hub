@@ -16,7 +16,7 @@ if ($task) {
 if (Test-Path -LiteralPath $destination) {
     if ((Get-Item -LiteralPath $destination -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing to remove a reparse-point directory.' }
     # Refuse unexpected content instead of traversing a computed arbitrary tree.
-    $allowed = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'config.json')
+    $allowed = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll', 'config.json')
     foreach ($item in Get-ChildItem -LiteralPath $destination -Force) {
         if ($item.PSIsContainer -or $item.Name -notin $allowed -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected diagnostics content; manual review required.' }
     }

@@ -16,15 +16,35 @@ const store = {
   authenticate: vi.fn(async (value: string) => value === token ? { deviceId: id, computerName: "PC-1", domain: "sccc.edu" } : null),
   queue: vi.fn(async () => ({ queued: 1, jobIds: [jobId] })), checkIn: vi.fn(), transfer: vi.fn(), transferReceipt: vi.fn(), result: vi.fn(async () => ({ ok: true })), reports: vi.fn(async () => ({ reports: [], nextCursor: "0" })),
   revoke: vi.fn(async () => ({ ok: true })), rotate: vi.fn(async () => ({ deviceId: id, deviceToken: token })),
+  cancel: vi.fn(async () => ({ ok: true, status: "cancelled" })), jobStatus: vi.fn(async () => ({ id: jobId, status: "running", expiresAt: new Date(Date.now() + 60000).toISOString() })),
 };
 function app() { const a = express(); a.use(express.json()); a.use("/api/building-diagnostics", createBuildingDiagnosticsRouter(store as any)); return a; }
 const path = "/api/building-diagnostics";
 const heartbeat = { deviceId: id, computerName: "PC-1", adDomain: "sccc.edu", adJoined: true, uptimeSeconds: 20, agentVersion: "1.0.0", interfaces: [{ mac: "aa:bb:cc:dd:ee:ff", ipAddresses: ["10.0.0.4"], kind: "ethernet" }] };
 beforeEach(() => {
   vi.clearAllMocks(); process.env.BUILDING_DIAGNOSTICS_ENABLED = "true"; process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "false"; process.env.BUILDING_DIAGNOSTICS_WORKER_TOKEN = worker;
+  delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_ORIGIN;
+  delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_SUSTAINED_ENABLED;
   store.checkIn.mockResolvedValue(null); store.transfer.mockResolvedValue({ downloadBytes: 256, uploadBytes: 256 });
 });
 describe("building diagnostics authority boundaries", () => {
+  it("separates administrator cancellation from device-owned status and rejects arbitrary external targets", async () => {
+    expect((await request(app()).post(`${path}/jobs/${jobId}/cancel`).set("Authorization", `Bearer ${token}`).send({ reason: "stop measurement" })).status).toBe(401);
+    expect((await request(app()).post(`${path}/jobs/${jobId}/cancel`).set("Authorization", "Bearer fred-session").set("x-role", "network").send({ reason: "stop measurement" })).status).toBe(200);
+    expect((await request(app()).get(`${path}/agent/jobs/${jobId}`).set("Authorization", `Bearer ${token}`)).status).toBe(200);
+    expect(store.jobStatus).toHaveBeenCalledWith(id, jobId);
+    expect((await request(app()).post(`${path}/jobs`).set("Authorization", "Bearer fred-session").set("x-role", "network").send({ deviceIds: [id], type: "external-quick", targetOrigin: "https://evil.example.org" })).status).toBe(400);
+  });
+  it("accepts only bounded external measurement fields and emits v2 proofs for capable helpers", async () => {
+    const job = { id: jobId, expiresAt: new Date(Date.now() + 120000).toISOString(), downloadBytes: 5242880, uploadBytes: 0, pingCount: 1, proofVersion: 2, type: "external-quick" as const, targetOrigin: "https://probe.example.org", timeoutSeconds: 30 };
+    store.checkIn.mockResolvedValue(job);
+    const response = await request(app()).post(`${path}/agent/check-in`).set("Authorization", `Bearer ${token}`).send({ ...heartbeat, capabilities: ["external-probe-v2"] });
+    expect(response.body.job.proof).toBe(jobProof(token, id, job));
+    const external = { type: job.type, targetOrigin: job.targetOrigin, path: "/probe-5mb.bin", timestamp: new Date().toISOString(), bytesReceived: 1024, elapsedMs: 30, httpStatus: 0, failure: "timeout", dnsMs: 2, dnsAddresses: ["8.8.8.8"], activeAdapter: { interfaceAlias: "Ethernet", localIp: "10.1.2.3", subnetPrefixLength: 24 } };
+    expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external })).status).toBe(200);
+    expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external: { ...external, bytesReceived: 1073741825 } })).status).toBe(400);
+    expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external: { ...external, headers: { Authorization: "secret" } } })).status).toBe(400);
+  });
   it("requires Fred network administrator access for viewing and queueing", async () => {
     expect((await request(app()).get(`${path}/overview`)).status).toBe(401);
     expect((await request(app()).get(`${path}/overview`).set("Authorization", "Bearer fred-session").set("x-role", "helpdesk")).status).toBe(403);
