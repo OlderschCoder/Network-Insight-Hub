@@ -4,8 +4,8 @@ The authoritative collector runs on `10.0.0.22` from the immutable release
 selected by `/opt/sccc-switch-telemetry/current`. The systemd timer starts it
 nightly at 03:15 America/Chicago with a stable delay of up to 15 minutes.
 
-Each run validates the canonical scope of 49 switches and two FortiGate
-firewalls. All 49 switches are attempted. Successful switch records are audited,
+Each run validates the canonical scope of 48 active switches and two FortiGate
+firewalls. All 48 switches are attempted. Successful switch records are audited,
 preflighted, and published to Fred even when another switch is unreachable; the
 failed records remain in the run audit and the final state becomes
 `completed_with_warnings`. A malformed scope or a publish failure still fails

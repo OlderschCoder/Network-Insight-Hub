@@ -18,11 +18,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { ShieldCheck, Globe, Loader2, AlertTriangle, ArrowLeft, Printer, Laptop, Trash2, PhoneCall, ExternalLink, Building2, Server, Pencil, Users, MapPin } from "lucide-react";
+import { ShieldCheck, Globe, Loader2, AlertTriangle, ArrowLeft, Printer, Laptop, Trash2, PhoneCall, ExternalLink, Building2, Server, Pencil, Users, MapPin, Network } from "lucide-react";
 import { Link } from "wouter";
 import { InstallPrinterTool } from "./script-tools/install-printer";
 import { AddLaptopTool } from "./script-tools/add-laptop";
 import { RemoveEquipmentTool } from "./script-tools/remove-equipment";
+import { SwitchEnrollmentTool } from "./script-tools/switch-enrollment";
 import { authFetch } from "@/lib/authFetch";
 import { useAuth } from "@/context/AuthContext";
 
@@ -265,6 +266,7 @@ export default function NetworkTools() {
           <TabsTrigger value="printer" className="gap-1.5"><Printer className="h-4 w-4" /> Install Printer</TabsTrigger>
           <TabsTrigger value="laptop" className="gap-1.5"><Laptop className="h-4 w-4" /> Add Laptop</TabsTrigger>
           <TabsTrigger value="remove" className="gap-1.5"><Trash2 className="h-4 w-4" /> Remove Equipment</TabsTrigger>
+          <TabsTrigger value="switch" className="gap-1.5"><Network className="h-4 w-4" /> Add Switch</TabsTrigger>
         </TabsList>
 
         <TabsContent value="calling" className="space-y-6">
@@ -721,6 +723,10 @@ export default function NetworkTools() {
 
         <TabsContent value="remove">
           <RemoveEquipmentTool />
+        </TabsContent>
+
+        <TabsContent value="switch">
+          <SwitchEnrollmentTool canApply={canEditPhoneBuildings} />
         </TabsContent>
       </Tabs>
     </div>

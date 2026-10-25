@@ -124,16 +124,16 @@ DEVICE_CATALOG="${TELEMETRY_DEVICE_CATALOG_FILE:-$APP/device-catalog.csv}"
 if [[ -r "$APP/expected-target-count" ]]; then
   release_expected_count="$(tr -d '[:space:]' <"$APP/expected-target-count")"
 else
-  release_expected_count=49
+  release_expected_count=48
 fi
 EXPECTED_TARGET_COUNT="${TELEMETRY_EXPECTED_TARGET_COUNT:-$release_expected_count}"
 [[ "$EXPECTED_TARGET_COUNT" =~ ^[1-9][0-9]*$ ]] || die 'expected target count must be a positive integer' 64
-EXPECTED_CATALOG_COUNT="${TELEMETRY_EXPECTED_CATALOG_COUNT:-51}"
+EXPECTED_CATALOG_COUNT="${TELEMETRY_EXPECTED_CATALOG_COUNT:-50}"
 EXPECTED_FIREWALL_COUNT="${TELEMETRY_EXPECTED_FIREWALL_COUNT:-2}"
 [[ "$EXPECTED_CATALOG_COUNT" =~ ^[1-9][0-9]*$ ]] || die 'expected catalog count must be a positive integer' 64
 [[ "$EXPECTED_FIREWALL_COUNT" =~ ^[1-9][0-9]*$ ]] || die 'expected firewall count must be a positive integer' 64
-[[ "$EXPECTED_TARGET_COUNT" == 49 ]] || die 'the approved production switch scope is exactly 49 targets' 78
-[[ "$EXPECTED_CATALOG_COUNT" == 51 ]] || die 'the approved production catalog scope is exactly 51 devices' 78
+[[ "$EXPECTED_TARGET_COUNT" == 48 ]] || die 'the approved production switch scope is exactly 48 targets' 78
+[[ "$EXPECTED_CATALOG_COUNT" == 50 ]] || die 'the approved production catalog scope is exactly 50 devices' 78
 [[ "$EXPECTED_FIREWALL_COUNT" == 2 ]] || die 'the approved production firewall scope is exactly 2 devices' 78
 
 for required_file in "$COLLECTOR" "$AUDITOR" "$PUBLISHER" "$FIREWALL_CHECKER" "$MANIFEST" "$REQUIRED_TARGETS" "$DEVICE_CATALOG"; do

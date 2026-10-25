@@ -11,7 +11,7 @@
 "sw-aa144","192.168.2.5","Hobble","switch","auto","Canonical","true","switch-enrollment","192.168.2.5","Platform will be detected before configuration","2026-09-07"
 "sw-aa144-A24","192.168.2.71","Hobble","switch","cisco_nxos","Canonical","true","switch-enrollment","192.168.2.71","","2026-09-07"
 "sw-aa144-A48","192.168.2.70","Hobble","switch","cisco_nxos","Canonical","true","switch-enrollment","192.168.2.70","","2026-09-07"
-"sw-aa144-core-usd480","172.22.1.1","Hobble","switch","auto","Canonical","true","switch-enrollment","172.22.1.1","Platform will be detected before configuration","2026-09-07"
+"sw-aa144-core-usd480","172.22.1.1","Hobble","switch","auto","Retired","false","switch-enrollment","172.22.1.1","Decommissioned; retained for history only","2026-10-25"
 "SW-AA148-Aruba","192.168.2.41","Hobble","switch","aruba_aoscx","Canonical","true","switch-enrollment","192.168.2.41","","2026-09-07"
 "swa-a161","192.168.2.197","Hobble","switch","aruba_aoscx","Canonical","true","switch-enrollment","192.168.2.197","","2026-09-07"
 "SWA-AA105","192.168.2.199","Hobble","switch","aruba_aoscx","Canonical","true","switch-enrollment","192.168.2.199","Canonical management address; 10.70.34.1 is a duplicate SVI","2026-09-07"

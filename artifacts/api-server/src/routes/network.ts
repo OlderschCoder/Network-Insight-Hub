@@ -51,6 +51,7 @@ import {
   prepareWebexSupportDeviceInventory,
   webexSupportFetch,
 } from "../lib/webex_support";
+import { isPrivateIpv4, runSwitchEnrollment } from "../lib/switch_enrollment";
 
 const router = Router();
 
@@ -474,6 +475,63 @@ router.get("/switches", requireAuth, async (req: any, res) => {
       : await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
   }
   return res.json(switches.map(withVisibleMaintenanceLog).map(withCanonicalSwitchBuilding));
+});
+
+const switchEnrollmentPreviewSchema = z.object({
+  ip: z.string().trim().refine(isPrivateIpv4, "A private IPv4 management address is required"),
+});
+
+const switchEnrollmentApplySchema = switchEnrollmentPreviewSchema.extend({
+  building: z.string().trim().min(1).max(80),
+  location: z.string().trim().min(1).max(80).optional(),
+  confirm: z.string().trim().max(64),
+});
+
+router.post("/switch-enrollment/preview", requireAuth, requireNetworkToolsAccess, async (req: any, res) => {
+  const parsed = switchEnrollmentPreviewSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Validation error" });
+  try {
+    return res.json(await runSwitchEnrollment({ action: "preview", ip: parsed.data.ip }, 180_000));
+  } catch (error: any) {
+    return res.status(502).json({ error: error?.message || "Switch discovery failed" });
+  }
+});
+
+router.post("/switch-enrollment/apply", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const parsed = switchEnrollmentApplySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Validation error" });
+  if (parsed.data.confirm !== `ENROLL ${parsed.data.ip}`) {
+    return res.status(400).json({ error: `Type ENROLL ${parsed.data.ip} to confirm` });
+  }
+  try {
+    const result = await runSwitchEnrollment({ action: "apply", ...parsed.data }, 600_000);
+    const facts = result?.facts;
+    if (!facts?.hostname || facts?.ip !== parsed.data.ip) {
+      return res.status(502).json({ error: "Collector verification did not return the expected switch identity" });
+    }
+    const before = await findSwitchByIdentity({ hostname: facts.hostname, ipAddress: facts.ip });
+    const saved = await saveSwitchByIdentity({
+      hostname: facts.hostname,
+      building: parsed.data.building,
+      ipAddress: facts.ip,
+      model: facts.model || facts.models?.join(", ") || null,
+      status: "online",
+      location: parsed.data.location || parsed.data.building,
+      notes: `SNMPv3 and Telegraf enrollment verified ${result.completedAt || new Date().toISOString()}`,
+    });
+    await recordInventoryAudit({
+      entityType: "switch",
+      entityId: saved.row.id,
+      entityLabel: saved.row.hostname,
+      action: saved.action === "created" ? "create" : "update",
+      source: "manual",
+      actor: reqActor(req),
+      changes: diffFields(before, saved.row, SWITCH_AUDIT_FIELDS),
+    });
+    return res.json({ ...result, fredInventory: { action: saved.action, switch: withCanonicalSwitchBuilding(saved.row) } });
+  } catch (error: any) {
+    return res.status(502).json({ error: error?.message || "Switch enrollment failed" });
+  }
 });
 
 router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res) => {
