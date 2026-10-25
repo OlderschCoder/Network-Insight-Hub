@@ -56,8 +56,8 @@ export default function MfaTapActivity() {
   const metrics = [
     { label: "TAPs in flagged rows", value: data?.summary.totalPasses ?? 0, icon: KeyRound },
     { label: "Flagged students", value: data?.summary.uniqueStudents ?? 0, icon: Users },
-    { label: "Review flags (4–7)", value: data?.summary.reviewFlags ?? 0, icon: AlertTriangle },
-    { label: "Above policy (>7)", value: data?.summary.policyExceeded ?? 0, icon: ShieldAlert },
+    { label: `Review flags (${data?.policy.reviewThreshold ?? 4}–${data?.policy.dailyLimit ?? 15})`, value: data?.summary.reviewFlags ?? 0, icon: AlertTriangle },
+    { label: `Above policy (>${data?.policy.dailyLimit ?? 15})`, value: data?.summary.policyExceeded ?? 0, icon: ShieldAlert },
   ];
 
   return (
@@ -111,7 +111,7 @@ export default function MfaTapActivity() {
                 <TableBody>
                   {data.rows.map((row) => {
                     const review = row.count >= (data.policy.reviewThreshold ?? 4);
-                    const exceeded = row.count > (data.policy.dailyLimit ?? 7);
+                    const exceeded = row.count > (data.policy.dailyLimit ?? 15);
                     return (
                       <TableRow key={`${row.date}-${row.objectId}`} className={review ? "bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/40" : undefined}>
                         <TableCell className="whitespace-nowrap">{row.date}</TableCell>

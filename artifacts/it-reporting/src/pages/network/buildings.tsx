@@ -15,16 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Server, Wifi, WifiOff, AlertTriangle, Activity,
   ArrowLeft, ChevronRight, Loader2, RefreshCw, Search, Pencil, Save, X, PhoneCall, ExternalLink,
-  Eye, EyeOff,
 } from "lucide-react";
 import { TelemetrySwitchPortMap } from "./switch-port-map";
 
 const API = "/api";
 const PUBLIC_BUILDINGS_API = `${API}/network/public/buildings`;
 const PUBLIC_BUILDINGS_LAYOUT_API = `${API}/network/public/buildings/map-layout`;
-const CAMPUS_MAP_LAYOUT_REFRESH_MS = 30_000;
-const CAMPUS_MAP_LAYOUT_UPDATED_EVENT = "sccc:campus-map-layout-updated";
-const CAMPUS_MAP_LAYOUT_STORAGE_KEY = "sccc-campus-map-layout-version";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,22 +66,17 @@ interface BuildingDetail {
   influxConfigured: boolean;
 }
 
-export interface OverlayPosition {
+interface OverlayPosition {
   code: string;
   x: number;
   y: number;
   labelDx?: number | null;
   labelDy?: number | null;
-  visible?: boolean;
 }
 
-export interface SavedOverlayLayoutRow {
-  code: string;
-  x?: number;
-  y?: number;
-  labelDx?: number | null;
-  labelDy?: number | null;
-  visible?: boolean;
+interface CampusStatusMapProps {
+  buildings: BuildingSummary[];
+  publicMode?: boolean;
 }
 
 interface CallingSupportSnapshot {
@@ -116,7 +107,7 @@ interface CallingSupportSnapshot {
   };
   buildings: Array<{
     name: string;
-    healthColor: "green" | "amber" | "red" | "unknown";
+    healthColor: "green" | "amber" | "red" | "gray";
     monitoringStrategy: string;
     nodeCount: number;
     switchCount: number;
@@ -143,48 +134,35 @@ export type CampusMapBuildingHealth = {
   healthColor: "green" | "amber" | "red" | "unknown";
 };
 
-interface CampusStatusMapProps {
-  buildings: CampusMapBuildingHealth[];
-  publicMode?: boolean;
-  onLayoutChange?: (layout: Record<string, OverlayPosition>) => void;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export const BUILDING_HEALTH_LABELS = {
-  green: "All monitored switches online",
-  amber: "One or more switch issues; full outage not confirmed",
-  red: "Main switch and assigned phones offline",
-  unknown: "Evidence incomplete",
-} as const;
 
 const healthStyles: Record<string, { bg: string; border: string; ring: string; label: string; icon: ReactNode }> = {
   green: {
     bg: "bg-green-50 hover:bg-green-100",
     border: "border-green-400",
     ring: "ring-green-300",
-    label: BUILDING_HEALTH_LABELS.green,
+    label: "All systems up",
     icon: <Wifi className="h-5 w-5 text-green-600" />,
   },
   amber: {
     bg: "bg-amber-50 hover:bg-amber-100",
     border: "border-amber-400",
     ring: "ring-amber-300",
-    label: BUILDING_HEALTH_LABELS.amber,
+    label: "Degraded",
     icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
   },
   red: {
     bg: "bg-red-50 hover:bg-red-100",
     border: "border-red-400",
     ring: "ring-red-300",
-    label: BUILDING_HEALTH_LABELS.red,
+    label: "One or more devices down",
     icon: <WifiOff className="h-5 w-5 text-red-600" />,
   },
   unknown: {
     bg: "bg-gray-50 hover:bg-gray-100",
     border: "border-gray-300",
     ring: "ring-gray-200",
-    label: BUILDING_HEALTH_LABELS.unknown,
+    label: "Status unknown",
     icon: <Activity className="h-5 w-5 text-gray-400" />,
   },
 };
@@ -222,7 +200,6 @@ const CAMPUS_OVERLAYS: CampusOverlay[] = [
   { code: "SW", buildingName: "Student Union / Activities", preferredNames: ["Student Union / Student Activities"], aliases: ["sw", "student union / student activities", "student union / activities", "student union"], x: 72.5, y: 32.5, labelDx: 10, labelDy: -14, labelGroup: "student-union" },
   { code: "SHC", buildingName: "Student Health Center", preferredNames: ["Student Health Center"], aliases: ["shc", "student health center"], x: 78.2, y: 24.0, labelDx: 8, labelDy: -10 },
   { code: "SLC", buildingName: "Student Living Center", preferredNames: ["Student Living Center", "Student Living Center (SLC151)"], aliases: ["slc", "student living center"], x: 81.2, y: 31.0, labelDx: 8, labelDy: -10 },
-  { code: "MAN", buildingName: "Mansions", preferredNames: ["Mansions"], aliases: ["mansions", "student living ab", "student living de"], x: 19.6, y: 32.0, labelDx: 8, labelDy: -10 },
   { code: "SLF", buildingName: "Student Living F", preferredNames: ["Student Living F"], aliases: ["student living f"], x: 16.6, y: 27.8, displayCode: "F", compactMarker: true },
   { code: "SLG", buildingName: "Student Living G", preferredNames: ["Student Living G"], aliases: ["student living g"], x: 20.8, y: 27.8, displayCode: "G", compactMarker: true },
   { code: "SLH", buildingName: "Student Living H", preferredNames: ["Student Living H"], aliases: ["student living h"], x: 23.3, y: 27.8, displayCode: "H", compactMarker: true },
@@ -241,21 +218,6 @@ function normalizeBuildingName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-export function canEditCampusMap(role: string | null | undefined): boolean {
-  return role === "cio";
-}
-
-function customBuildingOverlayCode(name: string): string {
-  return `CUSTOM:${encodeURIComponent(name.trim())}`;
-}
-
-function buildingDisplayCode(name: string): string {
-  const words = name.match(/[A-Za-z0-9]+/g) ?? [];
-  return (words.length > 1 ? words.map((word) => word[0]).join("") : words[0]?.slice(0, 3) ?? "NEW")
-    .slice(0, 4)
-    .toUpperCase();
-}
-
 function matchesAlias(name: string, aliases: string[]): boolean {
   const normalized = normalizeBuildingName(name);
   return aliases.some((alias) => {
@@ -264,22 +226,6 @@ function matchesAlias(name: string, aliases: string[]): boolean {
     if (candidate.length < 4) return false;
     return normalized.includes(candidate);
   });
-}
-
-function findOverlayBuildingMatch<T extends CampusMapBuildingHealth>(
-  overlay: CampusOverlay,
-  buildings: T[],
-  byName: Map<string, T>,
-): T | null {
-  for (const preferredName of overlay.preferredNames ?? []) {
-    const preferredMatch = byName.get(normalizeBuildingName(preferredName));
-    if (preferredMatch) return preferredMatch;
-  }
-
-  const nameMatch = byName.get(normalizeBuildingName(overlay.buildingName));
-  if (nameMatch) return nameMatch;
-
-  return buildings.find((building) => matchesAlias(building.name, overlay.aliases)) ?? null;
 }
 
 function getVisibleCampusOverlayCodes() {
@@ -307,18 +253,27 @@ function getVisibleCampusOverlayCodes() {
   return anchors;
 }
 
-export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(
-  buildings: T[],
-  layout: Record<string, Pick<OverlayPosition, "visible">> = {},
-) {
+export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(buildings: T[]) {
   const byName = new Map(buildings.map((building) => [normalizeBuildingName(building.name), building]));
   const visibleOverlayCodes = getVisibleCampusOverlayCodes();
 
-  const staticEntries = CAMPUS_OVERLAYS
+  return CAMPUS_OVERLAYS
     .filter((overlay) => visibleOverlayCodes.has(overlay.code))
-    .filter((overlay) => layout[overlay.code]?.visible !== false)
     .map((overlay) => {
-      const match = findOverlayBuildingMatch(overlay, buildings, byName);
+      let match = null as T | null;
+
+      for (const preferredName of overlay.preferredNames ?? []) {
+        match = byName.get(normalizeBuildingName(preferredName)) ?? null;
+        if (match) break;
+      }
+
+      if (!match) {
+        match = byName.get(normalizeBuildingName(overlay.buildingName)) ?? null;
+      }
+
+      if (!match) {
+        match = buildings.find((building) => matchesAlias(building.name, overlay.aliases)) ?? null;
+      }
 
       return {
         code: overlay.code,
@@ -327,70 +282,6 @@ export function getCampusMapDisplayEntries<T extends CampusMapBuildingHealth>(
         match,
       };
     });
-
-  const staticallyMatchedBuildingNames = new Set(
-    CAMPUS_OVERLAYS
-      .map((overlay) => findOverlayBuildingMatch(overlay, buildings, byName)?.name)
-      .filter((name): name is string => !!name)
-      .map(normalizeBuildingName),
-  );
-  const customEntries = buildings
-    .filter((building) => !staticallyMatchedBuildingNames.has(normalizeBuildingName(building.name)))
-    .map((building) => ({
-      code: customBuildingOverlayCode(building.name),
-      buildingName: building.name,
-      displayCode: buildingDisplayCode(building.name),
-      match: building,
-    }))
-    .filter((entry) => layout[entry.code]?.visible !== false);
-
-  return [...staticEntries, ...customEntries];
-}
-
-export function mergeCampusMapLayoutRows(
-  defaultPositions: Record<string, OverlayPosition>,
-  rows: SavedOverlayLayoutRow[],
-  compactOverlayCodes: ReadonlySet<string> = new Set(),
-): Record<string, OverlayPosition> {
-  const nextPositions = { ...defaultPositions };
-  for (const row of rows) {
-    const isLegacyDormPosition = compactOverlayCodes.has(row.code)
-      && row.code.startsWith("SL")
-      && row.code !== "SLC"
-      && typeof row.x === "number"
-      && row.x > 30;
-    if (isLegacyDormPosition) continue;
-
-    const defaultPosition = nextPositions[row.code];
-    const x = typeof row.x === "number" && Number.isFinite(row.x) ? row.x : defaultPosition?.x;
-    const y = typeof row.y === "number" && Number.isFinite(row.y) ? row.y : defaultPosition?.y;
-    // Visibility-only metadata is useful only after its built-in or dynamic
-    // custom marker has supplied a safe default coordinate.
-    if (x === undefined || y === undefined) continue;
-    nextPositions[row.code] = {
-      code: row.code,
-      x,
-      y,
-      labelDx: row.labelDx ?? defaultPosition?.labelDx ?? null,
-      labelDy: row.labelDy ?? defaultPosition?.labelDy ?? null,
-      visible: row.visible ?? defaultPosition?.visible ?? true,
-    };
-  }
-  return nextPositions;
-}
-
-export function setCampusMapMarkerVisibility(
-  positions: Record<string, OverlayPosition>,
-  defaultPositions: Record<string, OverlayPosition>,
-  code: string,
-  visible: boolean,
-): Record<string, OverlayPosition> {
-  const position = positions[code] ?? defaultPositions[code];
-  if (!position) return positions;
-  return {
-    ...positions,
-    [code]: { ...position, code, visible },
-  };
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -438,45 +329,28 @@ const callingHealthBadgeClass: Record<string, string> = {
   green: "bg-green-100 text-green-700 border-green-300",
   amber: "bg-amber-100 text-amber-700 border-amber-300",
   red: "bg-red-100 text-red-700 border-red-300",
-  unknown: "bg-gray-100 text-gray-600 border-gray-300",
+  gray: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
 const callingHealthLabel: Record<string, string> = {
-  ...BUILDING_HEALTH_LABELS,
+  green: "Network healthy",
+  amber: "Attention needed",
+  red: "Likely building issue",
+  gray: "No live data",
 };
 
 // ─── Grid View ────────────────────────────────────────────────────────────────
 
-export function CampusStatusMap({
-  buildings,
-  publicMode = false,
-  onLayoutChange,
-}: CampusStatusMapProps) {
+export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusMapProps) {
   const { user } = useAuth();
-  const canEditMap = !publicMode && canEditCampusMap(user?.role);
+  const canEditMap = !publicMode && !!user;
   const { toast } = useToast();
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ code: string; offsetX: number; offsetY: number } | null>(null);
-  const allMapDisplayEntries = useMemo(() => getCampusMapDisplayEntries(buildings), [buildings]);
-  const overlayDefinitions = useMemo<CampusOverlay[]>(() => {
-    const customEntries = allMapDisplayEntries.filter((entry) => entry.code.startsWith("CUSTOM:"));
-    const customOverlays = customEntries.map((entry, index) => ({
-      code: entry.code,
-      buildingName: entry.buildingName,
-      preferredNames: [entry.buildingName],
-      aliases: [entry.buildingName],
-      displayCode: entry.displayCode,
-      x: 8 + (index % 5) * 8,
-      y: 90 - Math.floor(index / 5) * 8,
-      labelDx: 8,
-      labelDy: -10,
-    }));
-    return [...CAMPUS_OVERLAYS, ...customOverlays];
-  }, [allMapDisplayEntries]);
   const defaultPositions = useMemo<Record<string, OverlayPosition>>(
     () =>
       Object.fromEntries(
-        overlayDefinitions.map((overlay) => [
+        CAMPUS_OVERLAYS.map((overlay) => [
           overlay.code,
           {
             code: overlay.code,
@@ -484,11 +358,10 @@ export function CampusStatusMap({
             y: overlay.y,
             labelDx: overlay.labelDx ?? null,
             labelDy: overlay.labelDy ?? null,
-            visible: true,
           },
         ]),
       ),
-    [overlayDefinitions],
+    [],
   );
   const [savedPositions, setSavedPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
   const [overlayPositions, setOverlayPositions] = useState<Record<string, OverlayPosition>>(defaultPositions);
@@ -496,76 +369,46 @@ export function CampusStatusMap({
   const [savingLayout, setSavingLayout] = useState(false);
   const [dirtyLayout, setDirtyLayout] = useState(false);
 
-  const loadLayout = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
+  const loadLayout = useCallback(async () => {
     try {
       const response = publicMode
-        ? await fetch(PUBLIC_BUILDINGS_LAYOUT_API, { cache: "no-store" })
-        : await authFetch(`${API}/network/buildings/map-layout`, {
-            credentials: "include",
-            cache: "no-store",
-          });
+        ? await fetch(PUBLIC_BUILDINGS_LAYOUT_API)
+        : await authFetch(`${API}/network/buildings/map-layout`, { credentials: "include" });
       if (!response.ok) throw new Error(await response.text());
-      const rows = (await response.json()) as SavedOverlayLayoutRow[];
-      const compactOverlayCodes = new Set(
-        overlayDefinitions.filter((overlay) => overlay.compactMarker).map((overlay) => overlay.code),
-      );
-      const nextPositions = mergeCampusMapLayoutRows(defaultPositions, rows, compactOverlayCodes);
+      const rows = (await response.json()) as OverlayPosition[];
+      const nextPositions = { ...defaultPositions };
+      for (const row of rows) {
+        const overlayDefinition = CAMPUS_OVERLAYS.find((overlay) => overlay.code === row.code);
+        const isLegacyDormPosition = overlayDefinition?.compactMarker
+          && row.code.startsWith("SL")
+          && row.code !== "SLC"
+          && row.x > 30;
+        if (isLegacyDormPosition) continue;
+        nextPositions[row.code] = {
+          code: row.code,
+          x: row.x,
+          y: row.y,
+          labelDx: row.labelDx ?? nextPositions[row.code]?.labelDx ?? null,
+          labelDy: row.labelDy ?? nextPositions[row.code]?.labelDy ?? null,
+        };
+      }
       setSavedPositions(nextPositions);
       setOverlayPositions(nextPositions);
-      onLayoutChange?.(nextPositions);
       setDirtyLayout(false);
     } catch (error: any) {
-      if (!quiet) {
-        setSavedPositions(defaultPositions);
-        setOverlayPositions(defaultPositions);
-        onLayoutChange?.(defaultPositions);
-        toast({
-          title: "Couldn't load map positions",
-          description: error?.message ?? "Using default overlay positions.",
-          variant: "destructive",
-        });
-      }
+      setSavedPositions(defaultPositions);
+      setOverlayPositions(defaultPositions);
+      toast({
+        title: "Couldn't load map positions",
+        description: error?.message ?? "Using default overlay positions.",
+        variant: "destructive",
+      });
     }
-  }, [defaultPositions, onLayoutChange, overlayDefinitions, publicMode, toast]);
+  }, [defaultPositions, publicMode, toast]);
 
   useEffect(() => {
     void loadLayout();
   }, [loadLayout]);
-
-  useEffect(() => {
-    const refreshSavedLayout = () => {
-      if (!editMode && !dirtyLayout) void loadLayout({ quiet: true });
-    };
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshSavedLayout();
-    };
-    const refreshFromAnotherTab = (event: StorageEvent) => {
-      if (event.key === CAMPUS_MAP_LAYOUT_STORAGE_KEY) refreshSavedLayout();
-    };
-    const intervalId = window.setInterval(refreshSavedLayout, CAMPUS_MAP_LAYOUT_REFRESH_MS);
-
-    window.addEventListener("focus", refreshSavedLayout);
-    window.addEventListener(CAMPUS_MAP_LAYOUT_UPDATED_EVENT, refreshSavedLayout);
-    window.addEventListener("storage", refreshFromAnotherTab);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshSavedLayout);
-      window.removeEventListener(CAMPUS_MAP_LAYOUT_UPDATED_EVENT, refreshSavedLayout);
-      window.removeEventListener("storage", refreshFromAnotherTab);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, [dirtyLayout, editMode, loadLayout]);
-
-  const announceLayoutUpdate = useCallback(() => {
-    window.dispatchEvent(new Event(CAMPUS_MAP_LAYOUT_UPDATED_EVENT));
-    try {
-      window.localStorage.setItem(CAMPUS_MAP_LAYOUT_STORAGE_KEY, String(Date.now()));
-    } catch {
-      // Cross-tab refresh is a convenience; the no-cache focus/interval refresh remains authoritative.
-    }
-  }, []);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -612,11 +455,9 @@ export function CampusStatusMap({
       });
       if (!response.ok) throw new Error(await response.text());
       setSavedPositions(overlayPositions);
-      onLayoutChange?.(overlayPositions);
       setDirtyLayout(false);
       setEditMode(false);
-      announceLayoutUpdate();
-      toast({ title: "Campus map saved", description: "Marker positions and visibility were updated for everyone." });
+      toast({ title: "Campus map saved", description: "Bubble positions were updated for everyone." });
     } catch (error: any) {
       toast({
         title: "Couldn't save map positions",
@@ -626,7 +467,7 @@ export function CampusStatusMap({
     } finally {
       setSavingLayout(false);
     }
-  }, [announceLayoutUpdate, onLayoutChange, overlayPositions, toast]);
+  }, [overlayPositions, toast]);
 
   const cancelEditing = useCallback(() => {
     setOverlayPositions(savedPositions);
@@ -647,10 +488,8 @@ export function CampusStatusMap({
       if (!response.ok) throw new Error(await response.text());
       setSavedPositions(defaultPositions);
       setOverlayPositions(defaultPositions);
-      onLayoutChange?.(defaultPositions);
       setDirtyLayout(false);
       setEditMode(false);
-      announceLayoutUpdate();
       toast({ title: "Campus map reset", description: "Overlay positions were restored to the defaults." });
     } catch (error: any) {
       toast({
@@ -661,7 +500,7 @@ export function CampusStatusMap({
     } finally {
       setSavingLayout(false);
     }
-  }, [announceLayoutUpdate, defaultPositions, onLayoutChange, toast]);
+  }, [defaultPositions, toast]);
 
   const beginDrag = useCallback((event: React.PointerEvent<HTMLDivElement>, code: string) => {
     if (!editMode) return;
@@ -684,7 +523,7 @@ export function CampusStatusMap({
 
   const overlays = useMemo(
     () =>
-      overlayDefinitions.map((overlay) => {
+      CAMPUS_OVERLAYS.map((overlay) => {
         const saved = overlayPositions[overlay.code];
         return {
           ...overlay,
@@ -692,36 +531,22 @@ export function CampusStatusMap({
           y: saved?.y ?? overlay.y,
           labelDx: saved?.labelDx ?? overlay.labelDx,
           labelDy: saved?.labelDy ?? overlay.labelDy,
-          visible: saved?.visible ?? true,
         };
       }),
-    [overlayDefinitions, overlayPositions],
+    [overlayPositions],
   );
 
   const buildingByCode = useMemo(
-    () => new Map(allMapDisplayEntries.map((entry) => [entry.code, entry.match])),
-    [allMapDisplayEntries],
+    () => new Map(getCampusMapDisplayEntries(buildings).map((entry) => [entry.code, entry.match])),
+    [buildings],
   );
 
-  const defaultVisibleOverlayCodes = useMemo(() => getVisibleCampusOverlayCodes(), []);
-  const displayedEntryCodes = useMemo(
-    () => new Set(getCampusMapDisplayEntries(buildings, overlayPositions).map((entry) => entry.code)),
-    [buildings, overlayPositions],
-  );
+  const visibleOverlayCodes = useMemo(() => getVisibleCampusOverlayCodes(), []);
 
   const visibleOverlays = useMemo(
-    () => overlays.filter((overlay) =>
-      (defaultVisibleOverlayCodes.has(overlay.code) || overlay.code.startsWith("CUSTOM:"))
-      && displayedEntryCodes.has(overlay.code)
-      && overlay.visible !== false),
-    [defaultVisibleOverlayCodes, displayedEntryCodes, overlays],
+    () => overlays.filter((overlay) => visibleOverlayCodes.has(overlay.code)),
+    [overlays, visibleOverlayCodes],
   );
-
-  const setMarkerVisibility = useCallback((code: string, visible: boolean) => {
-    setOverlayPositions((current) =>
-      setCampusMapMarkerVisibility(current, defaultPositions, code, visible));
-    setDirtyLayout(true);
-  }, [defaultPositions]);
 
   const fiberLines = useMemo(
     () =>
@@ -775,42 +600,17 @@ export function CampusStatusMap({
           Building codes are matched to the campus map and colored by current building health.
         </p>
         {editMode && (
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground">
-              Drag the building bubbles where you want them. Use the controls below to choose which markers appear in both Buildings and Monitoring, then click <span className="font-medium text-foreground">Save Map</span>.
-            </p>
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">Building visibility</p>
-              <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto" role="group" aria-label="Campus map building visibility">
-                {allMapDisplayEntries.map((entry) => {
-                  const visible = overlayPositions[entry.code]?.visible !== false;
-                  return (
-                    <Button
-                      key={`visibility-${entry.code}`}
-                      type="button"
-                      variant={visible ? "secondary" : "outline"}
-                      size="sm"
-                      className="h-8 gap-1.5"
-                      aria-pressed={visible}
-                      onClick={() => setMarkerVisibility(entry.code, !visible)}
-                      disabled={savingLayout}
-                    >
-                      {visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                      {entry.match?.name ?? entry.buildingName}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Drag the building bubbles where you want them, then click <span className="font-medium text-foreground">Save Map</span>.
+          </p>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> {BUILDING_HEALTH_LABELS.green}</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> {BUILDING_HEALTH_LABELS.amber}</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> {BUILDING_HEALTH_LABELS.red}</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> {BUILDING_HEALTH_LABELS.unknown}</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All mapped devices up</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more mapped devices degraded</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more mapped devices down</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live building match yet</div>
         </div>
 
         <div ref={mapRef} className="relative overflow-hidden rounded-2xl border bg-[#dfe8d8]">
@@ -922,10 +722,10 @@ export function CampusStatusMap({
               >
                 <div className="relative">
                   <div
-                    className={`network-status-surface absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "px-1.5 py-0" : "px-2 py-0.5"} ${style.bg} ${style.border}`}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "px-1.5 py-0" : "px-2 py-0.5"} ${style.bg} ${style.border}`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className={`network-status-title ${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em]`}>{overlay.displayCode ?? overlay.code}</span>
+                      <span className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em] text-foreground`}>{overlay.displayCode ?? overlay.code}</span>
                       <span
                         className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "h-2 w-2" : "h-2.5 w-2.5"} rounded-full ${
                           match?.healthColor === "green"
@@ -940,18 +740,18 @@ export function CampusStatusMap({
                     </div>
                   </div>
                   {!overlay.compactMarker && <div
-                    className={`network-status-surface absolute min-w-[96px] max-w-[148px] rounded-2xl border px-2.5 py-1.5 shadow-sm backdrop-blur-sm ${style.bg} ${style.border} ${isWestCampus ? "ring-1 ring-[#355842]/40" : ""}`}
+                    className={`absolute min-w-[96px] max-w-[148px] rounded-2xl border px-2.5 py-1.5 shadow-sm backdrop-blur-sm ${style.bg} ${style.border} ${isWestCampus ? "ring-1 ring-[#355842]/40" : ""}`}
                     style={{ transform: `translate(${labelDx}px, ${labelDy}px)` }}
                   >
                     {isWestCampus && (
-                      <div className="network-status-action mb-1 text-[8px] font-bold uppercase leading-none tracking-[0.16em]">
+                      <div className="mb-1 text-[8px] font-bold uppercase leading-none tracking-[0.16em] text-[#355842]">
                         Remote site
                       </div>
                     )}
-                    <div className="network-status-title text-[10px] font-bold leading-tight">
+                    <div className="text-[10px] font-semibold leading-tight text-foreground">
                       {match?.name ?? overlay.buildingName}
                     </div>
-                    <div className="network-status-meta mt-0.5 text-[9px] font-medium leading-tight">{style.label}</div>
+                    <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
                   </div>}
                 </div>
               </div>
@@ -1073,10 +873,10 @@ function BuildingsGrid() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> {BUILDING_HEALTH_LABELS.green}</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> {BUILDING_HEALTH_LABELS.amber}</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> {BUILDING_HEALTH_LABELS.red}</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> {BUILDING_HEALTH_LABELS.unknown}</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All devices up</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more degraded</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more down</div>
+        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live data</div>
       </div>
 
       {/* Search */}
@@ -1107,7 +907,7 @@ function BuildingsGrid() {
               return (
                 <Link key={b.name} href={`/network/buildings/${encodeURIComponent(b.name)}`}>
                   <div className={`
-                    network-status-surface group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
+                    group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
                     ${style.bg} ${style.border}
                     hover:shadow-md hover:scale-[1.02] focus-within:ring-2 ${style.ring}
                   `}>
@@ -1118,18 +918,18 @@ function BuildingsGrid() {
                       : "bg-gray-300"
                     }`} />
                     <div className="flex h-full flex-col gap-2">
-                      <div className="network-status-meta">{style.icon}</div>
+                      <div className="text-muted-foreground">{style.icon}</div>
                       <div>
-                        <p className="network-status-title text-sm font-bold leading-tight">{b.name}</p>
-                        <p className="network-status-meta mt-0.5 text-xs font-medium">{style.label}</p>
+                        <p className="font-semibold text-sm leading-tight">{b.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
                       </div>
                       <div className="flex gap-2 mt-auto pt-1">
-                        <span className="network-status-meta text-xs">
+                        <span className="text-xs text-muted-foreground">
                           <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
                         </span>
-                        <span className="network-status-meta text-xs">VLANs: {b.vlanCount}</span>
+                        <span className="text-xs text-muted-foreground">VLANs: {b.vlanCount}</span>
                       </div>
-                      <span className="network-status-action text-xs font-semibold group-hover:underline">Open building →</span>
+                      <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
                     </div>
                   </div>
                 </Link>
@@ -1230,8 +1030,8 @@ function BuildingsGrid() {
                             <span>{building.nodeCount} monitored nodes</span>
                           </div>
                         </div>
-                        <Badge variant="outline" className={callingHealthBadgeClass[building.healthColor] ?? callingHealthBadgeClass.unknown}>
-                          {callingHealthLabel[building.healthColor] ?? callingHealthLabel.unknown}
+                        <Badge variant="outline" className={callingHealthBadgeClass[building.healthColor] ?? callingHealthBadgeClass.gray}>
+                          {callingHealthLabel[building.healthColor] ?? callingHealthLabel.gray}
                         </Badge>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1292,9 +1092,7 @@ function BuildingsGrid() {
                     <div>
                       <div className="font-medium text-foreground">Offline Webex endpoints</div>
                       <div className="text-muted-foreground">
-                        {callingSupport.queryError
-                          ? "Webex device inventory is unavailable, so no offline-device conclusion is shown."
-                          : offlineWebexDevices.length > 0
+                        {offlineWebexDevices.length > 0
                           ? `${offlineWebexDevices.length} device(s) are offline in Webex and should be compared against the building matrix.`
                           : "No Webex devices are currently reported offline."}
                       </div>

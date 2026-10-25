@@ -1,7 +1,6 @@
 import { and, eq, like, sql } from "drizzle-orm";
 import { db, aiKnowledgeTable } from "@workspace/db";
 import { logger } from "./logger";
-import { fredApplicationKnowledgeEntries } from "./fred_app_catalog";
 
 // Arbitrary constant key for a Postgres advisory lock so concurrent app
 // instances/restarts can't run the delete+insert at the same time.
@@ -13,7 +12,7 @@ const SEED_LOCK_KEY = 748213001;
 // the production database, which is provisioned fresh (schema only) on publish.
 const TITLE_PREFIX = "Using the Platform:";
 
-const CORE_APP_USAGE_ENTRIES: {
+const APP_USAGE_ENTRIES: {
   category: string;
   title: string;
   content: string;
@@ -28,13 +27,7 @@ const CORE_APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: Navigation",
     content:
-      "Use the top menu to choose Status & Reporting (/status), Campus Technology (/network/buildings), Troubleshooting (/support), My Work (/todos), IT Apps (/it-apps), or CIO-only Administration (/projects). Clicking a category title opens its landing page; clicking the separate chevron opens that category's dropdown destinations. Quick Start (/quick-start), Learn (/learn), Process Library (/processes), and the full User Guide (/user-guide) are under Troubleshooting. The top bar also provides search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls.",
-  },
-  {
-    category: "general",
-    title: "Using the Platform: Quick Start",
-    content:
-      "Quick Start (/quick-start) is the concise onboarding page for the rearranged Insights portal. It explains the six top-menu categories, the To-do -> Completed Work -> Weekly Log cycle, supervised Zendesk drafting and escalation, Fred Memory, Process Library, and the current SCCC wireless, requester-identity, and Microsoft 365 licensing reply rules. Direct new or returning users there first; use User Guide (/user-guide) for full detail and Learn (/learn) for guided practice.",
+      "Start at Home (/), then choose Status & Reporting (/status), Campus Technology (/network/buildings), or Troubleshooting (/support). The fixed left sidebar is organized into clickable category headings with separate dropdown chevrons: Status & Reporting, Campus Technology, Troubleshooting, My Work, IT Apps, and CIO-only Administration. Clicking a category title opens its landing page; clicking its chevron expands or collapses its pages. The top bar provides breadcrumbs, search (Cmd/Ctrl+K), theme, Fred, alerts, and account controls. IT Apps (/it-apps) launches Cisco Calling, Banner, IT Calls (1200), ETHOS EUP, ACR Analytics, and Continuity LMS.",
   },
   {
     category: "general",
@@ -46,13 +39,13 @@ const CORE_APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: To-dos, completed work, and the Weekly Log",
     content:
-      "Use To-do List (/todos) for outstanding assignments, priorities, due dates, and completion status. Fred can list accessible to-dos and, after showing the exact item/change and receiving confirmation, create, edit, or complete them. Mark and Tracy can also ask Fred to move (reassign) any team member's to-do; everyone else can create and manage only their own. Completed Work (/items) is separate: staff record finished tickets, installs, research, and project work there so it rolls into the Weekly Log. When it's time to report, go to My Work -> Weekly Log (/entries), choose New Entry, and wait for the week's solved Zendesk tickets to load. Save Draft keeps the log out of the department rollup; Submit Weekly Log includes it. If Zendesk cannot load, save a draft and use Retry tickets before submitting. There is one weekly log per user per week. CIOs, including Tracy, still submit their own Weekly Log here before working on the department report.",
+      "Use To-do List (/todos) for outstanding assignments, priorities, due dates, and completion status. Mark and Tracy can create, view, edit, reassign, complete, or delete any team member's to-do; everyone else can create and manage only their own. Completed Work (/items) is separate: staff record finished tickets, installs, research, and project work there so it rolls into the Weekly Log. When it's time to report, go to Weekly Log (/entries) and generate the week's entry. There is one weekly log per user per week, and submitting it feeds the department weekly report.",
   },
   {
     category: "general",
     title: "Using the Platform: Weekly Reports (CIO)",
     content:
-      "Department Weekly Reports (/reports) aggregate submitted staff Weekly Logs into one department report per week. This is separate from the CIO's own Weekly Log: Tracy first uses My Work -> Weekly Log and clicks Submit Weekly Log for her personal contribution, then opens Status & Reporting -> Weekly Reports to create or edit the department report. Open /reports/:id to edit the title, summary, accomplishments, challenges, strategic progress, next-week plans, selected work items, custom tasks, projects, Post-Incident Reviews, maintenance, risks, cloud/goal inclusion, and email recipients. The CIO can create, edit, finalize, delete, export, or email a report. Fred can create, edit, or finalize these reports only for the CIO and only after showing the exact change and receiving confirmation. Weekly logs saved before the September 14, 2026 explicit-submission cutover remain report-eligible until someone edits or returns them to draft; this preserves historical reports without rewriting their data. Resolved Zendesk tickets are selected by their solved date for the exact report week, so a later ticket update does not remove them from that week.",
+      "Reports (/reports) aggregate everyone's weekly logs into one department report per week. Open /reports/:id to edit the title, summary, accomplishments, challenges, strategic progress, next-week plans, selected work items, custom tasks, projects, Post-Incident Reviews, maintenance, risks, cloud/goal inclusion, and email recipients. The CIO can create, edit, finalize, delete, export, or email a report. Fred can create, edit, or finalize these reports only for the CIO and only after showing the exact change and receiving confirmation. Resolved Zendesk tickets for the report's week are pulled in automatically.",
   },
   {
     category: "general",
@@ -106,19 +99,19 @@ const CORE_APP_USAGE_ENTRIES: {
     category: "general",
     title: "Using the Platform: Zendesk tickets with Fred",
     content:
-      "Troubleshooting (/support) shows recent Zendesk activity and opens diagnostic workflows. Zendesk Monitor (/support/zendesk) polls the open conversation queue, shows the recent thread, asks Fred for one read-only reply draft, or uses Prepare open drafts to review up to 25 loaded open tickets. Batch review skips existing drafts, pending tickets, staff-last replies, internal-only activity, and escalation-only cases; it saves drafts but never sends them. Read the complete thread before drafting and do not repeat answered questions. Zendesk already supplies the requester's identity and email, so do not ask for either when present. For SCCC wireless, tell the requester to use their SCCC network username and password but never ask them to send, paste, or disclose a password or MFA code. SCCC IT can update Microsoft 365 licenses; ask only for missing application or entitlement details. For an active-student locked-account or password-reset ticket, an authorized CIO or help-desk operator may ask Fred to verify the cited ticket is active and prepare a ten-minute OnlineKiosk reset link only after independent identity verification and explicit confirmation. After the broker succeeds, Fred saves the exact link response to the same ticket's supervised draft queue without overwriting a pending draft or sending it. The name, username, email, and 800 number in the ticket are matching data, not identity proof. The student chooses the new password privately; Fred must never receive, generate, repeat, store, or post a password or Temporary Access Pass. Say the account is unlocked only after the student completes the reset. A successful reset clears Entra Smart Lockout but does not re-enable an administratively disabled or ineligible account. The operator can edit, replace, clear, or explicitly approve an exact public reply before it is posted. Auto-send is off. Mark, Tracy, and the CIO can globally turn Fred drafting and Zendesk public replies on or off from the monitor; the API enforces both controls, while manual escalation remains available. The monitor can escalate a ticket to an active team member with an optional private handoff note after the exact assignment is confirmed. Fred can search and read tickets, create a ticket, edit its subject/status/priority/assignment, add confirmed public replies or internal notes, recommend or perform a confirmed escalation, and solve a specific confirmed list of tickets when Fred Zendesk actions are enabled. In Zendesk, 'close' should be treated as 'solve'; Zendesk automation applies the final irreversible Closed state later. Before any ticket write, Fred must show the exact ticket or ticket IDs and proposed change and receive explicit confirmation. An unbounded request such as 'close all tickets' is not enough—Fred must search, present the exact set, and ask for confirmation.",
+      "Troubleshooting (/support) shows recent Zendesk activity and opens diagnostic workflows. Fred can search and read tickets, create a ticket, edit its subject/status/priority/assignment, and add public replies or internal notes. Fred can also solve a specific confirmed list of tickets. In Zendesk, 'close' should be treated as 'solve'; Zendesk automation applies the final irreversible Closed state later. Before any ticket write, Fred must show the exact ticket or ticket IDs and proposed change and receive explicit confirmation. An unbounded request such as 'close all tickets' is not enough—Fred must search, present the exact set, and ask for confirmation.",
   },
   {
     category: "general",
     title: "Using the Platform: Fred and Fred Memory",
     content:
-      "Fred (/ai-report) can answer operational questions, guide users through the whole portal, list accessible to-dos, create or complete confirmed to-dos, let Mark or Tracy move confirmed to-dos between team members, work with confirmed Zendesk tickets, manage confirmed Post-Incident Reviews and weekly logs within the user's permissions, let the CIO create, edit, or finalize confirmed weekly status reports, and prepare a guarded active-student Entra recovery link for CIO/help-desk users after independent identity verification and confirmation. Fred Memory is persistent knowledge about the SCCC environment; every active entry is loaded into Fred's context. Users can search, filter, add, edit, and toggle memories; only the CIO can delete. An edited draft does not train Fred by itself: save a durable correction to Fred Memory, and put complete repeatable procedures in Process Library (/processes). Never store passwords or secrets in Fred Memory; the system blocks credential-like content.",
+      "Fred (/ai-report) can answer operational questions, guide users through the whole portal, create tasks, work with confirmed Zendesk tickets, manage confirmed Post-Incident Reviews and weekly logs within the user's permissions, and let the CIO create, edit, or finalize confirmed weekly status reports. Fred Memory is persistent knowledge about the SCCC environment; every active entry is loaded into Fred's context. Users can search, filter, add, edit, and toggle memories; only the CIO can delete. Never store passwords or secrets in Fred Memory; the system blocks credential-like content.",
   },
   {
     category: "general",
     title: "Using the Platform: User Guide page",
     content:
-      "The built-in User Guide at /user-guide contains the full written, step-by-step guide to signing in, the rearranged top menu, Home, Status, To-do List, Completed Work, Weekly Log, Risks & Issues, Post-Incident Reviews, Network and IT Tools, Troubleshooting, Weekly Reports, Projects, Department Goals, Fred, and Admin. Quick Start (/quick-start) is the concise 10-minute orientation. Both are under the Troubleshooting dropdown. When a user wants help, give the immediate click-by-click steps, link to Quick Start for orientation, and link to User Guide when full detail is useful.",
+      "The built-in User Guide at /user-guide contains the full written, step-by-step guide to signing in, Home, Status, To-do List, Completed Work, Weekly Log, Risks & Issues, Post-Incident Reviews, Network and IT Tools, Troubleshooting, Weekly Reports, Projects, Department Goals, Fred, and Admin. When a user wants a detailed walkthrough, give the immediate click-by-click steps and link to the User Guide for the longer reference.",
   },
   {
     category: "general",
@@ -132,11 +125,6 @@ const CORE_APP_USAGE_ENTRIES: {
     content:
       "Recommended rhythm: (1) start at Home and use Status for current workload; (2) track outstanding assignments in To-do List, then record finished work under Completed Work; (3) log risks/issues and write Post-Incident Reviews for incidents; (4) near week-end, generate, review, and submit the Weekly Log; (5) the CIO opens the weekly Report, selects PIRs, maintenance, goal progress, open risks, and other extras, then finalizes and exports or emails it. Fred can guide each step and, after showing the exact change and receiving confirmation, can create or edit the relevant supported records within the signed-in user's permissions.",
   },
-];
-
-export const APP_USAGE_ENTRIES = [
-  ...CORE_APP_USAGE_ENTRIES,
-  ...fredApplicationKnowledgeEntries(),
 ];
 
 // Idempotent: removes the previously seeded app-usage rows (identified by the

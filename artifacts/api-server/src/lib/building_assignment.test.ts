@@ -2,47 +2,41 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_AUTHORITATIVE_BUILDINGS,
   getAssignedBuildingName,
-  getAuthoritativeBuildingName,
   getCanonicalBuildingName,
 } from "./building_assignment";
 
-describe("Mansions building assignment", () => {
-  it("keeps Mansions in the authoritative building list", () => {
-    expect(DEFAULT_AUTHORITATIVE_BUILDINGS).toContain("Mansions");
-    expect(getCanonicalBuildingName("Mansions")).toBe("Mansions");
+describe("student building assignments", () => {
+  it("keeps Student Union and Student Activities distinct", () => {
+    expect(getCanonicalBuildingName("Student Union")).toBe("Student Union");
+    expect(getCanonicalBuildingName("Student Activities")).toBe("Student Activities");
+    expect(DEFAULT_AUTHORITATIVE_BUILDINGS).toContain("Student Union");
+    expect(DEFAULT_AUTHORITATIVE_BUILDINGS).toContain("Student Activities");
+    expect(DEFAULT_AUTHORITATIVE_BUILDINGS).not.toContain("Student Union / Student Activities");
   });
 
   it.each([
-    ["SWA-SLAB", "Student Living A&B"],
-    ["SWA-SLCDE", "Student Living C&D"],
-  ])("assigns %s telemetry to Mansions", (hostname, location) => {
-    expect(getAssignedBuildingName("Student Living Center", location, hostname)).toBe("Mansions");
+    ["sw-sa208", "Student Activities"],
+    ["SUGymCam", "Student Activities"],
+    ["sw-sa208-replay", "Student Activities"],
+    ["swa-su121", "Student Union"],
+    ["SW-Cafe", "Student Union"],
+  ])("assigns %s to %s", (hostname, expected) => {
+    expect(getAssignedBuildingName("Student Union / Student Activities", null, hostname)).toBe(expected);
   });
 
-  it("does not absorb the Student Living Center switch", () => {
-    expect(getAssignedBuildingName("Student Living Center", "SLC151", "SWA-SLC151")).toBe(
-      "Student Living Center",
+  it("honors a later explicit move instead of pinning a switch by hostname", () => {
+    expect(getAssignedBuildingName("West Campus", null, "sugymcam")).toBe("West Campus");
+  });
+
+  it("keeps the legacy combined label identifiable until its records are migrated", () => {
+    expect(getCanonicalBuildingName("Student Union / Student Activities")).toBe(
+      "Student Union / Student Activities",
     );
   });
 
-  it.each(["Tech Building A", "Student Living G"])(
-    "preserves the exact authoritative anchor name %s",
-    (buildingName) => {
-      expect(
-        getAuthoritativeBuildingName(
-          buildingName,
-          DEFAULT_AUTHORITATIVE_BUILDINGS,
-        ),
-      ).toBe(buildingName);
-    },
-  );
-
-  it("still resolves legacy anchor aliases to an authoritative name", () => {
-    expect(
-      getAuthoritativeBuildingName(
-        "Student Living A&B",
-        DEFAULT_AUTHORITATIVE_BUILDINGS,
-      ),
-    ).toBe("Mansions");
+  it("keeps the user-managed Mansions building authoritative", () => {
+    expect(DEFAULT_AUTHORITATIVE_BUILDINGS).toContain("Mansions");
+    expect(getAssignedBuildingName("Mansions", "Student Living AB", "SWA-SLAB")).toBe("Mansions");
+    expect(getAssignedBuildingName("Mansions", "Student Living DE", "SWA-SLCDE")).toBe("Mansions");
   });
 });

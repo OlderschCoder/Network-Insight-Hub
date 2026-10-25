@@ -5,31 +5,6 @@ import {
   isZendeskDashboardTeamMember,
   zendeskDashboardTeamOrder,
 } from "../lib/zendesk_dashboard_team";
-import {
-  validateZendeskControlRequest,
-  validateZendeskEscalationRequest,
-  validateZendeskReplyRequest,
-} from "../lib/zendesk_reply_policy";
-import {
-  canManageZendeskControls,
-  readZendeskSupervisionConfig,
-  updateZendeskSupervisionConfig,
-} from "../lib/zendesk_supervision";
-import {
-  isZendeskMessagingChannel,
-  normalizeZendeskConversationLog,
-  type ZendeskConversationLogEvent,
-} from "../lib/zendesk_conversation_log";
-import {
-  getPendingZendeskReplyDraft,
-  listZendeskReplyDrafts,
-  markZendeskReplyDraftSent,
-  saveZendeskReplyDraft,
-} from "../lib/zendesk_reply_drafts";
-import {
-  zendeskSolvedTicketQuery,
-  zendeskSolvedWindow,
-} from "../lib/zendesk_solved_window";
 
 const router = Router();
 
@@ -37,7 +12,6 @@ interface ZendeskUser {
   id: number;
   name: string;
   email: string;
-  role?: string;
 }
 
 interface ZendeskTicket {
@@ -47,7 +21,6 @@ interface ZendeskTicket {
   assignee_id: number | null;
   created_at: string;
   updated_at: string;
-  via?: { channel?: string };
 }
 
 function zendeskConfig() {
@@ -198,26 +171,6 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max).trimEnd() + "…";
 }
 
-function draftActor(req: any) {
-  return {
-    id: req.user?.id ?? null,
-    name: req.user?.name ?? null,
-    email: req.user?.email ?? null,
-  };
-}
-
-async function resolveZendeskActor(cfg: ReturnType<typeof zendeskConfig>, req: any) {
-  const actorEmail = (req.user?.zendeskEmail || req.user?.email || "").trim();
-  return actorEmail
-    ? zget<{ users: ZendeskUser[] }>(
-        cfg,
-        `users/search.json?query=${encodeURIComponent(`email:${actorEmail}`)}`,
-      )
-        .then((result) => result.users?.[0] ?? null)
-        .catch(() => null)
-    : null;
-}
-
 router.get("/ticket/:id/timeline", requireAuth, async (req: any, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {
@@ -359,7 +312,6 @@ router.get("/recent-activity", requireAuth, async (_req, res) => {
       status: t.status,
       createdAt: t.created_at,
       updatedAt: t.updated_at,
-      channel: t.via?.channel ?? "ticket",
       url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
     }));
     const latestUpdatedAt = items.reduce(
@@ -390,47 +342,6 @@ router.get("/status", requireAuth, async (_req, res) => {
   } catch (e: any) {
     return res.json({ configured: true, error: e.message });
   }
-});
-
-router.get("/agents", requireAuth, async (_req, res) => {
-  const users = await db.select().from(usersTable);
-  return res.json(
-    users
-      .filter((user) => user.isActive)
-      .map((user) => ({
-        id: user.id,
-        name: user.name,
-        email: user.zendeskEmail || user.email,
-        role: user.role,
-      }))
-      .filter((user) => !!user.email)
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  );
-});
-
-router.get("/controls", requireAuth, async (req: any, res) => {
-  const controls = await readZendeskSupervisionConfig();
-  return res.json({
-    ...controls,
-    canManage: canManageZendeskControls(req.user),
-  });
-});
-
-router.put("/controls", requireAuth, async (req: any, res) => {
-  if (!canManageZendeskControls(req.user)) {
-    return res.status(403).json({
-      error: "Only a Zendesk supervisor may change these controls.",
-    });
-  }
-  const validation = validateZendeskControlRequest(req.body);
-  if (!validation.ok) {
-    return res.status(validation.status).json({ error: validation.error });
-  }
-  const controls = await updateZendeskSupervisionConfig(
-    validation.value,
-    req.user?.name || req.user?.email || "Zendesk supervisor",
-  );
-  return res.json({ ...controls, canManage: true });
 });
 
 router.get("/resolved-by-user", requireAuth, async (req, res) => {
@@ -573,7 +484,7 @@ router.get("/resolved-by-user", requireAuth, async (req, res) => {
 });
 
 // Tickets resolved by the current logged-in user on a given date (YYYY-MM-DD).
-// Match the authenticated app user's normalized SCCC or explicit Zendesk email.
+// Matches by email local-part or by last name (handles Zendesk vs SCCC email differences).
 router.get("/my-tickets", requireAuth, async (req: any, res) => {
   const cfg = zendeskConfig();
   if (!cfg) {
@@ -587,13 +498,16 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
   if (weekOf && !/^\d{4}-\d{2}-\d{2}$/.test(weekOf)) {
     return res.status(400).json({ error: "Invalid weekOf format, use YYYY-MM-DD" });
   }
-  let solvedWindow;
-  try {
-    solvedWindow = zendeskSolvedWindow(date, weekOf);
-  } catch (error) {
-    return res.status(400).json({
-      error: error instanceof Error ? error.message : "Invalid reporting date",
-    });
+  // Build the date set we're filtering by — single day or all 7 days of the week
+  const dateSet = new Set<string>();
+  if (weekOf) {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekOf + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + i);
+      dateSet.add(d.toISOString().slice(0, 10));
+    }
+  } else {
+    dateSet.add(date);
   }
   const me = req.user;
   // Strict email match: prefer the explicit zendeskEmail override if set,
@@ -605,10 +519,15 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
 
   try {
     const group = process.env.ZENDESK_GROUP || "Onsite_it";
+    // Pick the earliest date we care about, then fetch from the day before that
+    // and paginate fully. This works for both single-day and weekly queries.
+    const earliest = Array.from(dateSet).sort()[0];
+    const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
     const allResults: ZendeskTicket[] = [];
     let nextUrl: string | null =
       `search.json?query=${encodeURIComponent(
-        zendeskSolvedTicketQuery(group, solvedWindow),
+        `type:ticket solved>${dayBefore} group:"${group}"`
       )}&per_page=100`;
     let pages = 0;
     while (nextUrl && pages < 10) {
@@ -621,8 +540,14 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
         : null;
     }
 
+    // Filter to tickets last-updated within the date set. For solved tickets
+    // updated_at corresponds to when the ticket was solved.
+    const onDate = allResults.filter((t) =>
+      dateSet.has((t.updated_at || "").slice(0, 10))
+    );
+
     const candidateIds = Array.from(
-      new Set(allResults.map((t) => t.assignee_id).filter((x): x is number => !!x))
+      new Set(onDate.map((t) => t.assignee_id).filter((x): x is number => !!x))
     );
     const userMap = new Map<number, ZendeskUser>();
     if (candidateIds.length > 0) {
@@ -634,7 +559,7 @@ router.get("/my-tickets", requireAuth, async (req: any, res) => {
     }
 
     // Match assignee by zendeskEmail override or normalized email local-part
-    const mine = allResults.filter((t) => {
+    const mine = onDate.filter((t) => {
       if (!t.assignee_id) return false;
       const u = userMap.get(t.assignee_id);
       if (!u || !u.email) return false;
@@ -673,168 +598,34 @@ router.get("/ticket/:id", requireAuth, async (req: any, res) => {
       status: string; priority: string | null;
       requester_id: number; assignee_id: number | null;
       created_at: string; updated_at: string;
-      via?: { channel?: string };
     };
     const { ticket } = await zget<{ ticket: FullTicket }>(cfg, `tickets/${ticketId}.json`);
     const { comments } = await zget<{ comments: ZendeskComment[] }>(
       cfg, `tickets/${ticketId}/comments.json?sort_order=asc`
     );
-    // Resolve ticket participants even when the visible thread comes from the
-    // Conversation Log. The log is what includes live Messaging events.
-    const ids = Array.from(new Set([
-      ...comments.map(c => c.author_id),
-      ticket.requester_id,
-      ...(ticket.assignee_id ? [ticket.assignee_id] : []),
-    ]));
+    // Resolve author names
+    const ids = Array.from(new Set(comments.map(c => c.author_id)));
     const userMap = new Map<number, ZendeskUser>();
     if (ids.length > 0) {
       const { users } = await zget<{ users: ZendeskUser[] }>(cfg, `users/show_many.json?ids=${ids.join(",")}`);
       for (const u of users) userMap.set(u.id, u);
     }
-    let enriched: Array<{
-      id: string | number;
-      author: string;
-      authorType: string;
-      public: boolean;
-      body: string;
-      createdAt: string;
-      eventType: string;
-    }>;
-    let threadSource: "conversation_log" | "ticket_comments" = "ticket_comments";
-    try {
-      const log = await zget<{ events: ZendeskConversationLogEvent[] }>(
-        cfg,
-        `tickets/${ticketId}/conversation_log?sort=created_at&page%5Bsize%5D=100`,
-      );
-      enriched = normalizeZendeskConversationLog(log.events || [])
-        .slice(-60)
-        .map((entry) => ({ ...entry, body: truncate(entry.body, 1_500) }));
-      threadSource = "conversation_log";
-    } catch {
-      enriched = comments.slice(-20).map(c => ({
-        id: c.id,
-        author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
-        authorType: ["agent", "admin"].includes(
-          String(userMap.get(c.author_id)?.role ?? "").toLowerCase(),
-        )
-          ? "agent"
-          : "user",
-        public: c.public,
-        body: truncate((c.plain_body || c.body || "").trim(), 600),
-        createdAt: c.created_at,
-        eventType: "Comment",
-      }));
-    }
+    const enriched = comments.slice(-20).map(c => ({
+      id: c.id,
+      author: userMap.get(c.author_id)?.name ?? `User ${c.author_id}`,
+      public: c.public,
+      body: truncate((c.plain_body || c.body || "").trim(), 600),
+      createdAt: c.created_at,
+    }));
     return res.json({
       id: ticket.id, subject: ticket.subject, description: ticket.description,
       status: ticket.status, priority: ticket.priority,
       requesterId: ticket.requester_id,
-      requesterName: userMap.get(ticket.requester_id)?.name ?? null,
       assigneeId: ticket.assignee_id,
       assigneeName: ticket.assignee_id ? (userMap.get(ticket.assignee_id)?.name ?? null) : null,
-      channel: ticket.via?.channel ?? "ticket",
       createdAt: ticket.created_at, updatedAt: ticket.updated_at,
       url: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticket.id}`,
-      threadSource,
-      isMessaging: isZendeskMessagingChannel(ticket.via?.channel),
       comments: enriched,
-    });
-  } catch (e: any) {
-    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
-    return res.status(502).json({ error: "Zendesk API error", message: e.message });
-  }
-});
-
-// ── Shared Fred reply drafts ─────────────────────────────────────────────────
-// Drafts are stored in Insights so one staff member can ask Fred to prepare a
-// response and another can review it. Nothing is written to Zendesk here.
-router.get("/drafts", requireAuth, async (_req, res) => {
-  return res.json({ drafts: await listZendeskReplyDrafts("pending") });
-});
-
-router.get("/ticket/:id/draft", requireAuth, async (req: any, res) => {
-  const ticketId = Number.parseInt(req.params.id, 10);
-  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
-  return res.json({ draft: await getPendingZendeskReplyDraft(ticketId) });
-});
-
-router.put("/ticket/:id/draft", requireAuth, async (req: any, res) => {
-  const cfg = zendeskConfig();
-  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
-  const ticketId = Number.parseInt(req.params.id, 10);
-  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
-  const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
-  const source = req.body?.source === "fred" ? "fred" : "operator";
-  if (!body) return res.status(400).json({ error: "Draft body is required." });
-  if (body.length > 10_000) {
-    return res.status(400).json({ error: "Draft body must be 10,000 characters or fewer." });
-  }
-  const controls = await readZendeskSupervisionConfig();
-  if (source === "fred" && !controls.fredEnabled) {
-    return res.status(423).json({ error: "Fred drafting is turned off by a supervisor." });
-  }
-  try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    const draft = await saveZendeskReplyDraft({
-      ticketId,
-      ticketSubject: ticket.subject,
-      ticketUrl: `https://${cfg.subdomain}.zendesk.com/agent/tickets/${ticketId}`,
-      channel: ticket.via?.channel ?? "ticket",
-      body,
-      source,
-      actor: draftActor(req),
-    });
-    return res.json({ draft });
-  } catch (e: any) {
-    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
-    return res.status(502).json({ error: "Zendesk API error", message: e.message });
-  }
-});
-
-// Human approval is the only route that sends a saved draft. Messaging is
-// deliberately rejected here on Suite Growth: its supported send surface is
-// the Agent Workspace composer, not the Support ticket-comment API.
-router.post("/ticket/:id/draft/approve-send", requireAuth, async (req: any, res) => {
-  const cfg = zendeskConfig();
-  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
-  const ticketId = Number.parseInt(req.params.id, 10);
-  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
-  if (req.body?.confirmed !== true) {
-    return res.status(409).json({ error: "Explicit approval is required before sending the draft." });
-  }
-  const draft = await getPendingZendeskReplyDraft(ticketId);
-  if (!draft || draft.id !== req.body?.draftId) {
-    return res.status(409).json({ error: "The pending draft changed. Reload it before approval." });
-  }
-  const controls = await readZendeskSupervisionConfig();
-  if (!controls.repliesEnabled) {
-    return res.status(423).json({ error: "Zendesk replies are turned off by a supervisor." });
-  }
-  try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    if (isZendeskMessagingChannel(ticket.via?.channel)) {
-      return res.status(409).json({
-        error: "Messaging drafts must be sent from Zendesk Agent Workspace on the current Zendesk plan.",
-        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
-        ticketUrl: draft.ticketUrl,
-      });
-    }
-    const actor = await resolveZendeskActor(cfg, req);
-    await zput(cfg, `tickets/${ticketId}.json`, {
-      ticket: {
-        comment: {
-          body: draft.body,
-          public: true,
-          ...(actor ? { author_id: actor.id } : {}),
-        },
-      },
-    });
-    const sent = await markZendeskReplyDraftSent(ticketId, draft.id, draftActor(req));
-    return res.json({
-      ok: true,
-      ticketId,
-      delivery: "support_ticket",
-      sentBy: sent?.sentBy ?? actor?.name ?? "configured Zendesk service account",
     });
   } catch (e: any) {
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
@@ -878,71 +669,13 @@ router.post("/ticket/:id/comment", requireAuth, async (req: any, res) => {
   if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
   const ticketId = parseInt(req.params.id, 10);
   if (!isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
-  const validation = validateZendeskReplyRequest(req.body);
-  if (!validation.ok) return res.status(validation.status).json({ error: validation.error });
-  const { body, public: isPublic } = validation.value;
-  const controls = await readZendeskSupervisionConfig();
-  if (isPublic && !controls.repliesEnabled) {
-    return res.status(423).json({
-      error: "Zendesk replies are turned off by a supervisor.",
-    });
-  }
+  const { body, public: isPublic = true } = req.body ?? {};
+  if (!body?.trim()) return res.status(400).json({ error: "body required" });
   try {
-    const { ticket } = await zget<{ ticket: ZendeskTicket }>(cfg, `tickets/${ticketId}.json`);
-    if (isPublic && isZendeskMessagingChannel(ticket.via?.channel)) {
-      return res.status(409).json({
-        error:
-          "This is a Zendesk Messaging ticket. Save the response for approval and send it from Zendesk Agent Workspace.",
-        code: "ZENDESK_MESSAGING_MANUAL_SEND_REQUIRED",
-      });
-    }
-    const actor = await resolveZendeskActor(cfg, req);
     await zput(cfg, `tickets/${ticketId}.json`, {
-      ticket: { comment: { body, public: isPublic, ...(actor ? { author_id: actor.id } : {}) } }
+      ticket: { comment: { body: body.trim(), public: !!isPublic } }
     });
-    return res.json({
-      ok: true,
-      ticketId,
-      public: isPublic,
-      postedBy: actor?.name ?? "configured Zendesk service account",
-    });
-  } catch (e: any) {
-    if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
-    return res.status(502).json({ error: "Zendesk API error", message: e.message });
-  }
-});
-
-// POST /zendesk/ticket/:id/escalate
-// body: { assigneeEmail: string, note?: string, confirmed: true }
-router.post("/ticket/:id/escalate", requireAuth, async (req: any, res) => {
-  const cfg = zendeskConfig();
-  if (!cfg) return res.status(503).json({ error: "Zendesk not configured" });
-  const ticketId = Number.parseInt(req.params.id, 10);
-  if (!Number.isFinite(ticketId)) return res.status(400).json({ error: "Invalid ticket id" });
-  const validation = validateZendeskEscalationRequest(req.body);
-  if (!validation.ok) return res.status(validation.status).json({ error: validation.error });
-
-  const { assigneeEmail, note } = validation.value;
-  try {
-    const { users } = await zget<{ users: ZendeskUser[] }>(
-      cfg,
-      `users/search.json?query=${encodeURIComponent(`email:${assigneeEmail}`)}`,
-    );
-    const assignee = users?.[0];
-    if (!assignee) return res.status(404).json({ error: `No Zendesk agent found for ${assigneeEmail}` });
-    await zput(cfg, `tickets/${ticketId}.json`, {
-      ticket: {
-        assignee_id: assignee.id,
-        ...(note ? { comment: { body: note, public: false } } : {}),
-      },
-    });
-    return res.json({
-      ok: true,
-      ticketId,
-      assigneeName: assignee.name,
-      assigneeEmail: assignee.email,
-      internalNoteAdded: !!note,
-    });
+    return res.json({ ok: true, ticketId, public: !!isPublic });
   } catch (e: any) {
     if (/Zendesk 404/.test(e.message)) return res.status(404).json({ error: "Ticket not found" });
     return res.status(502).json({ error: "Zendesk API error", message: e.message });

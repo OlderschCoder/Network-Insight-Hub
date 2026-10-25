@@ -33,7 +33,7 @@ export const LEARN_SCENARIOS: LearnScenario[] = [
         { label: "An online phone proves every access point is healthy.", correct: false, result: "It proves the broader path works, not that every wireless component is healthy." },
       ]},
       { title: "Ask the useful follow-up", situation: "Evidence points away from a building-wide outage and toward wireless service.", coach: "A support technician does not need switch commands here. Ask observable questions that help the network engineer identify the wireless scope.", pageLabel: "Monitoring", pageHref: "/monitoring", evidence: "Simulation: no building-wide reachability alert is active.", question: "Which caller question is most useful now?", choices: [
-        { label: "Can users see the SCCC Wi-Fi name? If yes, use the SCCC network username and password and report the exact error—never send the password.", correct: true, result: "Good. ‘SSID missing’ and ‘authentication failed’ point to different checks, and the requester knows which existing credentials to use without disclosing them." },
+        { label: "Can users see the SCCC Wi-Fi name, and what exact message appears when they connect?", correct: true, result: "Good. ‘SSID missing’ and ‘authentication failed’ point to very different next owners and checks." },
         { label: "What spanning-tree priority is the gym using?", correct: false, result: "That is not a caller-facing question and is not supported by the current fault domain." },
         { label: "Can you configure the switch trunk for me?", correct: false, result: "Do not ask an end user to make infrastructure changes." },
       ]},
@@ -48,10 +48,10 @@ export const LEARN_SCENARIOS: LearnScenario[] = [
     id: "student-account-missing", title: "Student cannot access an account", mode: "desk", minutes: 10,
     summary: "Use Banner/EUP evidence, validate identifiers, and distinguish provisioning delay from an Entra mismatch.", sections: ["Banner", "Student Access", "Risks", "My Tasks"],
     steps: [
-      { title: "Use the identity already supplied", situation: "A Zendesk ticket says a student account does not work.", coach: "Zendesk already supplies the requester name and email. Do not ask for either again. Ask only for a missing institutional student ID or technical detail, and never ask for the password.", pageLabel: "Banner", pageHref: "/banner", evidence: "Simulation: the ticket already includes firstname.lastname@g.sccc.edu and the student provides an 800-number.", question: "What should you verify first?", choices: [
-        { label: "Use the ticket identity to find the matching Banner/EUP record and compare the supplied ID, name, and email.", correct: true, result: "Correct. Start with the identity already in Zendesk and the provisioning evidence in the Hub." },
-        { label: "Ask the student to resend their email address.", correct: false, result: "Zendesk already supplied it. Repeating the question wastes time and makes Fred look delightfully unobservant." },
+      { title: "Collect the minimum identifiers", situation: "A student says their account does not work.", coach: "Ask for the institutional student ID and school-issued email. Never ask for their password.", pageLabel: "Banner", pageHref: "/banner", evidence: "Simulation: student provides an 800-number and firstname.lastname@g.sccc.edu.", question: "What should you verify first?", choices: [
+        { label: "Find the matching Banner/EUP audit record and compare ID, name, and email.", correct: true, result: "Correct. Start with the provisioning evidence already in the Hub." },
         { label: "Ask the student to send their password.", correct: false, result: "Never collect passwords. The audit record should answer the provisioning question." },
+        { label: "Create a second account immediately.", correct: false, result: "Duplicates make identity problems worse. Verify the existing record first." },
       ]},
       { title: "Interpret verification", situation: "The EUP record exists but shows Entra verification failed because the email suffix differs.", coach: "Compare the institutional format and determine whether the source record or Entra identity is wrong.", pageLabel: "High School Student Access", pageHref: "/student-access", evidence: "Expected email is firstname.lastname@g.sccc.edu; observed Entra value uses a different domain.", question: "What is the fault domain?", choices: [
         { label: "Identity/provisioning mismatch, not a password-strength problem.", correct: true, result: "Correct. Route the mismatch with both values and the audit timestamp." },
@@ -62,48 +62,6 @@ export const LEARN_SCENARIOS: LearnScenario[] = [
         { label: "Assign a task with student ID, expected email, observed mismatch, and audit link.", correct: true, result: "Complete. The next person can act without repeating discovery." },
         { label: "Write ‘account broken’ and assign it.", correct: false, result: "That forces the next person to repeat your work." },
         { label: "Paste a password into the task.", correct: false, result: "Credentials never belong in operational records." },
-      ]},
-    ],
-  },
-  {
-    id: "m365-license", title: "Microsoft 365 license request", mode: "desk", minutes: 7,
-    summary: "Use the requester identity already in Zendesk, verify the missing entitlement, and leave a supervised response draft.", sections: ["Zendesk Monitor", "Microsoft 365", "Fred Memory", "My Tasks"],
-    steps: [
-      { title: "Read before asking", situation: "A Zendesk ticket says Microsoft Office is no longer activated. The ticket already contains the requester name and email.", coach: "Read the full thread and reuse the requester identity. Ask only for technical information that is actually missing.", pageLabel: "Zendesk Monitor", pageHref: "/support/zendesk", evidence: "Simulation: requester identity and email are present; the affected application is Office desktop activation.", question: "What should Fred ask next?", choices: [
-        { label: "Ask for the exact activation message and device type; do not ask for the email or password again.", correct: true, result: "Correct. That adds useful evidence without making the requester repeat the ticket." },
-        { label: "Ask for their email address and password.", correct: false, result: "The email is already present, and passwords must never be collected." },
-        { label: "Tell them SCCC cannot change Microsoft 365 licenses.", correct: false, result: "Incorrect. SCCC IT handles Microsoft 365 license updates." },
-      ]},
-      { title: "Verify and update the entitlement", situation: "The requester has the wrong or missing Microsoft 365 license for the application they need.", coach: "SCCC IT can add, remove, or update Microsoft 365 licenses. Verify the intended entitlement and follow the approved administrative procedure before changing it.", pageLabel: "Process Library", pageHref: "/processes", evidence: "Simulation: the required application and current license mismatch are confirmed; no password is needed.", question: "What is the correct handling?", choices: [
-        { label: "Update the approved Microsoft 365 entitlement, record the change, and verify activation afterward.", correct: true, result: "Correct. Licensing is an IT action, and validation closes the loop." },
-        { label: "Ask the requester to buy a personal license.", correct: false, result: "That ignores SCCC's managed licensing process." },
-        { label: "Mark the ticket solved before activation is verified.", correct: false, result: "A changed license is not proof that the application now activates." },
-      ]},
-      { title: "Keep the reply supervised", situation: "Fred has enough evidence to explain the license correction and validation step.", coach: "Save the response for a person to review. Drafting and sending are separate actions.", pageLabel: "Zendesk Monitor", pageHref: "/support/zendesk", evidence: "The proposed public reply is ready; no public comment has been posted.", question: "What should happen next?", choices: [
-        { label: "Save the exact response as a supervised draft for human review and sending.", correct: true, result: "Complete. Fred prepared the work without impersonating the final approver." },
-        { label: "Send automatically without showing the reply.", correct: false, result: "Zendesk replies remain confirmation-gated." },
-        { label: "Ask for the requester's email one more time just to be safe.", correct: false, result: "No. The ticket already knows who opened it; Fred should, too." },
-      ]},
-    ],
-  },
-  {
-    id: "student-account-recovery", title: "Verified student account recovery", mode: "desk", minutes: 8,
-    summary: "Verify identity independently, let Fred prepare the secure recovery link, and review the same-ticket draft before sending.", sections: ["Zendesk Monitor", "Fred", "OnlineKiosk", "Password Reset Activity"],
-    steps: [
-      { title: "Separate matching from verification", situation: "An open Zendesk ticket includes a student's name, SCCC username, email, and full 800 number and asks for an account unlock.", coach: "The ticket values help match the account, but they all came through the same channel. Complete an approved independent identity check before any reset action.", pageLabel: "Zendesk Monitor", pageHref: "/support/zendesk", evidence: "Simulation: the supplied identifiers agree, but no independent verification is recorded yet.", question: "What must happen next?", choices: [
-        { label: "Verify in person with photo ID, by callback to a number already on file, or by live video with photo ID.", correct: true, result: "Correct. Matching data is useful, but it is not independent proof." },
-        { label: "Treat the 800 number in the ticket as sufficient proof.", correct: false, result: "No. That value arrived through the same unverified ticket channel." },
-        { label: "Ask the student to send their current password.", correct: false, result: "Never collect an existing password or MFA code." },
-      ]},
-      { title: "Prepare the supervised recovery", situation: "The operator completed an approved independent verification method and Fred has read the exact active ticket.", coach: "Give Fred the exact identifiers, ticket ID, and verification method. Review the proposed action, then explicitly confirm creation of the ten-minute link and same-ticket draft.", pageLabel: "Fred", pageHref: "/ai-report", evidence: "Simulation: the ticket is active and the verified name, 800 number, and username identify one eligible student.", question: "What does Fred do after confirmation?", choices: [
-        { label: "Create the single-use OnlineKiosk link and save its response as a pending draft for that ticket.", correct: true, result: "Correct. The recovery action and response are joined, but the operator remains the sender." },
-        { label: "Set a predictable default password and post it publicly.", correct: false, result: "That exposes a credential and bypasses the student's private password choice." },
-        { label: "Send the reply immediately without review.", correct: false, result: "No. Fred saves a supervised draft and never auto-sends it." },
-      ]},
-      { title: "Confirm the actual unlock", situation: "The draft is ready, but the student has not opened the recovery link yet.", coach: "Review and send the exact draft through the supported Zendesk surface. Do not say the account is unlocked until Password Reset Activity shows the student completed the reset.", pageLabel: "Password Reset Activity", pageHref: "/password-reset-activity", evidence: "Simulation: a link was issued, but no completed reset event exists.", question: "What is the accurate ticket status?", choices: [
-        { label: "Recovery link prepared; account unlock is still awaiting student completion.", correct: true, result: "Complete. A prepared link is not the same thing as a completed reset." },
-        { label: "Account unlocked successfully.", correct: false, result: "Not yet. Only a completed password reset clears the cloud lockout." },
-        { label: "Administratively re-enable the account regardless of eligibility.", correct: false, result: "Disabled or ineligible accounts require source-of-truth review and escalation." },
       ]},
     ],
   },

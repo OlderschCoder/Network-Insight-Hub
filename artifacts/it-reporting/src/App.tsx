@@ -14,7 +14,6 @@ import { ConfirmDialogProvider } from "@/components/ConfirmDialog";
 import Dashboard from "@/pages/dashboard";
 import HomeHub from "@/pages/home-hub";
 import SupportCenter from "@/pages/support-center";
-import ZendeskMonitor from "@/pages/zendesk-monitor";
 import Entries from "@/pages/entries/index";
 import NewEntry from "@/pages/entries/new";
 import EntryDetail from "@/pages/entries/[id]";
@@ -41,7 +40,6 @@ import IncidentRoom from "@/pages/incidents/[id]";
 import Admin from "@/pages/admin/index";
 import AIReport, { FredMobilePage } from "@/pages/ai-report/index";
 import UserGuide from "@/pages/user-guide/index";
-import QuickStart from "@/pages/quick-start/index";
 import ProcessesIndex from "@/pages/processes/index";
 import NewProcess from "@/pages/processes/new";
 import ProcessDetail from "@/pages/processes/[id]";
@@ -63,7 +61,6 @@ import AnalyticsPage from "@/pages/analytics/index";
 import DesignSystem from "@/pages/design-system/index";
 import Banner from "@/pages/banner/index";
 import LearnPage from "@/pages/learn/index";
-import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,13 +84,11 @@ function rememberPostLoginRedirect() {
 function ProtectedRoute({
   component: Component,
   adminOnly = false,
-  networkToolsOnly = false,
 }: {
   component: React.ComponentType;
   adminOnly?: boolean;
-  networkToolsOnly?: boolean;
 }) {
-  const { isAuthenticated, isLoading, isCIO, user } = useAuth();
+  const { isAuthenticated, isLoading, isCIO } = useAuth();
   const [, setLocation] = useLocation();
 
   if (isLoading) {
@@ -116,17 +111,6 @@ function ProtectedRoute({
         <h2 className="text-2xl font-bold">Access Denied</h2>
         <p className="text-muted-foreground mt-2">
           You need CIO privileges to view this page.
-        </p>
-      </div>
-    );
-  }
-
-  if (networkToolsOnly && !canUseNetworkTools(user)) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
-        <h2 className="text-2xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground mt-2">
-          You need Network Tools access to view this page.
         </p>
       </div>
     );
@@ -193,10 +177,6 @@ function Router() {
       <Route
         path="/status"
         component={() => <ProtectedRoute component={Dashboard} />}
-      />
-      <Route
-        path="/support/zendesk"
-        component={() => <ProtectedRoute component={ZendeskMonitor} />}
       />
       <Route
         path="/support"
@@ -298,7 +278,7 @@ function Router() {
       />
       <Route
         path="/network/tools"
-        component={() => <ProtectedRoute component={NetworkTools} networkToolsOnly />}
+        component={() => <ProtectedRoute component={NetworkTools} />}
       />
       <Route
         path="/network/map"
@@ -375,10 +355,6 @@ function Router() {
         component={() => <ProtectedRoute component={AIReport} />}
       />
 
-      <Route
-        path="/quick-start"
-        component={() => <ProtectedRoute component={QuickStart} />}
-      />
       <Route
         path="/user-guide"
         component={() => <ProtectedRoute component={UserGuide} />}

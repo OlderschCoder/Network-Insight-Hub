@@ -16,12 +16,6 @@ import {
 import { eq, inArray, desc, notInArray } from "drizzle-orm";
 import { streamPdf, type PdfSection } from "./pdf";
 import { summarizeVmRisks, type VmRiskSummary } from "./azure_risk";
-import {
-  includedWeeklyLogUserIds,
-  includedWeeklyLogs,
-  selectedItemsForIncludedWeeklyLogs,
-} from "./weekly_report_entry_policy";
-import { fetchSolvedZendeskTickets } from "./zendesk_report_tickets";
 
 export type CloudInventorySnapshot = {
   configured: boolean;
@@ -140,26 +134,66 @@ async function fetchClosedTicketsForWeek(weekOf: string): Promise<{
   unassigned: number;
   total: number;
 }> {
-  const result = await fetchSolvedZendeskTickets(weekOf);
-  if (!result.configured) {
+  const subdomain = process.env.ZENDESK_SUBDOMAIN;
+  const email = process.env.ZENDESK_EMAIL;
+  const token = process.env.ZENDESK_API_TOKEN;
+  if (!subdomain || !email || !token) {
     return { configured: false, byUser: new Map(), unassigned: 0, total: 0 };
   }
-  const byUser = new Map<string, number>();
-  let unassigned = 0;
-  for (const ticket of result.tickets) {
-    if (!ticket.assigneeName) unassigned++;
-    else
-      byUser.set(
-        ticket.assigneeName,
-        (byUser.get(ticket.assigneeName) ?? 0) + 1,
-      );
+  const auth = Buffer.from(`${email}/token:${token}`).toString("base64");
+  const group = process.env.ZENDESK_GROUP || "Onsite_it";
+
+  const dateSet = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekOf + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + i);
+    dateSet.add(d.toISOString().slice(0, 10));
   }
-  return {
-    configured: true,
-    byUser,
-    unassigned,
-    total: result.count ?? result.tickets.length,
-  };
+  const earliest = Array.from(dateSet).sort()[0];
+  const dayBefore = new Date(new Date(earliest).getTime() - 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+
+  try {
+    const all: any[] = [];
+    let nextUrl: string | null =
+      `https://${subdomain}.zendesk.com/api/v2/search.json?query=${encodeURIComponent(
+        `type:ticket solved>${dayBefore} group:"${group}"`,
+      )}&per_page=100`;
+    let pages = 0;
+    while (nextUrl && pages < 10) {
+      const r = await fetch(nextUrl, {
+        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+      });
+      if (!r.ok) break;
+      const data: any = await r.json();
+      all.push(...(data.results ?? []));
+      nextUrl = data.next_page ?? null;
+      pages++;
+    }
+    const onWeek = all.filter((t) => dateSet.has((t.updated_at || "").slice(0, 10)));
+    const ids = Array.from(new Set(onWeek.map((t) => t.assignee_id).filter(Boolean)));
+    const userMap = new Map<number, string>();
+    if (ids.length > 0) {
+      const r = await fetch(
+        `https://${subdomain}.zendesk.com/api/v2/users/show_many.json?ids=${ids.join(",")}`,
+        { headers: { Authorization: `Basic ${auth}` } },
+      );
+      if (r.ok) {
+        const data: any = await r.json();
+        for (const u of data.users ?? []) userMap.set(u.id, u.name);
+      }
+    }
+    const byUser = new Map<string, number>();
+    let unassigned = 0;
+    for (const t of onWeek) {
+      const name = t.assignee_id ? userMap.get(t.assignee_id) : null;
+      if (!name) unassigned++;
+      else byUser.set(name, (byUser.get(name) ?? 0) + 1);
+    }
+    return { configured: true, byUser, unassigned, total: onWeek.length };
+  } catch {
+    return { configured: true, byUser: new Map(), unassigned: 0, total: 0 };
+  }
 }
 
 export async function gatherReportExportData(report: Report): Promise<ReportExportData> {
@@ -168,9 +202,7 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
   const weekStartStr = weekStart.toISOString().slice(0, 10);
   const weekEndStr = weekEnd.toISOString().slice(0, 10);
 
-  const entries = includedWeeklyLogs(
-    await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf)),
-  );
+  const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
   const userIds = [...new Set(entries.map((e) => e.userId))];
   const users = userIds.length > 0
     ? await db.select().from(usersTable).where(inArray(usersTable.id, userIds))
@@ -187,17 +219,9 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
   const logUserMap = new Map(logUsers.map((u) => [u.id, u.name]));
   const enrichedItems = logItems.map((i) => ({ ...i, userName: logUserMap.get(i.userId) ?? "Unknown" }));
 
-  const eligibleUserIds = includedWeeklyLogUserIds(entries);
-  const eligibleLogItems = selectedItemsForIncludedWeeklyLogs(
-    enrichedItems,
-    eligibleUserIds,
-    null,
-  );
-  const selectedLogItems = selectedItemsForIncludedWeeklyLogs(
-    enrichedItems,
-    eligibleUserIds,
-    report.selectedItemIds,
-  );
+  const allItemIds = enrichedItems.map((i) => i.id);
+  const selIds = report.selectedItemIds == null ? allItemIds : report.selectedItemIds;
+  const selectedLogItems = enrichedItems.filter((i) => selIds.includes(i.id));
   const customTasks = (report.customTasks ?? []) as { title: string; userName?: string }[];
 
   // Linked projects
@@ -355,7 +379,7 @@ export async function gatherReportExportData(report: Report): Promise<ReportExpo
     weekEndStr,
     entries,
     userMap,
-    logItems: eligibleLogItems,
+    logItems: enrichedItems,
     selectedLogItems,
     customTasks,
     ticketsByUser: tickets.byUser,

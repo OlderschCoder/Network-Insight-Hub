@@ -17,7 +17,6 @@ import {
   mapEntraToHubRole,
   randomState,
 } from "../lib/entra";
-import { canUseNetworkTools } from "../lib/network_tools_policy";
 
 const router = Router();
 
@@ -129,13 +128,6 @@ export function requireNetworkAdmin(req: any, res: any, next: any) {
   const allowedRoles = ["cio", "network", "network_engineer"];
   if (!allowedRoles.includes(req.user?.role)) {
     return res.status(403).json({ error: "Network administrator access required" });
-  }
-  next();
-}
-
-export function requireNetworkToolsAccess(req: any, res: any, next: any) {
-  if (!canUseNetworkTools(req.user)) {
-    return res.status(403).json({ error: "Network Tools access required" });
   }
   next();
 }
