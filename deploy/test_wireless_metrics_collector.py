@@ -7,6 +7,19 @@ import wireless_metrics_collector as collector
 
 
 class WirelessMetricsParserTests(unittest.TestCase):
+    def test_diagnostics_sidecar_exports_only_fresh_up_known_bss_locations(self):
+        snapshot = collector.ArubaSnapshot(
+            users=[{"username": "must-not-be-exported", "mac": "00:11:22:33:44:55"}],
+            bsses={"00:11:22:33:44:66": {"ap": "AP-AA113"},
+                   "00:11:22:33:44:77": {"ap": "Unknown-AP"},
+                   "00:11:22:33:44:88": {"ap": "AP-H101"}},
+            aps={"AP-AA113": {"up": True, "group": "a-apgrp"},
+                 "Unknown-AP": {"up": True}, "AP-H101": {"up": False, "group": "h-apgrp"}}, radius={})
+        result = collector.diagnostics_observations(snapshot, "2026-10-25T20:00:00Z")
+        self.assertEqual(result["observations"], [{"source": "wifi", "edge": True,
+            "bssid": "00:11:22:33:44:66", "building": "Main Campus", "observedAt": "2026-10-25T20:00:00Z"}])
+        self.assertNotIn("must-not-be-exported", str(result))
+
     def test_bss_parser_preserves_ssid_and_ap_with_space(self):
         text = (
             "f0:5c:19:ef:54:b0  SCCC Wireless  N/A   10.80.35.23  "

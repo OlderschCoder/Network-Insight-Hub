@@ -423,7 +423,9 @@ def main() -> int:
     parser.add_argument("--state-file", default=os.environ.get("WIRELESS_STATE_FILE", "/var/lib/sccc-wireless-metrics/state.json"))
     args = parser.parse_args()
     state_path = Path(args.state_file)
-    metrics, next_state = build_metrics(collect_snapshot(), load_state(state_path))
+    snapshot = collect_snapshot()
+    observed_at = datetime_now_utc()
+    metrics, next_state = build_metrics(snapshot, load_state(state_path))
     payload = line_protocol(metrics)
     if args.dry_run:
         print(payload, end="")
@@ -433,8 +435,34 @@ def main() -> int:
     temporary = state_path.with_suffix(".tmp")
     temporary.write_text(json.dumps(next_state, sort_keys=True), encoding="utf-8")
     os.replace(temporary, state_path)
+    # Reuse this controller poll for diagnostics location; never poll again or
+    # export client/user identities. Unknown and down APs cannot establish place.
+    sidecar = state_path.with_name("diagnostics-observations.json")
+    temporary_sidecar = sidecar.with_suffix(".tmp")
+    with temporary_sidecar.open("w", encoding="utf-8") as handle:
+        os.chmod(temporary_sidecar, 0o600)
+        json.dump(diagnostics_observations(snapshot, observed_at), handle)
+    os.replace(temporary_sidecar, sidecar)
     print(f"wrote {len(metrics)} wireless metric series")
     return 0
+
+
+def datetime_now_utc() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def diagnostics_observations(snapshot: ArubaSnapshot, observed_at: str) -> dict[str, Any]:
+    observations = []
+    for bssid, bss in snapshot.bsses.items():
+        ap_name = str(bss.get("ap", ""))
+        ap = snapshot.aps.get(ap_name, {})
+        building = building_for(ap_name, str(ap.get("group", "")))
+        if not MAC_RE.fullmatch(bssid) or not ap.get("up") or building == "Unknown":
+            continue
+        observations.append({"source": "wifi", "edge": True, "bssid": bssid.lower(),
+                             "building": building, "observedAt": observed_at})
+    return {"schema": "sccc.network.wifi_location.v1", "observations": observations}
 
 
 if __name__ == "__main__":
