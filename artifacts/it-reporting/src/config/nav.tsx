@@ -94,6 +94,12 @@ export function getNavGroups(
         desc: "Live Grafana dashboards",
         icon: Gauge,
       },
+        {
+          href: "/network/building-probes",
+          label: "GPO Monitor",
+          desc: "Selected building computers, SCCC Key & Alert, and paging tests",
+          icon: Activity,
+        },
       {
         href: "/it-apps/cisco-calling",
         label: "Cisco Webex Phones",
