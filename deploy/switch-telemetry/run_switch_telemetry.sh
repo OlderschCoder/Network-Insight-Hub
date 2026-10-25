@@ -282,7 +282,8 @@ jq -e \
     .expected == $expectedCount and
     ((.ok + .failed) == $expectedCount) and
     (.firewalls | type == "array") and
-    (.failures | type == "array" and length == .failed)
+    (.failures | type == "array") and
+    ((.failures | length) == .failed)
   ' "$FIREWALL_RESULT" >/dev/null || die 'firewall verification result is malformed'
 FIREWALLS_OK="$(jq -er '.ok' "$FIREWALL_RESULT")"
 FIREWALLS_FAILED="$(jq -er '.failed' "$FIREWALL_RESULT")"
