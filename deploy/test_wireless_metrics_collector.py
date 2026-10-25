@@ -20,6 +20,17 @@ class WirelessMetricsParserTests(unittest.TestCase):
             "bssid": "00:11:22:33:44:66", "building": "Main Campus", "observedAt": "2026-10-25T20:00:00Z"}])
         self.assertNotIn("must-not-be-exported", str(result))
 
+    def test_diagnostics_sidecar_joins_current_client_mac_without_exporting_username(self):
+        snapshot = collector.ArubaSnapshot(
+            users=[{"mac": "00:11:22:33:44:55", "bssid": "00:11:22:33:44:66", "username": "private"},
+                   {"mac": "01:11:22:33:44:55", "bssid": "00:11:22:33:44:66"}],
+            bsses={"00:11:22:33:44:66": {"ap": "AP-AA113"}},
+            aps={"AP-AA113": {"up": True, "group": "a-apgrp"}}, radius={})
+        rows = collector.diagnostics_observations(snapshot, "2026-10-25T20:00:00Z")["observations"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1]["mac"], "00:11:22:33:44:55")
+        self.assertNotIn("username", str(rows))
+
     def test_bss_parser_preserves_ssid_and_ap_with_space(self):
         text = (
             "f0:5c:19:ef:54:b0  SCCC Wireless  N/A   10.80.35.23  "

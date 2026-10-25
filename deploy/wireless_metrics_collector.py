@@ -454,14 +454,23 @@ def datetime_now_utc() -> str:
 
 def diagnostics_observations(snapshot: ArubaSnapshot, observed_at: str) -> dict[str, Any]:
     observations = []
+    by_bssid = {}
     for bssid, bss in snapshot.bsses.items():
         ap_name = str(bss.get("ap", ""))
         ap = snapshot.aps.get(ap_name, {})
         building = building_for(ap_name, str(ap.get("group", "")))
         if not MAC_RE.fullmatch(bssid) or not ap.get("up") or building == "Unknown":
             continue
-        observations.append({"source": "wifi", "edge": True, "bssid": bssid.lower(),
-                             "building": building, "observedAt": observed_at})
+        observation = {"source": "wifi", "edge": True, "bssid": bssid.lower(),
+                       "building": building, "observedAt": observed_at}
+        observations.append(observation)
+        by_bssid[bssid.lower()] = observation
+    for client in snapshot.users:
+        mac = str(client.get("mac", "")).lower()
+        association = by_bssid.get(str(client.get("bssid", "")).lower())
+        if not association or not MAC_RE.fullmatch(mac) or int(mac[:2], 16) & 1 or mac == "00:00:00:00:00:00":
+            continue
+        observations.append(dict(association, mac=mac))
     return {"schema": "sccc.network.wifi_location.v1", "observations": observations}
 
 
