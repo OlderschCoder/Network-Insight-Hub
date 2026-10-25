@@ -322,6 +322,42 @@ async function requireTelemetryImporter(req: any, res: any, next: any) {
   return requireAuth(req, res, () => requireNetworkAdmin(req, res, next));
 }
 
+const approvedTelemetryFirewalls = [
+  { name: "FortigateA-Sccc", host: "192.168.1.1" },
+  { name: "WestCampus-Fortigate", host: "172.25.0.1" },
+] as const;
+
+/**
+ * GET /network-map/telemetry/firewalls/status
+ *
+ * Narrow service-token readback used by the nightly collector. The response
+ * proves that Fred can see fresh continuous SNMP data for both approved
+ * firewalls without exposing interface names, traffic, or Influx credentials.
+ */
+router.get("/telemetry/firewalls/status", requireTelemetryImporter, async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const firewalls = await Promise.all(
+    approvedTelemetryFirewalls.map(async ({ name, host }) => {
+      const telemetry = await getNetworkDeviceInfluxTelemetry(host, 10);
+      return {
+        name,
+        host,
+        configured: telemetry.configured,
+        reachable: telemetry.reachable,
+        lastPolled: telemetry.lastPolled,
+        interfaceTelemetryAvailable: telemetry.interfaceTelemetryAvailable,
+        interfaceCount: telemetry.interfaces.length,
+      };
+    }),
+  );
+  return res.json({
+    schema: "sccc.network.firewall_telemetry.readback.v1",
+    checkedAt: new Date().toISOString(),
+    expected: approvedTelemetryFirewalls.length,
+    firewalls,
+  });
+});
+
 const telemetryInterfaceSchema = z.object({
   port: z.string().min(1).max(80),
   description: z.string().max(255).optional().nullable(),

@@ -1,0 +1,4 @@
+netmiko>=4.7,<5
+pandas==2.2.2
+paramiko==4.0.0
+python-dotenv==1.0.1
