@@ -1,0 +1,12 @@
+[Unit]
+Description=Collect SCCC wireless metrics every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=10s
+Persistent=true
+Unit=sccc-wireless-metrics.service
+
+[Install]
+WantedBy=timers.target

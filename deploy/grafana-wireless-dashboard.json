@@ -1,0 +1,153 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"clients_total\") |> last()", "refId": "A"}],
+      "title": "Wireless clients",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"guest_clients\") |> last()", "refId": "A"}],
+      "title": "Guest clients",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 6, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"authenticated_clients\") |> last()", "refId": "A"}],
+      "title": "SCCC / West authenticated",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 9, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"clients_without_ipv4\") |> last()", "refId": "A"}],
+      "title": "Connected without IPv4",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 12, "y": 0},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"aps_up\") |> last()", "refId": "A"}],
+      "title": "APs up",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 0},
+      "id": 6,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"aps_down\") |> last()", "refId": "A"}],
+      "title": "APs down",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 18, "y": 0},
+      "id": 7,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"reject_delta\") |> last()", "refId": "A"}],
+      "title": "RADIUS rejects / interval",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 3, "x": 21, "y": 0},
+      "id": 8,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_summary\" and r._field == \"timeout_delta\") |> last()", "refId": "A"}],
+      "title": "RADIUS timeouts / interval",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "Clients", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 18, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 4, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "none"}}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 9,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"aruba_wireless_ssid\" and r._field == \"clients\") |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false) |> yield(name: \"clients\")", "refId": "A"}],
+      "title": "Clients by SSID",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "min": 0}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 10,
+      "options": {"displayMode": "gradient", "maxVizHeight": 300, "minVizHeight": 16, "minVizWidth": 8, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_building\" and r._field == \"clients\") |> last()", "refId": "A"}],
+      "title": "Clients by building",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 12},
+      "id": 11,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_building\" and contains(value: r._field, set: [\"clients\",\"guest_clients\",\"authenticated_clients\",\"clients_without_ipv4\",\"aps_up\",\"aps_down\",\"avg_clients_per_ap\"])) |> last() |> pivot(rowKey: [\"building\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> keep(columns: [\"building\",\"clients\",\"guest_clients\",\"authenticated_clients\",\"clients_without_ipv4\",\"aps_up\",\"aps_down\",\"avg_clients_per_ap\"])", "refId": "A"}],
+      "title": "Building summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 12},
+      "id": 12,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_radius_server\" and contains(value: r._field, set: [\"accept_delta\",\"reject_delta\",\"timeout_delta\",\"avg_response_ms\"])) |> last() |> pivot(rowKey: [\"server\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> keep(columns: [\"server\",\"accept_delta\",\"reject_delta\",\"timeout_delta\",\"avg_response_ms\"])", "refId": "A"}],
+      "title": "ClearPass target activity from controllers",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 21},
+      "id": 13,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "targets": [{"query": "from(bucket: \"telegraf\") |> range(start: -10m) |> filter(fn: (r) => r._measurement == \"aruba_wireless_ap\" and contains(value: r._field, set: [\"clients\",\"up\",\"ssids\"])) |> last() |> pivot(rowKey: [\"ap\",\"building\",\"group\",\"model\"], columnKey: [\"_field\"], valueColumn: \"_value\") |> keep(columns: [\"ap\",\"building\",\"group\",\"model\",\"clients\",\"up\",\"ssids\"]) |> sort(columns: [\"clients\"], desc: true)", "refId": "A"}],
+      "title": "AP load and state",
+      "type": "table"
+    }
+  ],
+  "refresh": "2m",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["SCCC", "wireless", "Aruba", "ClearPass"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SCCC Wireless Operations",
+  "uid": "sccc-wireless-overview",
+  "version": 1,
+  "weekStart": ""
+}

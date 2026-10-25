@@ -1,0 +1,6 @@
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir --disable-pip-version-check paramiko==3.5.1
+COPY wireless_metrics_collector.py /app/wireless_metrics_collector.py
+
+ENTRYPOINT ["python", "/app/wireless_metrics_collector.py"]

@@ -11,6 +11,8 @@ Azure VM, so we stop editing snippets by hand.
 | `noc_probe_agent.py` | Restricted probe used by FRED on `10.0.0.22`; supports bounded ping, TCP, and read-only LLDP/SNMP collection. |
 | `configure_noc_probe_snmp.py` | Builds root-owned SNMPv3 profiles from the working local Telegraf configuration without printing credentials. |
 | `sccc-noc-probe.env.template` | Root-only probe settings, including allowed target networks and collection limits. |
+| `wireless_metrics_collector.py` | Read-only Mobility Master collector for client, AP, SSID, building, and RADIUS metrics. |
+| `install_wireless_metrics.sh` | Installs the collector, root-only environment, systemd service, and two-minute timer on `10.0.0.22`. |
 
 ## 1. Configure the email sender (one time, in M365)
 
