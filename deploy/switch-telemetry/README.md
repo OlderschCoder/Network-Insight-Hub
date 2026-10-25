@@ -20,6 +20,7 @@ Operational files:
 
 - Timer: `/etc/systemd/system/sccc-switch-telemetry.timer`
 - Service: `/etc/systemd/system/sccc-switch-telemetry.service`
+- Approved scope override: `/etc/systemd/system/sccc-switch-telemetry.service.d/scope.conf`
 - Active release: `/opt/sccc-switch-telemetry/current`
 - Status: `/var/lib/sccc-switch-telemetry/status.json`
 - Latest completed run: `/var/lib/sccc-switch-telemetry/latest`
