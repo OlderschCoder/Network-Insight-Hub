@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
-  Bot,
   BookOpen,
+  ExternalLink,
   Gauge,
   GraduationCap,
   KeyRound,
@@ -11,25 +11,17 @@ import {
   Map,
   Network,
   PhoneCall,
-  Rocket,
   Search,
   ShieldCheck,
   Sparkles,
   Ticket,
-  ToggleRight,
   Wifi,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { useConfirm } from "@/components/ConfirmDialog";
-import { useToast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/authFetch";
-import { useAuth } from "@/context/AuthContext";
-import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 import {
   SectionEyebrow,
   StatusDot,
@@ -49,14 +41,6 @@ interface ZendeskActivityItem {
 interface ZendeskActivityResponse {
   configured: boolean;
   items: ZendeskActivityItem[];
-}
-
-interface ZendeskControls {
-  fredEnabled: boolean;
-  repliesEnabled: boolean;
-  canManage: boolean;
-  updatedAt: string | null;
-  updatedBy: string | null;
 }
 
 const quickIssues = [
@@ -112,23 +96,12 @@ function statusHealth(status: string): PortalHealth {
 }
 
 export default function SupportCenter() {
-  const { user } = useAuth();
   const [, navigate] = useLocation();
-  const confirm = useConfirm();
-  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [tickets, setTickets] = useState<ZendeskActivityItem[]>([]);
   const [ticketsConfigured, setTicketsConfigured] = useState<boolean | null>(
     null,
   );
-  const [controls, setControls] = useState<ZendeskControls>({
-    fredEnabled: true,
-    repliesEnabled: true,
-    canManage: false,
-    updatedAt: null,
-    updatedBy: null,
-  });
-  const [updatingControl, setUpdatingControl] = useState<string | null>(null);
   const { data: summary } = useGetDashboardSummary();
   const callSummary = summary as
     | (typeof summary & {
@@ -150,13 +123,6 @@ export default function SupportCenter() {
         setTickets(response.ok && body.configured ? body.items : []);
       })
       .catch(() => !cancelled && setTicketsConfigured(false));
-    authFetch(`${import.meta.env.BASE_URL}api/zendesk/controls`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load controls");
-        return response.json() as Promise<ZendeskControls>;
-      })
-      .then((body) => !cancelled && setControls(body))
-      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -173,60 +139,6 @@ export default function SupportCenter() {
   const askFred = (prompt = query) => {
     const value = prompt.trim() || "Help me diagnose an IT issue";
     navigate(`/ai-report?from=%2Fsupport&prompt=${encodeURIComponent(value)}`);
-  };
-
-  const updateControl = async (
-    key: "fredEnabled" | "repliesEnabled",
-    nextValue: boolean,
-  ) => {
-    if (!controls.canManage || updatingControl) return;
-    const name = key === "fredEnabled" ? "Fred drafting" : "Zendesk replies";
-    const approved = await confirm({
-      title: `Turn ${name} ${nextValue ? "on" : "off"}?`,
-      description:
-        key === "fredEnabled"
-          ? nextValue
-            ? "Fred may prepare supervised Zendesk drafts and perform confirmed Zendesk actions again."
-            : "Fred's Zendesk drafting and write actions will be blocked."
-          : nextValue
-            ? "Confirmed public Zendesk replies will be allowed again."
-            : "Public replies from Insights and Fred will be blocked. Human escalation remains available.",
-      confirmText: `Turn ${nextValue ? "on" : "off"}`,
-      destructive: !nextValue,
-    });
-    if (!approved) return;
-    setUpdatingControl(key);
-    try {
-      const response = await authFetch(
-        `${import.meta.env.BASE_URL}api/zendesk/controls`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [key]: nextValue }),
-        },
-      );
-      const body = (await response.json().catch(() => null)) as
-        | ZendeskControls
-        | { error?: string }
-        | null;
-      if (!response.ok || !body || !("fredEnabled" in body)) {
-        throw new Error(
-          (body as { error?: string } | null)?.error ||
-            "Unable to save control",
-        );
-      }
-      setControls(body);
-      toast({ title: `${name} turned ${nextValue ? "on" : "off"}` });
-    } catch (error) {
-      toast({
-        title: "Control was not changed",
-        description:
-          error instanceof Error ? error.message : "Unable to save control",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingControl(null);
-    }
   };
 
   return (
@@ -279,69 +191,6 @@ export default function SupportCenter() {
         </div>
       </section>
 
-      <Card className="border-primary/35 bg-primary/5 shadow-sm">
-        <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
-          <div className="min-w-[230px] flex-1">
-            <SectionEyebrow>Zendesk supervision</SectionEyebrow>
-            <p className="mt-1 flex items-center gap-2 text-base font-extrabold">
-              <ToggleRight className="h-5 w-5 text-primary" /> Fred & reply
-              controls
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pause Fred or public replies globally. Escalation to a person
-              stays available.
-            </p>
-          </div>
-          <div className="grid flex-[2] gap-2 sm:grid-cols-2">
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
-              <span>
-                <span className="flex items-center gap-1.5 text-sm font-bold">
-                  <Bot className="h-4 w-4 text-primary" /> Fred drafting
-                </span>
-                <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                  {controls.fredEnabled
-                    ? "ON — supervised drafts allowed"
-                    : "OFF — Zendesk actions blocked"}
-                </span>
-              </span>
-              <Switch
-                checked={controls.fredEnabled}
-                onCheckedChange={(checked) =>
-                  void updateControl("fredEnabled", checked)
-                }
-                disabled={!controls.canManage || updatingControl !== null}
-                aria-label="Toggle Fred Zendesk drafting"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
-              <span>
-                <span className="flex items-center gap-1.5 text-sm font-bold">
-                  <Ticket className="h-4 w-4 text-primary" /> Zendesk replies
-                </span>
-                <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                  {controls.repliesEnabled
-                    ? "ON — confirmed replies allowed"
-                    : "OFF — public replies blocked"}
-                </span>
-              </span>
-              <Switch
-                checked={controls.repliesEnabled}
-                onCheckedChange={(checked) =>
-                  void updateControl("repliesEnabled", checked)
-                }
-                disabled={!controls.canManage || updatingControl !== null}
-                aria-label="Toggle Zendesk public replies"
-              />
-            </label>
-          </div>
-          <Button asChild className="shrink-0">
-            <Link href="/support/zendesk">
-              Open Monitor <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
@@ -386,9 +235,11 @@ export default function SupportCenter() {
               </div>
             ) : null}
             {openTickets.slice(0, 6).map((ticket, index) => (
-              <Link
+              <a
                 key={ticket.id}
-                href={`/support/zendesk?ticket=${ticket.id}`}
+                href={ticket.url}
+                target="_blank"
+                rel="noreferrer"
                 className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/40"
               >
                 <StatusDot
@@ -409,9 +260,9 @@ export default function SupportCenter() {
                   <span className="hidden text-[10px] text-muted-foreground md:block">
                     {new Date(ticket.updatedAt).toLocaleString()}
                   </span>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-              </Link>
+              </a>
             ))}
           </CardContent>
         </Card>
@@ -424,9 +275,7 @@ export default function SupportCenter() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-2 p-4">
-            {diagnosticTools
-              .filter(({ href }) => href !== "/network/tools" || canUseNetworkTools(user))
-              .map(({ label, description, href, icon: Icon }) => (
+            {diagnosticTools.map(({ label, description, href, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -438,7 +287,7 @@ export default function SupportCenter() {
                   {description}
                 </p>
               </Link>
-              ))}
+            ))}
           </CardContent>
         </Card>
 
@@ -448,12 +297,6 @@ export default function SupportCenter() {
             <CardTitle className="mt-1 text-base">Common workflows</CardTitle>
           </CardHeader>
           <CardContent className="divide-y p-0">
-            <SupportLink
-              href="/quick-start"
-              icon={Rocket}
-              label="Quick Start"
-              detail="Learn the top menu and daily workflow"
-            />
             <SupportLink
               href="/incidents"
               icon={Activity}
@@ -554,11 +397,7 @@ export default function SupportCenter() {
               : "Operational"
           }
         />
-        <StatusDot
-          service="Fred"
-          status={controls.fredEnabled ? "operational" : "degraded"}
-          label={controls.fredEnabled ? "Zendesk on" : "Zendesk off"}
-        />
+        <StatusDot service="Fred" status="operational" label="Online" />
         <span className="ml-auto text-xs font-semibold text-muted-foreground">
           Help Desk ext. {callSummary?.itHuntGroupExtension ?? "1200"}
         </span>

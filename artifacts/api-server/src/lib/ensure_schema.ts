@@ -742,24 +742,6 @@ export async function ensureSchema(): Promise<void> {
     logger.error({ err }, "Failed to ensure Webex IT call history tables");
   }
 
-  // Fred must observe a target healthy before a down sequence can alert.
-  // This durable bit survives restarts between the first and third probe.
-  try {
-    await db.execute(sql`
-      ALTER TABLE "fred_building_alert_states"
-      ADD COLUMN IF NOT EXISTS "baseline_established" boolean DEFAULT false NOT NULL
-    `);
-    await db.execute(sql`
-      UPDATE "fred_building_alert_states"
-      SET "baseline_established" = true
-      WHERE "phase" = 'outage'
-        AND "baseline_established" = false
-    `);
-    logger.info("Ensured Fred alert healthy-baseline state exists");
-  } catch (err) {
-    logger.error({ err }, "Failed to ensure Fred alert healthy-baseline state");
-  }
-
   // 7) reports.include_cloud_inventory: opt-in flag to attach the Azure cloud
   //    inventory snapshot to a weekly report. New column added after initial
   //    setup; ADD COLUMN IF NOT EXISTS is a no-op when already present.
@@ -819,19 +801,6 @@ export async function ensureSchema(): Promise<void> {
     logger.info("Ensured team to-do permissions and table exist");
   } catch (err) {
     logger.error({ err }, "Failed to ensure team to-do schema");
-  }
-
-  // Network Tools access is narrower than the network-engineer role. It lets
-  // selected staff use the firewall whitelist, printer setup, and approved
-  // equipment scripts without granting switch, VLAN, or topology write access.
-  try {
-    await db.execute(sql`
-      ALTER TABLE "users"
-      ADD COLUMN IF NOT EXISTS "can_use_network_tools" boolean DEFAULT false NOT NULL
-    `);
-    logger.info("Ensured users.can_use_network_tools column exists");
-  } catch (err) {
-    logger.error({ err }, "Failed to ensure Network Tools permission column");
   }
 
   // Product engagement is distinct from work records. A task assignment or PIR

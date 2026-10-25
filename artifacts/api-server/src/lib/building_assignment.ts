@@ -10,14 +10,15 @@ export const DEFAULT_AUTHORITATIVE_BUILDINGS = [
   "Hobble",
   "Humanities",
   "Industrial Technology Campus",
-  "Mansions",
   "Tech Building A",
   "Tech Building B",
   "Tech Building D",
   "Tech Building T",
   "Maintenance Building",
+  "Mansions",
   "Sharp Champion Center",
   "Softball Field",
+  "Student Activities",
   "Student Health Center",
   "Student Living Center",
   "Student Living F",
@@ -27,33 +28,12 @@ export const DEFAULT_AUTHORITATIVE_BUILDINGS = [
   "Student Living R",
   "Student Living S",
   "Student Living T",
-  "Student Union / Student Activities",
+  "Student Union",
   "West Campus",
 ] as const;
 
 export function normalizeBuildingKey(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-/**
- * Preserve an exact authoritative display name before applying legacy alias
- * canonicalization. Lettered dorm/tech buildings are separate map entities
- * even though older inventory labels may roll up to a campus grouping.
- */
-export function getAuthoritativeBuildingName(
-  rawBuilding: string,
-  authoritativeBuildings: readonly string[],
-): string {
-  const key = normalizeBuildingKey(rawBuilding);
-  const exact = authoritativeBuildings.find(
-    (name) => normalizeBuildingKey(name) === key,
-  );
-  if (exact) return exact;
-
-  const canonical = getCanonicalBuildingName(rawBuilding);
-  return authoritativeBuildings.find(
-    (name) => normalizeBuildingKey(name) === normalizeBuildingKey(canonical),
-  ) ?? canonical;
 }
 
 export function getCanonicalBuildingName(rawBuilding: string | null | undefined): string {
@@ -76,19 +56,16 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
     "main campus": "Hobble",
     "sharp center": "Sharp Champion Center",
     "softball": "Softball Field",
-    "student union": "Student Union / Student Activities",
-    "student union gym 208 sugymcam": "Student Union / Student Activities",
+    "student activities": "Student Activities",
+    "student union": "Student Union",
+    "student union activities": "Student Union / Student Activities",
+    "student union student activities": "Student Union / Student Activities",
+    "student union gym 208 sugymcam": "Student Activities",
     "student living center slc151": "Student Living Center",
-    "student life ab": "Mansions",
-    "student life de": "Mansions",
-    "student living ab": "Mansions",
-    "student living a b": "Mansions",
-    "student living cd": "Mansions",
-    "student living c d": "Mansions",
-    "student living de": "Mansions",
-    "student living d e": "Mansions",
-    "swa slab": "Mansions",
-    "swa slcde": "Mansions",
+    "student life ab": "Student Living Center",
+    "student life de": "Student Living Center",
+    "swa slab": "Student Living Center",
+    "swa slcde": "Student Living Center",
     "student living slg": "Student Living Center",
     "student living slh": "Student Living Center",
     "student living slj": "Student Living Center",
@@ -119,14 +96,12 @@ export function getCanonicalBuildingName(rawBuilding: string | null | undefined)
 
   if (key.includes("azure connectivity")) return "Azure Connectivity (Objects)";
   if (key.includes("azure")) return "Azure (Hybrid-VNet)";
-  if (key.includes("mansions")) return "Mansions";
   if (key.includes("student health")) return "Student Health Center";
   if (key.includes("student living") || key.includes("student life") || key.includes("tech dorm") || /^sl[ghjrst]\b/.test(key)) {
     return "Student Living Center";
   }
-  if (key.includes("student union") || key.includes("student activities") || key.includes("sports & activities")) {
-    return "Student Union / Student Activities";
-  }
+  if (key.includes("student activities") || key.includes("sports activities")) return "Student Activities";
+  if (key.includes("student union")) return "Student Union";
   if (key.includes("sharp champion") || key.includes("sharp family champion") || key.includes("sharp center")) {
     return "Sharp Champion Center";
   }
@@ -172,8 +147,10 @@ export function getAssignedBuildingName(
   hostname?: string | null,
 ): string {
   const hint = normalizeBuildingKey(`${location ?? ""} ${hostname ?? ""}`);
-  if (/\b(?:swa slab|swa slcde|student living a b|student living c d|student living d e)\b/.test(hint)) {
-    return "Mansions";
+  const canonicalBuilding = getCanonicalBuildingName(building);
+  if (canonicalBuilding === "Student Union / Student Activities") {
+    if (/\b(?:sw sa208 replay|sw sa208|sugymcam)\b/.test(hint)) return "Student Activities";
+    if (/\b(?:swa su121|sw cafe)\b/.test(hint)) return "Student Union";
   }
   if (/\btech core\b/.test(hint)) return "Industrial Technology Campus";
   const lettered: Array<[RegExp, string]> = [
@@ -190,5 +167,5 @@ export function getAssignedBuildingName(
     [/\b(?:tt103|t122|technology t)\b/, "Tech Building T"],
   ];
   for (const [pattern, assigned] of lettered) if (pattern.test(hint)) return assigned;
-  return getCanonicalBuildingName(building);
+  return canonicalBuilding;
 }

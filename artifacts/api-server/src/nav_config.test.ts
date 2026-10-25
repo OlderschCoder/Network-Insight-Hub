@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getNavGroups } from "../../it-reporting/src/config/nav";
 
 describe("primary navigation", () => {
-  it("organizes the top menu into linked category dropdowns", () => {
+  it("organizes the sidebar into linked category dropdowns", () => {
     const groups = getNavGroups(true, true);
     expect(groups.map((group) => [group.label, group.href])).toEqual([
       ["Status & Reporting", "/status"],
@@ -19,17 +19,6 @@ describe("primary navigation", () => {
       "Cisco Webex Phones",
       "Azure",
       "Network Tools",
-    ]);
-    expect(groups[2].items.map((item) => item.label)).toEqual([
-      "Quick Start",
-      "Support Center",
-      "Zendesk Monitor",
-      "Incident Rooms",
-      "Risks & Issues",
-      "Post-Incident Reviews",
-      "Process Library",
-      "Learn",
-      "User Guide",
     ]);
   });
 

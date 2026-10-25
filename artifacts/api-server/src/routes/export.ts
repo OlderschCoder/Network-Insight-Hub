@@ -19,7 +19,6 @@ import {
   buildReportDocxBuffer,
   buildReportPdfSections,
 } from "../lib/report_export";
-import { includedWeeklyLogs } from "../lib/weekly_report_entry_policy";
 
 const router = Router();
 
@@ -129,9 +128,7 @@ router.get("/report/:id/xlsx", requireAuth, async (req: any, res) => {
       entriesSheet.addRow([
         entry.id, data.userMap[entry.userId]?.name ?? "Unknown", entry.category, entry.title, entry.description,
         entry.accomplishments ?? "", entry.challenges ?? "",
-        entry.ticketCount ?? 0,
-        entry.isSubmitted ? "Yes" : "Legacy eligible",
-        entry.createdAt.toISOString(),
+        entry.ticketCount ?? 0, entry.isSubmitted ? "Yes" : "No", entry.createdAt.toISOString(),
       ]);
     }
 
@@ -717,9 +714,7 @@ router.post("/report/:id/zendesk", requireAuth, requireCIO, async (req: any, res
   const [report] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Not found" });
 
-  const entries = includedWeeklyLogs(
-    await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf)),
-  );
+  const entries = await db.select().from(entriesTable).where(eq(entriesTable.weekOf, report.weekOf));
 
   const body = [
     `IT Department Weekly Report — Week of ${report.weekOf}`,

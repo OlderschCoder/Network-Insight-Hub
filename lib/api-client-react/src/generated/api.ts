@@ -73,7 +73,6 @@ import type {
   ListVlansParams,
   LogItem,
   LoginBody,
-  NetworkDeviceInfluxTelemetry,
   NetworkLayoutPosition,
   NetworkSwitch,
   Process,
@@ -142,7 +141,7 @@ export const getHealthCheckQueryKey = () => {
 
 export const getHealthCheckQueryOptions = <
   TData = Awaited<ReturnType<typeof healthCheck>>,
-  TError = ErrorType<HealthStatus>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
@@ -169,7 +168,7 @@ export const getHealthCheckQueryOptions = <
 export type HealthCheckQueryResult = NonNullable<
   Awaited<ReturnType<typeof healthCheck>>
 >;
-export type HealthCheckQueryError = ErrorType<HealthStatus>;
+export type HealthCheckQueryError = ErrorType<unknown>;
 
 /**
  * @summary Health check
@@ -177,7 +176,7 @@ export type HealthCheckQueryError = ErrorType<HealthStatus>;
 
 export function useHealthCheck<
   TData = Awaited<ReturnType<typeof healthCheck>>,
-  TError = ErrorType<HealthStatus>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof healthCheck>>,
@@ -6538,102 +6537,6 @@ export const useClearNetworkLayout = <
 > => {
   return useMutation(getClearNetworkLayoutMutationOptions(options));
 };
-
-/**
- * @summary Read bounded live telemetry for one network device
- */
-export const getGetNetworkDeviceInfluxTelemetryUrl = (host: string) => {
-  return `/api/network/influx/device/${host}`;
-};
-
-export const getNetworkDeviceInfluxTelemetry = async (
-  host: string,
-  options?: RequestInit,
-): Promise<NetworkDeviceInfluxTelemetry> => {
-  return customFetch<NetworkDeviceInfluxTelemetry>(
-    getGetNetworkDeviceInfluxTelemetryUrl(host),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getGetNetworkDeviceInfluxTelemetryQueryKey = (host: string) => {
-  return [`/api/network/influx/device/${host}`] as const;
-};
-
-export const getGetNetworkDeviceInfluxTelemetryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>,
-  TError = ErrorType<ErrorResponse>,
->(
-  host: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getGetNetworkDeviceInfluxTelemetryQueryKey(host);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>
-  > = ({ signal }) =>
-    getNetworkDeviceInfluxTelemetry(host, { signal, ...requestOptions });
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!host,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetNetworkDeviceInfluxTelemetryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>
->;
-export type GetNetworkDeviceInfluxTelemetryQueryError =
-  ErrorType<ErrorResponse>;
-
-/**
- * @summary Read bounded live telemetry for one network device
- */
-
-export function useGetNetworkDeviceInfluxTelemetry<
-  TData = Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>,
-  TError = ErrorType<ErrorResponse>,
->(
-  host: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getNetworkDeviceInfluxTelemetry>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetNetworkDeviceInfluxTelemetryQueryOptions(
-    host,
-    options,
-  );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
 
 /**
  * @summary List VLANs with search

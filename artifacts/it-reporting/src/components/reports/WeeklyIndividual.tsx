@@ -93,13 +93,7 @@ export default function WeeklyIndividual() {
             </div>
             <div className="flex gap-2 text-xs text-muted-foreground">
               <Badge variant="outline">{itemList.length} items</Badge>
-              <Badge variant={entry?.isSubmitted ? "default" : "outline"}>
-                {entry
-                  ? entry.isSubmitted
-                    ? "Weekly log submitted"
-                    : "Weekly log draft"
-                  : "No weekly log yet"}
-              </Badge>
+              <Badge variant="outline">{entry ? "Weekly log saved" : "No weekly log yet"}</Badge>
             </div>
           </div>
 

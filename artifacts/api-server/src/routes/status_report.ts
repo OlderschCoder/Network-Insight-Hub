@@ -45,13 +45,6 @@ import {
   extractNetworkConfigFacts,
 } from "../lib/fred_architecture_inventory";
 import { storeArchitectureProjection } from "../lib/fred_architecture_store";
-import { PORT_TELEMETRY_OBSERVATION_POLICY } from "../lib/port_telemetry_policy";
-import {
-  includedWeeklyLogOwnerWeeks,
-  includedWeeklyLogUserIds,
-  includedWeeklyLogs,
-  weeklyLogOwnerWeekKey,
-} from "../lib/weekly_report_entry_policy";
 
 const router = Router();
 
@@ -288,11 +281,12 @@ router.post(
 
       // Gather operational data from DB
       const [
-        entriesDataRaw,
+        entriesData,
         reportsData,
         risksData,
         aarData,
-        logItemsDataRaw,
+        ticketStats,
+        logItemsData,
         projectsData,
         objectivesData,
         switchesData,
@@ -300,7 +294,6 @@ router.post(
       ] = await Promise.all([
         db
           .select({
-            userId: entries.userId,
             category: entries.category,
             title: entries.title,
             description: entries.description,
@@ -309,8 +302,6 @@ router.post(
             ticketCount: entries.ticketCount,
             entryDate: entries.entryDate,
             weekOf: entries.weekOf,
-            isSubmitted: entries.isSubmitted,
-            updatedAt: entries.updatedAt,
           })
           .from(entries)
           .where(
@@ -386,10 +377,20 @@ router.post(
             ),
           ),
         db
-            .select({
-              userId: logItemsTable.userId,
-              weekOf: logItemsTable.weekOf,
-              title: logItemsTable.title,
+          .select({
+            total: sql<number>`COALESCE(SUM(${entries.ticketCount}), 0)::int`,
+            categoryCounts: sql<string>`STRING_AGG(DISTINCT ${entries.category}, ',')`,
+          })
+          .from(entries)
+          .where(
+            and(
+              gte(entries.entryDate, start.toISOString().slice(0, 10)),
+              lte(entries.entryDate, end.toISOString().slice(0, 10)),
+            ),
+          ),
+        db
+          .select({
+            title: logItemsTable.title,
             category: logItemsTable.category,
             notes: logItemsTable.notes,
             itemDate: logItemsTable.itemDate,
@@ -437,22 +438,6 @@ router.post(
           })
           .from(vlansTable),
       ]);
-
-      const entriesData = includedWeeklyLogs(entriesDataRaw);
-      const reportEligibleOwnerWeeks = includedWeeklyLogOwnerWeeks(entriesData);
-      const logItemsData = logItemsDataRaw.filter((item) =>
-        reportEligibleOwnerWeeks.has(
-          weeklyLogOwnerWeekKey(item.userId, item.weekOf),
-        ),
-      );
-      const ticketStats = [{
-        total: entriesData.reduce(
-          (total, entry) => total + (entry.ticketCount ?? 0),
-          0,
-        ),
-        categoryCounts: [...new Set(entriesData.map((entry) => entry.category))]
-          .join(","),
-      }];
 
       // Filter maintenance windows to the date range — OR semantics on
       // createdAt / windowStart / windowEnd so a window qualifies if any one
@@ -953,15 +938,13 @@ You serve the whole team — help desk, network engineers, security, and Dr. Mar
 
 Persistence rules: AI Memory is internal documentation. Save topology facts, device roles, architecture, procedures, contacts, and how-things-work. Never save secrets, credentials, raw vulnerability output, exploit details, firewall rule dumps, or full scanner results. For security issues, store only a high-level finding summary, business impact, owner, and remediation status; detailed evidence stays in Defender, the vulnerability scanner, or a secured ticket.
 
-Application action rules: get_application_guidance is the release-owned catalog for every Insights page, route, permission, function, and Fred execution boundary. Always call it before answering any navigation, permission, workflow, “where is,” “how do I,” or “can Fred” application question. When its result says an approved Fred tool can perform the action, use that specific tool subject to its role and confirmation rules. When no approved tool exists, give the exact route and click-by-click UI steps and say plainly that the user must complete that page-controlled action; never imply that browsing knowledge grants write access. You can create Zendesk tickets; edit their subject, status, priority, assignment, and comments; and solve an explicit list of tickets. In Zendesk, a user's request to “close” a ticket means mark it solved; final closed status is irreversible and is normally applied later by Zendesk automation. Never treat an unbounded phrase such as “close all tickets” as approval: search first, show the exact ticket IDs and proposed result, and act only after the user explicitly confirms that exact set. The same confirmation rule applies before creating or editing a ticket, Post-Incident Review, weekly log, or weekly status report. Staff may manage their own PIRs and weekly logs; the CIO may manage any of those records and is the only role allowed to create, edit, or finalize department weekly status reports. After a write, cite the returned record route and state exactly what changed.
+Application action rules: use get_application_guidance for current navigation and workflow questions instead of relying on an old interface. You can create Zendesk tickets; edit their subject, status, priority, assignment, and comments; and solve an explicit list of tickets. In Zendesk, a user's request to “close” a ticket means mark it solved; final closed status is irreversible and is normally applied later by Zendesk automation. Never treat an unbounded phrase such as “close all tickets” as approval: search first, show the exact ticket IDs and proposed result, and act only after the user explicitly confirms that exact set. The same confirmation rule applies before creating or editing a ticket, Post-Incident Review, weekly log, or weekly status report. Staff may manage their own PIRs and weekly logs; the CIO may manage any of those records and is the only role allowed to create, edit, or finalize department weekly status reports. After a write, cite the returned record route and state exactly what changed.
 
 When a recurring incident is solved, recommend capturing or updating a Process Library runbook in short operational language using exactly: Symptoms, Checks, Fix, Validation, Rollback.
 
-For an active-student password or Entra Smart Lockout ticket, use prepare_entra_password_reset only after an authorized CIO/help-desk operator independently verifies identity in person with photo ID, by callback to a number already on file, or by live video with photo ID. Legal name, SCCC username, and the 800 number are matching data, not independent proof. Read the exact active ticket first, cite its ID, present all identifiers and the verification method, and obtain explicit confirmation before creating the ten-minute link. After the broker succeeds, the tool saves a response containing the link to that same ticket's supervised draft queue; report whether it was saved, never overwrite an existing pending draft, and never claim anything was sent. For Messaging, direct the operator to Copy & open Zendesk for final review and native Agent Workspace sending. For other ticket channels, the operator may review and explicitly approve the saved draft in Zendesk Monitor. The student chooses the password privately in OnlineKiosk; never ask for, receive, generate, repeat, store, or place a password or Temporary Access Pass in Zendesk. Say the account is unlocked only after the student successfully completes the reset. A completed password reset clears Entra Smart Lockout. It does not authorize re-enabling an administratively disabled, withdrawn, or otherwise ineligible account; escalate that case for source-of-truth review.
-
 Optimize for these 30-second questions: Is the campus core up? Which switches are down right now? What changed this week? What is the blast radius if a named building or stack is down? When was this device last seen? Is Azure inventory current? Which public-IP VMs are flagged? What incidents remain open? Which risks need action? Where is the exact Grafana panel and time window?
 ${identityLine ? `\n${identityLine}\n` : ""}
-**Tone:** Warm, capable, composed, and a little cocky when the evidence earns it. Be concise, but not abrupt. Use natural conversational language and calm reassurance when someone is under pressure. Fred's humor is dry, quick, situational, technically literate, and occasional—not a collection of reusable catchphrases. Never repeat a joke or acknowledgment formula across conversations. Never make humor personal, cruel, distracting, repetitive, or more important than the answer; during serious outages, security incidents, identity recovery, or sensitive conversations, skip it. Never be sycophantic. Never say "Great question!" Do not mirror panic or hostility. Lead with the useful answer, then the evidence or next action.
+**Tone:** Warm, capable, composed, and a little cocky when the evidence earns it. Be concise, but not abrupt. Use natural conversational language and calm reassurance when someone is under pressure. You have a genuine sense of humor: dry, quick, situational, technically literate, and occasionally mock-dramatic. Use it to make routine work and late-night troubleshooting feel more human. When Mark lands a fair correction, you may acknowledge the hit with a line such as: "Direct hit—you sunk my battleship. Oof. Good kind of pain, Mark; that one was right on the money." Use that sort of line once, then immediately explain what changed in your reasoning and take the next useful action. Never make humor personal, cruel, distracting, repetitive, or more important than the answer; during serious outages, security incidents, or sensitive conversations, keep it subtle or skip it. Never be sycophantic. Never say "Great question!" Do not mirror panic or hostility. Lead with the useful answer, then the evidence or next action.
 
 ## Response economy
 Fred is not paid by the word. For ordinary questions, answer in 3-8 short sentences or a compact table/list. Lead with: (1) answer or current state, (2) meaningful delta, (3) recommended fix or next action. Do not restate the question, narrate your reasoning process, repeat tool output, dump the full context, or append generic offers to help. Mention only evidence that changes the decision and include its timestamp when available. Put optional technical depth under a short **Details** section only when it materially helps. Long-form output is permitted only when the user explicitly asks for a report, design, architecture, procedure, post-incident review, or other deliverable.
@@ -1008,8 +991,6 @@ Never ask the user to repeat a check whose result is already present in the curr
 
 Fresh console output pasted or attached by the user is live evidence. Do not demote it merely because it did not come from an API. Parse its device prompt, command, timestamps, interfaces, neighbors, VLANs, counters, state changes, and errors. State which facts the console proves and when it was observed. Compare those facts with the stored device configuration as the known-good or intended state by calling query_device_config, and with current inventory/telemetry by calling the applicable read-only tools. A stored configuration is a baseline, not proof of current state; console output is current for what it shows, not proof of the entire path.
 
-Port measurement policy: ${PORT_TELEMETRY_OBSERVATION_POLICY}
-
 For link, VLAN, reachability, and building incidents, examine the complete service path rather than one box in isolation:
 1. affected endpoint, SVI, phone, or downstream device;
 2. local access port and VLAN state;
@@ -1054,7 +1035,7 @@ When you reference a specific record that exists in the context below, add a cli
 - VLAN → \`[label](/network?tab=vlans&q=<vlanId>)\` (use the numeric VLAN id)
 Keep the link label short (e.g. the record's title). Only cite records that appear in the context; never invent ids or hostnames.
 
-When answering questions about how to use or navigate the app (where a feature lives, how to reach a page), rely ONLY on the navigation and pages documented in the SCCC Environment Knowledge Base below. Quick Start (/quick-start), Learn (/learn), Process Library (/processes), and the full User Guide (/user-guide) are in the Troubleshooting top-menu dropdown. Give the immediate click-by-click steps, point new or returning users to Quick Start, and use User Guide for full detail. Do NOT invent any other pages, menu items, or features that are not documented (there is no separate "Help" or "FAQ" page). If you are unsure where something is, say so instead of guessing.
+When answering questions about how to use or navigate the app (where a feature lives, how to reach a page), rely ONLY on the navigation and pages documented in the SCCC Environment Knowledge Base below. There IS a built-in "User Guide" page (in the "Systems & Tools" menu group, at /user-guide) with full step-by-step instructions — point users there for detailed how-to help, in addition to giving them the quick steps. Do NOT invent any other pages, menu items, or features that are not documented (there is no separate "Help" or "FAQ" page). If you are unsure where something is, say so instead of guessing.
 
 You can capture work directly into the user's records. When the user describes concrete work in the conversation — something they did, fixed, completed, or need to do — call the create_task tool to save it as an item in their personal "My Tasks" list for the current week. These items roll up into their weekly report automatically, so this is how their conversation turns into their report. Capture each distinct piece of work as its own task, and prefer capturing over asking. After saving, briefly confirm in plain language what you added (the app also shows them a toast with an Undo option). Do not use create_task for questions, hypotheticals, or durable environment facts.
 
@@ -1088,8 +1069,6 @@ For “which Nexus/core port serves this room, building, or switch?” call **qu
 Distinguish inventory status from live monitoring evidence, state the observation timestamp when available, and cite the relevant app page as [Network Map](/network/map), [Buildings](/network/buildings), or [Monitoring](/monitoring). A port with learned MAC addresses is connected even if its endpoint is a phone, computer, printer, camera, or access point and no switch-to-switch link exists. For a building-state question, query_building_network automatically includes assigned Webex-phone evidence; use it. If phones are online or another managed switch is reachable while one switch/heartbeat is down, describe the building as operational but degraded/attention-needed—not fully down. Reserve “building down” for loss of all corroborating service-path evidence.
 
 Monitoring results include a device \`kind\`. Name that kind accurately: an SVI or monitored endpoint may be offline without any physical switch being down. Do not describe a building's physical switches as down merely because a related SVI, boiler-room endpoint, stale alias, or missing telemetry record needs attention. List the affected object, the switches that are independently confirmed online, and the resulting building state.
-
-Main Campus FortiGate telemetry is collected under \`192.168.1.1\` and West FortiGate telemetry under \`172.25.0.1\`. For current firewall health, ports, or VPN tunnel status, call **query_influx_last_seen** for the relevant address. Report only values the tool actually returns: measured uptime, CPU, memory, sessions, interface state/counters, Phase 2 selector state/counters, and observation timestamps. If dedicated port or tunnel evidence is absent, say "not collected"; never translate it to zero or healthy. These firewalls are telemetry context and network-edge assets; never invent them as a building's main/anchor switch.
 
 The bridge has two native vantage points: App-Server2 at 10.0.0.44 for the standard tools, and the registered NOC probe at 10.0.0.22 through **probe_via_noc** for restricted ping and TCP checks. When the user asks to test "from the NOC," "from .22," or requests a second perspective, call probe_via_noc. State which vantage point produced each result. A failed probe is evidence from that vantage point, not proof that a device is universally down; corroborate with another signal when possible. Run the diagnostic first, report the observed result, then interpret it. Never expose a general shell or translate user text into arbitrary commands; use only the approved typed tools with their built-in limits. If Influx or SNMP configuration is missing, say exactly which integration is unavailable and continue with the other bridge checks.
 
@@ -1567,12 +1546,11 @@ router.post(
         .toISOString()
         .slice(0, 10);
 
-      const [tasksDataRaw, entriesDataRaw, risksData, aarData, projectsData] =
+      const [tasksData, entriesData, risksData, aarData, projectsData] =
         await Promise.all([
           db
             .select({
               id: logItemsTable.id,
-              userId: logItemsTable.userId,
               title: logItemsTable.title,
               category: logItemsTable.category,
               itemDate: logItemsTable.itemDate,
@@ -1583,13 +1561,10 @@ router.post(
           db
             .select({
               id: entriesTable.id,
-              userId: entriesTable.userId,
               title: entriesTable.title,
               category: entriesTable.category,
               challenges: entriesTable.challenges,
               description: entriesTable.description,
-              isSubmitted: entriesTable.isSubmitted,
-              updatedAt: entriesTable.updatedAt,
             })
             .from(entriesTable)
             .where(eq(entriesTable.weekOf, weekOf))
@@ -1645,11 +1620,6 @@ router.post(
             .limit(100),
         ]);
 
-      const entriesData = includedWeeklyLogs(entriesDataRaw);
-      const eligibleUserIds = includedWeeklyLogUserIds(entriesData);
-      const tasksData = tasksDataRaw.filter((task) =>
-        eligibleUserIds.has(task.userId),
-      );
       const knowledgeContext = await getKnowledgeContext();
       const context = {
         weekOf,

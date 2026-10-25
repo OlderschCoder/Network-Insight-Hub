@@ -255,7 +255,7 @@ export default function NetworkTools() {
           <ShieldCheck className="h-6 w-6 text-emerald-600" /> Network Tools
         </h1>
         <p className="text-muted-foreground">
-          Firewall whitelisting plus ready-to-run PowerShell for common on-site tasks.
+          Approved network actions plus guided tools for common on-site tasks.
         </p>
       </div>
 

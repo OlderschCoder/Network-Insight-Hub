@@ -18,27 +18,6 @@ export const HealthCheckResponse = zod.object({
     .describe(
       'Status of the emergency break-glass login seeder. \"failed\" means the feature is configured but the emergency CIO account could not be created on boot, which forces the overall status to \"degraded\".',
     ),
-  fredAlerts: zod
-    .object({
-      state: zod.enum(["disabled", "starting", "ok", "degraded"]),
-      lastSuccessAt: zod.coerce.date().nullable(),
-      lastErrorAt: zod.coerce.date().nullable(),
-      errorCode: zod
-        .enum([
-          "configuration_invalid",
-          "anchor_seed_failed",
-          "no_enabled_anchors",
-          "sms_configuration_invalid",
-          "phone_evidence_incomplete",
-          "lease_lost",
-          "tick_failed",
-          "fallback_failed",
-        ])
-        .nullable(),
-    })
-    .describe(
-      "Sanitized Fred alert-worker health. It contains no configuration values, recipient identifiers, provider payloads, or secrets.",
-    ),
 });
 
 /**
@@ -66,7 +45,6 @@ export const LoginResponse = zod.object({
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
     canManageTodos: zod.boolean().optional(),
-    canUseNetworkTools: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -104,7 +82,6 @@ export const EntraExchangeResponse = zod.object({
     department: zod.string().optional(),
     jobTitle: zod.string().nullish(),
     canManageTodos: zod.boolean().optional(),
-    canUseNetworkTools: zod.boolean().optional(),
     isActive: zod.boolean().optional(),
     createdAt: zod.coerce.date().optional(),
   }),
@@ -130,7 +107,6 @@ export const GetMeResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
-  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -184,7 +160,6 @@ export const ListUsersResponseItem = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
-  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -210,7 +185,6 @@ export const GetUserResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
-  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -234,7 +208,6 @@ export const UpdateUserBody = zod.object({
     .optional(),
   department: zod.string().optional(),
   isActive: zod.boolean().optional(),
-  canUseNetworkTools: zod.boolean().optional(),
 });
 
 export const UpdateUserResponse = zod.object({
@@ -253,7 +226,6 @@ export const UpdateUserResponse = zod.object({
   department: zod.string().optional(),
   jobTitle: zod.string().nullish(),
   canManageTodos: zod.boolean().optional(),
-  canUseNetworkTools: zod.boolean().optional(),
   isActive: zod.boolean().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -552,8 +524,8 @@ export const ListReportTicketsParams = zod.object({
 
 export const ListReportTicketsResponse = zod.object({
   weekOf: zod.string(),
-  count: zod.number().nullable(),
-  configured: zod.boolean(),
+  count: zod.number(),
+  configured: zod.boolean().optional(),
   tickets: zod.array(
     zod.object({
       id: zod.number(),
@@ -692,24 +664,6 @@ export const GetAggregateReportResponse = zod.object({
   weekOf: zod.string(),
   totalEntries: zod.number(),
   contributorCount: zod.number(),
-  eligibleUserIds: zod
-    .array(zod.number())
-    .describe(
-      "User IDs whose weekly logs satisfy the shared department-report submission policy.",
-    ),
-  submissionStatus: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        userName: zod.string(),
-        userRole: zod.string(),
-        entryCount: zod.number(),
-        isSubmitted: zod.boolean(),
-      }),
-    )
-    .describe(
-      "Active reporting-team members and their weekly-log submission state, including users with no log row.",
-    ),
   byRole: zod.record(zod.string(), zod.number()).optional(),
   byCategory: zod.record(zod.string(), zod.number()).optional(),
   totalTickets: zod.number().optional(),
@@ -2206,71 +2160,6 @@ export const ClearNetworkLayoutBody = zod.object({
 
 export const ClearNetworkLayoutResponse = zod.object({
   ok: zod.boolean().optional(),
-});
-
-/**
- * @summary Read bounded live telemetry for one network device
- */
-export const getNetworkDeviceInfluxTelemetryPathHostRegExp = new RegExp(
-  "^[A-Za-z0-9._:-]+$",
-);
-
-export const GetNetworkDeviceInfluxTelemetryParams = zod.object({
-  host: zod.coerce
-    .string()
-    .regex(getNetworkDeviceInfluxTelemetryPathHostRegExp),
-});
-
-export const GetNetworkDeviceInfluxTelemetryResponse = zod.object({
-  configured: zod.boolean(),
-  reachable: zod.boolean(),
-  host: zod.string(),
-  system: zod.object({
-    uptime: zod.number().nullable(),
-    cpuUsagePct: zod.number().nullable(),
-    memoryUsagePct: zod.number().nullable(),
-    sessionCount: zod.number().nullable(),
-    observedAt: zod.coerce.date().nullable(),
-  }),
-  pingLoss: zod.number().nullable(),
-  rtt: zod.number().nullable(),
-  pingObservedAt: zod.coerce.date().nullable(),
-  interfaces: zod.array(
-    zod.object({
-      name: zod.string(),
-      description: zod.string().nullable(),
-      ifIndex: zod.number().nullable(),
-      ifType: zod.number().nullable(),
-      mtu: zod.number().nullable(),
-      macAddress: zod.string().nullable(),
-      adminStatus: zod.string().nullable(),
-      operStatus: zod.string().nullable(),
-      speedMbps: zod.number().nullable(),
-      inErrors: zod.number().nullable(),
-      outErrors: zod.number().nullable(),
-      inDiscards: zod.number().nullable(),
-      outDiscards: zod.number().nullable(),
-      inOctets: zod.number().nullable(),
-      outOctets: zod.number().nullable(),
-      observedAt: zod.coerce.date().nullable(),
-      measurement: zod.string(),
-    }),
-  ),
-  tunnels: zod.array(
-    zod.object({
-      index: zod.string().nullable(),
-      phase1: zod.string(),
-      phase2: zod.string(),
-      vdom: zod.string().nullable(),
-      status: zod.enum(["up", "down", "unknown"]),
-      inOctets: zod.number().nullable(),
-      outOctets: zod.number().nullable(),
-      observedAt: zod.coerce.date().nullable(),
-    }),
-  ),
-  interfaceTelemetryAvailable: zod.boolean(),
-  tunnelTelemetryAvailable: zod.boolean(),
-  lastPolled: zod.coerce.date().nullable(),
 });
 
 /**

@@ -83,9 +83,6 @@ export default function EntryDetail() {
             {e.category}
           </Badge>
         )}
-        <Badge variant={e.isSubmitted ? "default" : "secondary"}>
-          {e.isSubmitted ? "Submitted" : "Draft"}
-        </Badge>
         {canEdit && (
           <Link href={`/entries/${e.id}/edit`}>
             <Button variant="outline" size="sm">

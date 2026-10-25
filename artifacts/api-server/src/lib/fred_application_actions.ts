@@ -5,25 +5,8 @@ import {
   db,
   entriesTable,
   reportsTable,
-  teamTodosTable,
-  usersTable,
 } from "@workspace/db";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
-import {
-  canAccessTodo,
-  canManageTeamTodos,
-  todoAssigneeForCreate,
-  type TodoActor,
-} from "./team_todo_policy";
-import {
-  findFredApplicationPages,
-  renderFredApplicationPage,
-} from "./fred_app_catalog";
-import {
-  canPrepareIdentityRecovery,
-  isIdentityRecoveryConfigured,
-  prepareIdentityRecovery,
-} from "./identity_recovery";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 
 export type FredActor = {
   id: number | null;
@@ -267,83 +250,6 @@ export async function executeZendeskSolveTickets(
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-export const PREPARE_ENTRA_PASSWORD_RESET_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
-  {
-    type: "function",
-    function: {
-      name: "prepare_entra_password_reset",
-      description:
-        "For an active Zendesk ticket, prepare a ten-minute, single-use OnlineKiosk link for an active SCCC student to choose a private Entra password, then save the exact link response as a supervised Zendesk draft. This is for CIO/help-desk staff after independent identity verification. It does not accept, generate, reveal, or send a password, and it never sends the draft automatically. Before calling, read the ticket, show the legal name, full 800 number, SCCC username, ticket ID, verification method, and exact action; call only after explicit confirmation.",
-      parameters: {
-        type: "object",
-        properties: {
-          legal_first_name: { type: "string" },
-          legal_last_name: { type: "string" },
-          student_id: {
-            type: "string",
-            description:
-              "Full nine-digit SCCC student number beginning with 800.",
-          },
-          username: {
-            type: "string",
-            description: "SCCC username, with or without @sccc.edu.",
-          },
-          zendesk_ticket_id: {
-            type: "number",
-            description:
-              "Exact Zendesk ticket that authorized the assisted workflow.",
-          },
-          verification_method: {
-            type: "string",
-            enum: [
-              "in_person_photo_id",
-              "callback_to_number_on_file",
-              "live_video_photo_id",
-            ],
-            description:
-              "Independent verification completed by the human operator. Information typed into the ticket is not independent verification.",
-          },
-          identity_verified: {
-            type: "boolean",
-            description:
-              "True only after the operator completed the named independent verification method.",
-          },
-          confirmed: confirmationProperty,
-        },
-        required: [
-          "legal_first_name",
-          "legal_last_name",
-          "student_id",
-          "username",
-          "zendesk_ticket_id",
-          "verification_method",
-          "identity_verified",
-          "confirmed",
-        ],
-      },
-    },
-  };
-
-export async function executePrepareEntraPasswordReset(
-  rawArgs: string,
-  actor: FredActor,
-): Promise<string> {
-  const args = parseArgs(rawArgs);
-  return prepareIdentityRecovery(
-    {
-      legalFirstName: cleanText(args.legal_first_name) || "",
-      legalLastName: cleanText(args.legal_last_name) || "",
-      studentId: cleanText(args.student_id) || "",
-      username: cleanText(args.username) || "",
-      zendeskTicketId: Number(args.zendesk_ticket_id),
-      verificationMethod: cleanText(args.verification_method) || "",
-      identityVerified: args.identity_verified === true,
-      confirmed: args.confirmed === true,
-    },
-    actor,
-  );
 }
 
 const afterActionProperties = {
@@ -754,359 +660,19 @@ export async function executeManageWeeklyReport(
   return `✓ Weekly status report #${report.id} ${args.action === "finalize" ? "finalized" : "updated"}. Open /reports/${report.id}`;
 }
 
-export const QUERY_TEAM_TODOS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
-  {
-    type: "function",
-    function: {
-      name: "query_team_todos",
-      description:
-        "List the to-dos the signed-in user is allowed to see. Mark and Tracy may see the whole team; everyone else receives only their own items. Use this before completing, editing, or reassigning a to-do when its exact id is not already known.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "Optional title/details search text.",
-          },
-          status: {
-            type: "string",
-            enum: ["active", "open", "in_progress", "completed", "all"],
-            description: "Defaults to active (open and in progress).",
-          },
-          assignee: {
-            type: "string",
-            description:
-              "Optional exact team member name or email. Available only to Mark and Tracy.",
-          },
-        },
-        required: [],
-      },
-    },
-  };
-
-export const MANAGE_TEAM_TODO_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
-  {
-    type: "function",
-    function: {
-      name: "manage_team_todo",
-      description:
-        "Create, edit, complete, or reassign a portal to-do. Reassignment is called 'move' in ordinary conversation. Resolve an existing item with query_team_todos first and show its exact id/title and every proposed change. Call only after explicit confirmation. Mark and Tracy may manage or reassign any team item; everyone else may create and manage only their own.",
-      parameters: {
-        type: "object",
-        properties: {
-          action: {
-            type: "string",
-            enum: ["create", "update", "complete", "reassign"],
-          },
-          id: {
-            type: "number",
-            description: "Required for update, complete, or reassign.",
-          },
-          title: { type: "string" },
-          details: { type: ["string", "null"] },
-          due_date: {
-            type: ["string", "null"],
-            description: "YYYY-MM-DD or null to clear.",
-          },
-          priority: {
-            type: "string",
-            enum: ["low", "normal", "high", "urgent"],
-          },
-          status: {
-            type: "string",
-            enum: ["open", "in_progress", "completed"],
-          },
-          assignee: {
-            type: "string",
-            description:
-              "Exact active team member name or email. Required for reassign; optional for create.",
-          },
-          confirmed: confirmationProperty,
-        },
-        required: ["action", "confirmed"],
-      },
-    },
-  };
-
-const TODO_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
-const TODO_STATUSES = new Set(["open", "in_progress", "completed"]);
-const TODO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-function todoTextError(title?: string, details?: string): string | null {
-  if (title && title.length > 500)
-    return "Error: a to-do title cannot exceed 500 characters.";
-  if (details && details.length > 10_000)
-    return "Error: to-do details cannot exceed 10,000 characters.";
-  return null;
-}
-
-async function todoActor(actor: FredActor): Promise<TodoActor> {
-  const actorId = requireActor(actor);
-  const [user] = await db
-    .select({
-      id: usersTable.id,
-      role: usersTable.role,
-      canManageTodos: usersTable.canManageTodos,
-    })
-    .from(usersTable)
-    .where(eq(usersTable.id, actorId));
-  if (!user) throw new Error("The signed-in user was not found.");
-  return user;
-}
-
-async function resolveTodoAssignee(reference: unknown) {
-  const value = cleanText(reference);
-  if (!value) return null;
-  const exact = await db
-    .select({
-      id: usersTable.id,
-      name: usersTable.name,
-      email: usersTable.email,
-    })
-    .from(usersTable)
-    .where(
-      and(
-        eq(usersTable.isActive, true),
-        or(ilike(usersTable.name, value), ilike(usersTable.email, value)),
-      ),
-    );
-  if (exact.length === 1) return exact[0];
-
-  const matches = await db
-    .select({
-      id: usersTable.id,
-      name: usersTable.name,
-      email: usersTable.email,
-    })
-    .from(usersTable)
-    .where(
-      and(
-        eq(usersTable.isActive, true),
-        or(
-          ilike(usersTable.name, `%${value}%`),
-          ilike(usersTable.email, `%${value}%`),
-        ),
-      ),
-    )
-    .limit(6);
-  if (matches.length === 1) return matches[0];
-  if (matches.length === 0)
-    throw new Error(`No active team member matched “${value}”.`);
-  throw new Error(
-    `Assignee “${value}” is ambiguous. Choose one exact name or email: ${matches
-      .map((user) => `${user.name} <${user.email}>`)
-      .join(", ")}.`,
-  );
-}
-
-export async function executeQueryTeamTodos(
-  rawArgs: string,
-  actor: FredActor,
-): Promise<string> {
-  const args = parseArgs(rawArgs);
-  const policyActor = await todoActor(actor);
-  const manager = canManageTeamTodos(policyActor);
-  const requestedAssignee = args.assignee
-    ? await resolveTodoAssignee(args.assignee)
-    : null;
-  if (
-    requestedAssignee &&
-    !manager &&
-    requestedAssignee.id !== policyActor.id
-  ) {
-    return "Error: you may only view your own to-dos.";
-  }
-
-  const conditions: any[] = [];
-  if (!manager) {
-    conditions.push(eq(teamTodosTable.assigneeId, policyActor.id));
-  } else if (requestedAssignee) {
-    conditions.push(eq(teamTodosTable.assigneeId, requestedAssignee.id));
-  }
-
-  const status = cleanText(args.status) || "active";
-  if (status === "active") {
-    conditions.push(
-      or(
-        eq(teamTodosTable.status, "open"),
-        eq(teamTodosTable.status, "in_progress"),
-      )!,
-    );
-  } else if (["open", "in_progress", "completed"].includes(status)) {
-    conditions.push(eq(teamTodosTable.status, status));
-  } else if (status !== "all") {
-    return "Error: status must be active, open, in_progress, completed, or all.";
-  }
-
-  const query = cleanText(args.query);
-  if (query) {
-    conditions.push(
-      or(
-        ilike(teamTodosTable.title, `%${query}%`),
-        ilike(teamTodosTable.details, `%${query}%`),
-      )!,
-    );
-  }
-
-  const rows = await db
-    .select({
-      id: teamTodosTable.id,
-      title: teamTodosTable.title,
-      details: teamTodosTable.details,
-      status: teamTodosTable.status,
-      priority: teamTodosTable.priority,
-      dueDate: teamTodosTable.dueDate,
-      assigneeId: teamTodosTable.assigneeId,
-      assigneeName: usersTable.name,
-      updatedAt: teamTodosTable.updatedAt,
-    })
-    .from(teamTodosTable)
-    .leftJoin(usersTable, eq(teamTodosTable.assigneeId, usersTable.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(teamTodosTable.updatedAt))
-    .limit(50);
-
-  return rows.length
-    ? JSON.stringify({ todos: rows }, null, 2)
-    : "No matching to-dos were found.";
-}
-
-export async function executeManageTeamTodo(
-  rawArgs: string,
-  actor: FredActor,
-): Promise<string> {
-  const args = parseArgs(rawArgs);
-  const confirmationError = requireConfirmation(args);
-  if (confirmationError) return confirmationError;
-  const policyActor = await todoActor(actor);
-  const manager = canManageTeamTodos(policyActor);
-  const action = cleanText(args.action);
-
-  if (action === "create") {
-    const title = cleanText(args.title);
-    if (!title) return "Error: title is required to create a to-do.";
-    const details = cleanText(args.details);
-    const textError = todoTextError(title, details);
-    if (textError) return textError;
-    const dueDate = cleanText(args.due_date);
-    if (dueDate && !TODO_DATE_PATTERN.test(dueDate))
-      return "Error: due_date must use YYYY-MM-DD.";
-    const priority = cleanText(args.priority) || "normal";
-    if (!TODO_PRIORITIES.has(priority))
-      return "Error: priority must be low, normal, high, or urgent.";
-    const assignee = args.assignee
-      ? await resolveTodoAssignee(args.assignee)
-      : null;
-    const assigneeId = todoAssigneeForCreate(
-      policyActor,
-      assignee?.id ?? policyActor.id,
-    );
-    if (assigneeId == null) {
-      return "Error: only Mark and Tracy may create a to-do for another team member.";
-    }
-    const [created] = await db
-      .insert(teamTodosTable)
-      .values({
-        title,
-        details: details || null,
-        dueDate: dueDate || null,
-        priority,
-        assigneeId,
-        createdById: policyActor.id,
-      })
-      .returning();
-    return `✓ To-do #${created.id} created for ${assignee?.name ?? actor.name ?? "you"}: ${created.title}. Open /todos`;
-  }
-
-  if (!["update", "complete", "reassign"].includes(action || "")) {
-    return "Error: action must be create, update, complete, or reassign.";
-  }
-  const id = Number(args.id);
-  if (!Number.isInteger(id) || id < 1)
-    return "Error: a valid to-do id is required.";
-  const [existing] = await db
-    .select()
-    .from(teamTodosTable)
-    .where(eq(teamTodosTable.id, id));
-  if (!existing) return `Error: To-do #${id} was not found.`;
-  if (!canAccessTodo(policyActor, existing.assigneeId)) {
-    return "Error: you may only update your own to-dos unless you are Mark or Tracy.";
-  }
-
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  let assigneeName: string | null = null;
-  if (action === "complete") {
-    updates.status = "completed";
-    updates.completedAt = new Date();
-  } else if (action === "reassign") {
-    if (!manager) return "Error: only Mark and Tracy may reassign team to-dos.";
-    const assignee = await resolveTodoAssignee(args.assignee);
-    if (!assignee) return "Error: assignee is required for reassignment.";
-    updates.assigneeId = assignee.id;
-    assigneeName = assignee.name;
-  } else {
-    if (args.title !== undefined) {
-      const title = cleanText(args.title);
-      if (!title) return "Error: title cannot be empty.";
-      if (title.length > 500)
-        return "Error: a to-do title cannot exceed 500 characters.";
-      updates.title = title;
-    }
-    if (args.details !== undefined) {
-      const details = cleanText(args.details);
-      if (details && details.length > 10_000)
-        return "Error: to-do details cannot exceed 10,000 characters.";
-      updates.details = details || null;
-    }
-    if (args.due_date !== undefined) {
-      const dueDate = cleanText(args.due_date);
-      if (dueDate && !TODO_DATE_PATTERN.test(dueDate))
-        return "Error: due_date must use YYYY-MM-DD.";
-      updates.dueDate = dueDate || null;
-    }
-    if (args.priority !== undefined) {
-      const priority = cleanText(args.priority);
-      if (!priority || !TODO_PRIORITIES.has(priority))
-        return "Error: priority must be low, normal, high, or urgent.";
-      updates.priority = priority;
-    }
-    if (args.status !== undefined) {
-      const status = cleanText(args.status);
-      if (!status || !TODO_STATUSES.has(status))
-        return "Error: status must be open, in_progress, or completed.";
-      updates.status = status;
-      updates.completedAt = status === "completed" ? new Date() : null;
-    }
-  }
-
-  if (Object.keys(updates).length === 1)
-    return "Error: no to-do changes were provided.";
-  const [updated] = await db
-    .update(teamTodosTable)
-    .set(updates)
-    .where(eq(teamTodosTable.id, id))
-    .returning();
-  if (action === "complete")
-    return `✓ To-do #${updated.id} marked completed: ${updated.title}.`;
-  if (action === "reassign")
-    return `✓ To-do #${updated.id} moved to ${assigneeName}: ${updated.title}.`;
-  return `✓ To-do #${updated.id} updated: ${updated.title}.`;
-}
-
 export const APPLICATION_GUIDANCE_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
   {
     type: "function",
     function: {
       name: "get_application_guidance",
       description:
-        "Read the release-owned catalog for every SCCC Insights page, route, permission, function, and Fred execution boundary. Always call this for navigation, permissions, workflows, or any question about what a page or function does. Use an approved action tool when the catalog says Fred can perform the action; otherwise give the exact route and UI steps without pretending the action was performed.",
+        "Read the current, seeded step-by-step guidance for the SCCC IT Portal. Use for navigation, permissions, workflows, or any 'how do I use this app?' question instead of guessing from an old interface.",
       parameters: {
         type: "object",
         properties: {
           topic: {
             type: "string",
-            description:
-              "Optional page name, route, feature, or workflow. Pass an exact route when one is known. Omit to list the complete page catalog.",
+            description: "Optional feature or workflow to narrow the guide.",
           },
         },
         required: [],
@@ -1119,23 +685,6 @@ export async function executeApplicationGuidance(
 ): Promise<string> {
   const args = parseArgs(rawArgs);
   const topic = cleanText(args.topic);
-  const catalogPages = findFredApplicationPages(topic);
-  if (catalogPages.length) {
-    if (!topic) {
-      return [
-        "# SCCC Insights application capability catalog",
-        "Use get_application_guidance again with a page name, route, feature, or workflow for full functions and Fred action boundaries.",
-        ...catalogPages.map(
-          (page) =>
-            `- ${page.name}: ${page.routes.join(", ")} | ${page.menu} | ${page.access}`,
-        ),
-      ].join("\n");
-    }
-    return catalogPages
-      .slice(0, 12)
-      .map(renderFredApplicationPage)
-      .join("\n\n");
-  }
   const conditions = [
     eq(aiKnowledgeTable.source, "seed"),
     eq(aiKnowledgeTable.isActive, true),
@@ -1157,7 +706,7 @@ export async function executeApplicationGuidance(
     .where(and(...conditions))
     .limit(20);
   if (!rows.length)
-    return `No application guidance matched ${topic ? `“${topic}”` : "that request"}. Do not invent a page or function; say that the current catalog has no match.`;
+    return `No application guidance matched ${topic ? `“${topic}”` : "that request"}.`;
   return rows.map((row) => `## ${row.title}\n${row.content}`).join("\n\n");
 }
 
@@ -1165,20 +714,13 @@ export function fredApplicationToolsForRole(
   role?: string | null,
   zendeskConfigured = true,
 ) {
-  const identityActor = { id: 1, role };
   return [
     ...(zendeskConfigured
       ? [ZENDESK_CREATE_TICKET_TOOL, ZENDESK_SOLVE_TICKETS_TOOL]
       : []),
     MANAGE_AFTER_ACTION_TOOL,
     MANAGE_WEEKLY_LOG_TOOL,
-    QUERY_TEAM_TODOS_TOOL,
-    MANAGE_TEAM_TODO_TOOL,
     APPLICATION_GUIDANCE_TOOL,
-    ...(isIdentityRecoveryConfigured() &&
-    canPrepareIdentityRecovery(identityActor)
-      ? [PREPARE_ENTRA_PASSWORD_RESET_TOOL]
-      : []),
     ...(String(role || "")
       .trim()
       .toLowerCase() === "cio"

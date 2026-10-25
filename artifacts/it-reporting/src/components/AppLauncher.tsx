@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Search, CornerDownLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { canUseNetworkTools } from "@/lib/networkToolsAccess";
 import { getNavGroups, isNavItemActive, type NavItem } from "@/config/nav";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,7 @@ export function AppLauncher({
   onOpenChange: (v: boolean) => void;
 }) {
   const { isCIO, user } = useAuth();
-  const canNetworkTools = canUseNetworkTools(user);
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(user?.role ?? "");
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);

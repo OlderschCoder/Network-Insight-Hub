@@ -36,12 +36,6 @@ import { useAuth } from "@/context/AuthContext";
 import { downloadAuthenticatedFile } from "@/lib/downloadFile";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import {
-  missingWeeklyLogSubmissions,
-  resolvedTicketCount,
-  type WeeklyReportSubmissionStatus,
-  weeklyLogSubmissionLabel,
-} from "@/lib/weekly_report_overview";
 
 export default function ReportDetail() {
   const confirm = useConfirm();
@@ -62,11 +56,7 @@ export default function ReportDetail() {
     { weekOf: r?.weekOf ?? "" },
     { query: { enabled: !!r?.weekOf } } as any,
   );
-  const {
-    data: ticketsResponse,
-    isLoading: reportTicketsLoading,
-    isError: reportTicketsError,
-  } = useListReportTickets(id, {
+  const { data: ticketsResponse } = useListReportTickets(id, {
     query: { enabled: !!r?.id },
   } as any);
   const { data: allProjects } = useListProjects();
@@ -236,7 +226,8 @@ export default function ReportDetail() {
     }
   };
 
-  const toggleItem = async (itemId: number, checked: boolean, allIds: number[]) => {
+  const toggleItem = async (itemId: number, checked: boolean) => {
+    const allIds = ((weekItems ?? []) as any[]).map((it: any) => it.id as number);
     const current = selectedItemIds ?? allIds;
     const next = checked
       ? Array.from(new Set([...current, itemId]))
@@ -320,29 +311,7 @@ export default function ReportDetail() {
   const agg: any = aggregate ?? {};
   const entries: any[] = agg.entrySummaries ?? [];
   const risks: any[] = agg.risks ?? [];
-  const reportTickets: any[] = Array.isArray((ticketsResponse as any)?.tickets)
-    ? (ticketsResponse as any).tickets
-    : [];
-  const directResolvedTicketCount = resolvedTicketCount(ticketsResponse as any);
-  const reportTicketsUnavailable =
-    reportTicketsError || (!reportTicketsLoading && directResolvedTicketCount === null);
-  const resolvedTicketMetric = reportTicketsLoading
-    ? "…"
-    : reportTicketsUnavailable
-      ? "—"
-      : (directResolvedTicketCount ?? "—");
-  const submissionStatus = Array.isArray(agg.submissionStatus)
-    ? (agg.submissionStatus as WeeklyReportSubmissionStatus[])
-    : [];
-  const missingSubmissions = missingWeeklyLogSubmissions(submissionStatus);
-  const eligibleUserIds = new Set<number>(
-    Array.isArray(agg.eligibleUserIds)
-      ? agg.eligibleUserIds.filter((userId: unknown): userId is number => typeof userId === "number")
-      : entries.map((entry) => entry.userId).filter((userId) => typeof userId === "number"),
-  );
-  const items: any[] = ((weekItems ?? []) as any[]).filter((item) =>
-    eligibleUserIds.has(item.userId),
-  );
+  const items: any[] = (weekItems ?? []) as any[];
 
   // Group items per user for the per-contributor breakdown
   const itemsByUser: Record<number, any[]> = {};
@@ -475,55 +444,15 @@ export default function ReportDetail() {
         <MetricCard label="Weekly Logs" value={agg.totalEntries ?? 0} />
         <MetricCard label="Contributors" value={agg.contributorCount ?? 0} />
         <MetricCard label="Tasks Completed" value={items.length} />
-        <MetricCard label="Zendesk Tickets Solved" value={resolvedTicketMetric} />
+        <MetricCard label="Tickets Resolved" value={agg.totalTickets ?? 0} />
       </div>
-
-      {missingSubmissions.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50/40 dark:bg-amber-950/10">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Weekly logs still missing ({missingSubmissions.length})
-              </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                These active team members are not included in Team Activity for this report week.
-              </p>
-            </div>
-            <Link href="/entries" className="shrink-0 text-xs font-medium text-primary hover:underline">
-              Open my Weekly Log
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {missingSubmissions.map((submission) => (
-                <li
-                  key={submission.userId}
-                  className="flex items-center justify-between gap-3 rounded border bg-background/70 p-2"
-                >
-                  <span className="min-w-0 truncate font-medium">{submission.userName}</span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] capitalize">
-                      {submission.userRole}
-                    </Badge>
-                    <Badge variant="outline" className="border-amber-300 text-amber-700">
-                      {weeklyLogSubmissionLabel(submission)}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Included in this export — preview */}
       {(() => {
-        const tasksIncluded = (selectedItemIds === null
-          ? items.length
-          : items.filter((item) => selectedItemIds.includes(item.id)).length)
+        const tasksIncluded = (selectedItemIds === null ? items.length : selectedItemIds.length)
           + customTasks.length;
-        const ticketsIncluded = directResolvedTicketCount ?? "—";
+        const ticketsList = (ticketsResponse as { tickets?: unknown[] } | undefined)?.tickets;
+        const ticketsIncluded = Array.isArray(ticketsList) ? ticketsList.length : 0;
         const projectsIncluded = projectIds.length;
         const aarsIncluded =
           selectedAarIds === null
@@ -537,7 +466,7 @@ export default function ReportDetail() {
         const risksIncluded = includeOpenRisks
           ? (selectedRiskIds ? selectedRiskIds.length : risks.length)
           : 0;
-        const Item = ({ label, n, on = true }: { label: string; n: number | string; on?: boolean }) => (
+        const Item = ({ label, n, on = true }: { label: string; n: number; on?: boolean }) => (
           <div className={`flex items-center justify-between text-sm py-1 ${on ? "" : "opacity-50"}`}>
             <span>{label}</span>
             <span className="font-mono">{on ? n : "—"}</span>
@@ -665,9 +594,7 @@ export default function ReportDetail() {
                         id={`item-${it.id}`}
                         checked={checked}
                         disabled={!canEdit}
-                        onCheckedChange={(v) =>
-                          toggleItem(it.id, v === true, allIds)
-                        }
+                        onCheckedChange={(v) => toggleItem(it.id, v === true)}
                         className="mt-0.5"
                       />
                       <label htmlFor={`item-${it.id}`} className="flex-1 cursor-pointer">
@@ -751,9 +678,10 @@ export default function ReportDetail() {
 
       {/* Closed Zendesk tickets — per-user totals */}
       {(() => {
+        const tickets: any[] = (ticketsResponse as any)?.tickets ?? [];
         const counts = new Map<string, number>();
         let unassigned = 0;
-        for (const t of reportTickets) {
+        for (const t of tickets) {
           const name = t.assigneeName as string | null | undefined;
           if (!name) unassigned++;
           else counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -762,16 +690,10 @@ export default function ReportDetail() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Closed Helpdesk Tickets ({resolvedTicketMetric})</CardTitle>
+              <CardTitle>Closed Helpdesk Tickets ({tickets.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              {reportTicketsLoading ? (
-                <p className="text-sm text-muted-foreground">Checking Zendesk…</p>
-              ) : reportTicketsUnavailable ? (
-                <p className="text-sm text-amber-600">
-                  Zendesk ticket totals are temporarily unavailable. Retry before exporting.
-                </p>
-              ) : reportTickets.length === 0 ? (
+              {tickets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No solved Zendesk tickets for this week.
                 </p>
@@ -1261,7 +1183,7 @@ export default function ReportDetail() {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: number | string }) {
+function MetricCard({ label, value }: { label: string; value: number }) {
   return (
     <Card>
       <CardContent className="py-4">
