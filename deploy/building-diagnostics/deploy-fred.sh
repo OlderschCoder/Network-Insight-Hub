@@ -7,7 +7,7 @@ candidate=$(realpath "${1:?Usage: deploy-fred.sh /absolute/reviewed/build}")
 [[ -d "$live" && "$candidate" != "$live" && -f "$candidate/deploy/building-diagnostics/live-baseline.sha256" ]] || exit 1
 cd "$live"
 sha256sum --check "$candidate/deploy/building-diagnostics/live-baseline.sha256"
-mapfile -t source_files < "$candidate/deploy/building-diagnostics/deploy-source-files.txt"
+mapfile -t source_files < <(tr -d '\r' < "$candidate/deploy/building-diagnostics/deploy-source-files.txt")
 for path in "${source_files[@]}"; do
   [[ "$path" != /* && "$path" != *..* && -f "$candidate/$path" ]] || exit 1
   # New modules may not overwrite another intervening deployment.
