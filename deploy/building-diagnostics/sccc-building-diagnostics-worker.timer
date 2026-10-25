@@ -1,0 +1,11 @@
+[Unit]
+Description=Pull Fred building diagnostics into private 10.0.0.22
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=60s
+RandomizedDelaySec=20s
+Unit=sccc-building-diagnostics-worker.service
+
+[Install]
+WantedBy=timers.target

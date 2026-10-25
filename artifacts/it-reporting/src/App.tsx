@@ -29,6 +29,7 @@ import RiskDetail from "@/pages/risks/[id]";
 import Network from "@/pages/network/index";
 import NetworkVisualize from "@/pages/network/visualize";
 import NetworkTools from "@/pages/network/tools";
+import BuildingDiagnostics from "@/pages/network/building-diagnostics";
 import NetworkMap from "@/pages/network/map";
 import NodeDetail from "@/pages/network/node-detail";
 import Buildings, { BuildingsEmbedPage } from "@/pages/network/buildings";
@@ -255,6 +256,7 @@ function Router() {
       />
 
       <Route path="/network/buildings/embed" component={BuildingsEmbedPage} />
+      <Route path="/network/diagnostics" component={() => <ProtectedRoute component={BuildingDiagnostics} />} />
       <Route path="/monitoring/embed" component={MonitoringEmbedPage} />
       <Route
         path="/network/nodes/:id"

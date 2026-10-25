@@ -1,0 +1,25 @@
+[Unit]
+Description=SCCC private building diagnostics inventory and report pull
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sccc-diagnostics
+Group=sccc-diagnostics
+EnvironmentFile=/etc/sccc-building-diagnostics/worker.env
+ExecStart=/usr/bin/python3 /opt/sccc-building-diagnostics/pull_worker.py --inventory /var/lib/sccc-building-diagnostics/inventory.json --state /var/lib/sccc-building-diagnostics/results.json
+UMask=0077
+StateDirectory=sccc-building-diagnostics
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/sccc-building-diagnostics
+TimeoutStartSec=300

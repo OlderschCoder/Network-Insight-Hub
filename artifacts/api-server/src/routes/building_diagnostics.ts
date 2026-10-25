@@ -1,0 +1,127 @@
+import { randomBytes } from "node:crypto";
+import { Router, type RequestHandler } from "express";
+import { z } from "zod";
+import { requireAuth, requireNetworkAdmin } from "./auth";
+import { jobProof, MAX_TRANSFER_BYTES, secretsEqual, TARGET_LABEL } from "../lib/building_diagnostics";
+import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
+
+const text = z.string().trim().min(1).max(120);
+const mac = z.string().regex(/^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i);
+const guid = z.string().uuid();
+const timestamp = z.string().datetime({ offset: true });
+const provisionSchema = z.object({ adObjectGuid: guid, computerName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/), domain: text, enabled: z.literal(true).optional() }).strict();
+const inventorySchema = z.object({
+  snapshotComplete: z.literal(true),
+  adObservedAt: timestamp,
+  adComputers: z.array(provisionSchema.extend({ enabled: z.boolean() })).max(30_000),
+  observations: z.array(z.object({ mac: mac.optional(), bssid: mac.optional(), building: text, switchName: text.optional(), port: text.optional(), source: z.enum(["switch", "wifi"]), observedAt: timestamp, edge: z.boolean() }).strict().refine((o) => o.source === "switch" ? !!o.mac : !!o.bssid, "Matching MAC or BSSID required")).max(60_000),
+  userBuildingAssignments: z.array(z.object({ username: text, building: text, source: z.enum(["desk-phone", "assignment"]), observedAt: timestamp }).strict()).max(30_000),
+}).strict();
+const checkInSchema = z.object({
+  deviceId: guid, computerName: text, adDomain: text, adJoined: z.boolean(), uptimeSeconds: z.number().finite().nonnegative(), agentVersion: z.string().max(40), loggedOnUser: text.optional(),
+  interfaces: z.array(z.object({ mac, ipAddresses: z.array(z.string().ip()).max(16), gateway: z.string().ip().optional(), kind: z.enum(["ethernet", "wifi", "other"]), bssid: mac.optional(), ssid: z.string().max(64).optional(), linkMbps: z.number().finite().nonnegative().max(1_000_000).optional() }).strict()).max(16),
+}).strict();
+const metric = z.number().finite().nonnegative().max(1_000_000).optional();
+const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional() }).strict().refine((r) => !!r.error || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
+const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional() }).strict().refine((v) => !!v.deviceIds || !!v.building, "Select devices or a building");
+const credentialActionSchema = z.object({ reason: z.string().trim().min(3).max(300) }).strict();
+
+function bearer(req: any): string { const value = req.headers.authorization; return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : ""; }
+function workerValid(req: any) { const expected = process.env.BUILDING_DIAGNOSTICS_WORKER_TOKEN ?? ""; return expected.length >= 32 && secretsEqual(bearer(req), expected); }
+const workerOnly: RequestHandler = (req, res, next) => workerValid(req) ? next() : void res.status(401).json({ error: "Diagnostics worker authentication required" });
+function flags() { const enabled = process.env.BUILDING_DIAGNOSTICS_ENABLED === "true"; return { enabled, schedulerEnabled: enabled && process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED === "true" }; }
+const enabledOnly: RequestHandler = (_req, res, next) => flags().enabled ? next() : void res.status(503).json({ error: "Building diagnostics is not enabled" });
+function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> { const result = schema.safeParse(value); if (!result.success) throw new DiagnosticsError(400, "Invalid diagnostics request"); return result.data; }
+
+export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
+  const router = Router();
+  const adminOrWorker: RequestHandler = (req, res, next) => workerValid(req) ? next() : requireAuth(req, res, () => requireNetworkAdmin(req, res, next));
+  const actor = (req: any) => workerValid(req) ? "private AD worker" : `Fred user ${req.user.id}`;
+  const agentOnly: RequestHandler = async (req: any, res, next) => {
+    const token = bearer(req);
+    const identity = await store.authenticate(token);
+    if (!identity) return void res.status(401).json({ error: "Diagnostics device authentication required" });
+    req.diagnosticDevice = identity;
+    next();
+  };
+  router.get("/overview", requireAuth, requireNetworkAdmin, async (_req, res) => {
+    const config = flags();
+    if (!config.enabled) return res.json({ ...config, devices: [], buildings: [], jobs: [], inventoryUpdatedAt: null, targetLabel: TARGET_LABEL });
+    return res.json({ ...config, ...await store.overview() });
+  });
+  router.post("/inventory", enabledOnly, workerOnly, async (req, res) => {
+    const input = parse(inventorySchema, req.body);
+    const ids = new Set(input.adComputers.map((a) => a.adObjectGuid.toLowerCase()));
+    if (ids.size !== input.adComputers.length) throw new DiagnosticsError(400, "Duplicate AD object identity");
+    return res.json(await store.ingest(input));
+  });
+  router.post("/devices/provision", enabledOnly, adminOrWorker, async (req: any, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.status(201).json(await store.provision(parse(provisionSchema, req.body), actor(req)));
+  });
+  router.post("/devices/:deviceId/revoke", enabledOnly, adminOrWorker, async (req, res) => {
+    const { reason } = parse(credentialActionSchema, req.body);
+    res.set("Cache-Control", "no-store");
+    return res.json(await store.revoke(parse(guid, req.params.deviceId), reason, actor(req)));
+  });
+  router.post("/devices/:deviceId/rotate", enabledOnly, adminOrWorker, async (req, res) => {
+    const { reason } = parse(credentialActionSchema, req.body);
+    res.set("Cache-Control", "no-store");
+    return res.json(await store.rotate(parse(guid, req.params.deviceId), reason, actor(req)));
+  });
+  router.post("/jobs", enabledOnly, requireAuth, requireNetworkAdmin, async (req: any, res) => res.status(202).json(await store.queue(parse(queueSchema, req.body), `Fred user ${req.user.id}`)));
+  router.get("/reports", enabledOnly, workerOnly, async (req, res) => {
+    const after = typeof req.query.after === "string" ? req.query.after : "0";
+    const limit = Number(req.query.limit ?? 100);
+    if (!/^\d{1,18}$/.test(after) || !Number.isInteger(limit) || limit < 1 || limit > 1000) throw new DiagnosticsError(400, "Invalid report cursor");
+    res.set("Cache-Control", "no-store");
+    return res.json(await store.reports(after, limit));
+  });
+  router.use("/agent", enabledOnly, agentOnly, (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
+  router.post("/agent/check-in", async (req: any, res) => {
+    const input = parse(checkInSchema, req.body), identity = req.diagnosticDevice;
+    if (input.deviceId !== identity.deviceId || input.computerName.toLowerCase() !== identity.computerName.toLowerCase() || input.adDomain.toLowerCase() !== identity.domain.toLowerCase() || !input.adJoined) throw new DiagnosticsError(403, "Diagnostics identity does not match provisioned AD computer");
+    const job = await store.checkIn(input, flags().schedulerEnabled);
+    return res.json({ ok: true, job: job ? { ...job, proof: jobProof(bearer(req), input.deviceId, job) } : null });
+  });
+  router.get("/agent/ping/:jobId", async (req: any, res) => {
+    await store.transfer(req.diagnosticDevice.deviceId, parse(guid, req.params.jobId), "ping");
+    return res.json({ ok: true });
+  });
+  router.get("/agent/download/:jobId", async (req: any, res) => {
+    const jobId = parse(guid, req.params.jobId);
+    const job = await store.transfer(req.diagnosticDevice.deviceId, jobId, "download");
+    if (job.downloadBytes < 1 || job.downloadBytes > MAX_TRANSFER_BYTES) throw new DiagnosticsError(409, "Invalid transfer budget");
+    req.setTimeout(20_000);
+    res.set({ "Content-Type": "application/octet-stream", "Content-Length": String(job.downloadBytes), "Content-Encoding": "identity" });
+    // Incompressible bounded payload. Only one persisted job can run across all devices.
+    const payload = randomBytes(job.downloadBytes);
+    await store.transferReceipt(jobId, "download", payload.length);
+    return res.end(payload);
+  });
+  router.put("/agent/upload/:jobId", async (req: any, res) => {
+    if (!req.is("application/octet-stream")) throw new DiagnosticsError(415, "Use application/octet-stream");
+    const jobId = parse(guid, req.params.jobId);
+    const job = await store.transfer(req.diagnosticDevice.deviceId, jobId, "upload");
+    const length = Number(req.get("content-length"));
+    if (!Number.isInteger(length) || length !== job.uploadBytes || length > MAX_TRANSFER_BYTES) { req.resume(); throw new DiagnosticsError(413, "Transfer size does not match job budget"); }
+    req.setTimeout(20_000, () => req.destroy());
+    let bytes = 0;
+    for await (const chunk of req) { bytes += chunk.length; if (bytes > job.uploadBytes) { req.destroy(); return; } }
+    if (bytes !== job.uploadBytes) throw new DiagnosticsError(400, "Incomplete upload");
+    await store.transferReceipt(jobId, "upload", bytes);
+    return res.json({ ok: true, bytes, receivedBytes: bytes });
+  });
+  router.post("/agent/results", async (req: any, res) => {
+    const input = parse(resultsSchema, req.body);
+    if (input.deviceId !== req.diagnosticDevice.deviceId) throw new DiagnosticsError(403, "Diagnostics device mismatch");
+    return res.json(await store.result(req.diagnosticDevice.deviceId, input));
+  });
+  router.use((err: any, req: any, res: any, _next: any) => {
+    if (!(err instanceof DiagnosticsError)) req.log?.error({ err }, "building diagnostics request failed");
+    if (res.headersSent) return res.destroy();
+    return res.status(err instanceof DiagnosticsError ? err.status : 500).json({ error: err instanceof DiagnosticsError ? err.message : "Building diagnostics request failed" });
+  });
+  return router;
+}
+export default createBuildingDiagnosticsRouter();

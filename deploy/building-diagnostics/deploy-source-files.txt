@@ -1,0 +1,7 @@
+artifacts/api-server/src/routes/index.ts
+artifacts/api-server/src/routes/building_diagnostics.ts
+artifacts/api-server/src/lib/building_diagnostics.ts
+artifacts/api-server/src/lib/building_diagnostics_store.ts
+artifacts/it-reporting/src/App.tsx
+artifacts/it-reporting/src/config/nav.tsx
+artifacts/it-reporting/src/pages/network/building-diagnostics.tsx

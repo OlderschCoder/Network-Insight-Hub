@@ -110,6 +110,13 @@ export function getNavGroups(
       ...(canNetworkTools
         ? [
             {
+              href: "/network/diagnostics",
+              label: "Building Speed & Computers",
+              desc: "AD computer presence and measured building performance",
+              icon: Activity,
+              netBadge: true,
+            } as NavItem,
+            {
               href: "/network/tools",
               label: "Network Tools",
               desc: "Whitelist websites and generate setup scripts",
