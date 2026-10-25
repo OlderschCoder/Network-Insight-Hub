@@ -306,7 +306,17 @@ router.get("/ports", requireAuth, async (req: any, res) => {
 function telemetryServiceAuthorized(req: any): boolean {
   const expected = process.env.NOC_PROBE_TOKEN?.trim();
   const supplied = String(req.headers.authorization ?? "");
-  const remoteAddress = String(req.socket?.remoteAddress ?? "").replace(/^::ffff:/, "");
+  const socketAddress = String(req.socket?.remoteAddress ?? "").replace(/^::ffff:/, "");
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "")
+    .split(",")[0]
+    .trim()
+    .replace(/^::ffff:/, "");
+  // nginx is local to Fred and replaces the inbound forwarding header. Trust
+  // that header only from loopback; direct collector traffic still uses the
+  // socket address. This keeps the service token scoped to 10.0.0.22.
+  const remoteAddress = socketAddress === "127.0.0.1" || socketAddress === "::1"
+    ? forwarded
+    : socketAddress;
   if (!expected || remoteAddress !== "10.0.0.22") return false;
   const expectedHeader = Buffer.from(`Bearer ${expected}`);
   const suppliedHeader = Buffer.from(supplied);
