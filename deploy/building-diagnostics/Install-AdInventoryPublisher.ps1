@@ -7,7 +7,7 @@ param([Parameter(Mandatory=$true)][string]$ProvisioningFile,
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $root=Join-Path $env:ProgramData 'SCCC-DiagnosticsPublisher'
-if ($env:COMPUTERNAME -ine 'LP-AA152MB-01') { throw 'This publisher pilot is restricted to LP-AA152MB-01.' }
+if ($env:COMPUTERNAME -notin @('LP-AA152MB-01','LP-F6K6S64')) { throw 'This publisher pilot is restricted to the two authorized SCCC pilot computers.' }
 $trusted=@('S-1-5-18','S-1-5-32-544')
 function Protect-Path([string]$Path,[bool]$Directory) {
     $acl=if($Directory){New-Object Security.AccessControl.DirectorySecurity}else{New-Object Security.AccessControl.FileSecurity}

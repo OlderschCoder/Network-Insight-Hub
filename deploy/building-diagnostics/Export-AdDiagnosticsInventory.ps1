@@ -182,6 +182,9 @@ foreach ($fileName in $requiredAgentFiles) {
     if (-not $AgentSourceDirectory -or -not (Test-Path -LiteralPath (Join-Path $AgentSourceDirectory $fileName) -PathType Leaf)) {
         throw 'AgentSourceDirectory must contain the separately reviewed diagnostics installer, module, and runner.'
     }
+    $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $AgentSourceDirectory $fileName)
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ine $SignerThumbprint -or
+        -not $signature.TimeStamperCertificate) { throw 'Reviewed diagnostics payload signature validation failed.' }
 }
 
 # Provisioning must not silently replace the current network/phone observations
@@ -239,8 +242,8 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
             computerName = $computer.Name; domain = $adDomain.DNSRoot; externalProbeOrigin = $externalOrigin; permitSustained = [bool]$PermitSustained }
         Invoke-Command -Session $session -ArgumentList ($deviceConfig | ConvertTo-Json -Compress) -ScriptBlock {
             param([string]$ConfigJson)
-            $directory = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning'
-            if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
+            $applicationRoot = Join-Path $env:ProgramData 'SCCC-Diagnostics'
+            $directory = Join-Path $applicationRoot 'Provisioning'
             $acl = New-Object Security.AccessControl.DirectorySecurity
             $acl.SetAccessRuleProtection($true, $false)
             $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
@@ -249,6 +252,13 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
                 $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
                 $acl.AddAccessRule($rule)
             }
+            # Secure the new independent root before placing credentials or
+            # executable source below it. Never alter the shared SCCC folder.
+            if (-not (Test-Path -LiteralPath $applicationRoot)) {
+                New-Item -ItemType Directory -Path $applicationRoot | Out-Null
+                Set-Acl -LiteralPath $applicationRoot -AclObject $acl
+            }
+            if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
             Set-Acl -LiteralPath $directory -AclObject $acl
             $path = Join-Path $directory 'device.json'
             [IO.File]::WriteAllText($path, $ConfigJson, (New-Object Text.UTF8Encoding($false)))
@@ -269,6 +279,11 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
         Invoke-Command -Session $session -ArgumentList $adDomain.DNSRoot,$SignerThumbprint -ScriptBlock {
             param([string]$ExpectedDomain, [string]$ExpectedSigner)
             $directory = Join-Path $env:ProgramData 'SCCC-Diagnostics\Provisioning'
+            foreach ($name in @('Install-DiagnosticsAgent.ps1','Invoke-DiagnosticsAgent.ps1','Sccc.Diagnostics.psm1','ExternalProbe.dll')) {
+                $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $directory $name)
+                if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ine $ExpectedSigner -or
+                    -not $signature.TimeStamperCertificate) { throw 'Remote diagnostics payload signature validation failed.' }
+            }
             & (Join-Path $directory 'Install-DiagnosticsAgent.ps1') -ProvisioningFile (Join-Path $directory 'device.json') -ExpectedDomain $ExpectedDomain -SignerThumbprint $ExpectedSigner
             if (-not $?) { throw 'Diagnostics staging failed.' }
         } | Out-Null
