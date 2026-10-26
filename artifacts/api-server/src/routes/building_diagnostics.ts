@@ -1,21 +1,33 @@
 import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
-import { requireAuth, requireNetworkAdmin } from "./auth";
-import { externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
+import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
+import { diagnosticsReadiness, externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, MAX_ROTATION_MINUTES, MIN_ROTATION_MINUTES, schedulerSettings, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
 
 const text = z.string().trim().min(1).max(120);
 const mac = z.string().regex(/^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i);
 const guid = z.string().uuid();
 const timestamp = z.string().datetime({ offset: true });
+const counter = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const portTelemetrySchema = z.object({ source: z.enum(["snmp", "switch-cli"]), observedAt: timestamp,
+  ifIndex: z.number().int().min(1).max(2147483647).optional(), operStatus: z.enum(["up", "down", "unknown"]).optional(),
+  linkMbps: z.number().finite().min(0).max(1_000_000).optional(), inBitsPerSecond: z.number().finite().min(0).max(1_000_000_000_000).optional(), outBitsPerSecond: z.number().finite().min(0).max(1_000_000_000_000).optional(),
+  inErrors: counter.optional(), outErrors: counter.optional(), inDiscards: counter.optional(), outDiscards: counter.optional(),
+}).strict().refine((v) => Object.keys(v).some((key) => !["source", "observedAt"].includes(key)), "An actual port measurement is required");
+const observationSchema = z.object({ mac: mac.optional(), bssid: mac.optional(), building: text, switchName: text.optional(), port: text.optional(), source: z.enum(["switch", "wifi"]), observedAt: timestamp, edge: z.boolean(), portTelemetry: portTelemetrySchema.optional() }).strict()
+  .refine((o) => o.source === "switch" ? !!o.mac : !!o.bssid, "Matching MAC or BSSID required")
+  .refine((o) => !o.portTelemetry || (o.source === "switch" && o.edge && !!o.switchName && !!o.port), "Port measurements require an identified access switch port");
 const provisionSchema = z.object({ adObjectGuid: guid, computerName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/), domain: text, enabled: z.literal(true).optional() }).strict();
+const adComputersSchema = z.array(provisionSchema.extend({ enabled: z.boolean() })).min(1).max(30_000).refine((rows) => new Set(rows.map((row) => row.adObjectGuid.toLowerCase())).size === rows.length, "Duplicate AD object identity");
+const adInventorySchema = z.object({ snapshotComplete: z.literal(true), adObservedAt: timestamp, adComputers: adComputersSchema }).strict();
 const inventorySchema = z.object({
   snapshotComplete: z.literal(true),
   adObservedAt: timestamp,
-  adComputers: z.array(provisionSchema.extend({ enabled: z.boolean() })).max(30_000),
-  observations: z.array(z.object({ mac: mac.optional(), bssid: mac.optional(), building: text, switchName: text.optional(), port: text.optional(), source: z.enum(["switch", "wifi"]), observedAt: timestamp, edge: z.boolean() }).strict().refine((o) => o.source === "switch" ? !!o.mac : !!o.bssid, "Matching MAC or BSSID required")).max(60_000),
+  adComputers: adComputersSchema,
+  observations: z.array(observationSchema).max(60_000),
   userBuildingAssignments: z.array(z.object({ username: text, building: text, source: z.enum(["desk-phone", "assignment"]), observedAt: timestamp }).strict()).max(30_000),
+  collectorStatus: z.object({ observedAt: timestamp, status: z.enum(["ok", "degraded"]), switchesObserved: z.number().int().min(0).max(1000), portObservations: z.number().int().min(0).max(60000), wifiObservations: z.number().int().min(0).max(60000) }).strict().optional(),
 }).strict();
 const checkInSchema = z.object({
   deviceId: guid, computerName: text, adDomain: text, adJoined: z.boolean(), uptimeSeconds: z.number().finite().nonnegative(), agentVersion: z.string().max(40), loggedOnUser: text.optional(),
@@ -32,19 +44,22 @@ const externalResultSchema = z.object({
   activeAdapter: z.object({ interfaceAlias: text.optional(), kind: z.enum(["ethernet", "wifi", "other"]).optional(), mac: mac.optional(), localIp: z.string().ip().optional(), subnetPrefixLength: z.number().int().min(0).max(128).optional(), gateway: z.string().ip().optional(), ssid: z.string().max(64).optional(), bssid: mac.optional() }).strict().optional(),
 }).strict();
 const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional(), external: externalResultSchema.optional() }).strict().refine((r) => !!r.error || !!r.external || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
-const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional(), type: z.enum(["fred", "external-quick", "external-sustained"]).optional(), maxBytes: z.number().int().min(5_242_880).max(SUSTAINED_OBJECT_BYTES).optional(), scheduledAt: timestamp.optional(), sustainedConfirmed: z.boolean().optional() }).strict().refine((v) => !!v.deviceIds || !!v.building, "Select devices or a building");
+const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional(), type: z.enum(["fred", "external-quick", "external-sustained"]).optional(), maxBytes: z.number().int().min(5_242_880).max(SUSTAINED_OBJECT_BYTES).optional(), scheduledAt: timestamp.optional(), sustainedConfirmed: z.boolean().optional() }).strict()
+  .refine((v) => !!v.deviceIds !== !!v.building, "Select devices or a building, not both")
+  .refine((v) => !v.deviceIds || new Set(v.deviceIds).size === v.deviceIds.length, "Duplicate device selection");
+const settingsSchema = z.object({ schedulerArmed: z.boolean(), rotationIntervalMinutes: z.number().int().min(MIN_ROTATION_MINUTES).max(MAX_ROTATION_MINUTES) }).strict();
 const credentialActionSchema = z.object({ reason: z.string().trim().min(3).max(300) }).strict();
 
 function bearer(req: any): string { const value = req.headers.authorization; return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : ""; }
 function workerValid(req: any) { const expected = process.env.BUILDING_DIAGNOSTICS_WORKER_TOKEN ?? ""; return expected.length >= 32 && secretsEqual(bearer(req), expected); }
-const workerOnly: RequestHandler = (req, res, next) => workerValid(req) ? next() : void res.status(401).json({ error: "Diagnostics worker authentication required" });
 function flags() { const enabled = process.env.BUILDING_DIAGNOSTICS_ENABLED === "true"; return { enabled, schedulerEnabled: enabled && process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED === "true" }; }
 const enabledOnly: RequestHandler = (_req, res, next) => flags().enabled ? next() : void res.status(503).json({ error: "Building diagnostics is not enabled" });
 function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> { const result = schema.safeParse(value); if (!result.success) throw new DiagnosticsError(400, "Invalid diagnostics request"); return result.data; }
 
 export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   const router = Router();
-  const adminOrWorker: RequestHandler = (req, res, next) => workerValid(req) ? next() : requireAuth(req, res, () => requireNetworkAdmin(req, res, next));
+  const workerOnly: RequestHandler = async (req, res, next) => { if (!workerValid(req)) return void res.status(401).json({ error: "Diagnostics worker authentication required" }); await store.workerSeen(); next(); };
+  const adminOrWorker: RequestHandler = async (req, res, next) => { if (workerValid(req)) { await store.workerSeen(); next(); } else requireAuth(req, res, () => requireNetworkAdmin(req, res, next)); };
   const actor = (req: any) => workerValid(req) ? "private AD worker" : `Fred user ${req.user.id}`;
   const agentOnly: RequestHandler = async (req: any, res, next) => {
     const token = bearer(req);
@@ -55,8 +70,34 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   };
   router.get("/overview", requireAuth, requireNetworkAdmin, async (_req, res) => {
     const config = flags();
-    if (!config.enabled) return res.json({ ...config, devices: [], buildings: [], jobs: [], inventoryUpdatedAt: null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() });
-    return res.json({ ...config, ...await store.overview() });
+    res.set("Cache-Control", "no-store");
+    if (!config.enabled) return res.json({ ...config, devices: [], buildings: [], jobs: [], audit: [], settings: schedulerSettings(), readiness: diagnosticsReadiness(), inventoryUpdatedAt: null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() });
+    const overview = await store.overview();
+    return res.json({ ...config, ...overview, schedulerEnabled: overview.settings?.effectiveSchedulerEnabled ?? false });
+  });
+  router.get("/settings", requireAuth, requireNetworkAdmin, async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.json(flags().enabled ? await store.settings() : schedulerSettings());
+  });
+  router.put("/settings", requireAuth, requireCIO, enabledOnly, async (req: any, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.json(await store.saveSettings(parse(settingsSchema, req.body), `Fred user ${req.user.id}`));
+  });
+  router.get("/ad-inventory", enabledOnly, workerOnly, async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    return res.json(await store.adInventory());
+  });
+  router.post("/ad-inventory", enabledOnly, workerOnly, async (req, res) => {
+    const { snapshotComplete: _complete, ...data } = parse(adInventorySchema, req.body);
+    return res.json(await store.ingestAd(data));
+  });
+  router.get("/reporting-snapshot", enabledOnly, workerOnly, async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    const overview = await store.overview(), observedAt = new Date().toISOString();
+    const devices = overview.devices.map((d) => ({ deviceId: d.deviceId, adObjectGuid: d.adObjectGuid, computerName: d.computerName, domain: d.adDomain,
+      enabled: d.adEnabled, enrolled: d.enrolled && !d.revoked, online: d.online, adVerified: d.adVerified, lastSeenAt: d.lastCheckIn,
+      location: { building: d.location.building, kind: d.location.kind, source: d.location.source, observedAt: d.location.observedAt } }));
+    return res.json({ observedAt, updatedAt: observedAt, readiness: overview.readiness, devices });
   });
   router.post("/inventory", enabledOnly, workerOnly, async (req, res) => {
     const input = parse(inventorySchema, req.body);

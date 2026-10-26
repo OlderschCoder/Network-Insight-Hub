@@ -74,7 +74,7 @@ def validate_inventory(data: dict, now: datetime | None = None) -> dict:
     now = now or utc_now()
     ad_observed_at = data.get("adObservedAt", data.get("generatedAt"))
     age = (now - timestamp(ad_observed_at)).total_seconds()
-    if age < -300 or age > 86400:
+    if age < -30 or age > 86400:
         raise ValueError("AD inventory must be a complete export within the last 24 hours")
     if data.get("snapshotComplete") is not True:
         raise ValueError("Incomplete inventory cannot replace the trusted snapshot")
@@ -85,26 +85,39 @@ def validate_inventory(data: dict, now: datetime | None = None) -> dict:
             raise ValueError("Missing or excessive inventory rows: " + key)
         if any(not isinstance(row, dict) for row in rows):
             raise ValueError("Inventory rows must be objects")
-    if not data["adComputers"] and data.get("allowEmptyAdInventory") is not True:
-        raise ValueError("Empty AD roster rejected; explicit decommission approval required")
+    if not data["adComputers"]:
+        raise ValueError("Empty AD roster rejected")
     # Reject malformed and future evidence. Expired network observations are left
     # out; they must not be refreshed merely because the worker ran again.
     observations = []
     for row in data["observations"]:
         evidence_age = (now - timestamp(row.get("observedAt"))).total_seconds()
-        if evidence_age < -300:
+        if evidence_age < -30:
             raise ValueError("Network observation is in the future")
-        if evidence_age <= 900 and row.get("edge") is True:
+        if evidence_age <= 600 and row.get("edge") is True:
             observations.append(row)
     assignments = []
     for row in data["userBuildingAssignments"]:
         assignment_age = (now - timestamp(row.get("observedAt"))).total_seconds()
-        if assignment_age < -300:
+        if assignment_age < -30:
             raise ValueError("User assignment is in the future")
         if assignment_age <= 30 * 86400:
             assignments.append(row)
-    return {"snapshotComplete": True, "adObservedAt": ad_observed_at, "adComputers": data["adComputers"],
-            "observations": observations, "userBuildingAssignments": assignments}
+    result = {"snapshotComplete": True, "adObservedAt": ad_observed_at, "adComputers": data["adComputers"],
+              "observations": observations, "userBuildingAssignments": assignments}
+    status = data.get("collectorStatus")
+    if status is not None:
+        if not isinstance(status, dict) or set(status) != {"observedAt", "status", "switchesObserved", "portObservations", "wifiObservations"} or status["status"] not in ("ok", "degraded"):
+            raise ValueError("Invalid collector status")
+        age = (now - timestamp(status["observedAt"])).total_seconds()
+        if age < -30:
+            raise ValueError("Future collector status")
+        for name, maximum in (("switchesObserved", 1000), ("portObservations", 60000), ("wifiObservations", 60000)):
+            value = status.get(name)
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+                raise ValueError("Invalid collector count")
+        result["collectorStatus"] = dict(status)
+    return result
 
 
 class NoRedirect(HTTPRedirectHandler):

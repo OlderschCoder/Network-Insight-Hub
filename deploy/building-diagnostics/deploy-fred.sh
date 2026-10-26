@@ -11,7 +11,7 @@ mapfile -t source_files < <(tr -d '\r' < "$candidate/deploy/building-diagnostics
 for path in "${source_files[@]}"; do
   [[ "$path" != /* && "$path" != *..* && -f "$candidate/$path" ]] || exit 1
   # New modules may not overwrite another intervening deployment.
-  if [[ "$path" == *building_diagnostics* || "$path" == *building-diagnostics.tsx ]]; then
+  if [[ "$path" == *building_diagnostics* || "$path" == *building-diagnostics.tsx || "$path" == *diagnosticsEntry.ts ]]; then
     [[ ! -e "$live/$path" ]] || { echo "New feature file already exists: $path" >&2; exit 1; }
   fi
 done
@@ -51,6 +51,9 @@ restore() {
   # Restore the old entrypoint without deleting unrelated public files/assets.
   cp -a "$backup/public/." "$live/artifacts/it-reporting/dist/public/"
   tar -xzf "$backup/source.tgz" -C "$live"
+  for path in "${source_files[@]}"; do
+    if ! grep -Fxq -- "$path" "$backup/existing-source-files.txt"; then rm -f -- "$live/$path"; fi
+  done
   systemctl restart sccc-api || true
 }
 trap restore ERR
@@ -63,7 +66,7 @@ cp -a "$candidate/artifacts/it-reporting/dist/public/assets/." artifacts/it-repo
 install -m 644 "$candidate/artifacts/it-reporting/dist/public/index.html" artifacts/it-reporting/dist/public/index.html
 systemctl restart sccc-api
 for attempt in {1..15}; do
-  if curl --fail --silent http://127.0.0.1:8080/api/healthz >/dev/null; then break; fi
+  if curl --fail --silent --connect-timeout 2 --max-time 3 http://127.0.0.1:8080/api/healthz >/dev/null; then break; fi
   sleep 1
 done
 curl --fail --silent http://127.0.0.1:8080/api/healthz >/dev/null

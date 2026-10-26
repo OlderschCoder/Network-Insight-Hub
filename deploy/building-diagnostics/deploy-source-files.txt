@@ -5,3 +5,5 @@ artifacts/api-server/src/lib/building_diagnostics_store.ts
 artifacts/it-reporting/src/App.tsx
 artifacts/it-reporting/src/config/nav.tsx
 artifacts/it-reporting/src/pages/network/building-diagnostics.tsx
+artifacts/it-reporting/src/pages/login.tsx
+artifacts/it-reporting/src/lib/diagnosticsEntry.ts

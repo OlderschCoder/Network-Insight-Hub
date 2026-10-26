@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Activity, RefreshCw, Shuffle } from "lucide-react";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DIAGNOSTICS_SSO_ATTEMPT_KEY, diagnosticGuid, diagnosticIneligibility } from "@/lib/diagnosticsEntry";
 
 type Result = {
   id: string; recordedAt: string; downloadMbps: number | null; uploadMbps: number | null;
@@ -16,18 +17,29 @@ type Result = {
   external?: { type: string; targetOrigin: string; path: string; dnsMs: number | null; dnsAddresses?: string[]; remoteAddress?: string; tcpConnectMs: number | null; tlsMs: number | null; ttfbMs?: number | null; httpStatus: number | null; bytesReceived: number; elapsedMs: number; mbps: number | null; timestamp: string; failure?: string; activeAdapter?: { interfaceAlias?: string; kind?: string; mac?: string; localIp?: string; subnetPrefixLength?: number; gateway?: string; ssid?: string; bssid?: string } };
 };
 type Device = {
-  deviceId: string | null; adObjectGuid: string; enrolled: boolean; computerName: string; adVerified: boolean; online: boolean;
+  deviceId: string | null; adObjectGuid: string; adDomain: string; enrolled: boolean; revoked?: boolean; computerName: string; adVerified: boolean; online: boolean;
   lastCheckIn: string | null; agentVersion: string | null; loggedOnUser: string | null;
   capabilities?: string[];
   location: { building: string | null; kind: string; source: string | null; observedAt: string | null };
   lastResult: Result | null;
+  portTelemetry?: { source: string; observedAt: string; switchName: string; port: string; operStatus?: string; linkMbps?: number; inBitsPerSecond?: number; outBitsPerSecond?: number; inErrors?: number; outErrors?: number; inDiscards?: number; outDiscards?: number } | null;
 };
+type Settings = { schedulerArmed: boolean; rotationIntervalMinutes: number; revision: number; updatedAt: string | null; updatedBy: string | null; persisted: boolean; deploymentSchedulerEnabled: boolean; effectiveSchedulerEnabled: boolean };
 type Overview = {
   enabled: boolean; schedulerEnabled: boolean; targetLabel: string; inventoryUpdatedAt: string | null;
   externalProbe?: { configured: boolean; origin: string | null; quickBytes: number; sustainedEnabled: boolean; dailyBudgetBytes: number };
   devices: Device[];
   buildings: { building: string; onlineDevices: number; eligibleDevices: number; lastResult: Result | null; noCurrentMeasurement: boolean }[];
-  jobs: { id: string; computerName: string; building: string | null; status: string; createdAt: string; requestedBy: string; type?: string }[];
+  jobs: { id: string; computerName: string; building: string | null; status: string; createdAt: string; scheduledAt?: string | null; requestedBy: string; type?: string }[];
+  settings?: Settings;
+  readiness?: {
+    featureEnabled: boolean; workerConfigured: boolean;
+    worker: { state: string; lastSeenAt: string | null };
+    inventory: { state: string; importedAt: string | null; adObservedAt: string | null; networkObservedAt: string | null };
+    collector: { state: string; lastSeenAt: string | null; status: string | null; switchesObserved: number | null; portObservations: number | null; wifiObservations: number | null };
+    counts: { inventory: number; enrolled: number; online: number; adTrusted: number; eligible: number; unlocated: number };
+  };
+  audit?: { id: string; deviceId: string | null; computerName: string | null; action: string; actor: string; reason: string; createdAt: string }[];
 };
 
 const API = `${import.meta.env.VITE_API_URL || "/api"}/building-diagnostics`;
@@ -53,19 +65,75 @@ export default function BuildingDiagnostics() {
   const [building, setBuilding] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState("");
+  const [entryGuid] = useState(() => new URLSearchParams(window.location.search).get("adObjectGuid"));
+  const appliedEntry = useRef(false);
+  const [schedulerArmed, setSchedulerArmed] = useState(false);
+  const [rotationIntervalMinutes, setRotationIntervalMinutes] = useState(360);
+  const [credentialAction, setCredentialAction] = useState<{ device: Device; action: "enroll" | "rotate" | "revoke" } | null>(null);
+  const [credentialReason, setCredentialReason] = useState("");
   const [measurementType, setMeasurementType] = useState("auto");
   const [sustainedMiB, setSustainedMiB] = useState(64);
   const [sustainedConfirmed, setSustainedConfirmed] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + 5 * 60_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
   const query = useQuery({ queryKey: ["building-diagnostics"], queryFn: readOverview, enabled: canManage, retry: false, refetchInterval: 30_000 });
-  const data = query.data;
+  const data = canManage ? query.data : undefined;
   const jobType = measurementType === "auto" ? (data?.externalProbe?.configured ? "external-quick" : "fred") : measurementType;
   const isSustained = jobType === "external-sustained";
   const devices = useMemo(() => (data?.devices || []).filter(d =>
     (!building || d.location.building === building) &&
     `${d.computerName} ${d.loggedOnUser || ""} ${d.location.building || ""}`.toLowerCase().includes(search.toLowerCase())), [data, building, search]);
-  const eligible = (d: Device): d is Device & { deviceId: string } => !!d.deviceId && d.online && d.adVerified && (jobType === "fred" || !!d.capabilities?.includes("external-probe-v2"));
+  const eligible = (d: Device): d is Device & { deviceId: string } => diagnosticIneligibility(d, jobType) === null;
   const selectedEligible = (data?.devices || []).filter(eligible).filter(d => selected.has(d.deviceId));
+  useEffect(() => {
+    if (data?.settings) { setSchedulerArmed(data.settings.schedulerArmed); setRotationIntervalMinutes(data.settings.rotationIntervalMinutes); }
+  }, [data?.settings?.revision]);
+  useEffect(() => {
+    if (!data || appliedEntry.current) return;
+    appliedEntry.current = true;
+    sessionStorage.removeItem(DIAGNOSTICS_SSO_ATTEMPT_KEY);
+    if (entryGuid === null) return;
+    const guid = diagnosticGuid(entryGuid);
+    if (!guid) { setNotice("The selected receiver did not include a valid AD computer identity. Select a computer from the verified inventory below."); return; }
+    const match = data.devices.find(d => diagnosticGuid(d.adObjectGuid) === guid);
+    if (!match) { setNotice("This AD computer is not in the current diagnostics inventory. Refresh the central AD inventory before enrolling it."); return; }
+    setSearch(match.computerName);
+    const reason = diagnosticIneligibility(match, jobType);
+    if (!data.enabled || reason) { setNotice(`${match.computerName}: ${!data.enabled ? "reporting is not enabled" : reason}. No measurement was started.`); return; }
+    setSelected(new Set([match.deviceId!]));
+    setNotice(`${match.computerName} selected using its verified AD identity. Choose a measurement and review the selection; no test has started.`);
+  }, [data, entryGuid, jobType]);
+  const saveSettings = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch(`${API}/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schedulerArmed, rotationIntervalMinutes }) });
+      if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || `Could not save schedule (${response.status}).`); }
+      return response.json() as Promise<Settings>;
+    },
+    onSuccess: result => { setNotice(result.effectiveSchedulerEnabled ? "Automatic Fred-path rotation enabled. External downloads still require an explicit request." : "Schedule saved. Automatic measurements are paused or unavailable in this deployment."); client.invalidateQueries({ queryKey: ["building-diagnostics"] }); },
+  });
+  const changeCredential = useMutation({
+    mutationFn: async () => {
+      if (!credentialAction) throw new Error("Select a credential action first.");
+      const { device, action } = credentialAction;
+      const endpoint = action === "enroll" ? "devices/provision" : `devices/${encodeURIComponent(device.deviceId!)}/${action}`;
+      const body = action === "enroll" ? { adObjectGuid: device.adObjectGuid, computerName: device.computerName, domain: device.adDomain } : { reason: credentialReason.trim() };
+      const response = await authFetch(`${API}/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || `Could not ${action} this computer (${response.status}).`); }
+      const result = await response.json();
+      let computerName = device.computerName;
+      if (action !== "revoke") {
+        if (!diagnosticGuid(result.deviceId) || typeof result.deviceToken !== "string" || !/^sccc-diag\.[A-Za-z0-9_-]{43}$/.test(result.deviceToken)) throw new Error("The server credential response could not be verified. Do not retry enrollment; refresh the inventory and rotate the credential if needed.");
+        computerName = result.computerName || (device.adVerified ? device.computerName : "");
+        const domain = result.domain || (device.adVerified ? device.adDomain : "");
+        if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(computerName) || typeof domain !== "string" || !domain.trim() || domain.length > 120) throw new Error("The server did not confirm the current AD computer name and domain. Refresh the directory before replacing this credential.");
+        const content = { serverUrl: "https://insights.sccc.edu", deviceId: result.deviceId, deviceToken: result.deviceToken, computerName, domain };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(content, null, 2)], { type: "application/json" }));
+        const link = document.createElement("a"); link.href = url; link.download = `${computerName}-diagnostics-provisioning.json`; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      }
+      return { action, computerName };
+    },
+    onSuccess: ({ action, computerName }) => { setCredentialAction(null); setCredentialReason(""); setNotice(action === "revoke" ? `${computerName}: diagnostic credential revoked. Alert reception is unchanged.` : `${computerName}: provisioning file downloaded once. Move this secret file into the protected deployment workflow. Enrollment is not installation; wait for an authenticated agent check-in.`); client.invalidateQueries({ queryKey: ["building-diagnostics"] }); },
+  });
   const queue = useMutation({
     mutationFn: async (deviceIds: string[]) => {
       const body = { deviceIds, type: jobType, ...(isSustained ? { maxBytes: sustainedMiB * 1024 * 1024, scheduledAt: new Date(scheduledAt).toISOString(), sustainedConfirmed } : {}) };
@@ -115,6 +183,22 @@ export default function BuildingDiagnostics() {
         <Badge variant="outline">{data.devices.filter(d => d.online).length} reporting online / {data.devices.length} inventoried</Badge>
       </div>
       <p className="text-sm text-muted-foreground">Inventory updated {time(data.inventoryUpdatedAt)}. Online means a recent authenticated check-in; AD membership is verified centrally. External probes measure end-to-end HTTPS download performance. Endpoint hardware, Wi-Fi, hosting and the Internet path can limit the result; these measurements do not certify a 10 Gb link.</p>
+      <Card><CardHeader><CardTitle>Reporting readiness</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
+        {data.readiness ? <><div className="grid gap-3 md:grid-cols-3">
+          <div><strong>AD inventory · {data.readiness.inventory.state}</strong><p>Directory observed {time(data.readiness.inventory.adObservedAt)}</p><p>Network evidence {time(data.readiness.inventory.networkObservedAt)}</p></div>
+          <div><strong>Central worker · {data.readiness.worker.state}</strong><p>{data.readiness.workerConfigured ? "Credential configured" : "Worker credential not configured"}</p><p>Authenticated request {time(data.readiness.worker.lastSeenAt)}</p></div>
+          <div><strong>Switch collector · {data.readiness.collector.state}</strong><p>Observed {time(data.readiness.collector.lastSeenAt)}</p><p>{data.readiness.collector.switchesObserved ?? "—"} switches · {data.readiness.collector.portObservations ?? "—"} port observations · {data.readiness.collector.wifiObservations ?? "—"} wireless observations</p></div>
+        </div><p>{data.readiness.counts.enrolled} enrolled · {data.readiness.counts.online} online · {data.readiness.counts.adTrusted} AD trusted · {data.readiness.counts.eligible} measurement eligible · {data.readiness.counts.unlocated} without a current building.</p></> : <p>Detailed collector readiness has not been reported by this server.</p>}
+        <p className="text-muted-foreground">SNMP credentials remain on the central collector. Switch counters and endpoint throughput are separate measurements. A worker request alone does not prove a successful switch collection.</p>
+      </CardContent></Card>
+      {data.settings && <Card><CardHeader><CardTitle>Automatic building rotation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
+        <p>One eligible computer per building with current network evidence. The rotation measures the Fred HTTPS path; external and sustained downloads remain explicit requests.</p>
+        <label className="flex items-center gap-2"><input type="checkbox" aria-label="Enable automatic building rotation" checked={schedulerArmed} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setSchedulerArmed(event.target.checked)} />Enable automatic building rotation</label>
+        <label className="flex items-center gap-3">Rotation interval <select aria-label="Rotation interval" className="rounded-md border bg-background p-2" value={rotationIntervalMinutes} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setRotationIntervalMinutes(Number(event.target.value))}>{[60, 180, 360, 720, 1440].map(minutes => <option key={minutes} value={minutes}>{minutes / 60} hour{minutes > 60 ? "s" : ""}</option>)}</select></label>
+        {user?.role === "cio" ? <Button onClick={() => saveSettings.mutate()} disabled={!data.enabled || saveSettings.isPending}>Save rotation schedule</Button> : <p className="text-muted-foreground">The CIO controls automatic rotation. Network administrators can request measurements below.</p>}
+        <p>Effective state: {data.settings.effectiveSchedulerEnabled ? "running" : "paused"}. Deployment scheduler {data.settings.deploymentSchedulerEnabled ? "enabled" : "disabled"}. Saved {time(data.settings.updatedAt)}{data.settings.updatedBy ? ` by ${data.settings.updatedBy}` : ""}.</p>
+        {saveSettings.error && <p role="alert" className="text-destructive">{saveSettings.error.message}</p>}
+      </CardContent></Card>}
       <Card><CardHeader><CardTitle>Building measurements</CardTitle></CardHeader><CardContent>
         {data.buildings.length === 0 ? <p>No building evidence has been imported yet.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Building</TableHead><TableHead>Online / eligible</TableHead><TableHead>Download</TableHead><TableHead>Upload</TableHead><TableHead>Latency / request loss</TableHead><TableHead>Measured</TableHead></TableRow></TableHeader><TableBody>
           {data.buildings.map(b => <TableRow key={b.building}><TableCell className="font-medium">{b.building}</TableCell><TableCell>{b.onlineDevices} / {b.eligibleDevices}</TableCell><TableCell>{metric(b.lastResult?.downloadMbps, "Mbps")}<div className="text-xs text-muted-foreground">{b.lastResult?.external ? `${b.lastResult.external.type} · ${b.lastResult.external.targetOrigin}` : b.lastResult?.targetLabel}</div></TableCell><TableCell>{metric(b.lastResult?.uploadMbps, "Mbps")}</TableCell><TableCell>{metric(b.lastResult?.latencyMs, "ms")} / {metric(b.lastResult?.requestLossPercent, "%")}</TableCell><TableCell>{b.noCurrentMeasurement ? "No current measurement" : time(b.lastResult?.recordedAt)}{b.lastResult?.error && <p className="text-destructive">{b.lastResult.error}</p>}</TableCell></TableRow>)}
@@ -143,12 +227,28 @@ export default function BuildingDiagnostics() {
           <Button onClick={() => { setNotice(""); queue.mutate(selectedEligible.map(d => d.deviceId)); }} disabled={!data.enabled || !selectedEligible.length || !sustainedReady || queue.isPending}>Measure selected ({selectedEligible.length})</Button>
         </div>
         {notice && <p role="status" className="text-sm">{notice}</p>}{queue.error && <p role="alert" className="text-destructive">{queue.error.message}</p>}
-        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Select</TableHead><TableHead>Computer / current user</TableHead><TableHead>Presence / AD</TableHead><TableHead>Building evidence</TableHead><TableHead>Last check-in</TableHead><TableHead>Agent</TableHead></TableRow></TableHeader><TableBody>
-          {devices.map(d => <TableRow key={d.deviceId || d.adObjectGuid}><TableCell><input type="checkbox" aria-label={`Select ${d.computerName}`} checked={!!d.deviceId && selected.has(d.deviceId)} disabled={!data.enabled || !eligible(d)} onChange={e => { const id = d.deviceId; if (id) setSelected(previous => { const next = new Set(previous); e.target.checked ? next.add(id) : next.delete(id); return next; }); }} /></TableCell><TableCell><div className="font-medium">{d.computerName}</div><div className="text-xs text-muted-foreground">{d.loggedOnUser || "No user reported"}</div></TableCell><TableCell>{d.online ? "Online" : d.enrolled ? "No recent check-in" : "Not enrolled"}<div className="text-xs">{d.adVerified ? "AD verified" : "AD verification unavailable"}</div></TableCell><TableCell>{d.location.building || "Unknown"}<div className="text-xs text-muted-foreground">{locationLabels[d.location.kind] || d.location.kind}{d.location.source ? ` · ${d.location.source}` : ""}</div><div className="text-xs text-muted-foreground">{time(d.location.observedAt)}</div></TableCell><TableCell>{time(d.lastCheckIn)}</TableCell><TableCell>{d.agentVersion || "Not enrolled"}</TableCell></TableRow>)}
-          {devices.length === 0 && <TableRow><TableCell colSpan={6}>No matching computers. AD inventory and diagnostic enrollment are separate from the alert receiver.</TableCell></TableRow>}
+        {credentialAction && <section role="region" aria-label="Review diagnostic enrollment" className="space-y-3 rounded-md border bg-muted/30 p-4">
+          <h3 className="font-semibold">{credentialAction.action === "enroll" ? "Enroll" : credentialAction.action === "rotate" ? "Replace diagnostic credential for" : "Revoke diagnostic access for"} {credentialAction.device.computerName}</h3>
+          <p>AD object: <code>{credentialAction.device.adObjectGuid}</code></p>
+          <p>{credentialAction.action === "revoke" ? "This stops diagnostic reporting and cancels its pending measurements. It does not revoke alert reception." : credentialAction.action === "rotate" ? "This invalidates the existing diagnostic credential and cancels pending measurements. A replacement secret provisioning file downloads once; deploy it through the protected workstation workflow." : "A secret provisioning file downloads once. Deploy the diagnostic agent and protected file through AD/GPO; a receiver registration alone does not install this agent."}</p>
+          {credentialAction.action !== "enroll" && <label className="block text-sm">Reason <Input aria-label="Diagnostic credential change reason" maxLength={300} value={credentialReason} onChange={event => setCredentialReason(event.target.value)} /></label>}
+          <div className="flex gap-2"><Button onClick={() => changeCredential.mutate()} disabled={changeCredential.isPending || (credentialAction.action !== "enroll" && credentialReason.trim().length < 3)}>Confirm {credentialAction.action}</Button><Button variant="outline" disabled={changeCredential.isPending} onClick={() => { setCredentialAction(null); setCredentialReason(""); changeCredential.reset(); }}>Cancel credential change</Button></div>
+          {changeCredential.error && <p role="alert" className="text-destructive">{changeCredential.error.message}</p>}
+        </section>}
+        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Select</TableHead><TableHead>Computer / current user</TableHead><TableHead>Presence / AD</TableHead><TableHead>Building evidence</TableHead><TableHead>Switch / port</TableHead><TableHead>Last check-in / agent</TableHead><TableHead>Diagnostic enrollment</TableHead></TableRow></TableHeader><TableBody>
+          {devices.map(d => <TableRow key={d.deviceId || d.adObjectGuid}><TableCell><input type="checkbox" aria-label={`Select ${d.computerName}`} title={diagnosticIneligibility(d, jobType) || "Select for measurement"} checked={!!d.deviceId && selected.has(d.deviceId)} disabled={!data.enabled || !eligible(d)} onChange={e => { const id = d.deviceId; if (id) setSelected(previous => { const next = new Set(previous); e.target.checked ? next.add(id) : next.delete(id); return next; }); }} /></TableCell>
+            <TableCell><div className="font-medium">{d.computerName}</div><div className="text-xs text-muted-foreground">{d.loggedOnUser || "No user reported"}</div></TableCell>
+            <TableCell>{d.online ? "Online" : d.enrolled ? "No recent check-in" : "Not enrolled"}<div className="text-xs">{d.adVerified ? "AD verified" : "AD verification unavailable"}</div>{diagnosticIneligibility(d, jobType) && <div className="mt-1 max-w-52 text-xs text-muted-foreground">{diagnosticIneligibility(d, jobType)}</div>}</TableCell>
+            <TableCell>{d.location.building || "Unknown"}<div className="text-xs text-muted-foreground">{locationLabels[d.location.kind] || d.location.kind}{d.location.source ? ` · ${d.location.source}` : ""}</div><div className="text-xs text-muted-foreground">{time(d.location.observedAt)}</div></TableCell>
+            <TableCell>{d.portTelemetry ? <><div>{d.portTelemetry.switchName} · {d.portTelemetry.port}</div><div className="text-xs">{d.portTelemetry.operStatus || "State unreported"} · link {metric(d.portTelemetry.linkMbps, "Mbps")}</div><div className="text-xs">In {metric(d.portTelemetry.inBitsPerSecond === undefined ? null : d.portTelemetry.inBitsPerSecond / 1_000_000, "Mbps")} / out {metric(d.portTelemetry.outBitsPerSecond === undefined ? null : d.portTelemetry.outBitsPerSecond / 1_000_000, "Mbps")}</div><div className="text-xs text-muted-foreground">{d.portTelemetry.source} · {time(d.portTelemetry.observedAt)}</div><details className="text-xs"><summary>Port counters</summary><p>Errors in/out: {d.portTelemetry.inErrors ?? "—"} / {d.portTelemetry.outErrors ?? "—"}</p><p>Discards in/out: {d.portTelemetry.inDiscards ?? "—"} / {d.portTelemetry.outDiscards ?? "—"}</p></details></> : <span className="text-xs text-muted-foreground">No current port evidence</span>}</TableCell>
+            <TableCell>{time(d.lastCheckIn)}<div className="text-xs text-muted-foreground">{d.agentVersion || "Agent not reported"}</div></TableCell>
+            <TableCell><div className="flex flex-col items-start gap-2">{!d.enrolled ? <Button size="sm" variant="outline" disabled={!data.enabled || !d.adVerified || !diagnosticGuid(d.adObjectGuid) || !d.adDomain || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "enroll" }); }}>Enroll {d.computerName}</Button> : <><Button size="sm" variant="outline" disabled={!data.enabled || !diagnosticGuid(d.adObjectGuid) || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "rotate" }); }}>Replace credential</Button><Button size="sm" variant="outline" disabled={!data.enabled || d.revoked || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "revoke" }); }}>Revoke diagnostics</Button></>}</div></TableCell>
+          </TableRow>)}
+          {devices.length === 0 && <TableRow><TableCell colSpan={7}>No matching computers. AD inventory and diagnostic enrollment are separate from the alert receiver.</TableCell></TableRow>}
         </TableBody></Table></div>
       </CardContent></Card>
-      <Card><CardHeader><CardTitle>Recent measurement jobs</CardTitle></CardHeader><CardContent>{data.jobs.length === 0 ? <p>No measurements requested.</p> : <ul className="space-y-2 text-sm">{data.jobs.slice(0, 30).map(job => <li key={job.id}><strong>{job.computerName}</strong> · {job.building || "Unlocated"} · {job.type || "fred"} · {job.status} · {time(job.createdAt)} · {job.requestedBy}{["queued", "running"].includes(job.status) && <Button className="ml-2" variant="outline" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>Cancel {job.computerName}</Button>}</li>)}</ul>}{cancel.error && <p role="alert" className="text-destructive">{cancel.error.message}</p>}</CardContent></Card>
+      <Card><CardHeader><CardTitle>Recent measurement jobs</CardTitle></CardHeader><CardContent>{data.jobs.length === 0 ? <p>No measurements requested.</p> : <ul className="space-y-2 text-sm">{data.jobs.slice(0, 30).map(job => <li key={job.id}><strong>{job.computerName}</strong> · {job.building || "Unlocated"} · {job.type || "fred"} · {job.status} · {time(job.createdAt)} · {job.requestedBy}{job.scheduledAt && <span> · Scheduled {time(job.scheduledAt)}</span>}{["queued", "running"].includes(job.status) && <Button className="ml-2" variant="outline" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>Cancel {job.computerName}</Button>}</li>)}</ul>}{cancel.error && <p role="alert" className="text-destructive">{cancel.error.message}</p>}</CardContent></Card>
+      {!!data.audit?.length && <Card><CardHeader><CardTitle>Diagnostic administration history</CardTitle></CardHeader><CardContent><ul className="space-y-2 text-sm">{data.audit.slice(0, 20).map(item => <li key={item.id}><strong>{item.computerName || "Reporting configuration"}</strong> · {item.action} · {item.actor} · {time(item.createdAt)}<p className="text-muted-foreground">{item.reason}</p></li>)}</ul></CardContent></Card>}
       {data.devices.some(d => d.lastResult?.external) && <Card><CardHeader><CardTitle>External probe details</CardTitle></CardHeader><CardContent className="space-y-3">{data.devices.filter(d => d.lastResult?.external).map(d => {
         const result = d.lastResult!, external = result.external!, adapter = external.activeAdapter;
         return <details key={d.deviceId || d.adObjectGuid} className="rounded-md border p-3 text-sm"><summary className="cursor-pointer font-medium">{d.computerName} · {metric(external.mbps, "Mbps")} · {external.failure || "Completed"} · {time(external.timestamp)}</summary>

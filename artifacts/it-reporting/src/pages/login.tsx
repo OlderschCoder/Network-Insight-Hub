@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { DIAGNOSTICS_SSO_ATTEMPT_KEY, diagnosticsSsoNavigation, diagnosticsSsoTarget } from "@/lib/diagnosticsEntry";
 
 const schema = z.object({
   email: z.string().email(),
@@ -39,11 +40,18 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [showBreakGlass, setShowBreakGlass] = useState(false);
   const [exchanging, setExchanging] = useState(false);
+  const [ssoStarting, setSsoStarting] = useState(false);
+  const [signInError, setSignInError] = useState("");
+  const [hasEntraResponse] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("entra_code") || params.has("entra_error");
+  });
 
   const { data: entraStatus } = useEntraStatus({
     query: { retry: false } as any,
   });
   const ssoConfigured = entraStatus?.configured ?? false;
+  const loginOrigin = (entraStatus as { loginOrigin?: string | null } | undefined)?.loginOrigin;
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -57,6 +65,7 @@ export default function Login() {
     const err = params.get("entra_error");
     const code = params.get("entra_code");
     if (err) {
+      setSignInError(err);
       toast.error(err);
       window.history.replaceState({}, "", window.location.pathname);
       return;
@@ -67,15 +76,35 @@ export default function Login() {
       exchangeMutation
         .mutateAsync({ data: { code } })
         .then((res) => {
+          sessionStorage.removeItem(DIAGNOSTICS_SSO_ATTEMPT_KEY);
           login(res.token, res.user);
         })
         .catch((e: any) => {
-          toast.error(e?.message || "Microsoft sign-in failed");
+          const message = e?.message || "Microsoft sign-in failed";
+          setSignInError(message);
+          toast.error(message);
           setExchanging(false);
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sender deep links use Fred's own Microsoft flow and role checks. Attempt
+  // once; an OIDC refusal/expired callback returns to an actionable login page.
+  useEffect(() => {
+    if (!ssoConfigured || hasEntraResponse || showBreakGlass) return;
+    try {
+      const target = diagnosticsSsoTarget(sessionStorage.getItem("post_login_redirect"));
+      if (!target) return;
+      const destination = diagnosticsSsoNavigation(target, loginOrigin, window.location.origin);
+      // A prior attempt on the alias must not prevent the safe canonical hop.
+      // On the canonical origin, a failed OIDC round-trip still stops once.
+      if (destination === ENTRA_LOGIN_URL && sessionStorage.getItem(DIAGNOSTICS_SSO_ATTEMPT_KEY)) return;
+      sessionStorage.setItem(DIAGNOSTICS_SSO_ATTEMPT_KEY, "1");
+      setSsoStarting(true);
+      window.location.replace(destination);
+    } catch (error) { setSignInError(error instanceof Error ? error.message : "Microsoft sign-in could not start. Use the sign-in button to retry."); }
+  }, [ssoConfigured, loginOrigin, hasEntraResponse, showBreakGlass]);
 
   const onSubmit = async (data: z.infer<typeof schema>) => {
     try {
@@ -86,7 +115,7 @@ export default function Login() {
     }
   };
 
-  if (exchanging) {
+  if (exchanging || ssoStarting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="flex items-center gap-3 text-muted-foreground">
@@ -106,11 +135,17 @@ export default function Login() {
             <CardDescription>Sign in with your SCCC Microsoft account</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {signInError && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">{signInError}</p>}
             <Button
               type="button"
               className="w-full"
               onClick={() => {
-                window.location.href = ENTRA_LOGIN_URL;
+                setSignInError("");
+                try {
+                  sessionStorage.removeItem(DIAGNOSTICS_SSO_ATTEMPT_KEY);
+                  const target = diagnosticsSsoTarget(sessionStorage.getItem("post_login_redirect"));
+                  window.location.href = target ? diagnosticsSsoNavigation(target, loginOrigin, window.location.origin) : ENTRA_LOGIN_URL;
+                } catch (error) { setSignInError(error instanceof Error ? error.message : "Microsoft sign-in could not start."); }
               }}
               disabled={ssoConfigured === false && !!entraStatus}
             >

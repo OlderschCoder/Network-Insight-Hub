@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { chooseCandidates, externalProbeConfig, fresh, JOB_MS, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, type Assignment, type Heartbeat, type JobType, type Observation, type QueueInput } from "./building_diagnostics";
+import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB_MS, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, resolvePortTelemetry, schedulerSettings, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, MIN_ROTATION_MINUTES, MAX_ROTATION_MINUTES, type Assignment, type CollectorStatus, type Heartbeat, type JobType, type Observation, type QueueInput, type SchedulerInput } from "./building_diagnostics";
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
-export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean }[]; observations: Observation[]; userBuildingAssignments: Assignment[] };
+export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean }[]; observations: Observation[]; userBuildingAssignments: Assignment[]; collectorStatus?: CollectorStatus };
+type AdInventory = Pick<Inventory, "adObservedAt" | "adComputers">;
 let schemaReady: Promise<unknown> | undefined;
 export function ensureDiagnosticsSchema() {
   // Lazy, separate schema: normal Fred startup is unchanged while the feature is disabled.
   return schemaReady ??= pool.query(`
     CREATE TABLE IF NOT EXISTS building_diagnostics_inventory (id integer PRIMARY KEY CHECK(id=1), data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), last_scheduler_at timestamptz);
+    CREATE TABLE IF NOT EXISTS building_diagnostics_settings (
+      id integer PRIMARY KEY CHECK(id=1), scheduler_armed boolean NOT NULL DEFAULT false,
+      rotation_interval_minutes integer NOT NULL DEFAULT 360 CHECK(rotation_interval_minutes BETWEEN 60 AND 1440),
+      revision integer NOT NULL DEFAULT 0, updated_at timestamptz, updated_by text, worker_last_seen_at timestamptz);
+    INSERT INTO building_diagnostics_settings(id) VALUES(1) ON CONFLICT(id) DO NOTHING;
     CREATE TABLE IF NOT EXISTS building_diagnostics_devices (
       id uuid PRIMARY KEY, ad_object_guid uuid NOT NULL UNIQUE, computer_name text NOT NULL,
       domain text NOT NULL, token_hash text NOT NULL UNIQUE, heartbeat jsonb, last_check_in timestamptz,
@@ -28,6 +34,8 @@ export function ensureDiagnosticsSchema() {
     ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS timeout_seconds integer NOT NULL DEFAULT 30;
     ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS scheduled_at timestamptz NOT NULL DEFAULT now();
     ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS cancelled_reason text;
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS automatic boolean NOT NULL DEFAULT false;
+    ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS scheduler_revision integer;
     ALTER TABLE building_diagnostics_jobs DROP CONSTRAINT IF EXISTS building_diagnostics_jobs_status_check;
     ALTER TABLE building_diagnostics_jobs ADD CONSTRAINT building_diagnostics_jobs_status_check CHECK(status IN ('queued','running','complete','expired','cancelled'));
     CREATE INDEX IF NOT EXISTS building_diagnostics_jobs_device ON building_diagnostics_jobs(device_id,created_at DESC);
@@ -38,8 +46,11 @@ export function ensureDiagnosticsSchema() {
     CREATE INDEX IF NOT EXISTS building_diagnostics_reports_building ON building_diagnostics_reports(building,recorded_at DESC);
     CREATE INDEX IF NOT EXISTS building_diagnostics_reports_device ON building_diagnostics_reports(device_id,id DESC);
     CREATE TABLE IF NOT EXISTS building_diagnostics_audit (
-      id bigserial PRIMARY KEY,device_id uuid NOT NULL REFERENCES building_diagnostics_devices(id),
+      id bigserial PRIMARY KEY,device_id uuid REFERENCES building_diagnostics_devices(id),
       action text NOT NULL,actor text NOT NULL,reason text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+    ALTER TABLE building_diagnostics_audit ALTER COLUMN device_id DROP NOT NULL;
+    ALTER TABLE building_diagnostics_audit ADD COLUMN IF NOT EXISTS job_id uuid REFERENCES building_diagnostics_jobs(id);
+    ALTER TABLE building_diagnostics_audit ADD COLUMN IF NOT EXISTS details jsonb NOT NULL DEFAULT '{}'::jsonb;
   `).catch((err) => { schemaReady = undefined; throw err; });
 }
 function iso(value: any): string | null { return value ? new Date(value).toISOString() : null; }
@@ -56,12 +67,33 @@ async function transaction<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   try { await client.query("BEGIN"); await client.query("SELECT pg_advisory_xact_lock(17409243)"); const result = await fn(client); await client.query("COMMIT"); return result; }
   catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
 }
+async function readSettings(client: Client = pool) {
+  const row = (await client.query("SELECT * FROM building_diagnostics_settings WHERE id=1")).rows[0];
+  return { settings: schedulerSettings(row), workerLastSeenAt: iso(row?.worker_last_seen_at) };
+}
+function validateAdSnapshot(data: AdInventory, previous: Inventory) {
+  if (!data.adComputers.length || data.adComputers.length > 30_000) throw new DiagnosticsError(400, "A nonempty complete AD roster is required");
+  if (new Set(data.adComputers.map((a) => a.adObjectGuid.toLowerCase())).size !== data.adComputers.length) throw new DiagnosticsError(400, "Duplicate AD object identity");
+  if (Date.parse(data.adObservedAt) > Date.now() + 30_000 || Date.parse(data.adObservedAt) < Date.parse(previous.adObservedAt || "1970-01-01")) throw new DiagnosticsError(409, "AD snapshot timestamp is future or older than current inventory");
+  if (!fresh(data.adObservedAt, Date.now(), 24 * 60 * 60_000)) throw new DiagnosticsError(409, "AD snapshot must be a complete export within the last 24 hours");
+}
+async function fenceAutomatic(client: Client, settings: ReturnType<typeof schedulerSettings>) {
+  // Persisted revision + deployment gate are rechecked under the same lease lock.
+  // A restart or a stale API caller cannot dispatch a previously armed schedule.
+  await client.query(`UPDATE building_diagnostics_jobs SET status='cancelled',cancelled_reason='Automatic schedule is disarmed or superseded'
+    WHERE automatic AND status IN ('queued','running') AND (NOT $1::boolean OR scheduler_revision IS DISTINCT FROM $2)`, [settings.effectiveSchedulerEnabled, settings.revision]);
+}
 const indexes = new WeakMap<Inventory, { ad: Map<string, Inventory["adComputers"][number]>; macs: Map<string, Observation[]>; aps: Map<string, Observation[]>; users: Map<string, Assignment[]> }>();
 function getIndexes(inv: Inventory) {
   let result = indexes.get(inv);
   if (result) return result;
   result = { ad: new Map(inv.adComputers.map((a) => [a.adObjectGuid.toLowerCase(), a])), macs: new Map(), aps: new Map(), users: new Map() };
-  for (const o of inv.observations) { const key = (o.source === "switch" ? o.mac : o.bssid)?.replace(/[^a-f0-9]/gi, "").toLowerCase(); if (!key) continue; const map = o.source === "switch" ? result.macs : result.aps; map.set(key, [...(map.get(key) ?? []), o]); }
+  for (const o of inv.observations) {
+    // A private controller may attest client MAC -> BSSID -> AP without Windows
+    // location permission. Endpoints still cannot supply location observations.
+    if (o.mac) { const key = o.mac.replace(/[^a-f0-9]/gi, "").toLowerCase(); result.macs.set(key, [...(result.macs.get(key) ?? []), o]); }
+    if (o.source === "wifi" && o.bssid) { const key = o.bssid.replace(/[^a-f0-9]/gi, "").toLowerCase(); result.aps.set(key, [...(result.aps.get(key) ?? []), o]); }
+  }
   for (const a of inv.userBuildingAssignments) { const key = a.username.trim().toLowerCase(); result.users.set(key, [...(result.users.get(key) ?? []), a]); }
   indexes.set(inv, result); return result;
 }
@@ -85,19 +117,23 @@ async function snapshot(client: Client = pool) {
     const location = locationFor(heartbeat, inv);
     if (!currentHeartbeat && location.kind === "network-confirmed") location.kind = "stale";
     return { deviceId: d.id as string | null, enrolled: true, revoked: !!d.revoked_at, computerName: d.computer_name, adObjectGuid: d.ad_object_guid, adDomain: d.domain,
+      adEnabled: inv.adObservedAt ? getIndexes(inv).ad.get(d.ad_object_guid.toLowerCase())?.enabled ?? false : null,
       adVerified: adMatch(inv, d) && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: currentHeartbeat && !d.revoked_at,
       lastCheckIn: iso(d.last_check_in), agentVersion: heartbeat.agentVersion ?? null,
       loggedOnUser: heartbeat.loggedOnUser ?? null, interfaces: heartbeat.interfaces, location,
       capabilities: heartbeat.capabilities ?? [],
+      portTelemetry: currentHeartbeat ? resolvePortTelemetry(heartbeat, inv.observations) : null,
       lastTestAt: iso(d.last_test_at), lastResult: d.report_id ? { id: String(d.report_id), recordedAt: iso(d.recorded_at), ...d.report_data } : null };
   });
   const enrolledIds = new Set(enrolled.map((d) => d.adObjectGuid.toLowerCase()));
   for (const a of inv.adComputers) {
     if (enrolledIds.has(a.adObjectGuid.toLowerCase())) continue;
     enrolled.push({ deviceId: null, enrolled: false, revoked: false, computerName: a.computerName, adObjectGuid: a.adObjectGuid, adDomain: a.domain,
+      adEnabled: a.enabled,
       adVerified: a.enabled && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: false,
       lastCheckIn: null, agentVersion: null, loggedOnUser: null, interfaces: [],
       capabilities: [],
+      portTelemetry: null,
       location: { building: null, kind: "unknown", source: null, observedAt: null }, lastTestAt: null, lastResult: null });
   }
   return { inv, devices: enrolled };
@@ -106,11 +142,51 @@ async function expire(client: Client) {
   await client.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE status IN ('queued','running','cancelled') AND expires_at<=now()");
 }
 export const diagnosticsStore = {
+  async settings() {
+    await ensureDiagnosticsSchema();
+    return (await readSettings()).settings;
+  },
+  async saveSettings(input: SchedulerInput, actor: string) {
+    if (typeof input.schedulerArmed !== "boolean" || !Number.isInteger(input.rotationIntervalMinutes) || input.rotationIntervalMinutes < MIN_ROTATION_MINUTES || input.rotationIntervalMinutes > MAX_ROTATION_MINUTES) throw new DiagnosticsError(400, "Invalid scheduler settings");
+    await ensureDiagnosticsSchema();
+    return transaction(async (client) => {
+      const row = (await client.query("UPDATE building_diagnostics_settings SET scheduler_armed=$1,rotation_interval_minutes=$2,revision=revision+1,updated_at=now(),updated_by=$3 WHERE id=1 RETURNING *", [input.schedulerArmed, input.rotationIntervalMinutes, actor])).rows[0];
+      const settings = schedulerSettings(row);
+      await fenceAutomatic(client, settings);
+      await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason,details) VALUES(NULL,'scheduler-settings',$1,'Operator saved automatic Fred-path rotation settings',$2::jsonb)", [actor, JSON.stringify({ ...input, revision: settings.revision })]);
+      return settings;
+    });
+  },
+  async workerSeen() {
+    await ensureDiagnosticsSchema();
+    await pool.query("UPDATE building_diagnostics_settings SET worker_last_seen_at=now() WHERE id=1");
+  },
+  async adInventory() {
+    await ensureDiagnosticsSchema();
+    const inv = await inventory();
+    return { snapshotComplete: !!inv.adObservedAt && inv.adComputers.length > 0, adObservedAt: inv.adObservedAt || null, adComputers: inv.adComputers, fresh: fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000) };
+  },
+  async ingestAd(data: AdInventory) {
+    await ensureDiagnosticsSchema();
+    await transaction(async (client) => {
+      const previous = await inventory(client);
+      validateAdSnapshot(data, previous);
+      // Share the full-inventory transaction lock. A concurrent private SNMP join
+      // cannot be erased by an AD-only exporter, nor roll this directory back.
+      const merged: Inventory = { ...data, observations: previous.observations, userBuildingAssignments: previous.userBuildingAssignments,
+        ...(previous.collectorStatus ? { collectorStatus: previous.collectorStatus } : {}) };
+      await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify(merged)]);
+    });
+    inventoryCache = undefined;
+    return { ok: true, adComputers: data.adComputers.length, adObservedAt: data.adObservedAt };
+  },
   async ingest(data: Inventory) {
     await ensureDiagnosticsSchema();
     await transaction(async (client) => {
       const previous = await inventory(client);
-      if (Date.parse(data.adObservedAt) > Date.now() + 30_000 || Date.parse(data.adObservedAt) < Date.parse(previous.adObservedAt || "1970-01-01")) throw new DiagnosticsError(409, "AD snapshot timestamp is future or older than current inventory");
+      validateAdSnapshot(data, previous);
+      if (data.collectorStatus && Date.parse(data.collectorStatus.observedAt) > Date.now() + 30_000) throw new DiagnosticsError(409, "Collector observation cannot be in the future");
+      if (data.observations.some((o) => Date.parse(o.observedAt) > Date.now() + 30_000 || (o.portTelemetry && Date.parse(o.portTelemetry.observedAt) > Date.now() + 30_000))) throw new DiagnosticsError(409, "Network observation cannot be in the future");
       await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify(data)]);
     });
     inventoryCache = undefined;
@@ -126,7 +202,7 @@ export const diagnosticsStore = {
       const deviceId = randomUUID(), deviceToken = newToken();
       await client.query("INSERT INTO building_diagnostics_devices(id,ad_object_guid,computer_name,domain,token_hash,provisioned_by) VALUES($1,$2,$3,$4,$5,$6)", [deviceId, input.adObjectGuid, input.computerName, input.domain, tokenHash(deviceToken), actor]);
       await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason) VALUES($1,'provision',$2,'initial verified AD enrollment')", [deviceId, actor]);
-      return { deviceId, deviceToken };
+      return { deviceId, deviceToken, computerName: input.computerName, domain: input.domain };
     });
   },
   async revoke(deviceId: string, reason: string, actor: string) {
@@ -153,7 +229,7 @@ export const diagnosticsStore = {
       await client.query("UPDATE building_diagnostics_devices SET token_hash=$2,computer_name=$3,domain=$4,revoked_at=NULL,revoked_by=NULL,revoked_reason=NULL,rotated_at=now() WHERE id=$1", [deviceId, tokenHash(deviceToken), adObject.computerName, adObject.domain]);
       await client.query("UPDATE building_diagnostics_jobs SET status=CASE WHEN status='running' THEN 'cancelled' ELSE 'expired' END WHERE device_id=$1 AND status IN ('queued','running')", [deviceId]);
       await client.query("INSERT INTO building_diagnostics_audit(device_id,action,actor,reason) VALUES($1,'rotate',$2,$3)", [deviceId, actor, reason]);
-      return { deviceId, deviceToken };
+      return { deviceId, deviceToken, computerName: adObject.computerName, domain: adObject.domain };
     });
   },
   async authenticate(token: string) {
@@ -168,7 +244,7 @@ export const diagnosticsStore = {
     await ensureDiagnosticsSchema();
     await expire(pool);
     const { inv, devices } = await snapshot();
-    const jobs = (await pool.query(`SELECT j.*,d.computer_name FROM building_diagnostics_jobs j JOIN building_diagnostics_devices d ON d.id=j.device_id ORDER BY j.created_at DESC LIMIT 100`)).rows.map((j) => ({ id: j.id, deviceId: j.device_id, computerName: j.computer_name, building: j.building, status: j.status, type: j.type, targetOrigin: j.target_origin, downloadBytes: j.download_bytes, scheduledAt: iso(j.scheduled_at), createdAt: iso(j.created_at), expiresAt: iso(j.expires_at), requestedBy: j.requested_by }));
+    const jobs = (await pool.query(`SELECT j.*,d.computer_name FROM building_diagnostics_jobs j JOIN building_diagnostics_devices d ON d.id=j.device_id ORDER BY j.created_at DESC LIMIT 100`)).rows.map((j) => ({ id: j.id, deviceId: j.device_id, computerName: j.computer_name, building: j.building, status: j.status, type: j.type, automatic: j.automatic, targetOrigin: j.target_origin, downloadBytes: j.download_bytes, scheduledAt: iso(j.scheduled_at), createdAt: iso(j.created_at), expiresAt: iso(j.expires_at), requestedBy: j.requested_by }));
     // Buildings with no enrolled endpoint must remain visible as missing coverage.
     const catalog = (await pool.query("SELECT DISTINCT trim(building) AS building FROM net_nodes WHERE trim(building)<>''")).rows;
     const allBuildings = new Set([...catalog.map((b) => String(b.building)), ...inv.observations.map((o) => o.building), ...inv.userBuildingAssignments.map((a) => a.building)]);
@@ -178,7 +254,10 @@ export const diagnosticsStore = {
       const lastResult = r ? { id: String(r.id), recordedAt: iso(r.recorded_at), ...r.data } : null;
       return { building, onlineDevices: members.filter((d) => d.online).length, eligibleDevices: members.filter((d) => d.online && d.adVerified && d.location.kind === "network-confirmed").length, lastResult, noCurrentMeasurement: !r || !!r.data.error || r.data.downloadMbps === null || (!r.data.external && r.data.uploadMbps === null) || !fresh(iso(r.recorded_at), Date.now(), 12 * 60 * 60_000) };
     });
-    return { devices, buildings, jobs, inventoryUpdatedAt: inv.updatedAt, adObservedAt: inv.adObservedAt || null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() };
+    const { settings, workerLastSeenAt } = await readSettings();
+    const audit = (await pool.query(`SELECT a.*,d.computer_name FROM building_diagnostics_audit a LEFT JOIN building_diagnostics_devices d ON d.id=a.device_id ORDER BY a.id DESC LIMIT 50`)).rows.map((a) => ({ id: String(a.id), deviceId: a.device_id, jobId: a.job_id, computerName: a.computer_name ?? null, action: a.action, actor: a.actor, reason: a.reason, details: a.details, createdAt: iso(a.created_at) }));
+    return { devices, buildings, jobs, settings, readiness: diagnosticsReadiness({ inventory: inv, devices, workerLastSeenAt }), audit,
+      inventoryUpdatedAt: inv.updatedAt, adObservedAt: inv.adObservedAt || null, targetLabel: TARGET_LABEL, externalProbe: externalProbeConfig() };
   },
   async queue(input: QueueInput, actor: string, automatic = false) {
     await ensureDiagnosticsSchema();
@@ -194,14 +273,18 @@ export const diagnosticsStore = {
     const timeout = sustained ? 180 : 30;
     return transaction(async (client) => {
       await expire(client);
+      const { settings } = await readSettings(client);
       if (automatic) {
+        if (!settings.effectiveSchedulerEnabled) return { queued: 0, jobIds: [] };
+        await fenceAutomatic(client, settings);
         const sweep = await client.query("UPDATE building_diagnostics_inventory SET last_scheduler_at=now() WHERE id=1 AND (last_scheduler_at IS NULL OR last_scheduler_at<now()-interval '1 minute') RETURNING id");
         if (!sweep.rowCount) return { queued: 0, jobIds: [] };
       }
       const { devices } = await snapshot(client);
       const recent = (await client.query("SELECT building,max(created_at) AS tested_at FROM building_diagnostics_jobs WHERE building IS NOT NULL AND status IN ('running','complete') GROUP BY building")).rows;
       const enrolled = devices.filter((d) => !!d.deviceId).map((d) => ({ ...d, deviceId: d.deviceId! }));
-      let selected = automatic ? chooseCandidates(enrolled, new Map(recent.map((r) => [r.building, new Date(r.tested_at).getTime()]))) : enrolled.filter((d) => (input.deviceIds?.includes(d.deviceId) || (input.building && d.location.building === input.building)) && d.online && d.adVerified);
+      if (!automatic && input.deviceIds && (new Set(input.deviceIds).size !== input.deviceIds.length || input.deviceIds.some((id) => !enrolled.some((d) => d.deviceId === id && d.online && d.adVerified)))) throw new DiagnosticsError(409, "Every selected computer must be enrolled, online and AD verified");
+      let selected = automatic ? chooseCandidates(enrolled, new Map(recent.map((r) => [r.building, new Date(r.tested_at).getTime()])), Date.now(), settings.rotationIntervalMinutes * 60_000) : enrolled.filter((d) => (input.deviceIds?.includes(d.deviceId) || (input.building && d.location.kind === "network-confirmed" && d.location.building === input.building)) && d.online && d.adVerified);
       if (external && selected.some((d) => !d.capabilities.includes("external-probe-v2"))) throw new DiagnosticsError(409, "Selected computer does not support external probe jobs");
       const pending = (await client.query("SELECT device_id,building FROM building_diagnostics_jobs WHERE status IN ('queued','running')")).rows;
       selected = selected.filter((d) => !pending.some((p) => p.device_id === d.deviceId || (automatic && p.building === d.location.building))).slice(0, Math.max(0, 100 - pending.length));
@@ -217,7 +300,8 @@ export const diagnosticsStore = {
       for (let i = 0; i < selected.length; i++) {
         const d = selected[i]!, id = randomUUID();
         // Queue lifetime allows serial execution; each claim receives a new two-minute lease.
-        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+interval '30 minutes',$6,$7,$8,$9,$10,$5)", [id, d.deviceId, d.location.kind === "network-confirmed" ? d.location.building : null, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, external ? config.origin : null, timeout]);
+        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at,automatic,scheduler_revision) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+interval '30 minutes',$6,$7,$8,$9,$10,$5,$11,$12)", [id, d.deviceId, d.location.kind === "network-confirmed" ? d.location.building : null, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, external ? config.origin : null, timeout, automatic, automatic ? settings.revision : null]);
+        await client.query("INSERT INTO building_diagnostics_audit(device_id,job_id,action,actor,reason,details) VALUES($1,$2,'queue-job',$3,$4,$5::jsonb)", [d.deviceId, id, actor, automatic ? "Automatic building rotation" : "Operator requested a bounded measurement", JSON.stringify({ type, automatic, building: d.location.kind === "network-confirmed" ? d.location.building : null, downloadBytes: bytes, uploadBytes: external ? 0 : bytes, scheduledAt: scheduledAt.toISOString() })]);
         ids.push(id);
       }
       return { queued: ids.length, jobIds: ids };
@@ -228,6 +312,7 @@ export const diagnosticsStore = {
     if (auto) await this.queue({}, "automatic building rotation", true);
     return transaction(async (client) => {
       await expire(client);
+      await fenceAutomatic(client, (await readSettings(client)).settings);
       // Serialize all load tests, including across API processes.
       if ((await client.query("SELECT id FROM building_diagnostics_jobs WHERE status='running' OR (status='cancelled' AND claimed_at IS NOT NULL AND expires_at>now()) LIMIT 1")).rowCount) return null;
       // A 30-second cooldown separates transfer runs even if results arrive quickly.
@@ -261,15 +346,21 @@ export const diagnosticsStore = {
     });
   },
   async jobStatus(deviceId: string, jobId: string) {
-    const j = (await pool.query("SELECT id,status,expires_at FROM building_diagnostics_jobs WHERE id=$1 AND device_id=$2", [jobId, deviceId])).rows[0];
-    if (!j) throw new DiagnosticsError(404, "Unknown device job");
-    return { id: j.id, status: Date.parse(j.expires_at) <= Date.now() && ["running", "queued", "cancelled"].includes(j.status) ? "expired" : j.status, expiresAt: iso(j.expires_at) };
+    return transaction(async (client) => {
+      await fenceAutomatic(client, (await readSettings(client)).settings);
+      const j = (await client.query("SELECT id,status,expires_at FROM building_diagnostics_jobs WHERE id=$1 AND device_id=$2", [jobId, deviceId])).rows[0];
+      if (!j) throw new DiagnosticsError(404, "Unknown device job");
+      return { id: j.id, status: Date.parse(j.expires_at) <= Date.now() && ["running", "queued", "cancelled"].includes(j.status) ? "expired" : j.status, expiresAt: iso(j.expires_at) };
+    });
   },
   async transfer(deviceId: string, jobId: string, kind: "ping" | "download" | "upload") {
     const column = kind === "ping" ? "ping_count=ping_count+1" : `${kind}_started_at=now()`;
     const condition = kind === "ping" ? `ping_count<${PING_COUNT}` : `${kind}_started_at IS NULL`;
     const remaining = kind === "ping" ? "now()" : "now()+interval '20 seconds'";
-    const result = await pool.query(`UPDATE building_diagnostics_jobs SET ${column} WHERE id=$1 AND device_id=$2 AND type='fred' AND status='running' AND expires_at>${remaining} AND ${condition} RETURNING download_bytes,upload_bytes`, [jobId, deviceId]);
+    const result = await transaction(async (client) => {
+      await fenceAutomatic(client, (await readSettings(client)).settings);
+      return client.query(`UPDATE building_diagnostics_jobs SET ${column} WHERE id=$1 AND device_id=$2 AND type='fred' AND status='running' AND expires_at>${remaining} AND ${condition} RETURNING download_bytes,upload_bytes`, [jobId, deviceId]);
+    });
     if (!result.rows[0]) throw new DiagnosticsError(409, "Invalid, expired, or already used job operation");
     return { downloadBytes: result.rows[0].download_bytes, uploadBytes: result.rows[0].upload_bytes };
   },

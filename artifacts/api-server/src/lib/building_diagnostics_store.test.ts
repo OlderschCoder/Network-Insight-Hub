@@ -36,10 +36,12 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
   };
   const heartbeat = (identity: { deviceId: string }, name: string, mac: string) => ({ deviceId: identity.deviceId, computerName: name, adDomain: "sccc.edu", adJoined: true, uptimeSeconds: 10, agentVersion: "synthetic", interfaces: [{ mac, ipAddresses: ["127.0.0.1"], kind: "ethernet" as const }] });
   beforeAll(async () => {
+    process.env.BUILDING_DIAGNOSTICS_ENABLED = "true";
+    process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "true";
     db = (await import("@workspace/db")).pool;
     store = (await import("./building_diagnostics_store")).diagnosticsStore;
     // This explicitly named disposable test database is never shared with Fred.
-    await db.query("DROP TABLE IF EXISTS building_diagnostics_audit,building_diagnostics_reports,building_diagnostics_jobs,building_diagnostics_devices,building_diagnostics_inventory CASCADE");
+    await db.query("DROP TABLE IF EXISTS building_diagnostics_audit,building_diagnostics_reports,building_diagnostics_jobs,building_diagnostics_devices,building_diagnostics_inventory,building_diagnostics_settings CASCADE");
     await db.query("CREATE TABLE IF NOT EXISTS net_nodes(building text NOT NULL)");
     await db.query("TRUNCATE net_nodes");
     await db.query("INSERT INTO net_nodes(building) VALUES('Synthetic A'),('Synthetic B'),('Synthetic empty building')");
@@ -56,6 +58,8 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     expect(overview.devices.find((d) => d.adObjectGuid === guidNeverEnrolled)).toMatchObject({ deviceId: null, enrolled: false, online: false, lastCheckIn: null, adVerified: true });
     expect(JSON.stringify(overview)).not.toContain(a.deviceToken);
     expect(overview.buildings.find((building) => building.building === "Synthetic empty building")).toMatchObject({ onlineDevices: 0, eligibleDevices: 0, lastResult: null, noCurrentMeasurement: true });
+    expect(overview.settings).toMatchObject({ schedulerArmed: false, rotationIntervalMinutes: 360, effectiveSchedulerEnabled: false, persisted: true });
+    expect(overview.readiness).toMatchObject({ counts: { inventory: 3, enrolled: 2, online: 2, adTrusted: 3 }, collector: { state: "unknown" }, worker: { state: "never-seen" } });
   });
   it("requires immutable AD identity and stores only a token hash", async () => {
     await expect(store.provision({ adObjectGuid: randomUUID(), computerName: "DIAG-A", domain: "sccc.edu" }, "test")).rejects.toThrow("current enabled AD roster");
@@ -108,12 +112,15 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     await expect(store.ingest({ ...inventory, adObservedAt: new Date(Date.now() + 60_000).toISOString() })).rejects.toThrow("future");
   });
   it("persists a one-minute scheduler sweep throttle and avoids duplicate pending building jobs", async () => {
+    expect((await store.queue({}, "automatic", true)).queued).toBe(0);
+    await store.saveSettings({ schedulerArmed: true, rotationIntervalMinutes: 360 }, "synthetic CIO");
     const first = await store.queue({}, "automatic", true);
     expect(first.queued).toBe(1);
     expect((await store.queue({}, "automatic", true)).queued).toBe(0);
     await db.query("UPDATE building_diagnostics_inventory SET last_scheduler_at=now()-interval '61 seconds'");
     expect((await store.queue({}, "automatic", true)).queued).toBe(0);
     await db.query("UPDATE building_diagnostics_jobs SET status='expired' WHERE status='queued'");
+    await store.saveSettings({ schedulerArmed: false, rotationIntervalMinutes: 360 }, "synthetic CIO");
   });
   it("permits an explicit unlocated AD computer test without crediting an assumed building", async () => {
     const previous = (await db.query("SELECT heartbeat FROM building_diagnostics_devices WHERE id=$1", [a.deviceId])).rows[0].heartbeat;
@@ -136,7 +143,7 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     a = await store.rotate(a.deviceId, "synthetic reprovision", "synthetic admin");
     expect(a.deviceToken).not.toBe(previousToken); expect(await store.authenticate(previousToken)).toBeNull();
     expect(await store.authenticate(a.deviceToken)).toMatchObject({ deviceId: a.deviceId });
-    const actions = (await db.query("SELECT action FROM building_diagnostics_audit WHERE device_id=$1 ORDER BY id", [a.deviceId])).rows.map((r) => r.action);
+    const actions = (await db.query("SELECT action FROM building_diagnostics_audit WHERE device_id=$1 AND action IN ('provision','revoke','rotate') ORDER BY id", [a.deviceId])).rows.map((r) => r.action);
     expect(actions).toEqual(["provision", "revoke", "rotate"]);
   });
   it("does not count an error report as a current building speed measurement", async () => {
@@ -149,7 +156,7 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
   it("revokes device authentication when the authoritative AD object is disabled or removed", async () => {
     await store.ingest({ ...inventory, adObservedAt: new Date().toISOString(), adComputers: inventory.adComputers.map((d) => ({ ...d, enabled: false })) });
     expect(await store.authenticate(a.deviceToken)).toBeNull();
-    await store.ingest({ ...inventory, adObservedAt: new Date().toISOString(), adComputers: [] });
+    await expect(store.ingest({ ...inventory, adObservedAt: new Date().toISOString(), adComputers: [] })).rejects.toThrow("nonempty complete AD roster");
     expect(await store.authenticate(b.deviceToken)).toBeNull();
   });
   it("requires configured selected capable probes, not an external fleet sweep", async () => {
@@ -224,5 +231,85 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_DAILY_BUDGET_BYTES;
     delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_ORIGIN;
     delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_SUSTAINED_ENABLED;
+  });
+  it("persists settings and fences automatic work after operator disarm, revision changes and restart gates", async () => {
+    await store.ingest({ ...inventory, adObservedAt: new Date().toISOString() });
+    await db.query("UPDATE building_diagnostics_jobs SET status='expired',created_at=now()-interval '2 days' WHERE status IN ('queued','running','cancelled') OR building IS NOT NULL");
+    await db.query("UPDATE building_diagnostics_reports SET recorded_at=now()-interval '31 seconds'");
+    const ha = (await db.query("SELECT heartbeat FROM building_diagnostics_devices WHERE id=$1", [a.deviceId])).rows[0].heartbeat;
+    const hb = (await db.query("SELECT heartbeat FROM building_diagnostics_devices WHERE id=$1", [b.deviceId])).rows[0].heartbeat;
+    await store.checkIn(ha, false); await store.checkIn(hb, false);
+    const armed = await store.saveSettings({ schedulerArmed: true, rotationIntervalMinutes: 60 }, "synthetic CIO");
+    expect(await store.settings()).toMatchObject({ schedulerArmed: true, rotationIntervalMinutes: 60, revision: armed.revision, updatedBy: "synthetic CIO" });
+    await db.query("UPDATE building_diagnostics_inventory SET last_scheduler_at=NULL");
+    expect((await store.queue({}, "automatic rotation", true)).queued).toBe(2);
+    expect((await db.query("SELECT DISTINCT scheduler_revision FROM building_diagnostics_jobs WHERE automatic AND status='queued'")).rows).toEqual([{ scheduler_revision: armed.revision }]);
+    const disarmed = await store.saveSettings({ schedulerArmed: false, rotationIntervalMinutes: 60 }, "synthetic CIO");
+    expect(disarmed.revision).toBeGreaterThan(armed.revision);
+    expect((await db.query("SELECT count(*) FROM building_diagnostics_jobs WHERE automatic AND status IN ('queued','running')")).rows[0].count).toBe("0");
+    expect(await store.checkIn(ha, true)).toBeNull();
+    await store.saveSettings({ schedulerArmed: true, rotationIntervalMinutes: 60 }, "synthetic CIO");
+    await db.query("UPDATE building_diagnostics_inventory SET last_scheduler_at=NULL");
+    expect((await store.queue({}, "automatic rotation", true)).queued).toBe(2);
+    // Simulates a restart with the deployment gate off while durable arm remains true.
+    process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "false";
+    expect(await store.checkIn(ha, false)).toBeNull();
+    expect((await store.settings()).schedulerArmed).toBe(true);
+    expect((await store.settings()).effectiveSchedulerEnabled).toBe(false);
+    process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "true";
+    expect(await store.checkIn(ha, false)).toBeNull();
+    // A manual network-operator request is independent of automatic arming.
+    const manual = await store.queue({ deviceIds: [a.deviceId] }, "synthetic network operator");
+    expect(manual.queued).toBe(1);
+    await store.saveSettings({ schedulerArmed: false, rotationIntervalMinutes: 360 }, "synthetic CIO");
+    const job = await store.checkIn(ha, false);
+    expect(job?.id).toBe(manual.jobIds[0]);
+    await store.result(a.deviceId, { jobId: job!.id, error: "synthetic completion" });
+    const audit = (await store.overview()).audit.find((row) => row.jobId === manual.jobIds[0]);
+    expect(audit).toMatchObject({ action: "queue-job", actor: "synthetic network operator", deviceId: a.deviceId, details: { automatic: false, type: "fred", downloadBytes: 8388608 } });
+    expect(JSON.stringify(audit)).not.toContain(a.deviceToken);
+  });
+  it("rejects unknown target selections atomically and reports actual collector fields independently", async () => {
+    await expect(store.queue({ deviceIds: [a.deviceId, randomUUID()] }, "synthetic operator")).rejects.toThrow("Every selected computer");
+    await expect(store.queue({ deviceIds: [a.deviceId, a.deviceId] }, "synthetic operator")).rejects.toThrow("Every selected computer");
+    await store.workerSeen();
+    const current = new Date().toISOString();
+    await store.ingest({ ...inventory, adObservedAt: current, collectorStatus: { observedAt: current, status: "degraded", switchesObserved: 1, portObservations: 1, wifiObservations: 0 }, observations: inventory.observations.map((o) => ({ ...o, observedAt: current, portTelemetry: { source: "snmp" as const, observedAt: current, linkMbps: 1000, inErrors: 2 } })) });
+    const overview = await store.overview();
+    expect(overview.readiness).toMatchObject({ worker: { state: "current" }, collector: { state: "degraded", switchesObserved: 1 }, inventory: { state: "current" } });
+    expect(overview.devices.find((d) => d.deviceId === a.deviceId)?.portTelemetry).toMatchObject({ source: "snmp", linkMbps: 1000, inErrors: 2 });
+    await expect(store.ingest({ ...inventory, adObservedAt: current, collectorStatus: { observedAt: new Date(Date.now() + 60_000).toISOString(), status: "ok", switchesObserved: 1, portObservations: 1, wifiObservations: 0 } })).rejects.toThrow("future");
+  });
+  it("updates AD independently without erasing concurrent private network evidence", async () => {
+    const previous = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    const newest = new Date(Date.now() + 1000).toISOString();
+    await store.ingestAd({ adObservedAt: newest, adComputers: inventory.adComputers });
+    expect(await store.adInventory()).toMatchObject({ snapshotComplete: true, adObservedAt: newest, adComputers: inventory.adComputers, fresh: true });
+    let current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    expect(current.observations).toEqual(previous.observations); expect(current.userBuildingAssignments).toEqual(previous.userBuildingAssignments); expect(current.collectorStatus).toEqual(previous.collectorStatus);
+    await expect(store.ingest({ ...inventory, adObservedAt: previous.adObservedAt, observations: [] })).rejects.toThrow("older than current");
+    const networkTime = new Date(Date.now() + 2000).toISOString(), adTime = new Date(Date.now() + 3000).toISOString();
+    const network = { ...previous, adObservedAt: networkTime, observations: [{ ...inventory.observations[0], port: "1/1/9" }] };
+    const results = await Promise.allSettled([store.ingest(network), store.ingestAd({ adObservedAt: adTime, adComputers: inventory.adComputers })]);
+    expect(results[1].status).toBe("fulfilled");
+    current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    expect(current.adObservedAt).toBe(adTime);
+    expect(current.observations).toEqual(results[0].status === "fulfilled" ? network.observations : previous.observations);
+    expect(current.collectorStatus).toEqual(previous.collectorStatus);
+    await expect(store.ingestAd({ adObservedAt: adTime, adComputers: [] })).rejects.toThrow("nonempty complete");
+    await expect(store.ingestAd({ adObservedAt: new Date(Date.now() + 60_000).toISOString(), adComputers: inventory.adComputers })).rejects.toThrow("future");
+    await expect(store.ingestAd({ adObservedAt: "2020-01-01T00:00:00Z", adComputers: inventory.adComputers })).rejects.toThrow("older than current");
+    await expect(store.ingestAd({ adObservedAt: adTime, adComputers: [inventory.adComputers[0], inventory.adComputers[0]] })).rejects.toThrow("Duplicate AD object");
+  });
+  it("resolves a controller-attested client MAC without endpoint BSSID permission", async () => {
+    const current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    const heartbeat = (await db.query("SELECT heartbeat FROM building_diagnostics_devices WHERE id=$1", [a.deviceId])).rows[0].heartbeat;
+    const wifi = { ...heartbeat, interfaces: [{ ...heartbeat.interfaces[0], kind: "wifi" }] };
+    delete wifi.interfaces[0].bssid;
+    await store.ingest({ ...inventory, adObservedAt: current.adObservedAt, observations: [{ mac: wifi.interfaces[0].mac, bssid: "02:11:22:33:44:88", building: "Controller WiFi", source: "wifi", observedAt: new Date().toISOString(), edge: true }] });
+    await store.checkIn(wifi, false);
+    const device = (await store.overview()).devices.find((d) => d.deviceId === a.deviceId);
+    expect(device?.location).toMatchObject({ kind: "network-confirmed", building: "Controller WiFi", source: "Wi-Fi AP" });
+    expect(device?.portTelemetry).toBeNull();
   });
 });

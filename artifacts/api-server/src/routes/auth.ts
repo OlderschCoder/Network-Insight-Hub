@@ -181,7 +181,19 @@ router.post("/login", async (req, res) => {
 // Requires BOTH the OIDC client config AND an access gate — without the gate
 // every sign-in fails closed, so we don't advertise sign-in as available.
 router.get("/entra/status", (_req, res) => {
-  return res.json({ configured: isEntraConfigured() && isAccessGateConfigured() });
+  // Cookies and the SPA return target are origin-bound. Start a diagnostics
+  // sign-in on the already registered callback origin before creating OIDC state.
+  // This is public routing metadata only; credentials and tokens stay private.
+  let loginOrigin: string | null = null;
+  const cfg = getEntraConfig();
+  if (cfg) {
+    try {
+      const callback = new URL(cfg.redirectUri);
+      if (callback.protocol === "https:" && !callback.username && !callback.password &&
+          callback.pathname === "/api/auth/entra/callback" && !callback.search && !callback.hash) loginOrigin = callback.origin;
+    } catch { /* Invalid configuration must not become a redirect destination. */ }
+  }
+  return res.json({ configured: isEntraConfigured() && isAccessGateConfigured(), loginOrigin });
 });
 
 function frontendLoginUrl(req: any): string {
