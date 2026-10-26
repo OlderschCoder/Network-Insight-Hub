@@ -1,0 +1,33 @@
+# STAGED EXAMPLE ONLY. Add to the existing .22 Telegraf configuration after review.
+# Reuses its existing outputs.influxdb_v2; this is not a second agent or collector.
+# Supply the independent export token via a protected service-readable token file.
+# export is a bounded recent-window pull. Repeated samples retain original times.
+[[inputs.http]]
+  urls = ["https://app-server2.centralus.cloudapp.azure.com/api/building-probes/results/export?recent=true&limit=1000"]
+  interval = "15s"
+  timeout = "10s"
+  method = "GET"
+  token_file = "/etc/telegraf/building-probe-export.token"
+  headers = {"Cache-Control" = "no-store"}
+  tagexclude = ["url", "host"]
+  data_format = "json_v2"
+
+  [[inputs.http.json_v2]]
+    measurement_name = "sccc_building_probe_performance"
+    [[inputs.http.json_v2.object]]
+      path = "metrics"
+      timestamp_key = "originalSampleAt"
+      timestamp_format = "2006-01-02T15:04:05.999999999Z07:00"
+      tags = ["deviceId", "buildingId", "testType"]
+      included_keys = ["sampleId", "jobId", "deviceId", "buildingId", "testType", "originalSampleAt", "outcome", "termination", "successful", "bytes", "elapsedMs", "mbps", "rangeCount", "linkSpeedBps"]
+      [inputs.http.json_v2.object.fields]
+        sampleId = "string"
+        jobId = "string"
+        outcome = "string"
+        termination = "string"
+        successful = "bool"
+        bytes = "int"
+        elapsedMs = "float"
+        mbps = "float"
+        rangeCount = "int"
+        linkSpeedBps = "int"

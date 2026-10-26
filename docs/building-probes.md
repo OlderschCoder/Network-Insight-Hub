@@ -2,6 +2,8 @@
 
 Prepared 2026-10-25. Source and packages are built for review; production activation and a physical building pilot are separate steps. No network-device changes are required by this app.
 
+**Recurring monitoring revision:** the staged `codex/building-probe-recurring` branch extends this initial release. The [recurring monitoring review](building-probes-recurring-review.md) supersedes the initial one-assignment-per-building and on-demand-only limits below. It has not been deployed or activated. The existing production diagnostics prototype remains frozen until a reviewed migration.
+
 ## Behavior
 
 `/network/building-probes` adds **GPO Monitor** to Campus Technology. The existing restricted SCCC Key alert console links to this page. Fred's existing sign-in remains authoritative: CIO selects/revokes computers; CIO/network/network_engineer can view reports and request tests. A probe credential cannot call administrator, alert or MFA APIs.

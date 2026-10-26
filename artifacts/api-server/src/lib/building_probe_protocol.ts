@@ -23,7 +23,7 @@ const short = z.string().max(160);
 const address = z.string().max(64);
 const iso = z.string().datetime({ offset: true });
 export const assignmentInput = z.object({
-  building: z.string().trim().min(1).max(160), computerName: z.string().min(1).max(15),
+  buildingId: z.string().uuid(), computerName: z.string().min(1).max(15),
   adapterId: z.string().max(100).nullable().optional(),
   expectedVoiceSubnet: z.string().regex(/^(?:\d{1,3}\.){3}\d{1,3}\/(?:[1-9]|[12]\d|3[0-2])$/).nullable().optional(),
 }).strict();
@@ -35,6 +35,7 @@ export const snapshotSchema = z.object({
   schema: z.literal(PROBE_SCHEMA), computerName: z.string().max(15), agentVersion: z.string().max(30),
   capturedAt: iso, uptimeSeconds: z.number().int().min(0).max(100 * 365 * 86400),
   diagnosticsMode: z.literal("on-demand"),
+  capabilities: z.array(z.literal("throughput-v1")).max(1).optional(), installedAt: iso.optional(),
   adapters: z.array(z.object({ id: z.string().max(100), name: short, kind: short, state: short,
     mac: z.string().max(40), ipv4: z.array(address).max(8), gateways: z.array(address).max(4),
     dnsServers: z.array(address).max(4), dhcpServers: z.array(address).max(4),
@@ -44,7 +45,7 @@ export const snapshotSchema = z.object({
     version: z.string().max(40).nullable().optional(), uiProcessCount: z.number().int().min(0).max(1000),
   }).strict(),
 }).strict();
-const outcome = z.enum(["completed", "received", "no_packets_observed", "wrong_network", "unavailable"]);
+const outcome = z.enum(["completed", "received", "no_packets_observed", "wrong_network", "unavailable", "cancelled"]);
 // Details have an explicit allowlist; reject payload/audio/command/credential fields.
 export const detailsSchema = z.object({
   id: z.string().max(100).optional(), name: short.optional(), ipv4: z.array(address).max(8).optional(),
@@ -52,22 +53,45 @@ export const detailsSchema = z.object({
   gatewayReceived: z.number().int().min(0).max(3).optional(), gatewayAverageMs: z.number().min(0).max(10000).nullable().optional(),
   dns: z.enum(["unavailable", "resolved", "no_addresses", "failed", "timeout"]).optional(),
   httpsStatus: z.number().int().min(100).max(599).optional(), httpsElapsedMs: z.number().min(0).max(120000).optional(),
-  localAddress: address.optional(), group: z.literal(PAGING.group).optional(), port: z.literal(PAGING.port).optional(),
+  localAddress: address.nullable().optional(), group: z.literal(PAGING.group).optional(), port: z.literal(PAGING.port).optional(),
   expectedSource: z.literal(PAGING.source).optional(), packets: z.number().int().min(0).max(10000).optional(),
-  bytes: z.number().int().min(0).max(655360000).optional(), unexpectedSources: z.number().int().min(0).max(10000).optional(),
+  bytes: z.number().int().min(0).max(10000000000).optional(), unexpectedSources: z.number().int().min(0).max(10000).optional(),
   expectedVoiceSubnet: address.nullable().optional(), scopeVerified: z.boolean().optional(),
   observation: z.string().max(250).optional(), reason: z.string().max(250).optional(),
+  profile: z.enum(["quick", "hourly", "capacity"]).optional(), targetId: z.literal("sccc-external-v1").optional(),
+  elapsedMs: z.number().finite().min(0).max(930000).optional(), mbps: z.number().finite().min(0).max(1000000).nullable().optional(),
+  linkSpeedBps: z.number().finite().min(0).max(1e14).nullable().optional(),
+  termination: z.string().min(1).max(80).optional(), scheduledWindow: z.string().max(100).optional(),
+  rangeCount: z.number().int().min(0).max(10).optional(),
+  segments: z.array(z.object({ ordinal: z.number().int().min(0).max(9), requestedBytes: z.number().int().min(1).max(1073741824), bytes: z.number().int().min(0).max(1073741824), status: z.number().int().min(0).max(599), elapsedMs: z.number().finite().min(0).max(930000) }).strict()).max(10).optional(),
 }).strict();
-export const resultSchema = z.object({ jobId: z.string().uuid(), kind: z.enum(["network", "multicast"]),
+export const resultSchema = z.object({ jobId: z.string().uuid(), kind: z.enum(["network", "multicast", "throughput"]),
   startedAt: iso, completedAt: iso, outcome, details: detailsSchema,
-}).strict();
+  selectionRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(), slotAt: iso.optional(),
+}).strict().superRefine((result, ctx) => {
+  if (result.kind !== "throughput") return;
+  if (result.selectionRevision === undefined || !result.slotAt || !result.details.profile || !result.details.targetId || result.details.bytes === undefined || result.details.elapsedMs === undefined || !result.details.termination || result.details.rangeCount === undefined)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Throughput result metadata is required." });
+  if (result.outcome === "completed" && (!(result.details.bytes! > 0) || !(result.details.elapsedMs! > 0) || result.details.mbps === undefined || result.details.mbps === null))
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Completed throughput requires measured bytes, time and rate." });
+});
 export const heartbeatInput = z.object({ assignmentId: z.string().uuid(), deviceId: z.string().uuid(),
   snapshot: snapshotSchema, results: z.array(resultSchema).max(20),
+  runningJobId: z.string().uuid().optional(),
 }).strict();
 export type ProbeSnapshot = z.infer<typeof snapshotSchema>;
 export type ProbeResult = z.infer<typeof resultSchema>;
 
-export interface ProbeJob { id: string; assignmentId: string; deviceId: string; kind: "network" | "multicast"; issuedAt: number; expiresAt: number; }
+export type ThroughputProfile = "quick" | "hourly" | "capacity";
+export const THROUGHPUT_PROFILES = {
+  quick: { maxBytes: 5242880, timeoutSeconds: 10 },
+  hourly: { maxBytes: 64000000, timeoutSeconds: 10 },
+  capacity: { maxBytes: 10000000000, timeoutSeconds: 900 },
+} as const;
+export interface ProbeJob { id: string; assignmentId: string; deviceId: string; kind: "network" | "multicast" | "throughput"; issuedAt: number; expiresAt: number;
+  selectionRevision?: number; slotAt?: string;
+  options?: { profile: ThroughputProfile; targetId: "sccc-external-v1"; maxBytes: number; timeoutSeconds: number };
+}
 export class JobSigner {
   constructor(private readonly key: KeyObject) {
     if (key.asymmetricKeyType !== "ec" || key.asymmetricKeyDetails?.namedCurve !== "prime256v1") throw new Error("Building probe signing requires a P-256 key.");

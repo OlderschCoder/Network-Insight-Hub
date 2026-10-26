@@ -46,9 +46,9 @@ describe("probe identity and transaction boundaries", () => {
     const update = query.mock.calls.find(([sql]) => sql.startsWith("UPDATE building_probes"));
     expect(update?.[0]).toContain("bootstrap_hash=NULL"); expect(update?.[1]).toEqual([id,deviceId,digest(credential)]);
   });
-  it("never silently replaces an active building assignment", async () => {
+  it("never infers a canonical building from a supplied display label", async () => {
     const { store } = setup(null);
-    await expect(store.assign({ building: "West", computerName: "PC" }, bootstrap, 42)).rejects.toMatchObject({ status: 409 });
+    await expect(store.assign({ buildingId:randomUUID(), computerName: "PC" }, bootstrap, 42)).rejects.toMatchObject({ status: 400 });
   });
   it("rejects another probe's job result before writing a snapshot", async () => {
     const { store, query } = setup(registered);
