@@ -19,7 +19,7 @@
       timestamp_key = "originalSampleAt"
       timestamp_format = "2006-01-02T15:04:05.999999999Z07:00"
       tags = ["deviceId", "buildingId", "testType"]
-      included_keys = ["sampleId", "jobId", "deviceId", "buildingId", "testType", "originalSampleAt", "outcome", "termination", "successful", "bytes", "elapsedMs", "mbps", "rangeCount", "linkSpeedBps"]
+      included_keys = ["sampleId", "jobId", "attemptId", "capacityJobId", "deviceId", "buildingId", "testType", "originalSampleAt", "outcome", "termination", "successful", "bytes", "elapsedMs", "mbps", "rangeCount", "linkSpeedBps"]
       [inputs.http.json_v2.object.fields]
         sampleId = "string"
         jobId = "string"
@@ -31,3 +31,44 @@
         mbps = "float"
         rangeCount = "int"
         linkSpeedBps = "int"
+
+  [[inputs.http.json_v2]]
+    measurement_name = "sccc_building_probe_capacity_window"
+    [[inputs.http.json_v2.object]]
+      path = "capacityMetrics"
+      timestamp_key = "originalSampleAt"
+      timestamp_format = "2006-01-02T15:04:05.999999999Z07:00"
+      tags = ["buildingId"]
+      included_keys = ["capacityJobId", "buildingId", "originalSampleAt", "bytesValidated", "bytesReserved", "remainingBytes", "state", "attemptCount", "complete", "deadlineAtMs"]
+      [inputs.http.json_v2.object.fields]
+        capacityJobId = "string"
+        bytesValidated = "int"
+        bytesReserved = "int"
+        remainingBytes = "int"
+        state = "string"
+        attemptCount = "int"
+        complete = "bool"
+        deadlineAtMs = "int"
+
+  [[inputs.http.json_v2]]
+    measurement_name = "sccc_building_probe_health"
+    [[inputs.http.json_v2.object]]
+      path = "healthMetrics"
+      timestamp_key = "observedAt"
+      timestamp_format = "2006-01-02T15:04:05.999999999Z07:00"
+      tags = ["assignmentId", "buildingId"]
+      included_keys = ["assignmentId", "buildingId", "deviceId", "observedAt", "selected", "capable", "eligible", "online", "offline", "hasThroughputSample", "heartbeatAgeSeconds", "throughputAgeSeconds", "staleThroughput", "missedSlot", "consecutiveFailures", "missedSlotReason"]
+      [inputs.http.json_v2.object.fields]
+        deviceId = "string"
+        selected = "bool"
+        capable = "bool"
+        eligible = "bool"
+        online = "bool"
+        offline = "bool"
+        hasThroughputSample = "bool"
+        heartbeatAgeSeconds = "float"
+        throughputAgeSeconds = "float"
+        staleThroughput = "bool"
+        missedSlot = "bool"
+        consecutiveFailures = "int"
+        missedSlotReason = "string"

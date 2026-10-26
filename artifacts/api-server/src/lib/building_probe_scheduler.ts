@@ -19,7 +19,7 @@ export function chooseTransferLane(profile:ThroughputProfile,lanes:TransferLane[
   if(profile!=='hourly'&&lanes.some(l=>l.id>=first&&l.id<first+(profile==='quick'?4:2)&&l.building_id===buildingId&&occupied(l)))return null;
   return group.filter(l=>!occupied(l)).sort((a,b)=>a.id-b.id)[0]?.id??null;
 }
-export function throughputOptions(profile: ThroughputProfile) { return { profile, targetId: "sccc-external-v1" as const, ...THROUGHPUT_PROFILES[profile] }; }
+export function throughputOptions(profile: ThroughputProfile):{profile:ThroughputProfile;targetId:'sccc-external-v1';maxBytes:number;timeoutSeconds:number} { return { profile, targetId: "sccc-external-v1" as const, ...THROUGHPUT_PROFILES[profile] }; }
 export function capable(snapshot: any) { return Array.isArray(snapshot?.capabilities) && snapshot.capabilities.includes("throughput-v1"); }
 export function reporting(lastSeen: string | Date | null, now = Date.now()) { const value = lastSeen ? new Date(lastSeen).getTime() : NaN; return Number.isFinite(value) && value <= now + 30_000 && now - value <= SLOT_TOLERANCE_MS; }
 export function staggerSeconds(buildingId: string) { return createHash("sha256").update(buildingId).digest().readUInt32BE(0) % STAGGER_SECONDS; }

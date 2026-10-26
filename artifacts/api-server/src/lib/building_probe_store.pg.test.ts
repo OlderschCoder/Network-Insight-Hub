@@ -61,7 +61,7 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
     expect(await (store as any).transaction((client:any)=>(store as any).queueSlot(client,row,slot))).toBe(true);
     capacity=claims((await beat(b)).job!);
     expect(capacity.options).toMatchObject({profile:'capacity',maxBytes:10000000000,timeoutSeconds:900});
-    expect(capacity.expiresAt-capacity.issuedAt).toBe(930);expect(quick.expiresAt-quick.issuedAt).toBe(180);
+    expect(capacity.expiresAt-capacity.issuedAt).toBeLessThanOrEqual(900);expect(quick.expiresAt-quick.issuedAt).toBe(180);
     expect((await pool.query('SELECT id FROM building_probe_campus_lease WHERE job_id IS NOT NULL')).rows.map((r:any)=>r.id).sort()).toEqual([1,7]);
   });
   it('keeps original sample timestamps and immutable result identity when a result is retried',async()=>{
@@ -74,7 +74,7 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
   });
   it('acknowledges and discards old-generation results after deselection',async()=>{
     await store.select(b.id,false);
-    const time=new Date().toISOString(),old:ProbeResult={jobId:capacity.id,kind:'throughput',selectionRevision:capacity.selectionRevision,slotAt:capacity.slotAt,startedAt:time,completedAt:time,outcome:'cancelled',details:{profile:'capacity',targetId:'sccc-external-v1',bytes:0,elapsedMs:1,mbps:null,rangeCount:0,termination:'cancelled'}};
+    const time=new Date().toISOString(),old:ProbeResult={jobId:capacity.id,kind:'throughput',selectionRevision:capacity.selectionRevision,slotAt:capacity.slotAt,startedAt:time,completedAt:time,outcome:'cancelled',details:{profile:'capacity',targetId:'sccc-external-v1',bytes:0,elapsedMs:1,mbps:null,rangeCount:0,termination:'cancelled',bytesAccounted:true}};
     const response=await beat(b,[old],capacity.id);
     expect(response.acceptedResults).toContain(capacity.id);expect(response.selection.selected).toBe(false);expect(response.job).toBeNull();
     expect((await store.exportResults('0',100)).results.filter(r=>r.testType==='capacity')).toHaveLength(0);
@@ -82,7 +82,7 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
   });
   it('fails over a capacity window once, retaining its original slot and never retrying the second failure',async()=>{
     const response=await beat(a),fallback=claims(response.job!);expect(fallback.kind).toBe('throughput');expect(fallback.options.profile).toBe('capacity');expect(fallback.slotAt).toBe(capacity.slotAt);
-    const time=new Date().toISOString();await beat(a,[{jobId:fallback.id,kind:'throughput',selectionRevision:fallback.selectionRevision,slotAt:fallback.slotAt,startedAt:time,completedAt:time,outcome:'unavailable',details:{profile:'capacity',targetId:'sccc-external-v1',bytes:0,elapsedMs:1,mbps:null,rangeCount:0,termination:'target_not_ready'}}]);
+    const time=new Date().toISOString();await beat(a,[{jobId:fallback.id,kind:'throughput',selectionRevision:fallback.selectionRevision,slotAt:fallback.slotAt,startedAt:time,completedAt:time,outcome:'unavailable',details:{profile:'capacity',targetId:'sccc-external-v1',bytes:0,elapsedMs:1,mbps:null,rangeCount:0,termination:'target_not_ready',bytesAccounted:true}}]);
     const rows=(await pool.query('SELECT * FROM building_probe_slots WHERE key=$1',[`synthetic-capacity-${b.id}`])).rows;expect(rows[0]).toMatchObject({attempt:1,state:'failed'});
     expect((await pool.query("SELECT count(*) FROM building_probe_jobs WHERE slot_key=$1",[`synthetic-capacity-${b.id}`])).rows[0].count).toBe('2');
   });

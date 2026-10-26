@@ -54,10 +54,13 @@ test("retains separate bounded network/paging checks and starts no automatic job
   await page.goto("/network/building-probes");
   await expect(page.getByRole("heading", { name: "Building probes", exact: true })).toBeVisible();
   await expect(page.getByText("Hourly · every 60 minutes per computer", { exact: true })).toBeVisible();
+  await expect(page.getByText("Each building shares one 10 GB allowance per window; an alternate uses only the remaining allowance.", { exact: true })).toBeVisible();
   const card = page.getByTestId("probe-card");
   await expect(card).toContainText("WEST-LAB-01");
   await expect(card).toContainText("10.30.25.94/24");
   await expect(card).toContainText("Paging is not yet verified");
+  await expect(card).toContainText("first recorded initialization");
+  await expect(card).not.toContainText("· installed ");
   expect(state.mutations).toHaveLength(0);
   await page.screenshot({ path: "test-results/building-probes-desktop.png", fullPage: true });
   await card.screenshot({ path: "test-results/building-probes-desktop-card.png" });

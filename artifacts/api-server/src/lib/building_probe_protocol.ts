@@ -63,11 +63,13 @@ export const detailsSchema = z.object({
   linkSpeedBps: z.number().finite().min(0).max(1e14).nullable().optional(),
   termination: z.string().min(1).max(80).optional(), scheduledWindow: z.string().max(100).optional(),
   rangeCount: z.number().int().min(0).max(10).optional(),
+  bytesAccounted: z.boolean().optional(),
   segments: z.array(z.object({ ordinal: z.number().int().min(0).max(9), requestedBytes: z.number().int().min(1).max(1073741824), bytes: z.number().int().min(0).max(1073741824), status: z.number().int().min(0).max(599), elapsedMs: z.number().finite().min(0).max(930000) }).strict()).max(10).optional(),
 }).strict();
 export const resultSchema = z.object({ jobId: z.string().uuid(), kind: z.enum(["network", "multicast", "throughput"]),
   startedAt: iso, completedAt: iso, outcome, details: detailsSchema,
   selectionRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(), slotAt: iso.optional(),
+  capacityJobId: z.string().uuid().optional(), attemptId: z.string().uuid().optional(),
 }).strict().superRefine((result, ctx) => {
   if (result.kind !== "throughput") return;
   if (result.selectionRevision === undefined || !result.slotAt || !result.details.profile || !result.details.targetId || result.details.bytes === undefined || result.details.elapsedMs === undefined || !result.details.termination || result.details.rangeCount === undefined)
@@ -90,6 +92,7 @@ export const THROUGHPUT_PROFILES = {
 } as const;
 export interface ProbeJob { id: string; assignmentId: string; deviceId: string; kind: "network" | "multicast" | "throughput"; issuedAt: number; expiresAt: number;
   selectionRevision?: number; slotAt?: string;
+  capacityJobId?: string;
   options?: { profile: ThroughputProfile; targetId: "sccc-external-v1"; maxBytes: number; timeoutSeconds: number };
 }
 export class JobSigner {
