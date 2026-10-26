@@ -1,10 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Building2, Download, Laptop, Radio, RefreshCw } from "lucide-react";
+import { Activity, Building2, Download, Laptop, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/lib/authFetch";
@@ -73,10 +74,6 @@ const bytes = (value: number) => {
   return `${value.toLocaleString()} bytes`;
 };
 const duration = (seconds: number) => seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} minutes` : `${seconds}s`;
-const windowOffset = (window: string, minutes: number) => {
-  const [hour, minute] = window.split(":").map(Number), value = (hour * 60 + minute + minutes) % 1440;
-  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
-};
 const detailText = (value: unknown) => typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "unavailable");
 const centralTime = (value: string | null | undefined, zone: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(undefined, { timeZone: zone, dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Not activated";
 async function request(path: string, body?: unknown) {
@@ -166,21 +163,19 @@ export default function BuildingProbes() {
         { title: "Awaiting / offline probes", value: probes.filter(p => p.state !== "reporting").length, Icon: Laptop }]
         .map(({ title, value, Icon }) => <Card key={title} data-testid={`summary-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}><CardContent className="pt-6 flex justify-between items-center gap-3"><div><p className="text-sm text-muted-foreground">{title}</p><p className="text-3xl font-semibold">{value}</p></div><Icon className="h-7 w-7 shrink-0 text-muted-foreground" /></CardContent></Card>)}
     </div>
-    {canView && <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>Recurring performance</CardTitle><Badge variant={schedule?.enabled && schedule.targetReady ? "default" : "secondary"}>{schedule?.enabled && schedule.targetReady ? schedule.capacityEnabled === true ? "Server schedule active" : "Quick / hourly armed" : "Staged · not running"}</Badge></div></CardHeader><CardContent className="space-y-3 text-sm">
-      <p role="status">{schedule?.reason || (!schedule ? "Recurring performance is not available on this server." : !schedule.enabled ? "The server has not enabled recurring tests." : !schedule.targetReady ? "The fixed test target is not ready." : schedule.capacityEnabled !== true ? "Selected capable probes report quick and hourly measurements; capacity tests are paused by the server." : "Selected capable probes report on the server's bounded schedule.")}</p>
-      <p>Membership is saved per computer and stays in place until you change it. Selecting a computer makes its first baseline due at activation; deselecting stops recurring work and keeps its enrollment. Start with the IT pilot computers.</p>
-      {schedule && <><div className="grid gap-3 md:grid-cols-3">
-        {([['quick', 'Quick · every 5 minutes per computer'], ['hourly', 'Hourly · every 60 minutes per computer'], ['capacity', 'Capacity · once per building']] as const).map(([key, title]) => <div key={key} className="rounded-md border p-3"><p className="font-medium">{title}</p>{key === 'capacity' && schedule.capacityEnabled !== true && <Badge variant="secondary">Paused</Badge>}<p>Up to {bytes(schedule.profiles[key].maxBytes)} · {duration(schedule.profiles[key].timeoutSeconds)}</p></div>)}
-      </div><p>Capacity windows: {schedule.capacityWindows.join(" and ")} · {schedule.timeZone}. Building runs alternate selected computers and stagger within {duration(schedule.staggerWindowSeconds)}. Installed NIC link rate is not a measured download result.</p>
-      <p>Each building shares one {bytes(schedule.profiles.capacity.maxBytes)} allowance per window; an alternate uses only the remaining allowance.</p>
-      {schedule.capacityStartDeadlineMinutes !== undefined && schedule.capacityHardEndMinutes !== undefined && <p>Last capacity starts: {schedule.capacityWindows.map(window => windowOffset(window, schedule.capacityStartDeadlineMinutes!)).join(" and ")}. Hard stops: {schedule.capacityWindows.map(window => windowOffset(window, schedule.capacityHardEndMinutes!)).join(" and ")} · {schedule.timeZone}.</p>}
-      {(schedule.quickConcurrency !== undefined || schedule.hourlyConcurrency !== undefined || schedule.capacityConcurrency !== undefined) && <p>Configured global transfer lanes: {[["quick", schedule.quickConcurrency], ["hourly", schedule.hourlyConcurrency], ["capacity", schedule.capacityConcurrency]].filter(([, limit]) => limit !== undefined).map(([name, limit]) => `${name} ${limit}`).join(" · ")}. A computer runs one measurement at a time.</p>}
-      <p className="text-xs text-muted-foreground">Fixed target: {schedule.targetId || "Not configured"}. Transfer limits and activation are controlled by the server; this page does not enable the scheduler.</p></>}
+    {canView && <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>Measurement schedule</CardTitle><Badge variant={schedule?.enabled && schedule.targetReady ? "default" : "secondary"}>{schedule?.enabled && schedule.targetReady ? "Active" : "Pilot paused"}</Badge></div></CardHeader><CardContent className="space-y-3 text-sm">
+      <p role="status">{schedule?.reason || (!schedule ? "The server has not published a schedule." : !schedule.enabled ? "Pilot enrollment is open; recurring tests are still off." : !schedule.targetReady ? "The external test target is not ready." : "Selected computers are reporting on the bounded schedule.")}</p>
+      {schedule && <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-md border p-3"><strong>Live health</strong><p>Every 5 minutes · up to {bytes(schedule.profiles.quick.maxBytes)} · {duration(schedule.profiles.quick.timeoutSeconds)}</p></div>
+        <div className="rounded-md border p-3"><strong>Hourly speed</strong><p>Up to {bytes(schedule.profiles.hourly.maxBytes)} · {duration(schedule.profiles.hourly.timeoutSeconds)}</p></div>
+        <div className="rounded-md border p-3"><strong>10 GB capacity</strong><p>7:00 AM and 7:00 PM · one computer per building</p></div>
+      </div>}
+      <details><summary className="cursor-pointer text-muted-foreground">Schedule safeguards</summary><p className="mt-2">Tests use one transfer at a time per computer, fixed byte/time ceilings and campus-wide concurrency limits. The 10 GB test remains separately gated. A NIC link rate is not reported as a measured speed.</p></details>
     </CardContent></Card>}
-    <div className="rounded-lg border p-4 text-sm space-y-1"><p className="font-semibold flex items-center gap-2"><Radio className="h-4 w-4" />Paging test: 239.0.1.216:24016 · source 10.40.4.20</p>
-      <p>Queue a test, wait for “dispatched,” then send a test page during its 60-second listening window. A lab PC measures only its attached adapter and VLAN; packet receipt does not verify phone playback. No packets observed is inconclusive.</p></div>
     {enabled && probes.length === 0 && <Card><CardContent className="py-10 text-center text-muted-foreground">No current computer enrollments. Add a target under an explicit canonical building below.</CardContent></Card>}
-    <div className="grid xl:grid-cols-2 gap-5">{currentGroups.map(group => {
+    <Card><CardHeader><CardTitle>Building computers</CardTitle></CardHeader><CardContent className="px-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow>
+      <TableHead className="pl-6">Use</TableHead><TableHead>Computer</TableHead><TableHead>Building</TableHead><TableHead>Status</TableHead><TableHead>Network</TableHead><TableHead>Latest speed</TableHead><TableHead className="pr-6">Actions</TableHead>
+    </TableRow></TableHeader><TableBody>{currentGroups.map(group => {
       const probe = group.current!;
       const snapshot = probe.snapshot;
       const jobs = uniqueIds(probe.jobs || []);
@@ -189,52 +184,29 @@ export default function BuildingProbes() {
       const selectedInBuilding = selected.filter(item => item.buildingId === probe.buildingId).length;
       const capable = probe.capable === true && !!probe.capabilities?.includes("throughput-v1");
       const selectionBlocked = !probe.selected && (!schedule || !canonicalBuilding || group.conflicted || selectedInBuilding >= 2);
-      return <Card key={group.key} data-testid="probe-card"><CardHeader>
-        <div className="flex justify-between gap-3"><div className="min-w-0"><CardTitle>{canonicalBuilding?.label || probe.building}</CardTitle><p className="mt-1 break-all font-mono text-sm">{normalizedComputer(probe.computerName)}</p></div>
-          <Badge variant={probe.state === "reporting" ? "default" : "secondary"}>{label(probe.state)}</Badge></div>
-        <p className="break-all text-xs text-muted-foreground">{canonicalBuilding ? `Canonical building ID: ${canonicalBuilding.id}` : "Historical assignment · canonical building must be assigned explicitly."}</p>
-        <p className="text-xs text-muted-foreground">Assignment basis: {probe.assignmentBasis === "catalog-assignment" ? "Administrator catalog assignment" : "Historical label assignment"}. This is an administrative location, not a physical topology verification.</p>
-        <p className="text-xs text-muted-foreground">Last server check-in: {time(probe.lastSeen)}</p></CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="space-y-2 rounded-md border p-3">
-            <label className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label={`Select ${normalizedComputer(probe.computerName)} for recurring tests`} checked={pendingSelection?.id === probe.id ? pendingSelection.selected : !!probe.selected} disabled={!isCIO || !!busy || selectionBlocked} onChange={event => void setSelected(probe, event.target.checked)} /><span><strong>{pendingSelection?.id === probe.id ? "Saving membership…" : probe.selected ? "Selected for recurring tests" : "Not selected for recurring tests"}</strong><span className="block text-xs text-muted-foreground">{probe.deviceId ? "Credential enrolled" : "Awaiting credential enrollment"} · {capable ? "Throughput capability installed" : "Throughput upgrade required"}</span></span></label>
-            {!isCIO && <p className="text-xs text-muted-foreground">The CIO manages persistent membership.</p>}
-            {!probe.selected && selectedInBuilding >= 2 && <p className="text-xs">Two computers are already selected for this building. Deselect one before adding another.</p>}
-            {group.conflicted && <p className="text-destructive">Conflicting active assignments were grouped into one computer. Resolve the server assignment before selecting it.</p>}
-            <p>Probe installed version: <strong>{snapshot?.agentVersion || "Not reported"}</strong>{probe.installedAt ? ` · first recorded initialization ${time(probe.installedAt)}` : ""}</p>
-            <p data-testid="cadence-anchor">Cadence anchor: {probe.cadenceAnchorAt && Number.isFinite(Date.parse(probe.cadenceAnchorAt)) ? centralTime(probe.cadenceAnchorAt, schedule?.timeZone || "America/Chicago") : "Not reported"} · {probe.cadenceAnchorSource === "installed-at" ? "Recorded installation/initialization time" : probe.cadenceAnchorSource === "selection-time-fallback" ? "Selection-time fallback (installation time unavailable)" : "Source not reported"}</p>
-            <p>Activation: {centralTime(probe.activationAt, schedule?.timeZone || "America/Chicago")}</p>
-            <p>{probe.eligible && capable ? "Eligible for bounded throughput" : "Not eligible for throughput"}{!capable ? "; existing network and paging checks remain separate." : probe.state !== "reporting" ? "; probe is offline or stale." : !probe.selected ? "; select this computer first." : "; see the server schedule state."}</p>
-            <div className="grid gap-1 text-xs sm:grid-cols-2"><p>Last speed sample: {age(probe.lastThroughputAt)}</p><p>{probe.missedSlot || probe.missedSlotReason ? `Missed scheduled slot${probe.missedSlot ? `: ${centralTime(probe.missedSlot, schedule?.timeZone || "America/Chicago")}` : ""}${probe.missedSlotReason ? ` · ${label(probe.missedSlotReason.slice(0, 160))}` : ""}` : "No missed slot reported"}</p><p>Consecutive failures: {probe.consecutiveFailures ?? "Not reported"}</p><p>{probe.state === "reporting" ? "Probe online" : "Probe offline / awaiting check-in"}</p></div>
-          </div>
-          <div className="rounded-md bg-muted/50 p-3"><p className="font-medium">SCCC Key &amp; Alert</p>
-            {snapshot ? <><p>Installed: {snapshot.keyAlert.installed ? "Yes" : "No"} · version {snapshot.keyAlert.version || "unknown"}</p>
-              <p>Receiver service: {snapshot.keyAlert.serviceState} · UI processes: {snapshot.keyAlert.uiProcessCount}</p>
-              <p className="text-xs text-muted-foreground mt-1">Installation and process status; alert delivery and MFA are not tested.</p></> : <p>No app snapshot yet.</p>}</div>
-          <div><p className="font-medium">Network adapters</p>{snapshot?.adapters.length ? uniqueIds(snapshot.adapters).map(a => <div key={a.id} className="mt-2 border-l-2 pl-3 break-words">
-            <p>{a.name} · {a.state}{probe.adapterId === a.id ? " · selected" : ""}</p><p className="font-mono text-xs">{a.ipv4.join(", ") || "No IPv4 address"}</p>
-            <p className="text-xs text-muted-foreground">Gateway: {a.gateways.join(", ") || "none"} · DNS: {a.dnsServers.join(", ") || "none"}</p></div>) : <p className="text-muted-foreground">No adapter snapshot yet.</p>}
-            <p className="text-xs mt-2">Expected voice subnet: {probe.expectedVoiceSubnet || "Not specified; observations cannot confirm voice VLAN coverage."}</p></div>
-          <p className="font-medium">Manual network and paging checks</p>
-          <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!!busy || !probe.selected || probe.state !== "reporting" || pending}
-            onClick={() => void act(probe.id, async () => { await request(`/assignments/${probe.id}/jobs`, { kind: "network" }); setNotice(`Network test queued for ${probe.computerName}.`); })}>Run network check</Button>
-            <Button size="sm" variant="outline" disabled={!!busy || !probe.selected || probe.state !== "reporting" || pending}
-              onClick={() => void act(probe.id, async () => { await request(`/assignments/${probe.id}/jobs`, { kind: "multicast" }); setNotice(`Paging capture queued for ${probe.computerName}. Wait for dispatched, then send the test page.`); })}>Listen for paging</Button>
-            {isCIO && probe.enabled && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setReplace(probe)}>Revoke target</Button>}</div>
-          <div className="border-t pt-3"><p className="font-medium">Recent tests</p>{!jobs.length && <p className="text-muted-foreground">No test has run. Paging is not yet verified.</p>}
-            {jobs.map(job => <div key={job.id} className="mt-3 rounded-md border p-3"><p className="font-medium capitalize">{job.kind}{job.options?.profile ? ` · ${job.options.profile}` : ""} · {job.kind === "throughput" && job.status === "completed" ? "finished" : label(job.status)}{job.result ? ` · ${job.kind === "throughput" && job.result.outcome === "completed" ? "measurement recorded" : label(job.result.outcome)}` : ""}</p>
-              <p className="text-xs text-muted-foreground">{time(job.result?.completedAt || job.createdAt)}</p>
-              {job.options && <p className="mt-1 text-xs">Limit: {bytes(job.options.maxBytes)} · {duration(job.options.timeoutSeconds)}{job.slotAt ? ` · scheduled ${centralTime(job.slotAt, schedule?.timeZone || "America/Chicago")}` : ""}</p>}
-              {job.kind === "throughput" && job.result && <div className="mt-2 space-y-1 rounded-md bg-muted/50 p-2 text-xs">
-                <p>Transferred {typeof job.result.details.bytes === "number" ? bytes(job.result.details.bytes) : "Not reported"}{job.options ? ` of up to ${bytes(job.options.maxBytes)}` : " · byte ceiling not reported"}{typeof job.result.details.elapsedMs === "number" ? ` in ${duration(job.result.details.elapsedMs / 1000)}` : ""}.</p>
-                <p>Termination: {typeof job.result.details.termination === "string" ? label(job.result.details.termination) : "Not reported"}{typeof job.result.details.mbps === "number" ? ` · measured ${job.result.details.mbps.toFixed(1)} Mbps` : ""}.</p>
-                {job.options && typeof job.result.details.bytes === "number" && job.result.details.bytes < job.options.maxBytes && <p>Partial transfer: the byte ceiling was not reached. A recorded measurement does not mean the full capacity transfer completed.</p>}
-              </div>}
-              {job.result && <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 mt-2 text-xs">{Object.entries(job.result.details).map(([key, value]) => <div key={key} className="contents"><dt className="text-muted-foreground">{key}</dt><dd className="break-all">{detailText(value)}</dd></div>)}</dl>}</div>)}</div>
-          {snapshot && <p className="text-xs text-muted-foreground">Probe {snapshot.agentVersion} · computer uptime {Math.floor(snapshot.uptimeSeconds / 3600)} hours</p>}
-          {!!group.history.length && <details className="border-t pt-3" data-testid="assignment-history"><summary className="cursor-pointer font-medium">Previous assignments ({group.history.length})</summary><ul className="mt-2 space-y-2 text-xs">{group.history.map(previous => <li key={previous.id}>{previous.building} · {previous.enabled ? "Replaced duplicate assignment" : "Revoked"} · last check-in {time(previous.lastSeen)}<code className="block break-all">{previous.id}</code></li>)}</ul></details>}
-        </CardContent></Card>;
-    })}</div>
+      const adapter = snapshot?.adapters.find(item => item.id === probe.adapterId) || snapshot?.adapters.find(item => item.ipv4.length) || snapshot?.adapters[0];
+      const speed = jobs.find(job => job.kind === "throughput" && job.result);
+      const mbps = speed && typeof speed.result?.details.mbps === "number" ? `${speed.result.details.mbps.toFixed(1)} Mbps` : "No sample";
+      return <TableRow key={group.key} data-testid="probe-row" className="align-top">
+        <TableCell className="pl-6"><input type="checkbox" aria-label={`Select ${normalizedComputer(probe.computerName)} for recurring tests`} checked={pendingSelection?.id === probe.id ? pendingSelection.selected : !!probe.selected} disabled={!isCIO || !!busy || selectionBlocked} onChange={event => void setSelected(probe, event.target.checked)} /></TableCell>
+        <TableCell><p className="font-mono font-medium">{normalizedComputer(probe.computerName)}</p><p className="text-xs text-muted-foreground">Probe {snapshot?.agentVersion || "not reporting"}</p></TableCell>
+        <TableCell>{canonicalBuilding?.label || probe.building}</TableCell>
+        <TableCell><Badge variant={probe.state === "reporting" ? "default" : "secondary"}>{label(probe.state)}</Badge><p className="mt-1 text-xs text-muted-foreground">{age(probe.lastSeen)}</p></TableCell>
+        <TableCell><p>{adapter?.name || "Not reported"}</p><p className="font-mono text-xs text-muted-foreground">{adapter?.ipv4.join(", ") || "No IPv4"}</p></TableCell>
+        <TableCell><p className="font-medium">{mbps}</p><p className="text-xs text-muted-foreground">{age(speed?.result?.completedAt || probe.lastThroughputAt)}</p></TableCell>
+        <TableCell className="pr-6"><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!!busy || !probe.selected || probe.state !== "reporting" || pending} onClick={() => void act(probe.id, async () => { await request(`/assignments/${probe.id}/jobs`, { kind: "network" }); setNotice(`Network test queued for ${probe.computerName}.`); })}>Check now</Button>
+          <details className="w-full text-xs"><summary className="cursor-pointer text-muted-foreground">Advanced</summary><div className="mt-2 min-w-72 space-y-2 rounded-md border p-3">
+            <p><strong>Enrollment:</strong> {probe.deviceId ? "Credential enrolled" : "Awaiting credential"} · {capable ? "speed capable" : "upgrade required"}</p>
+            <p><strong>Last check-in:</strong> {time(probe.lastSeen)}</p><p><strong>Gateway:</strong> {adapter?.gateways.join(", ") || "not reported"}</p><p><strong>DNS:</strong> {adapter?.dnsServers.join(", ") || "not reported"}</p>
+            <p><strong>SCCC Key &amp; Alert:</strong> {snapshot ? `${snapshot.keyAlert.installed ? "installed" : "not installed"} · ${snapshot.keyAlert.serviceState}` : "not reported"}</p>
+            <p data-testid="cadence-anchor"><strong>Cadence anchor:</strong> {probe.cadenceAnchorAt ? centralTime(probe.cadenceAnchorAt, schedule?.timeZone || "America/Chicago") : "not reported"}</p>
+            <p><strong>Failures:</strong> {probe.consecutiveFailures ?? "not reported"}</p>
+            <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!!busy || !probe.selected || probe.state !== "reporting" || pending} onClick={() => void act(probe.id, async () => { await request(`/assignments/${probe.id}/jobs`, { kind: "multicast" }); setNotice(`Paging capture queued for ${probe.computerName}. Wait for dispatched, then send the test page.`); })}>Listen for paging</Button>{isCIO && probe.enabled && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setReplace(probe)}>Revoke</Button>}</div>
+            {!!jobs.length && <details><summary className="cursor-pointer">Recent results ({jobs.length})</summary>{jobs.map(job => <div key={job.id} className="mt-2 border-t pt-2"><p className="font-medium capitalize">{job.kind} · {label(job.status)}</p><p>{time(job.result?.completedAt || job.createdAt)}</p>{job.result && <p className="break-all text-muted-foreground">{Object.entries(job.result.details).map(([key, value]) => `${key}: ${detailText(value)}`).join(" · ")}</p>}</div>)}</details>}
+            {!!group.history.length && <p>Previous assignments: {group.history.length}</p>}
+          </div></details></div></TableCell>
+      </TableRow>;
+    })}</TableBody></Table></div></CardContent></Card>
     {!!retiredGroups.length && <Card><CardContent className="pt-6"><details data-testid="retired-history"><summary className="cursor-pointer font-semibold">Retired computer history ({retiredGroups.length})</summary><p className="mt-2 text-sm text-muted-foreground">Historical assignments are retained once per computer and do not count as current enrollments or selections.</p><ul className="mt-3 space-y-3">{retiredGroups.map(group => <li key={group.key} className="rounded-md border p-3"><p className="font-mono text-sm">{normalizedComputer(group.history[0].computerName)}</p><ul className="mt-2 space-y-2 text-xs">{group.history.map(previous => <li key={previous.id}>{previous.building} · revoked · last check-in {time(previous.lastSeen)}<code className="block break-all">{previous.id}</code></li>)}</ul></li>)}</ul></details></CardContent></Card>}
     {canView && historyQuery.error && <p role="alert" className="text-sm text-destructive">Assignment history could not be loaded. Current reporting is shown independently.</p>}
     {isCIO && enabled && <Card><CardHeader><CardTitle>Canonical building catalog</CardTitle></CardHeader><CardContent className="space-y-4">
