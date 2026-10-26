@@ -2,7 +2,7 @@
 
 Prepared 2026-10-25. Source and packages are built for review; production activation and a physical building pilot are separate steps. No network-device changes are required by this app.
 
-**Recurring monitoring revision:** the staged `codex/building-probe-recurring` branch extends this initial release. The [recurring monitoring review](building-probes-recurring-review.md) supersedes the initial one-assignment-per-building and on-demand-only limits below. It has not been deployed or activated. The existing production diagnostics prototype remains frozen until a reviewed migration.
+**Recurring monitoring revision:** `codex/building-probe-recurring` extends this initial release. The [recurring monitoring review](building-probes-recurring-review.md) supersedes the initial one-assignment-per-building and on-demand-only limits below and records current deployment status. The code-only server integration and two inert 0.1.4 pilot services are deployed; feature activation, enrollment and measurements remain off. The existing production diagnostics prototype remains frozen until a reviewed migration.
 
 ## Behavior
 
