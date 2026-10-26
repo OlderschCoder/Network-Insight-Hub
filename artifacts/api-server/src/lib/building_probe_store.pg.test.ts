@@ -11,7 +11,8 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
   const signer=new JobSigner(generateKeyPairSync('ec',{namedCurve:'prime256v1'}).privateKey);
   const credentials=new Map<string,string>();
   const identities=new Map<string,string>();
-  const snapshot=(name:string,capability=true):ProbeSnapshot=>({schema:PROBE_SCHEMA,computerName:name,agentVersion:capability?'0.1.4':'0.1.3',capturedAt:new Date().toISOString(),uptimeSeconds:100,diagnosticsMode:'on-demand',adapters:[],keyAlert:{installed:false,serviceState:'unavailable',uiProcessCount:0},...(capability?{capabilities:['throughput-v1'] as ['throughput-v1'],installedAt:new Date().toISOString()}:{})});
+  const installationTimes=new Map<string,string>();
+  const snapshot=(name:string,capability=true):ProbeSnapshot=>{if(!installationTimes.has(name))installationTimes.set(name,new Date().toISOString());return {schema:PROBE_SCHEMA,computerName:name,agentVersion:capability?'0.1.4':'0.1.3',capturedAt:new Date().toISOString(),uptimeSeconds:100,diagnosticsMode:'on-demand',adapters:[],keyAlert:{installed:false,serviceState:'unavailable',uiProcessCount:0},...(capability?{capabilities:['throughput-v1'] as ['throughput-v1'],installedAt:installationTimes.get(name)!}:{})};};
   const beat=(probe:any,results:ProbeResult[]=[],runningJobId?:string,capability=true)=>store.heartbeat(probe.id,identities.get(probe.id)!,credentials.get(probe.id)!,snapshot(probe.computerName,capability),results,signer,runningJobId);
   const claims=(value:string)=>JSON.parse(Buffer.from(value.split('.')[1]!,'base64url').toString('utf8'));
   const enroll=async(name:string)=>{const bootstrap=token(),probe=await store.assign({buildingId:building.id,computerName:name},bootstrap,42),deviceId=randomUUID(),credential=token();identities.set(probe.id,deviceId);credentials.set(probe.id,credential);await store.enroll({assignmentId:probe.id,deviceId,computerName:name,proposedToken:credential},bootstrap);return probe;};
@@ -51,7 +52,8 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
   });
   let quick:any,capacity:any;
   it('leases only one small transfer while admitting capacity in its separate lane',async()=>{
-    await pool.query("UPDATE building_probes SET activation_at=now()-interval '5 minutes',reporting_since=now()-interval '6 minutes' WHERE id IN ($1,$2)",[a.id,b.id]);
+    const installed=new Date(Date.now()-300000).toISOString();for(const p of [a,b])installationTimes.set(p.computerName,installed);
+    await pool.query("UPDATE building_probes SET installed_at=$3,cadence_anchor_at=$3,cadence_anchor_source='installed-at',cadence_anchor_resolved_at=now()-interval '6 minutes',selected_at=now()-interval '6 minutes',activation_at=now()-interval '5 minutes',reporting_since=now()-interval '6 minutes' WHERE id IN ($1,$2)",[a.id,b.id,installed]);
     policy={...policy,targetReady:true};const first=await beat(a);quick=claims(first.job!);expect(first.leaseExpiresAt).toBeDefined();
     expect(quick.options).toMatchObject({profile:'quick',maxBytes:5242880,timeoutSeconds:10});
     expect((await beat(b)).job).toBeNull();
@@ -95,7 +97,8 @@ describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries'
   });
   it('does not treat a version label as throughput capability or catch up missed quick slots',async()=>{
     await store.select(b.id,true);const oldClient=await beat(b,[],undefined,false);expect(claims(oldClient.job!).kind).toBe('network');
-    await pool.query("UPDATE building_probes SET activation_at=now()-interval '13 minutes',last_seen=now()-interval '1 hour' WHERE id=$1",[a.id]);
+    const installed=new Date(Date.now()-13*60000).toISOString();installationTimes.set(a.computerName,installed);
+    await pool.query("UPDATE building_probes SET installed_at=$2,cadence_anchor_at=$2,cadence_anchor_source='installed-at',cadence_anchor_resolved_at=now()-interval '14 minutes',selected_at=now()-interval '14 minutes',activation_at=now()-interval '13 minutes',last_seen=now()-interval '1 hour' WHERE id=$1",[a.id,installed]);
     expect((await beat(a)).job).toBeNull();
     const row=(await store.list()).find(p=>p.id===a.id);expect(row.missedSlot).not.toBeNull();
     const pending=(await pool.query("SELECT * FROM building_probe_jobs WHERE assignment_id=$1 AND status='pending'",[a.id])).rows;expect(pending).toHaveLength(0);

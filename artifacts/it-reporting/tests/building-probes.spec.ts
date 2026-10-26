@@ -4,13 +4,15 @@ const id = "172dd03b-5f99-4692-a993-c28d768bf119";
 const buildingId = "10000000-0000-4000-8000-000000000001";
 const baseballId = "10000000-0000-4000-8000-000000000002";
 const now = new Date().toISOString();
+const historicalAnchor = "2026-10-20T14:23:00.000Z";
 const buildings = [{ id: buildingId, label: "West Campus", normalizedKey: "west-campus" }, { id: baseballId, label: "Baseball Field", normalizedKey: "baseball-field" }];
 const schedule = { enabled: false, targetReady: false, reason: "Recurring tests are staged; the server scheduler is disabled.", targetId: "fixed-pilot-target",
   profiles: { quick: { maxBytes: 5 * 1024 ** 2, timeoutSeconds: 10 }, hourly: { maxBytes: 64_000_000, timeoutSeconds: 10 }, capacity: { maxBytes: 10_000_000_000, timeoutSeconds: 900 } },
   timeZone: "America/Chicago", capacityWindows: ["07:00", "19:00"], staggerWindowSeconds: 2700,
   capacityStartDeadlineMinutes: 45, capacityHardEndMinutes: 60, quickConcurrency: 4, hourlyConcurrency: 1, capacityConcurrency: 1 };
 const probe = { id, deviceId: "20000000-0000-4000-8000-000000000001", buildingId, assignmentBasis: "catalog-assignment", building: "West Campus", computerName: "WEST-LAB-01", state: "reporting", enabled: true,
-  selected: true, selectionRevision: 1, activationAt: now, capabilities: ["throughput-v1"], capable: true, eligible: true, installedAt: now,
+  selected: true, selectionRevision: 1, activationAt: now, capabilities: ["throughput-v1"], capable: true, eligible: true, installedAt: historicalAnchor,
+  cadenceAnchorAt: historicalAnchor, cadenceAnchorSource: "installed-at", cadenceAnchorResolvedAt: null, selectionAt: now,
   missedSlot: null, missedSlotReason: null, consecutiveFailures: 0, lastThroughputAt: now, lastSeen: now, expectedVoiceSubnet: "10.30.25.0/24", adapterId: null,
   snapshot: { agentVersion: "0.1.4", uptimeSeconds: 3600,
     adapters: [{ id: "voice", name: "Ethernet", state: "Up", ipv4: ["10.30.25.94/24"], gateways: ["10.30.25.254"], dnsServers: ["10.40.1.1"] }],
@@ -53,6 +55,7 @@ test("retains separate bounded network/paging checks and starts no automatic job
   const state = await mock(page);
   await page.goto("/network/building-probes");
   await expect(page.getByRole("heading", { name: "Building probes", exact: true })).toBeVisible();
+  await expect(page.getByText("Quick · every 5 minutes per computer", { exact: true })).toBeVisible();
   await expect(page.getByText("Hourly · every 60 minutes per computer", { exact: true })).toBeVisible();
   await expect(page.getByText("Each building shares one 10 GB allowance per window; an alternate uses only the remaining allowance.", { exact: true })).toBeVisible();
   const card = page.getByTestId("probe-card");
@@ -214,4 +217,23 @@ test("a time-budget capacity measurement shows partial bytes and never claims th
   await expect(card).toContainText("Termination: time budget · measured 0.6 Mbps");
   await expect(card).toContainText("Partial transfer: the byte ceiling was not reached");
   await expect(card).not.toContainText("[object Object]");
+});
+
+test("cadence anchor preserves a historical durable timestamp and labels fallback or missing evidence explicitly", async ({ page }) => {
+  const fallbackAt = "2026-10-21T09:14:00.000Z";
+  const fallback = { ...probe, id: "80000000-0000-4000-8000-000000000002", deviceId: "20000000-0000-4000-8000-000000000002", computerName: "LP-F6K6S64",
+    selected: false, eligible: false, installedAt: null, cadenceAnchorAt: fallbackAt, cadenceAnchorSource: "selection-time-fallback", selectionAt: fallbackAt };
+  const missing = { ...probe, id: "80000000-0000-4000-8000-000000000003", deviceId: "20000000-0000-4000-8000-000000000003", computerName: "IT-SPARE-01",
+    selected: false, eligible: false, cadenceAnchorAt: null, cadenceAnchorSource: null };
+  await mock(page, true, [probe, fallback, missing]);
+  await page.goto("/network/building-probes");
+  const formatted = await page.evaluate(values => values.map(value => new Intl.DateTimeFormat(undefined, { timeZone: "America/Chicago", dateStyle: "medium", timeStyle: "short" }).format(new Date(value))), [historicalAnchor, fallbackAt]);
+  const durableCard = page.getByTestId("probe-card").filter({ hasText: "WEST-LAB-01" });
+  await expect(durableCard.getByTestId("cadence-anchor")).toHaveText(`Cadence anchor: ${formatted[0]} · Recorded installation/initialization time`);
+  await expect(durableCard).toContainText("Activation:");
+  const fallbackCard = page.getByTestId("probe-card").filter({ hasText: "LP-F6K6S64" });
+  await expect(fallbackCard.getByTestId("cadence-anchor")).toHaveText(`Cadence anchor: ${formatted[1]} · Selection-time fallback (installation time unavailable)`);
+  await expect(fallbackCard).not.toContainText("first recorded initialization");
+  const missingCard = page.getByTestId("probe-card").filter({ hasText: "IT-SPARE-01" });
+  await expect(missingCard.getByTestId("cadence-anchor")).toHaveText("Cadence anchor: Not reported · Source not reported");
 });

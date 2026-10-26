@@ -32,7 +32,7 @@ describe.skipIf(!url)('strict logical capacity accounting in PostgreSQL',()=>{
     await pool.query("UPDATE building_probe_jobs SET status='cancelled' WHERE status IN ('pending','dispatched')");
     await pool.query("UPDATE building_probe_slots SET state='cancelled' WHERE state NOT IN ('completed','blocked_unknown')");
     await pool.query('UPDATE building_probe_campus_lease SET job_id=NULL,building_id=NULL,lease_until=NULL');
-    for(const p of [a,b])await pool.query("UPDATE building_probes SET selected=true,selection_revision=selection_revision+1,activation_at=now()-interval '2 minutes',reporting_since=now()-interval '1 hour',last_seen=now(),snapshot=$2::jsonb WHERE id=$1",[p.id,JSON.stringify(snap(p.computerName))]);
+    for(const p of [a,b])await pool.query("UPDATE building_probes SET selected=true,selection_revision=selection_revision+1,first_selected_at=coalesce(first_selected_at,now()-interval '2 minutes'),selected_at=now()-interval '2 minutes',cadence_anchor_at=coalesce(cadence_anchor_at,now()-interval '2 minutes'),cadence_anchor_source=coalesce(cadence_anchor_source,'selection-time-fallback'),cadence_anchor_resolved_at=coalesce(cadence_anchor_resolved_at,now()-interval '2 minutes'),activation_at=now()-interval '2 minutes',reporting_since=now()-interval '1 hour',last_seen=now(),snapshot=$2::jsonb WHERE id=$1",[p.id,JSON.stringify(snap(p.computerName))]);
   });
   afterAll(async()=>{await pool?.end();});
   it('serializes concurrent reservations for one logical building/window',async()=>{
@@ -50,12 +50,25 @@ describe.skipIf(!url)('strict logical capacity accounting in PostgreSQL',()=>{
     const done=terminal(second,7000000000,true,'completed');await Promise.all([beat(b,[done]),beat(b,[done])]);
     const complete=await view(first.capacityJobId);expect(complete).toMatchObject({bytesValidated:10000000000,bytesReserved:0,remainingBytes:0,state:'completed'});expect(complete).not.toHaveProperty('deviceId');expect(complete.attempts.map((x:any)=>x.deviceId).sort()).toEqual([devices.get(a.id),devices.get(b.id)].sort());expect(await queue(a,s,1)).toBe(false);
   });
+  it('settles a proven one-GiB stopped boundary and grants exactly 8,926,258,176 bytes to the alternate',async()=>{
+    const s=slot();await queue(a,s);const first=claims((await beat(a)).job!),original=await view(first.capacityJobId);
+    const stopped=terminal(first,1073741824,true);stopped.outcome='cancelled';stopped.details.termination='verified_range_boundary';
+    await beat(a,[stopped]);const next=claims((await beat(b)).job!);
+    expect(next.capacityJobId).toBe(first.capacityJobId);expect(next.options.maxBytes).toBe(8926258176);expect(next.expiresAt).toBeLessThanOrEqual(Math.floor(Date.parse(original.deadlineAt!)/1000));
+    const current=await view(first.capacityJobId);expect(current.deadlineAt).toBe(original.deadlineAt);expect(current.bytesValidated).toBe(1073741824);expect(current.bytesReserved).toBe(8926258176);expect(current.remainingBytes).toBe(0);
+  });
   it('freezes an unknown terminal prefix and rejects a changed retry that tries to reclaim its reservation',async()=>{
     const s=slot();await queue(a,s);const first=claims((await beat(a)).job!),unknown=terminal(first,1000000000,false);
     await beat(a,[unknown]);await beat(a,[unknown]);
     let current=await view(first.capacityJobId);expect(current).toMatchObject({bytesValidated:0,bytesReserved:10000000000,remainingBytes:0,state:'blocked_unknown'});expect(current.attempts[0]).toMatchObject({reportedBytes:1000000000,bytesAccounted:false,outcome:'unavailable'});expect(current.attempts[0].completedAt).toBeDefined();
     await expect(beat(a,[{...unknown,details:{...unknown.details,bytes:0,bytesAccounted:true}}])).rejects.toMatchObject({status:409});
     expect(await queue(b,s,1)).toBe(false);current=await view(first.capacityJobId);expect(current.bytesReserved).toBe(10000000000);expect(current.attempts).toHaveLength(1);
+  });
+  it('accepts a verified first range plus a failed next send as immutable unknown accounting',async()=>{
+    const s=slot();await queue(a,s);const first=claims((await beat(a)).job!),unknown=terminal(first,1073741824,false);
+    unknown.details.rangeCount=2;unknown.details.termination='send_failed';unknown.details.segments=[{ordinal:0,requestedBytes:1073741824,bytes:1073741824,status:206,elapsedMs:500},{ordinal:1,requestedBytes:1073741824,bytes:0,status:0,elapsedMs:500}];
+    expect((await beat(a,[unknown])).acceptedResults).toContain(first.id);expect((await beat(a,[unknown])).acceptedResults).toContain(first.id);
+    const current=await view(first.capacityJobId);expect(current).toMatchObject({bytesValidated:0,bytesReserved:10000000000,remainingBytes:0,state:'blocked_unknown'});expect(current.attempts).toHaveLength(1);expect(current.attempts[0]).toMatchObject({reportedBytes:1073741824,bytesAccounted:false,outcome:'unavailable'});expect(await queue(b,s,1)).toBe(false);
   });
   it('retains unknown bytes after lease loss, and a late full completion only settles/report-retries without new traffic',async()=>{
     const s=slot();await queue(a,s);const first=claims((await beat(a)).job!);

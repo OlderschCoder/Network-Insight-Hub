@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { digest, matches, computerName, buildingKey, ProbeError, type JobSigner, type ProbeSnapshot, type ProbeResult, type ProbeJob } from "./building_probe_protocol";
-import { capable, reporting, deviceSlot, capacitySlots, selectCapacityProbe, throughputOptions,chooseTransferLane,PENDING_POLL_SECONDS, type ScheduleSlot } from "./building_probe_scheduler";
+import { digest, matches, computerName, buildingKey, ProbeError,validatedInstalledAt, type JobSigner, type ProbeSnapshot, type ProbeResult, type ProbeJob } from "./building_probe_protocol";
+import { capable, reporting, deviceSlot, capacitySlots, selectCapacityProbe, throughputOptions,chooseTransferLane,PENDING_POLL_SECONDS,resolveCadenceAnchor, type ScheduleSlot,type CadenceAnchorSource } from "./building_probe_scheduler";
 import { projectProbeMetrics,projectCapacityMetrics,projectProbeHealth } from "./building_probe_metrics";
 import {remainingCapacity,capacityDeadline,terminalCapacityBytes} from './building_probe_capacity';
 
@@ -26,6 +26,12 @@ ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS activation_at timestamptz;
 ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS missed_slot timestamptz;
 ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS consecutive_failures integer NOT NULL DEFAULT 0;
 ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS reporting_since timestamptz;
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS installed_at timestamptz;
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS first_selected_at timestamptz;
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS selected_at timestamptz;
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS cadence_anchor_at timestamptz;
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS cadence_anchor_source varchar(40);
+ALTER TABLE building_probes ADD COLUMN IF NOT EXISTS cadence_anchor_resolved_at timestamptz;
 INSERT INTO building_probe_buildings(id,normalized_key,label) SELECT gen_random_uuid(),building_key,min(building) FROM building_probes WHERE building_id IS NULL GROUP BY building_key ON CONFLICT(normalized_key) DO NOTHING;
 UPDATE building_probes p SET building_id=b.id FROM building_probe_buildings b WHERE p.building_id IS NULL AND p.building_key=b.normalized_key;
 ALTER TABLE building_probes ALTER COLUMN building_id SET NOT NULL;
@@ -89,7 +95,7 @@ CREATE TABLE IF NOT EXISTS building_probe_result_exports (
 );
 `;
 const viewColumns = `id,building,building_id AS "buildingId",assignment_basis AS "assignmentBasis",building_key AS "buildingKey",computer_name AS "computerName",enabled,selected,
- selection_revision AS "selectionRevision",activation_at AS "activationAt",missed_slot AS "missedSlot",consecutive_failures AS "consecutiveFailures",
+ selection_revision AS "selectionRevision",activation_at AS "activationAt",selected_at AS "selectionAt",installed_at AS "installedAt",cadence_anchor_at AS "cadenceAnchorAt",cadence_anchor_source AS "cadenceAnchorSource",cadence_anchor_resolved_at AS "cadenceAnchorResolvedAt",missed_slot AS "missedSlot",consecutive_failures AS "consecutiveFailures",
  adapter_id AS "adapterId",expected_voice_subnet AS "expectedVoiceSubnet",device_id AS "deviceId",created_at AS "createdAt",last_seen AS "lastSeen",snapshot`;
 const asIso = (value: any) => value ? new Date(value).toISOString() : undefined;
 const generation = (row: any) => Number(row.selection_revision ?? 0);
@@ -119,7 +125,7 @@ export class BuildingProbeStore {
       (SELECT result->>'completedAt' FROM building_probe_jobs WHERE assignment_id=building_probes.id AND kind='throughput' AND status='completed' AND result->>'outcome'='completed' ORDER BY completed_at DESC LIMIT 1) AS "lastThroughputAt",
       (SELECT reason FROM building_probe_slots WHERE assignment_id=building_probes.id AND state='skipped' ORDER BY slot_at DESC LIMIT 1) AS "missedSlotReason"
       FROM building_probes WHERE enabled=$1 ORDER BY building,computer_name`, [!history])).rows;
-    return rows.map(row => ({ ...row, selectionRevision: Number(row.selectionRevision), capabilities: row.snapshot?.capabilities ?? [], installedAt: row.snapshot?.installedAt ?? null,
+    return rows.map(row => ({ ...row, selectionRevision: Number(row.selectionRevision), capabilities: row.snapshot?.capabilities ?? [], installedAt: asIso(row.installedAt)??validatedInstalledAt(row.snapshot?.installedAt)??null,
       capable: capable(row.snapshot), eligible: row.enabled && row.selected && capable(row.snapshot) && reporting(row.lastSeen) }));
   }
   async assign(input: { buildingId: string; computerName: string; adapterId?: string | null; expectedVoiceSubnet?: string | null }, bootstrap: string, userId: number) {
@@ -136,14 +142,26 @@ export class BuildingProbeStore {
     return this.transaction(async c => {
       const row = (await c.query("SELECT * FROM building_probes WHERE id=$1 FOR UPDATE", [id])).rows[0];
       if (!row?.enabled) throw new ProbeError(404, "Unknown active assignment.");
-      if (row.selected === selected) return this.selection(row);
+      if (row.selected === selected) {if(selected)await this.applyCadence(c,row,validatedInstalledAt(row.snapshot?.installedAt)??undefined);return this.selection(row);}
       if (selected && (await c.query("SELECT id FROM building_probes WHERE enabled AND selected AND building_id=$1 AND id<>$2", [row.building_id, id])).rowCount! >= 2) throw new ProbeError(409, "Only two computers may be selected per canonical building.");
       const activation = selected && this.policy().enabled && reporting(row.last_seen) ? new Date() : null;
-      const updated = (await c.query("UPDATE building_probes SET selected=$2,selection_revision=selection_revision+1,activation_at=$3 WHERE id=$1 RETURNING *", [id, selected, activation])).rows[0];
-      await this.cancel(c, id); return this.selection(updated);
+      const updated = (await c.query("UPDATE building_probes SET selected=$2,selection_revision=selection_revision+1,activation_at=$3,selected_at=CASE WHEN $2 THEN now() ELSE selected_at END,first_selected_at=CASE WHEN $2 THEN coalesce(first_selected_at,now()) ELSE first_selected_at END WHERE id=$1 RETURNING *", [id, selected, activation])).rows[0];
+      await this.cancel(c, id);if(selected)await this.applyCadence(c,updated,validatedInstalledAt(updated.snapshot?.installedAt)??undefined);return this.selection(updated);
     });
   }
-  private selection(row: any) { return { selected: !!row.selected, revision: generation(row), ...(row.activation_at ? { activationAt: asIso(row.activation_at) } : {}) }; }
+  private selection(row: any) { return { selected: !!row.selected, revision: generation(row), ...(row.activation_at ? { activationAt: asIso(row.activation_at) } : {}),...(row.selected_at?{selectionAt:asIso(row.selected_at)}:{}),...(row.cadence_anchor_at?{cadenceAnchorAt:asIso(row.cadence_anchor_at),cadenceAnchorSource:row.cadence_anchor_source,cadenceAnchorResolvedAt:asIso(row.cadence_anchor_resolved_at)}:{}) }; }
+  private async applyCadence(c:PoolClient,row:any,reported:unknown) {
+    const now=new Date(),first=asIso(row.first_selected_at)??(row.selected?now.toISOString():null);
+    const before={installedAt:asIso(row.installed_at)??null,anchorAt:asIso(row.cadence_anchor_at)??null,source:(row.cadence_anchor_source??null) as CadenceAnchorSource|null,resolvedAt:asIso(row.cadence_anchor_resolved_at)??null};
+    const after=resolveCadenceAnchor(before,reported,first,now.getTime());
+    const legacyPhase=!!row.selected&&!row.first_selected_at&&!row.cadence_anchor_at&&!!row.activation_at;
+    const resolution=!!row.selected&&((before.source==='selection-time-fallback'&&after.source==='installed-at')||legacyPhase);
+    const missingSelection=!!row.selected&&(!row.first_selected_at||!row.selected_at);
+    if(JSON.stringify(before)===JSON.stringify(after)&&!missingSelection)return;
+    if(resolution)await this.cancel(c,row.id);
+    const updated=(await c.query("UPDATE building_probes SET installed_at=$2,cadence_anchor_at=$3,cadence_anchor_source=$4,cadence_anchor_resolved_at=$5,first_selected_at=coalesce(first_selected_at,$6),selected_at=CASE WHEN selected THEN coalesce(selected_at,$6) ELSE selected_at END,selection_revision=selection_revision+$7,activation_at=CASE WHEN $7=1 THEN $8::timestamptz ELSE activation_at END WHERE id=$1 RETURNING *",[row.id,after.installedAt,after.anchorAt,after.source,after.resolvedAt,first,resolution?1:0,resolution&&this.policy().enabled?now:null])).rows[0];
+    Object.assign(row,updated);
+  }
   private async cancel(c: PoolClient, id: string) {
     const jobs=(await c.query("SELECT * FROM building_probe_jobs WHERE assignment_id=$1 AND status IN ('pending','dispatched') FOR UPDATE",[id])).rows;
     for(const job of jobs)await this.releaseUnsignedCapacity(c,job);
@@ -177,6 +195,7 @@ export class BuildingProbeStore {
       const row = (await c.query("SELECT * FROM building_probes WHERE id=$1 FOR UPDATE", [assignmentId])).rows[0];
       if (!row?.enabled || row.device_id !== deviceId || !matches(credential, row.credential_hash)) throw new ProbeError(401, "Probe credential rejected.");
       if (computerName(snapshot.computerName) !== row.computer_name) throw new ProbeError(403, "Probe computer identity mismatch.");
+      await this.applyCadence(c,row,snapshot.installedAt);
       const policy=this.policy();
       const accepted: string[] = [];
       for (const result of results) {
@@ -398,8 +417,9 @@ export class BuildingProbeStore {
       }
     }
     for (const probe of probes) {
-      if (!capable(probe.snapshot)) continue;
-      const slot = deviceSlot(probe.id,generation(probe),probe.activation_at,now);
+      if (!probe.activation_at||!capable(probe.snapshot)) continue;
+      const lowerBound=Math.max(...[probe.selected_at,probe.activation_at,probe.cadence_anchor_resolved_at].filter(Boolean).map(value=>new Date(value).getTime()));
+      const slot = deviceSlot(probe.id,generation(probe),probe.cadence_anchor_at,now,Number.isFinite(lowerBound)?new Date(lowerBound):null);
       if (!slot || (await c.query("SELECT key FROM building_probe_slots WHERE key=$1",[slot.key])).rowCount) continue;
       if (slot.late || !reporting(probe.last_seen,now) || (probe.reporting_since&&new Date(probe.reporting_since).getTime()>Date.parse(slot.slotAt))) { await this.skipSlot(c,probe,slot,"offline gap: no catch-up"); continue; }
       if (active.some(j=>j.assignment_id===probe.id && j.kind==='throughput' && j.options?.profile==='capacity')) { await this.skipSlot(c,probe,slot,"capacity supersedes this slot on this computer"); continue; }
@@ -425,7 +445,7 @@ export class BuildingProbeStore {
     await this.ensure(); const rows=(await this.pool.query(`SELECT id::text AS cursor,job_id AS "jobId",device_id AS "deviceId",assignment_id AS "assignmentId",building_id AS "buildingId",test_type AS "testType",original_sample_at AS "originalSampleAt",received_at AS "receivedAt",result FROM building_probe_result_exports WHERE id>$1 ORDER BY id ${recent?'DESC':'ASC'} LIMIT $2`,[after,limit])).rows;
     if(recent)rows.reverse();
     const results=rows.map(row=>({...row,...(row.result?.capacityJobId?{capacityJobId:row.result.capacityJobId,attemptId:row.result.attemptId??row.jobId}:{}),originalSampleAt:new Date(row.originalSampleAt).toISOString(),receivedAt:new Date(row.receivedAt).toISOString(),sampleId:digest(`${row.jobId}|${row.deviceId}|${row.testType}|${new Date(row.originalSampleAt).toISOString()}`)}));
-    const health=(await this.list()).slice(0,1000).map(p=>({assignmentId:p.id,deviceId:p.deviceId,buildingId:p.buildingId,computerName:p.computerName,selected:p.selected,selectionRevision:p.selectionRevision,activationAt:p.activationAt,lastSeen:p.lastSeen,capable:p.capable,eligible:p.eligible,missedSlot:p.missedSlot,missedSlotReason:p.missedSlotReason,consecutiveFailures:p.consecutiveFailures,lastThroughputAt:p.lastThroughputAt}));
+    const health=(await this.list()).slice(0,1000).map(p=>({assignmentId:p.id,deviceId:p.deviceId,buildingId:p.buildingId,computerName:p.computerName,selected:p.selected,selectionRevision:p.selectionRevision,activationAt:p.activationAt,selectionAt:p.selectionAt,cadenceAnchorAt:p.cadenceAnchorAt,cadenceAnchorSource:p.cadenceAnchorSource,cadenceAnchorResolvedAt:p.cadenceAnchorResolvedAt,lastSeen:p.lastSeen,capable:p.capable,eligible:p.eligible,missedSlot:p.missedSlot,missedSlotReason:p.missedSlotReason,consecutiveFailures:p.consecutiveFailures,lastThroughputAt:p.lastThroughputAt}));
     const windows=(await this.pool.query(`SELECT s.*,(SELECT coalesce(jsonb_agg(a),'[]'::jsonb) FROM (SELECT id AS "attemptId",device_id AS "deviceId",options->'maxBytes' AS "maxBytes",reserved_bytes AS "bytesReserved",terminal_accounted AS "bytesAccounted",terminal_bytes AS bytes,terminal_reported_bytes AS "reportedBytes",terminal_elapsed_ms AS "elapsedMs",terminal_termination AS termination,terminal_started_at AS "startedAt",terminal_completed_at AS "completedAt",dispatched_at AS "dispatchedAt",terminal_outcome AS outcome,status AS state FROM building_probe_jobs WHERE capacity_job_id=s.capacity_job_id ORDER BY created_at LIMIT 2)a) AS attempts FROM building_probe_slots s WHERE profile='capacity' AND capacity_job_id IS NOT NULL ORDER BY slot_at DESC LIMIT $1`,[Math.min(limit,1000)])).rows;
     const capacityWindows=windows.map(w=>({capacityJobId:w.capacity_job_id,buildingId:w.building_id,originalSampleAt:asIso(w.slot_at),deadlineAt:asIso(w.deadline_at)??null,firstDispatchedAt:asIso(w.first_dispatched_at)??null,bytesValidated:Number(w.bytes_validated),bytesReserved:Number(w.bytes_reserved),remainingBytes:remainingCapacity(Number(w.bytes_validated),Number(w.bytes_reserved)),state:w.state,reason:w.reason,attempts:w.attempts}));
     return {results,nextCursor:rows.at(-1)?.cursor??after,health,metrics:projectProbeMetrics(results),capacityWindows,capacityMetrics:projectCapacityMetrics(capacityWindows),healthMetrics:projectProbeHealth(health,new Date().toISOString())};

@@ -22,6 +22,12 @@ export function buildingKey(value: string): string {
 const short = z.string().max(160);
 const address = z.string().max(64);
 const iso = z.string().datetime({ offset: true });
+/** Installation metadata is evidence, not a request to reset a device's cadence. */
+export function validatedInstalledAt(value:unknown,now=Date.now()):string|null {
+  if(!iso.safeParse(value).success)return null;
+  const time=Date.parse(value as string);
+  return Number.isFinite(time)&&time>=Date.UTC(2000,0,1)&&time<=now+30000?new Date(time).toISOString():null;
+}
 export const assignmentInput = z.object({
   buildingId: z.string().uuid(), computerName: z.string().min(1).max(15),
   adapterId: z.string().max(100).nullable().optional(),
@@ -35,7 +41,7 @@ export const snapshotSchema = z.object({
   schema: z.literal(PROBE_SCHEMA), computerName: z.string().max(15), agentVersion: z.string().max(30),
   capturedAt: iso, uptimeSeconds: z.number().int().min(0).max(100 * 365 * 86400),
   diagnosticsMode: z.literal("on-demand"),
-  capabilities: z.array(z.literal("throughput-v1")).max(1).optional(), installedAt: iso.optional(),
+  capabilities: z.array(z.literal("throughput-v1")).max(1).optional(), installedAt: iso.refine(value=>validatedInstalledAt(value)!==null,'Invalid installation timestamp.').optional(),
   adapters: z.array(z.object({ id: z.string().max(100), name: short, kind: short, state: short,
     mac: z.string().max(40), ipv4: z.array(address).max(8), gateways: z.array(address).max(4),
     dnsServers: z.array(address).max(4), dhcpServers: z.array(address).max(4),

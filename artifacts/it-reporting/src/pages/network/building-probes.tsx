@@ -18,6 +18,8 @@ type Probe = { id: string; building: string; computerName: string; enabled: bool
   buildingId?: string | null; buildingKey?: string; deviceId?: string | null; createdAt?: string;
   assignmentBasis?: "catalog-assignment" | "historical-assignment"; selected?: boolean; selectionRevision?: number;
   activationAt?: string | null; capabilities?: string[]; installedAt?: string | null; capable?: boolean; eligible?: boolean;
+  cadenceAnchorAt?: string | null; cadenceAnchorSource?: "installed-at" | "selection-time-fallback" | null;
+  cadenceAnchorResolvedAt?: string | null; selectionAt?: string | null;
   missedSlot?: string | null; missedSlotReason?: string | null; consecutiveFailures?: number; lastThroughputAt?: string | null;
   lastSeen: string | null; expectedVoiceSubnet: string | null; adapterId: string | null;
   snapshot: { agentVersion: string; uptimeSeconds: number; adapters: Adapter[];
@@ -200,6 +202,7 @@ export default function BuildingProbes() {
             {!probe.selected && selectedInBuilding >= 2 && <p className="text-xs">Two computers are already selected for this building. Deselect one before adding another.</p>}
             {group.conflicted && <p className="text-destructive">Conflicting active assignments were grouped into one computer. Resolve the server assignment before selecting it.</p>}
             <p>Probe installed version: <strong>{snapshot?.agentVersion || "Not reported"}</strong>{probe.installedAt ? ` · first recorded initialization ${time(probe.installedAt)}` : ""}</p>
+            <p data-testid="cadence-anchor">Cadence anchor: {probe.cadenceAnchorAt && Number.isFinite(Date.parse(probe.cadenceAnchorAt)) ? centralTime(probe.cadenceAnchorAt, schedule?.timeZone || "America/Chicago") : "Not reported"} · {probe.cadenceAnchorSource === "installed-at" ? "Recorded installation/initialization time" : probe.cadenceAnchorSource === "selection-time-fallback" ? "Selection-time fallback (installation time unavailable)" : "Source not reported"}</p>
             <p>Activation: {centralTime(probe.activationAt, schedule?.timeZone || "America/Chicago")}</p>
             <p>{probe.eligible && capable ? "Eligible for bounded throughput" : "Not eligible for throughput"}{!capable ? "; existing network and paging checks remain separate." : probe.state !== "reporting" ? "; probe is offline or stale." : !probe.selected ? "; select this computer first." : "; see the server schedule state."}</p>
             <div className="grid gap-1 text-xs sm:grid-cols-2"><p>Last speed sample: {age(probe.lastThroughputAt)}</p><p>{probe.missedSlot || probe.missedSlotReason ? `Missed scheduled slot${probe.missedSlot ? `: ${centralTime(probe.missedSlot, schedule?.timeZone || "America/Chicago")}` : ""}${probe.missedSlotReason ? ` · ${label(probe.missedSlotReason.slice(0, 160))}` : ""}` : "No missed slot reported"}</p><p>Consecutive failures: {probe.consecutiveFailures ?? "Not reported"}</p><p>{probe.state === "reporting" ? "Probe online" : "Probe offline / awaiting check-in"}</p></div>
