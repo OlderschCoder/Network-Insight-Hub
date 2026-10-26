@@ -92,6 +92,7 @@ describe("building probes HTTP boundary", () => {
     const {app,store}=setup();
     const current=await admin(request(app).get('/'));
     expect(current.body.schedule.enabled).toBe(false);expect(current.body.schedule.profiles.hourly.maxBytes).toBe(64000000);
+    expect(current.body.schedule.capacityEnabled).toBe(false);expect(current.body.schedule.capacityReason).toBe('Capacity diagnostics are disabled.');
     expect(current.body.schedule.staggerWindowSeconds).toBe(2700);
     expect((await admin(request(app).get('/history'))).status).toBe(200);expect(store.list).toHaveBeenCalledWith(true);
   });

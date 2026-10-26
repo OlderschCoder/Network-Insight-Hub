@@ -6,7 +6,7 @@ const baseballId = "10000000-0000-4000-8000-000000000002";
 const now = new Date().toISOString();
 const historicalAnchor = "2026-10-20T14:23:00.000Z";
 const buildings = [{ id: buildingId, label: "West Campus", normalizedKey: "west-campus" }, { id: baseballId, label: "Baseball Field", normalizedKey: "baseball-field" }];
-const schedule = { enabled: false, targetReady: false, reason: "Recurring tests are staged; the server scheduler is disabled.", targetId: "fixed-pilot-target",
+const schedule = { enabled: false, targetReady: false, capacityEnabled: false, reason: "Recurring tests are staged; the server scheduler is disabled.", targetId: "fixed-pilot-target",
   profiles: { quick: { maxBytes: 5 * 1024 ** 2, timeoutSeconds: 10 }, hourly: { maxBytes: 64_000_000, timeoutSeconds: 10 }, capacity: { maxBytes: 10_000_000_000, timeoutSeconds: 900 } },
   timeZone: "America/Chicago", capacityWindows: ["07:00", "19:00"], staggerWindowSeconds: 2700,
   capacityStartDeadlineMinutes: 45, capacityHardEndMinutes: 60, quickConcurrency: 4, hourlyConcurrency: 1, capacityConcurrency: 1 };
@@ -236,4 +236,16 @@ test("cadence anchor preserves a historical durable timestamp and labels fallbac
   await expect(fallbackCard).not.toContainText("first recorded initialization");
   const missingCard = page.getByTestId("probe-card").filter({ hasText: "IT-SPARE-01" });
   await expect(missingCard.getByTestId("cadence-anchor")).toHaveText("Cadence anchor: Not reported · Source not reported");
+});
+
+test("an armed quick/hourly pilot keeps capacity visibly paused and starts no work from the page", async ({ page }) => {
+  const state = await mock(page, true, [probe], { schedule: { ...schedule, enabled: true, targetReady: true, capacityEnabled: false, reason: "" } });
+  await page.goto("/network/building-probes");
+  await expect(page.getByText("Quick / hourly armed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Selected capable probes report quick and hourly measurements; capacity tests are paused by the server.", { exact: true })).toBeVisible();
+  const capacity = page.getByText("Capacity · once per building", { exact: true }).locator("..");
+  await expect(capacity.getByText("Paused", { exact: true })).toBeVisible();
+  await expect(capacity).toContainText("Up to 10 GB · 15 minutes");
+  await expect(page.getByText("Server schedule active", { exact: true })).toHaveCount(0);
+  expect(state.mutations).toHaveLength(0);
 });

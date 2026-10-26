@@ -14,7 +14,7 @@ interface Dependencies {
   store: Store; enabled: () => boolean; signer: () => JobSigner;
   authenticate: RequestHandler; view: RequestHandler; manage: RequestHandler;
   publicOrigin: () => string;
-  schedule?: () => { enabled: boolean; targetReady: boolean; quickConcurrency?:number;hourlyConcurrency?:number;capacityConcurrency?: number };
+  schedule?: () => { enabled: boolean; targetReady: boolean; capacityEnabled?:boolean;quickConcurrency?:number;hourlyConcurrency?:number;capacityConcurrency?: number };
   exportTokenHash?: () => string | null;
 }
 function getBearer(req: any): string {
@@ -38,7 +38,7 @@ export function createBuildingProbesRouter(deps: Dependencies) {
   const enabled = () => { if (!deps.enabled()) throw new ProbeError(503, "Building probes are not enabled on this server."); };
   const schedule = () => {
     const policy = deps.schedule?.() ?? { enabled: false, targetReady: false, capacityConcurrency: 1 };
-    return { ...policy, enabled: deps.enabled() && policy.enabled, targetId: "sccc-external-v1", profiles: THROUGHPUT_PROFILES, timeZone: PROBE_TIME_ZONE,
+    return { ...policy, enabled: deps.enabled() && policy.enabled,capacityEnabled:policy.capacityEnabled===true,capacityReason:policy.capacityEnabled===true?null:'Capacity diagnostics are disabled.', targetId: "sccc-external-v1", profiles: THROUGHPUT_PROFILES, timeZone: PROBE_TIME_ZONE,
       capacityWindows: ["07:00", "19:00"], staggerWindowSeconds: STAGGER_SECONDS, capacityStartDeadlineMinutes: 45, capacityHardEndMinutes: 60,
       quickConcurrency:Math.max(1,Math.min(4,policy.quickConcurrency??4)),hourlyConcurrency:Math.max(1,Math.min(2,policy.hourlyConcurrency??1)),capacityConcurrency: Math.max(1,Math.min(2,policy.capacityConcurrency??1)),quickQueueWindowSeconds:240,
       reason: !policy.enabled ? "Staged: scheduling is disabled pending bounds review." : !policy.targetReady ? "Staged: external throughput target readiness is not approved." : null };
@@ -132,7 +132,7 @@ export function createBuildingProbesRouter(deps: Dependencies) {
 }
 
 let signer: JobSigner | undefined;
-const schedulePolicy=()=>({enabled:process.env.BUILDING_PROBE_SCHEDULER_ENABLED==="true",targetReady:process.env.BUILDING_PROBE_THROUGHPUT_TARGET_READY==="true",quickConcurrency:Math.max(1,Math.min(4,Math.floor(Number(process.env.BUILDING_PROBE_QUICK_CONCURRENCY)||4))),hourlyConcurrency:Math.max(1,Math.min(2,Math.floor(Number(process.env.BUILDING_PROBE_HOURLY_CONCURRENCY)||1))),capacityConcurrency:Math.max(1,Math.min(2,Math.floor(Number(process.env.BUILDING_PROBE_CAPACITY_CONCURRENCY)||1))) });
+const schedulePolicy=()=>({enabled:process.env.BUILDING_PROBE_SCHEDULER_ENABLED==="true",targetReady:process.env.BUILDING_PROBE_THROUGHPUT_TARGET_READY==="true",capacityEnabled:process.env.BUILDING_PROBE_CAPACITY_ENABLED==="true",quickConcurrency:Math.max(1,Math.min(4,Math.floor(Number(process.env.BUILDING_PROBE_QUICK_CONCURRENCY)||4))),hourlyConcurrency:Math.max(1,Math.min(2,Math.floor(Number(process.env.BUILDING_PROBE_HOURLY_CONCURRENCY)||1))),capacityConcurrency:Math.max(1,Math.min(2,Math.floor(Number(process.env.BUILDING_PROBE_CAPACITY_CONCURRENCY)||1))) });
 const router = createBuildingProbesRouter({
   store: new BuildingProbeStore(pool,schedulePolicy), enabled: () => process.env.BUILDING_PROBES_ENABLED === "true",schedule:schedulePolicy,
   exportTokenHash:()=>{const path=process.env.BUILDING_PROBE_EXPORT_TOKEN_HASH_FILE;if(!path)return null;try{const hash=readFileSync(path,"utf8").trim();return /^[a-f0-9]{64}$/.test(hash)?hash:null;}catch{return null;}},

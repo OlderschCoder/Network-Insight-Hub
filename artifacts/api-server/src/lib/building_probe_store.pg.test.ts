@@ -7,7 +7,7 @@ const url=process.env.BUILDING_PROBE_TEST_DATABASE_URL;
 if(url){const target=new URL(url);if(!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.pathname!=='/buildingprobetest')throw new Error('Probe SQL tests require localhost database buildingprobetest.');}
 describe.skipIf(!url)('retained probe PostgreSQL membership and lane boundaries',()=>{
   let pool:any,store:BuildingProbeStore,building:any,a:any,b:any,c:any;
-  let policy={enabled:false,targetReady:false,capacityConcurrency:1};
+  let policy={enabled:false,targetReady:false,capacityEnabled:true,capacityConcurrency:1};
   const signer=new JobSigner(generateKeyPairSync('ec',{namedCurve:'prime256v1'}).privateKey);
   const credentials=new Map<string,string>();
   const identities=new Map<string,string>();

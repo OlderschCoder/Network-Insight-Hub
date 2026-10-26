@@ -7,7 +7,7 @@ import {remainingCapacity,capacityDeadline,terminalCapacityBytes} from './buildi
 interface QueryResult { rows: any[]; rowCount: number | null; }
 interface PoolClient { query(sql: string, values?: unknown[]): Promise<QueryResult>; release(): void; }
 interface Pool { query(sql: string, values?: unknown[]): Promise<QueryResult>; connect(): Promise<PoolClient>; }
-export interface ProbeSchedulePolicy { enabled: boolean; targetReady: boolean; quickConcurrency?: number; hourlyConcurrency?: number; capacityConcurrency?: number; }
+export interface ProbeSchedulePolicy { enabled: boolean; targetReady: boolean; capacityEnabled?:boolean;quickConcurrency?: number; hourlyConcurrency?: number; capacityConcurrency?: number; }
 export const BUILDING_PROBE_DDL = `
 CREATE TABLE IF NOT EXISTS building_probe_buildings(id uuid PRIMARY KEY,normalized_key varchar(160) NOT NULL UNIQUE,label varchar(160) NOT NULL,created_by integer,created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS building_probes (
@@ -174,6 +174,12 @@ export class BuildingProbeStore {
     await c.query("UPDATE building_probe_slots SET state='cancelled',reason=$1 WHERE job_id IN (SELECT id FROM building_probe_jobs WHERE kind='throughput' AND status IN ('pending','dispatched'))",[reason]);
     await c.query("UPDATE building_probe_jobs SET status='cancelled' WHERE kind='throughput' AND status IN ('pending','dispatched')");
   }
+  private async cancelCapacity(c:PoolClient) {
+    const jobs=(await c.query("SELECT * FROM building_probe_jobs WHERE kind='throughput' AND options->>'profile'='capacity' AND status IN ('pending','dispatched') FOR UPDATE")).rows;
+    for(const job of jobs)await this.releaseUnsignedCapacity(c,job);
+    await c.query("UPDATE building_probe_slots SET state='cancelled',reason='capacity diagnostics are disabled' WHERE job_id IN (SELECT id FROM building_probe_jobs WHERE kind='throughput' AND options->>'profile'='capacity' AND status IN ('pending','dispatched'))");
+    await c.query("UPDATE building_probe_jobs SET status='cancelled' WHERE kind='throughput' AND options->>'profile'='capacity' AND status IN ('pending','dispatched')");
+  }
   async revoke(id: string) {
     await this.transaction(async c => { await c.query("UPDATE building_probes SET enabled=false,selected=false,selection_revision=selection_revision+1,credential_hash=NULL,bootstrap_hash=NULL WHERE id=$1", [id]); await this.cancel(c, id); });
   }
@@ -233,7 +239,7 @@ export class BuildingProbeStore {
       let cancelRunningJobId: string | undefined;
       if (runningJobId) {
         const job = (await c.query("SELECT * FROM building_probe_jobs WHERE id=$1 AND assignment_id=$2 AND device_id=$3", [runningJobId, assignmentId, deviceId])).rows[0];
-        if (!job || !row.selected || (job.kind==='throughput' && !allowed) || job.status !== "dispatched" || generation(row) !== Number(job.selection_revision) || new Date(job.expires_at).getTime() <= Date.now()) cancelRunningJobId = runningJobId;
+        if (!job || !row.selected || (job.kind==='throughput' && !allowed) || (job.options?.profile==='capacity'&&policy.capacityEnabled!==true) || job.status !== "dispatched" || generation(row) !== Number(job.selection_revision) || new Date(job.expires_at).getTime() <= Date.now()) cancelRunningJobId = runningJobId;
         else if(job.kind==='throughput') {
           const renewed=await c.query("UPDATE building_probe_campus_lease SET lease_until=least($2::timestamptz,now()+interval '30 seconds') WHERE job_id=$1 AND lease_until>now() RETURNING lease_until",[job.id,job.expires_at]);
           if(!renewed.rowCount)cancelRunningJobId=runningJobId;
@@ -247,12 +253,14 @@ export class BuildingProbeStore {
         await c.query("UPDATE building_probe_jobs SET status='expired' WHERE id=$1",[pending.id]);
         if(pending.slot_key)await c.query("UPDATE building_probe_slots SET state='skipped',reason='scheduled window expired' WHERE key=$1 AND state='queued'",[pending.slot_key]);
       }
-      if (pending && new Date(pending.expires_at).getTime()>Date.now() && row.selected && Number(pending.selection_revision) === generation(row) && (pending.kind !== "throughput" || allowed)) {
+      if (pending && new Date(pending.expires_at).getTime()>Date.now() && row.selected && Number(pending.selection_revision) === generation(row) && (pending.kind !== "throughput" || allowed) && (pending.options?.profile!=='capacity'||policy.capacityEnabled===true)) {
         signed = pending.signed_job ?? null;
         if (pending.status === "pending") {
           let lease = true;
           if (pending.kind === "throughput") {
-            if (pending.options?.profile==='capacity') lease=!!(await c.query("UPDATE building_probe_campus_lease SET lease_until=now()+interval '30 seconds' WHERE id IN (7,8) AND job_id=$1 AND lease_until>now() RETURNING id",[pending.id])).rowCount;
+            const other=(await c.query('SELECT l.id FROM building_probe_campus_lease l JOIN building_probe_jobs j ON j.id=l.job_id WHERE j.assignment_id=$1 AND l.job_id<>$2 AND l.lease_until>now() LIMIT 1',[assignmentId,pending.id])).rowCount;
+            if(other)lease=false;
+            else if (pending.options?.profile==='capacity') lease=!!(await c.query("UPDATE building_probe_campus_lease SET lease_until=now()+interval '30 seconds' WHERE id IN (7,8) AND job_id=$1 AND lease_until>now() RETURNING id",[pending.id])).rowCount;
             else {
               const lanes=(await c.query('SELECT * FROM building_probe_campus_lease ORDER BY id')).rows;
               const lane=chooseTransferLane(pending.options.profile,lanes,row.building_id,policy);
@@ -302,6 +310,7 @@ export class BuildingProbeStore {
     if(!job.capacity_job_id||job.signed_job||Number(job.reserved_bytes)<=0)return;
     await c.query('UPDATE building_probe_slots SET bytes_reserved=bytes_reserved-$2 WHERE capacity_job_id=$1 AND bytes_reserved>=$2',[job.capacity_job_id,Number(job.reserved_bytes)]);
     await c.query('UPDATE building_probe_jobs SET reserved_bytes=0 WHERE id=$1',[job.id]);
+    await c.query('UPDATE building_probe_campus_lease SET job_id=NULL,building_id=NULL,lease_until=NULL WHERE job_id=$1',[job.id]);
   }
   private async settleCapacity(c:PoolClient,job:any,result:ProbeResult) {
     if(job.terminal_accounted)return;
@@ -328,6 +337,7 @@ export class BuildingProbeStore {
     const id = randomUUID(), options = throughputOptions(slot.profile);
     let capacityLane: number | undefined,capacityJobId:string|undefined;
     if(slot.profile==='capacity') {
+      if(this.policy().capacityEnabled!==true)return false;
       const lanes=(await c.query('SELECT * FROM building_probe_campus_lease ORDER BY id')).rows;
       const lane=chooseTransferLane('capacity',lanes,probe.building_id,this.policy());
       if(lane===null || Date.parse(slot.windowEndsAt)<=Date.now())return false;
@@ -376,6 +386,10 @@ export class BuildingProbeStore {
     }
     const probes = (await c.query("SELECT * FROM building_probes WHERE enabled AND selected ORDER BY building_id,id")).rows;
     const active = (await c.query("SELECT j.*,p.building_id FROM building_probe_jobs j JOIN building_probes p ON p.id=j.assignment_id WHERE j.status IN ('pending','dispatched')")).rows;
+    if(policy.capacityEnabled!==true) {
+      await this.cancelCapacity(c);
+      for(let i=active.length-1;i>=0;i--)if(active[i].options?.profile==='capacity')active.splice(i,1);
+    }
     const now = Date.now();
     for(const probe of probes) {
       if(!probe.activation_at || !reporting(probe.last_seen,now))continue;
@@ -394,6 +408,7 @@ export class BuildingProbeStore {
     if(!policy.targetReady) {
       await this.cancelThroughput(c,'target readiness disarmed');return;
     }
+    if(policy.capacityEnabled===true) {
     const failures = (await c.query("SELECT * FROM building_probe_slots s WHERE profile='capacity' AND state='failed' AND attempt=0 AND NOT legacy_accounting AND bytes_reserved=0 AND bytes_validated<10000000000 AND window_ends_at>now() AND (deadline_at IS NULL OR deadline_at>now()) AND NOT EXISTS(SELECT 1 FROM building_probe_campus_lease l WHERE l.job_id=s.job_id AND l.lease_until>now())")).rows;
     for (const slot of failures) {
       const alternate = selectCapacityProbe(probes.filter(p => p.building_id===slot.building_id && !active.some(j=>j.assignment_id===p.id)), slot.first_assignment_id, now, slot.first_assignment_id);
@@ -415,6 +430,7 @@ export class BuildingProbeStore {
         if(await this.queueSlot(c,candidate,slot))active.push({assignment_id:candidate.id,building_id:buildingId,kind:'throughput',options:{profile:'capacity'}});
         else await this.skipSlot(c,candidate,slot,'skipped_due_to_capacity_contention');
       }
+    }
     }
     for (const probe of probes) {
       if (!probe.activation_at||!capable(probe.snapshot)) continue;

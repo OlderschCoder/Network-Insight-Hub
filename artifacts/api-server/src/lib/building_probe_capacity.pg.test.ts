@@ -6,7 +6,7 @@ import {JobSigner,token,PROBE_SCHEMA,type ProbeSnapshot,type ProbeResult} from '
 const url=process.env.BUILDING_PROBE_TEST_DATABASE_URL;
 if(url){const target=new URL(url);if(!['127.0.0.1','localhost','[::1]'].includes(target.hostname)||target.pathname!=='/buildingprobetest')throw new Error('Capacity SQL tests require localhost database buildingprobetest.');}
 describe.skipIf(!url)('strict logical capacity accounting in PostgreSQL',()=>{
-  let pool:any,store:BuildingProbeStore,building:any,a:any,b:any;
+  let pool:any,store:BuildingProbeStore,building:any,a:any,b:any,capacityEnabled=true;
   const credentials=new Map<string,string>(),devices=new Map<string,string>();
   const signer=new JobSigner(generateKeyPairSync('ec',{namedCurve:'prime256v1'}).privateKey);
   const snap=(name:string):ProbeSnapshot=>({schema:PROBE_SCHEMA,computerName:name,agentVersion:'0.1.4',capturedAt:new Date().toISOString(),uptimeSeconds:100,diagnosticsMode:'on-demand',capabilities:['throughput-v1'],adapters:[],keyAlert:{installed:false,serviceState:'unavailable',uiProcessCount:0}});
@@ -22,12 +22,13 @@ describe.skipIf(!url)('strict logical capacity accounting in PostgreSQL',()=>{
   beforeAll(async()=>{
     const pg=createRequire(import.meta.url)('pg');pool=new pg.Pool({connectionString:url,max:4});
     await pool.query('DROP TABLE IF EXISTS building_probe_result_exports,building_probe_campus_lease,building_probe_slots,building_probe_jobs,building_probes,building_probe_buildings CASCADE');
-    store=new BuildingProbeStore(pool,()=>({enabled:true,targetReady:true,quickConcurrency:4,hourlyConcurrency:1,capacityConcurrency:1}));await store.ensure();
+    store=new BuildingProbeStore(pool,()=>({enabled:true,targetReady:true,capacityEnabled,quickConcurrency:4,hourlyConcurrency:1,capacityConcurrency:1}));await store.ensure();
     building=await store.createBuilding('Synthetic capacity building',42);
     const enroll=async(name:string)=>{const bootstrap=token(),p=await store.assign({buildingId:building.id,computerName:name},bootstrap,42),deviceId=randomUUID(),credential=token();devices.set(p.id,deviceId);credentials.set(p.id,credential);await store.enroll({assignmentId:p.id,deviceId,computerName:name,proposedToken:credential},bootstrap);return p;};
     a=await enroll('BUDGET-A');b=await enroll('BUDGET-B');
   });
   beforeEach(async()=>{
+    capacityEnabled=true;
     // Reset synthetic execution fixtures; every logical window keeps its own ledger.
     await pool.query("UPDATE building_probe_jobs SET status='cancelled' WHERE status IN ('pending','dispatched')");
     await pool.query("UPDATE building_probe_slots SET state='cancelled' WHERE state NOT IN ('completed','blocked_unknown')");
@@ -101,5 +102,18 @@ describe.skipIf(!url)('strict logical capacity accounting in PostgreSQL',()=>{
     await pool.query("UPDATE building_probe_slots SET first_dispatched_at=$2::timestamptz-interval '900 seconds',deadline_at=$2 WHERE capacity_job_id=$1",[first.capacityJobId,deadline]);
     await beat(a,[terminal(first,3000000000,true)]);const response=await beat(b),second=claims(response.job!);
     expect(second.capacityJobId).toBe(first.capacityJobId);expect(second.options.maxBytes).toBe(7000000000);expect(second.options.timeoutSeconds).toBeLessThanOrEqual(20);expect(second.expiresAt).toBeLessThanOrEqual(Math.floor(Date.parse(deadline)/1000));expect(Date.parse(response.leaseExpiresAt!)).toBeLessThanOrEqual(Date.parse(deadline));expect((await view(first.capacityJobId)).deadlineAt).toBe(deadline);
+  });
+  it('cancels unsigned capacity while allowing quick and hourly diagnostics through their own lanes',async()=>{
+    const s=slot();await queue(a,s);const pending=(await pool.query('SELECT * FROM building_probe_jobs WHERE slot_key=$1',[s.key])).rows[0];capacityEnabled=false;
+    expect((await beat(a)).job).toBeNull();expect((await pool.query('SELECT status,reserved_bytes FROM building_probe_jobs WHERE id=$1',[pending.id])).rows[0]).toMatchObject({status:'cancelled',reserved_bytes:'0'});expect(await view(pending.capacity_job_id)).toMatchObject({bytesReserved:0,remainingBytes:10000000000});expect(await queue(b,slot())).toBe(false);
+    const quickId=await store.enqueue(a.id,'throughput',42),quick=claims((await beat(a)).job!);expect(quick.id).toBe(quickId.id);expect(quick.options.profile).toBe('quick');
+    const time=new Date().toISOString();await beat(a,[{jobId:quick.id,kind:'throughput',selectionRevision:quick.selectionRevision,slotAt:quick.slotAt,startedAt:time,completedAt:time,outcome:'completed',details:{profile:'quick',targetId:'sccc-external-v1',bytes:5242880,elapsedMs:1000,mbps:41.94304,rangeCount:1,termination:'byte_budget'}}]);
+    const hourly={...slot(),profile:'hourly',windowEndsAt:new Date(Date.now()+90000).toISOString()};expect(await queue(a,hourly)).toBe(true);const job=claims((await beat(a)).job!);expect(job.options).toMatchObject({profile:'hourly',maxBytes:64000000,timeoutSeconds:10});
+  });
+  it('disarms signed capacity without releasing unknown bytes or blocking another computer quick check',async()=>{
+    const s=slot();await queue(a,s);const running=claims((await beat(a)).job!);capacityEnabled=false;
+    const response=await beat(a,[],running.id);expect(response.cancelRunningJobId).toBe(running.id);expect(response.job).toBeNull();expect((await pool.query('SELECT status FROM building_probe_jobs WHERE id=$1',[running.id])).rows[0].status).toBe('cancelled');expect(await view(running.capacityJobId)).toMatchObject({bytesValidated:0,bytesReserved:10000000000,remainingBytes:0});
+    await store.enqueue(b.id,'throughput',42);expect(claims((await beat(b)).job!).options.profile).toBe('quick');
+    await store.enqueue(a.id,'throughput',42);expect((await beat(a,[],running.id)).job).toBeNull();
   });
 });
