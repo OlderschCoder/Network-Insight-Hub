@@ -66,6 +66,8 @@ Network administrators or the dedicated worker can revoke a device with `POST /a
 
 `verify-private-reporting.py --provision-dashboard` requires current private collector, AD presence and wireless points, backs up any changed provisioned dashboard, replaces it atomically, waits for Grafana provisioning, and performs a real datasource query. It separately reports the age of the latest endpoint result; add `--require-current-performance` only when a newly scheduled endpoint test is part of acceptance. `upgrade-private-reporting-1.2.2.sh` enables only the private five-minute collection timer and rolls the collector symlink back if the live read-back fails. It does not enable Fred's endpoint measurement scheduler.
 
+`provision-wireless-dashboard.sh` is the narrower dashboard-only path. It regenerates the current Wireless Operations model from the reviewed source and existing bucket name, backs up a changed provisioned JSON file outside the watched dashboard directory, replaces it atomically, and verifies both current wireless data and retained PC performance through Grafana's datasource. It does not restart or modify Telegraf, InfluxDB, Fred, the private collector, or endpoint schedules.
+
 ## Named workstation pilot and GPO preparation
 
 The Windows helper is in `windows/`; see its README for exact installation, signing, validation, activation, and removal commands. Keep it separate from the consumer website/Store installer.
