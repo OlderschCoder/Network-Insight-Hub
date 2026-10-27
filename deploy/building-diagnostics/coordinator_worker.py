@@ -231,16 +231,20 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     panels = []
 
     def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None,
-                  display_name=None, overrides=None):
+                  display_name=None, overrides=None, mappings=None, options=None):
         defaults = {"unit": unit}
         if thresholds:
             defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
         if display_name:
             defaults["displayName"] = display_name
+        if mappings:
+            defaults["mappings"] = mappings
         panel = {"id": len(panels) + 1, "title": title, "type": panel_type,
                  "datasource": datasource, "gridPos": {"x": x, "y": y, "w": w, "h": h},
                  "fieldConfig": {"defaults": defaults, "overrides": overrides or []},
                  "targets": [{"refId": "A", "query": flux}]}
+        if options:
+            panel["options"] = options
         if description:
             panel["description"] = description
         panels.append(panel)
@@ -363,10 +367,60 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                                   {"id": "decimals", "value": 1}]},
               ])
 
+    # Put current ClearPass health first. Every expected on-prem, Azure and VIP
+    # target receives an explicit unhealthy fallback, so a missing node cannot
+    # disappear and leave the cluster looking green. Recent response time and
+    # timeout deltas then raise that fallback to warning or healthy.
+    for panel in panels:
+        panel["gridPos"]["y"] += 4
+    health_query = f'''import "array"
+expected = array.from(rows: [
+  {{server: "SCCC_CPPM01", _value: 0}},
+  {{server: "SCCC_CPPM02", _value: 0}},
+  {{server: "SCCC_CPPM_AZ01", _value: 0}},
+  {{server: "SCCC_CPPM_AZ02", _value: 0}},
+  {{server: "SCCC_CPPM_VIP", _value: 0}}
+])
+observed = from(bucket: {bucket_literal})
+  |> range(start: -10m)
+  |> filter(fn: (r) => r._measurement == "aruba_radius_server" and (r._field == "avg_response_ms" or r._field == "timeout_delta"))
+  |> map(fn: (r) => ({{r with _value: float(v: r._value)}}))
+  |> group(columns: ["server", "_field"])
+  |> last()
+  |> group(columns: ["server"])
+  |> pivot(rowKey: ["server"], columnKey: ["_field"], valueColumn: "_value")
+  |> map(fn: (r) => ({{server: r.server, _value: if exists r.avg_response_ms and exists r.timeout_delta and r.avg_response_ms < 500.0 and r.timeout_delta == 0.0 then 2 else if exists r.avg_response_ms and exists r.timeout_delta and r.avg_response_ms < 1000.0 and r.timeout_delta <= 5.0 then 1 else 0}}))
+health = union(tables: [expected, observed])
+  |> group(columns: ["server"])
+  |> max(column: "_value")'''
+    health_mappings = [{"type": "value", "options": {
+        "0": {"text": "UNHEALTHY", "color": "red"},
+        "1": {"text": "WARNING", "color": "orange"},
+        "2": {"text": "HEALTHY", "color": "green"},
+    }}]
+    health_thresholds = [{"color": "red", "value": None}, {"color": "orange", "value": 1},
+                         {"color": "green", "value": 2}]
+    health_options = {"reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": ""},
+                      "orientation": "horizontal", "textMode": "value_and_name",
+                      "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                      "wideLayout": True}
+    server_health_options = {**health_options, "orientation": "vertical"}
+    add_panel("ClearPass Overall Health", "stat",
+              health_query + '\nhealth |> group() |> min(column: "_value") |> map(fn: (r) => ({_value: r._value})) |> yield(name: "overall")',
+              0, 0, 6, 4, unit="none",
+              description="Worst current state across both on-prem nodes, both Azure nodes and the RADIUS VIP. Missing/stale data is unhealthy.",
+              thresholds=health_thresholds, mappings=health_mappings,
+              display_name="ClearPass cluster", options=health_options)
+    add_panel("ClearPass Server Health", "stat", health_query + '\nhealth |> yield(name: "servers")',
+              6, 0, 18, 4, unit="none",
+              description="Healthy: fresh data, response under 500 ms and zero new timeouts. Warning: response under 1,000 ms and at most five new timeouts. Missing/stale or worse is unhealthy.",
+              thresholds=health_thresholds, mappings=health_mappings,
+              display_name="${__field.labels.server}", options=server_health_options)
+
     return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
             "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},
             "tags": ["SCCC", "wireless", "ClearPass"],
-            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health plus Fred PC performance by building, last known user and computer from the existing private Influx data. SNMP target collection is unchanged.",
+            "description": "Current Aruba wireless, building, SSID and explicit ClearPass/RADIUS health plus Fred PC performance by building, last known user and computer from the existing private Influx data. Missing ClearPass telemetry is unhealthy rather than silently omitted. SNMP target collection is unchanged.",
             "panels": panels}
 
 

@@ -87,7 +87,7 @@ def main():
     dashboard_specs = ((Path("/var/lib/sccc-building-diagnostics/grafana-device-performance.json"),
                         dashboard_dir / "sccc-device-performance.json", "sccc-device-performance", 15),
                        (Path("/var/lib/sccc-building-diagnostics/grafana-wireless-operations.json"),
-                        dashboard_dir / "sccc-wireless-operations.json", "sccc-wireless-overview", 21))
+                        dashboard_dir / "sccc-wireless-operations.json", "sccc-wireless-overview", 24))
     models = {}
 
     def provision(source, destination, uid, panel_count):

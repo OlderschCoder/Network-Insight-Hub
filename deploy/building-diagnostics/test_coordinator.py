@@ -251,7 +251,7 @@ class MetricsTests(unittest.TestCase):
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
-        self.assertEqual(len(wireless["panels"]), 22)
+        self.assertEqual(len(wireless["panels"]), 24)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
         encoded = json.dumps(wireless)
         for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
@@ -265,6 +265,12 @@ class MetricsTests(unittest.TestCase):
         self.assertIn('"value": "Latency"', encoded)
         self.assertIn("Throughput automatically displays in Mbps or Gbps", encoded)
         panels_by_title = {panel["title"]: panel for panel in wireless["panels"]}
+        self.assertIn("ClearPass Overall Health", panels_by_title)
+        self.assertIn("ClearPass Server Health", panels_by_title)
+        self.assertIn("SCCC_CPPM_AZ02", panels_by_title["ClearPass Server Health"]["targets"][0]["query"])
+        self.assertIn('yield(name: "overall")', panels_by_title["ClearPass Overall Health"]["targets"][0]["query"])
+        self.assertIn('yield(name: "servers")', panels_by_title["ClearPass Server Health"]["targets"][0]["query"])
+        self.assertEqual(panels_by_title["ClearPass Overall Health"]["fieldConfig"]["defaults"]["mappings"][0]["options"]["0"]["text"], "UNHEALTHY")
         self.assertEqual(panels_by_title["Clients by SSID"]["fieldConfig"]["defaults"]["displayName"],
                          "${__field.labels.ssid}")
         for title in ("Clients by building", "Average clients per AP by building",

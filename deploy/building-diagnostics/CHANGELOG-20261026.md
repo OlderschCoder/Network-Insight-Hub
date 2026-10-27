@@ -6,3 +6,4 @@
 - Reflowed the retained campus map, KPIs, trends, building exceptions, power, switch, and device inventory panels.
 - Changed refresh from two hours to one minute and moved the dashboard to a version-controlled file provider.
 - Preserved a full Grafana database backup and the original live dashboard JSON before provisioning.
+- Added explicit ClearPass overall and per-server health panels. Missing/stale nodes are unhealthy; degraded response/timeouts are warning; healthy requires fresh low-latency data with no new timeouts.
