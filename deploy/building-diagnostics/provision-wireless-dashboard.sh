@@ -9,17 +9,19 @@ dashboard_dir=/home/ITADMIN/sccc-ops/grafana-new/dashboards
 [[ -d "$dashboard_dir" && ! -L "$dashboard_dir" ]] || { echo 'Existing Grafana dashboard directory required.' >&2; exit 1; }
 
 python3 - "$bundle" "$dashboard_dir" <<'PY'
-import base64
+import csv
 from datetime import datetime, timezone
-import importlib
+import io
 import json
 import os
 from pathlib import Path
 import shlex
 import shutil
+import sqlite3
+import subprocess
 import sys
 import time
-from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import ProxyHandler, Request, build_opener
 
 bundle, dashboard_dir = map(Path, sys.argv[1:])
@@ -69,45 +71,72 @@ if changed:
     temporary.chmod(0o644)
     os.replace(temporary, destination)
 
-grafana = environment('/home/ITADMIN/sccc-ops/.env')
-credentials = base64.b64encode((grafana['GRAFANA_ADMIN_USER'] + ':' + grafana['GRAFANA_ADMIN_PASSWORD']).encode()).decode()
 opener = build_opener(ProxyHandler({}))
-def request(path, payload=None):
-    req = Request('http://127.0.0.1:3000' + path,
-                  None if payload is None else json.dumps(payload).encode(),
-                  headers={'Authorization': 'Basic ' + credentials, 'Content-Type': 'application/json'})
+
+def request(url, payload=None, headers=None):
+    req = Request(url, None if payload is None else payload, headers=headers or {})
     with opener.open(req, timeout=30) as response:
-        return json.load(response)
+        return response.read(2 * 1024 * 1024 + 1)
+
+health = json.loads(request('http://127.0.0.1:3000/api/health'))
+if health.get('database') != 'ok':
+    raise SystemExit('Grafana health check failed.')
+
+containers = []
+for line in subprocess.check_output(
+        ['docker', 'ps', '--format', '{{.ID}}\t{{.Image}}\t{{.Names}}'], text=True).splitlines():
+    container_id, image, name = line.split('\t', 2)
+    if 'grafana' in (image + ' ' + name).lower():
+        containers.append(container_id)
+if len(containers) != 1:
+    raise SystemExit('Expected exactly one running Grafana container.')
+details = json.loads(subprocess.check_output(['docker', 'inspect', containers[0]], text=True))[0]
+mounts = [entry for entry in details.get('Mounts', []) if entry.get('Destination') == '/var/lib/grafana']
+if len(mounts) != 1:
+    raise SystemExit('Grafana data mount could not be resolved safely.')
+database = Path(mounts[0]['Source']) / 'grafana.db'
+if not database.is_file() or database.is_symlink():
+    raise SystemExit('Grafana database is not a regular file.')
 
 loaded = None
 for _ in range(20):
-    try:
-        loaded = request('/api/dashboards/uid/sccc-wireless-overview')
-        if loaded.get('dashboard', {}).get('uid') == model['uid'] and len(loaded['dashboard'].get('panels', [])) == 21:
+    with sqlite3.connect('file:' + str(database) + '?mode=ro', uri=True, timeout=10) as connection:
+        row = connection.execute('SELECT data FROM dashboard WHERE uid = ?', (model['uid'],)).fetchone()
+    if row:
+        loaded = json.loads(row[0])
+        titles = {panel.get('title') for panel in loaded.get('panels', [])}
+        required = {'PC download by building/computer', 'PC upload by building/computer',
+                    'PC latency by building/computer', 'PC request loss by building/computer',
+                    'PC external DNS/TCP/TLS/TTFB', 'Latest PC performance'}
+        if len(loaded.get('panels', [])) == 21 and required <= titles:
             break
-    except HTTPError as error:
-        if error.code != 404:
-            raise
     time.sleep(2)
-if not loaded or len(loaded.get('dashboard', {}).get('panels', [])) != 21:
+if not loaded or len(loaded.get('panels', [])) != 21 or not required <= titles:
     raise SystemExit('Grafana did not load the reviewed dashboard.')
 
-now_ms = int(time.time() * 1000)
+for key in ('INFLUX_URL', 'INFLUX_TOKEN', 'INFLUX_ORG'):
+    if not worker.get(key):
+        raise SystemExit('Existing Influx connection is incomplete.')
+if worker['INFLUX_URL'].rstrip('/') != 'http://127.0.0.1:8086':
+    raise SystemExit('Only the existing local Influx service is accepted.')
+
+def influx(flux):
+    raw = request(worker['INFLUX_URL'].rstrip('/') + '/api/v2/query?' + urlencode({'org': worker['INFLUX_ORG']}),
+                  json.dumps({'query': flux, 'type': 'flux'}).encode(),
+                  {'Authorization': 'Token ' + worker['INFLUX_TOKEN'], 'Content-Type': 'application/json',
+                   'Accept': 'application/csv'})
+    if len(raw) > 2 * 1024 * 1024:
+        raise SystemExit('Influx query response exceeded the safety bound.')
+    return list(csv.DictReader(io.StringIO('\n'.join(
+        line for line in raw.decode().splitlines() if not line.startswith('#')))))
+
 source = 'from(bucket: ' + json.dumps(bucket) + ')'
-payload = {'from': str(now_ms - 7 * 86400 * 1000), 'to': str(now_ms), 'queries': [
-    {'refId': 'A', 'datasource': {'type': 'influxdb', 'uid': DATASOURCE_UID},
-     'query': source + ' |> range(start: -15m) |> filter(fn: (r) => r._measurement == "aruba_wireless_summary" and r._field == "clients_total") |> last()',
-     'maxDataPoints': 1000, 'intervalMs': 60000},
-    {'refId': 'B', 'datasource': {'type': 'influxdb', 'uid': DATASOURCE_UID},
-     'query': source + ' |> range(start: -7d) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "download_mbps")',
-     'maxDataPoints': 1000, 'intervalMs': 60000}]}
-results = request('/api/ds/query', payload).get('results', {})
-for ref in ('A', 'B'):
-    result = results.get(ref, {})
-    frames = result.get('frames', [])
-    if result.get('error') or not any(frame.get('data', {}).get('values') for frame in frames):
-        raise SystemExit('Grafana datasource did not return expected ' + ref + ' data.')
+wireless = influx(source + ' |> range(start: -15m) |> filter(fn: (r) => r._measurement == "aruba_wireless_summary" and r._field == "clients_total") |> last()')
+pc = influx(source + ' |> range(start: -7d) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "download_mbps")')
+for label, rows in (('wireless', wireless), ('PC', pc)):
+    if not any(row.get('_value') not in (None, '', '_value') for row in rows):
+        raise SystemExit('Influx did not return expected ' + label + ' data.')
 print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 21, 'changed': changed,
-                  'backup': str(backup) if backup else None, 'wirelessFrames': len(results['A']['frames']),
-                  'pcFrames': len(results['B']['frames'])}))
+                  'backup': str(backup) if backup else None, 'grafanaDatabase': 'loaded',
+                  'wirelessRows': len(wireless), 'pcRows': len(pc)}))
 PY
