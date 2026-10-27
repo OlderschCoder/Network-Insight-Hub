@@ -34,7 +34,7 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     ],
     userBuildingAssignments: [],
   };
-  const heartbeat = (identity: { deviceId: string }, name: string, mac: string) => ({ deviceId: identity.deviceId, computerName: name, adDomain: "sccc.edu", adJoined: true, uptimeSeconds: 10, agentVersion: "synthetic", interfaces: [{ mac, ipAddresses: ["127.0.0.1"], kind: "ethernet" as const }] });
+  const heartbeat = (identity: { deviceId: string }, name: string, mac: string) => ({ deviceId: identity.deviceId, computerName: name, adDomain: "sccc.edu", adJoined: true, uptimeSeconds: 10, agentVersion: "synthetic", loggedOnUser: "SCCC\\synthetic.user", interfaces: [{ mac, ipAddresses: ["127.0.0.1"], kind: "ethernet" as const }] });
   beforeAll(async () => {
     process.env.BUILDING_DIAGNOSTICS_ENABLED = "true";
     process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "true";
@@ -92,7 +92,7 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     await expect(store.result(a.deviceId, result)).rejects.toThrow("already completed");
     const report = await store.reports("0", 100);
     expect(report.reports).toHaveLength(1);
-    expect(report.reports[0]).toMatchObject({ requestLossPercent: 40, serverPingReceipts: 3, targetLabel: "Fred HTTPS path" });
+    expect(report.reports[0]).toMatchObject({ requestLossPercent: 40, serverPingReceipts: 3, targetLabel: "Fred HTTPS path", user: "SCCC\\synthetic.user" });
   });
   it("keeps the cooldown, expires the next lease and permits a new bounded job", async () => {
     const current = (await db.query("SELECT device_id FROM building_diagnostics_jobs WHERE status='queued'")).rows[0].device_id;

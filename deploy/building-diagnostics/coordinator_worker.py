@@ -88,7 +88,7 @@ def report_point(report: dict) -> str:
             fields[destination] = metric(external[source])
     if len(fields) == 1 and fields["measurement_ok"]:
         raise ValueError("Successful report has no actual measurement")
-    return point("sccc_device_performance", {"report_id": identifier, "device_id": text(report.get("deviceId")), "job_id": text(report.get("jobId")), "computer": text(report.get("computerName") or report.get("deviceId")), "building": text(report.get("building") or "Unlocated"), "type": text(report.get("type") or "fred")}, fields, report.get("recordedAt"))
+    return point("sccc_device_performance", {"report_id": identifier, "device_id": text(report.get("deviceId")), "job_id": text(report.get("jobId")), "computer": text(report.get("computerName") or report.get("deviceId")), "building": text(report.get("building") or "Unlocated"), "user": text(report.get("user") or "Unknown user"), "type": text(report.get("type") or "fred")}, fields, report.get("recordedAt"))
 
 
 def collector_points(snapshot: dict) -> list[str]:
@@ -131,7 +131,7 @@ def presence_points(snapshot: dict) -> list[str]:
             fields["ad_enabled"] = enabled
         location = device.get("location") or {}
         building = location.get("building") if location.get("kind") == "network-confirmed" else "Unlocated"
-        rows.append(point("sccc_device_presence", {"ad_guid": identity, "computer": text(device.get("computerName")), "building": text(building or "Unlocated", 120)}, fields, observed_at))
+        rows.append(point("sccc_device_presence", {"ad_guid": identity, "computer": text(device.get("computerName")), "building": text(building or "Unlocated", 120), "user": text(device.get("loggedOnUser") or "Unknown user")}, fields, observed_at))
     return rows
 
 
@@ -199,12 +199,16 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                    ("Collector switches observed", "sccc_device_performance_collector", "switches_observed", "short")]
     for index, (title, measurement, field, unit) in enumerate(definitions):
         query = f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")'
-        panels.append({"id": index + 1, "title": title, "type": "timeseries", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "fieldConfig": {"defaults": {"unit": unit}}, "targets": [{"refId": "A", "query": query}]})
+        defaults = {"unit": unit}
+        if measurement == "sccc_device_performance":
+            query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) |> group(columns: ["building", "user", "computer", "_field"])'
+            defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer}"
+        panels.append({"id": index + 1, "title": title, "type": "timeseries", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
     for field, title in (("online", "Current online computers by building"), ("enrolled", "Current enrolled computers by building")):
         index = len(panels)
         query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "{field}") |> group(columns: ["ad_guid"]) |> last() |> map(fn: (r) => ({{r with _value: if r._value then 1 else 0}})) |> group(columns: ["building"]) |> sum()'
         panels.append({"id": index + 1, "title": title, "type": "stat", "description": "Latest authenticated Fred snapshot per AD GUID within fifteen minutes. Missing/stale snapshots remain No data; Unlocated does not claim a current building.", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "targets": [{"refId": "A", "query": query}]})
-    query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> group(columns: ["ad_guid", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
+    query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> map(fn: (r) => ({{r with user: if exists r.user and r.user != "" then r.user else "Unknown user"}})) |> group(columns: ["ad_guid", "user", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "user", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "user", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
     table_y = math.ceil(len(panels) / 2) * 8
     panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
     return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "1m", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint HTTPS measurements and private SNMP access-port evidence. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
@@ -226,10 +230,12 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
 
     panels = []
 
-    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None):
+    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None, display_name=None):
         defaults = {"unit": unit}
         if thresholds:
             defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
+        if display_name:
+            defaults["displayName"] = display_name
         panel = {"id": len(panels) + 1, "title": title, "type": panel_type,
                  "datasource": datasource, "gridPos": {"x": x, "y": y, "w": w, "h": h},
                  "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": flux}]}
@@ -293,35 +299,46 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     add_panel("Current AP state", "table", ap_query, 0, 28, 24, 10,
               description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
 
-    pc_description = ("Fred endpoint test results retain building and computer tags but no username. "
-                      "No recent points means no current endpoint test has reported; it is not a healthy zero.")
-    add_panel("PC download by building / computer", "timeseries",
-              query("sccc_device_performance", ("download_mbps",)),
-              0, 38, 12, 8, unit="Mbits", description=pc_description)
-    add_panel("PC upload by building / computer", "timeseries",
-              query("sccc_device_performance", ("upload_mbps",)),
-              12, 38, 12, 8, unit="Mbits", description=pc_description)
-    add_panel("PC latency by building / computer", "timeseries",
-              query("sccc_device_performance", ("latency_ms",)),
-              0, 46, 8, 8, unit="ms", description=pc_description)
-    add_panel("PC request loss by building / computer", "timeseries",
-              query("sccc_device_performance", ("request_loss_percent",)),
-              8, 46, 8, 8, unit="percent", description=pc_description)
+    pc_description = ("Fred endpoint test results identify building, last known logged-on user and computer. "
+                      "Missing user identity is shown as Unknown user. No recent point is not a healthy zero.")
+    pc_series = ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) |> group(columns: ["building", "user", "computer", "_field"])'
+    pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer}"
+    add_panel("PC download by building / user / computer", "timeseries",
+              query("sccc_device_performance", ("download_mbps",), extra=pc_series),
+              0, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+    add_panel("PC upload by building / user / computer", "timeseries",
+              query("sccc_device_performance", ("upload_mbps",), extra=pc_series),
+              12, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+    add_panel("PC latency by building / user / computer", "timeseries",
+              query("sccc_device_performance", ("latency_ms",), extra=pc_series),
+              0, 46, 8, 8, unit="ms", description=pc_description, display_name=pc_display)
+    add_panel("PC request loss by building / user / computer", "timeseries",
+              query("sccc_device_performance", ("request_loss_percent",), extra=pc_series),
+              8, 46, 8, 8, unit="percent", description=pc_description, display_name=pc_display)
     add_panel("PC external DNS / TCP / TLS / TTFB", "timeseries",
-              query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms")),
-              16, 46, 8, 8, unit="ms", description=pc_description)
+              query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"), extra=pc_series),
+              16, 46, 8, 8, unit="ms", description=pc_description,
+              display_name=pc_display + " · ${__field.labels._field}")
+    building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms"),
+                           extra=' |> group(columns: ["building", "computer", "_field"]) |> last() '
+                                 '|> group(columns: ["building", "_field"]) |> mean() |> group() '
+                                 '|> pivot(rowKey: ["building"], columnKey: ["_field"], valueColumn: "_value") '
+                                 '|> keep(columns: ["building", "download_mbps", "upload_mbps", "latency_ms"])')
+    add_panel("Building PC speed summary", "table", building_speed, 0, 54, 24, 9,
+              description="Average of each computer's latest result in the selected time range, grouped by building.")
     pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms",
                                                           "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
-                     extra=' |> group(columns: ["report_id", "computer", "building", "type", "_field"]) |> last() |> group() '
-                           '|> pivot(rowKey: ["report_id", "computer", "building", "type", "_time"], columnKey: ["_field"], valueColumn: "_value") '
-                           '|> keep(columns: ["_time", "computer", "building", "type", "download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
-    add_panel("Latest PC performance results", "table", pc_table, 0, 54, 24, 10,
+                     extra=' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
+                           '|> group(columns: ["report_id", "computer", "building", "user", "type", "_field"]) |> last() |> group() '
+                           '|> pivot(rowKey: ["report_id", "computer", "building", "user", "type", "_time"], columnKey: ["_field"], valueColumn: "_value") '
+                           '|> keep(columns: ["_time", "building", "user", "computer", "type", "download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
+    add_panel("Latest PC performance results", "table", pc_table, 0, 63, 24, 10,
               description=pc_description)
 
     return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
             "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},
             "tags": ["SCCC", "wireless", "ClearPass"],
-            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health plus Fred PC performance by building/computer from the existing private Influx data. SNMP target collection is unchanged.",
+            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health plus Fred PC performance by building, last known user and computer from the existing private Influx data. SNMP target collection is unchanged.",
             "panels": panels}
 
 

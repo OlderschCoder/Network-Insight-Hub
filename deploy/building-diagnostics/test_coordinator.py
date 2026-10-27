@@ -27,11 +27,11 @@ MAC_KEY = (1, 0, 17, 34, 51, 68, 85)
 
 
 def report(seq=1):
-    return {"seq": str(seq), "deviceId": "synthetic-device", "jobId": "synthetic-job", "computerName": "SYNTHETIC", "building": "Synthetic A", "recordedAt": STAMP, "downloadMbps": 25.5, "uploadMbps": 10, "latencyMs": 2, "requestLossPercent": 0, "downloadBytes": 1024}
+    return {"seq": str(seq), "deviceId": "synthetic-device", "jobId": "synthetic-job", "computerName": "SYNTHETIC", "building": "Synthetic A", "user": "EXAMPLE\\staff", "recordedAt": STAMP, "downloadMbps": 25.5, "uploadMbps": 10, "latencyMs": 2, "requestLossPercent": 0, "downloadBytes": 1024}
 
 
 def presence():
-    return {"observedAt": STAMP, "updatedAt": STAMP, "readiness": {}, "devices": [{"deviceId": "synthetic-device", "adObjectGuid": "7393b75e-8173-4e96-b87a-5165fa12e6f1", "computerName": "SYNTHETIC", "domain": "example.invalid", "enabled": True, "enrolled": True, "online": True, "adVerified": True, "lastSeenAt": STAMP, "location": {"building": "Synthetic A", "kind": "network-confirmed"}}]}
+    return {"observedAt": STAMP, "updatedAt": STAMP, "readiness": {}, "devices": [{"deviceId": "synthetic-device", "adObjectGuid": "7393b75e-8173-4e96-b87a-5165fa12e6f1", "computerName": "SYNTHETIC", "domain": "example.invalid", "enabled": True, "enrolled": True, "online": True, "adVerified": True, "lastSeenAt": STAMP, "loggedOnUser": "EXAMPLE\\staff", "location": {"building": "Synthetic A", "kind": "network-confirmed"}}]}
 
 
 def metadata_owner(owner=0):
@@ -191,7 +191,7 @@ class BulkBoundaryTests(unittest.TestCase):
 
 
 class MetricsTests(unittest.TestCase):
-    def test_presence_exports_every_ad_guid_with_original_snapshot_time_and_unknown_safely(self):
+    def test_presence_exports_every_ad_guid_with_building_and_known_user(self):
         snapshot = presence()
         snapshot["devices"].append({"adObjectGuid": "12078014-77bb-43b6-9bde-bbb213668861", "computerName": "NOT-ENROLLED", "enabled": None, "enrolled": False, "online": False, "adVerified": False, "location": {"building": "Assigned Office", "kind": "assigned"}, "loggedOnUser": "never-export-user", "interfaces": [{"mac": "never-export-mac"}]})
         lines = presence_points(snapshot)
@@ -199,17 +199,21 @@ class MetricsTests(unittest.TestCase):
         self.assertTrue(all(line.endswith(" " + str(time_ns(STAMP))) for line in lines))
         self.assertEqual(lines, presence_points(snapshot))
         self.assertIn("building=Unlocated", lines[1])
+        self.assertIn("user=never-export-user", lines[1])
+        self.assertIn("user=EXAMPLE\\\\staff", lines[0])
         self.assertIn("ad_enabled_known=false", lines[1])
         self.assertNotIn("ad_enabled=", lines[1])
-        self.assertNotIn("never-export", "\n".join(lines))
         with self.assertRaises(ValueError):
             presence_points({**snapshot, "devices": snapshot["devices"] + [snapshot["devices"][0]]})
     def test_metrics_keep_immutable_identity_timestamp_and_numeric_field_types(self):
         line = report_point(report())
         self.assertTrue(line.endswith(" " + str(time_ns(STAMP))))
         self.assertIn("report_id=1", line)
+        self.assertIn("building=Synthetic\\ A", line)
+        self.assertIn("user=EXAMPLE\\\\staff", line)
         self.assertIn("upload_mbps=10", line)
         self.assertNotIn("upload_mbps=10i", line)
+        self.assertIn("user=Unknown\\ user", report_point({**report(), "user": None}))
         self.assertEqual(time_ns("2026-10-25T12:00:00.123456789Z") % 1_000_000_000, 123456789)
         self.assertEqual(time_ns("2026-10-25T07:00:00.123456789-05:00"), time_ns("2026-10-25T12:00:00.123456789Z"))
         for invalid in (math.nan, math.inf, -1, True):
@@ -247,12 +251,14 @@ class MetricsTests(unittest.TestCase):
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
-        self.assertEqual(len(wireless["panels"]), 21)
+        self.assertEqual(len(wireless["panels"]), 22)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
         encoded = json.dumps(wireless)
         for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
             self.assertIn(measurement, encoded)
         self.assertIn("Latest PC performance results", encoded)
+        self.assertIn("Building PC speed summary", encoded)
+        self.assertIn("Unknown user", encoded)
         self.assertIn("sccc_device_performance", encoded)
         self.assertNotIn("synthetic-token", encoded)
 

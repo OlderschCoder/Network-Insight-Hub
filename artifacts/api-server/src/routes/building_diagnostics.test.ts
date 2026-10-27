@@ -82,14 +82,14 @@ describe("building diagnostics authority boundaries", () => {
     for (const invalid of [{ ...body, snapshotComplete: false }, { ...body, adComputers: [] }, { ...body, adComputers: [adComputer, adComputer] }, { ...body, observations: [] }]) expect((await request(app()).post(`${path}/ad-inventory`).set("Authorization", `Bearer ${worker}`).send(invalid)).status).toBe(400);
     expect(store.ingestAd).toHaveBeenCalledTimes(1);
   });
-  it("exports a worker-only presence projection without user, MAC, audit or token data", async () => {
+  it("exports a worker-only presence projection with last-known user but without MAC, audit or token data", async () => {
     for (const credential of [token, "fred-session", "alerts.send-token"]) expect((await request(app()).get(`${path}/reporting-snapshot`).set("Authorization", `Bearer ${credential}`).set("x-role", "cio")).status).toBe(401);
     store.overview.mockResolvedValueOnce({ readiness: { counts: { inventory: 1 } }, devices: [{ deviceId: id, adObjectGuid: jobId, computerName: "PC-1", adDomain: "sccc.edu", adEnabled: true, enrolled: true, revoked: false, online: true, adVerified: true, lastCheckIn: "2026-10-25T12:00:00Z", location: { building: "Synthetic", kind: "network-confirmed", source: "switch / 1/1/2", observedAt: "2026-10-25T12:00:00Z" }, loggedOnUser: "private-user", interfaces: [{ mac: "private-mac" }], deviceToken: "private-token", lastResult: { error: "private-error" } }], audit: ["private-audit"] } as any);
     const response = await request(app()).get(`${path}/reporting-snapshot`).set("Authorization", `Bearer ${worker}`);
     expect(response.status).toBe(200); expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.body.devices).toEqual([{ deviceId: id, adObjectGuid: jobId, computerName: "PC-1", domain: "sccc.edu", enabled: true, enrolled: true, online: true, adVerified: true, lastSeenAt: "2026-10-25T12:00:00Z", location: { building: "Synthetic", kind: "network-confirmed", source: "switch / 1/1/2", observedAt: "2026-10-25T12:00:00Z" } }]);
+    expect(response.body.devices).toEqual([{ deviceId: id, adObjectGuid: jobId, computerName: "PC-1", domain: "sccc.edu", enabled: true, enrolled: true, online: true, adVerified: true, lastSeenAt: "2026-10-25T12:00:00Z", loggedOnUser: "private-user", location: { building: "Synthetic", kind: "network-confirmed", source: "switch / 1/1/2", observedAt: "2026-10-25T12:00:00Z" } }]);
     expect(response.body.updatedAt).toBe(response.body.observedAt);
-    expect(JSON.stringify(response.body)).not.toMatch(/private-/);
+    expect(JSON.stringify(response.body)).not.toMatch(/private-(mac|token|error|audit)/);
   });
   it("separates administrator cancellation from device-owned status and rejects arbitrary external targets", async () => {
     expect((await request(app()).post(`${path}/jobs/${jobId}/cancel`).set("Authorization", `Bearer ${token}`).send({ reason: "stop measurement" })).status).toBe(401);

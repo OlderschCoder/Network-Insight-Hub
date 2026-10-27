@@ -396,7 +396,7 @@ export const diagnosticsStore = {
   },
   async reports(after: string, limit: number) {
     await ensureDiagnosticsSchema();
-    const rows = (await pool.query("SELECT r.*,d.computer_name,d.ad_object_guid FROM building_diagnostics_reports r JOIN building_diagnostics_devices d ON d.id=r.device_id WHERE r.id>$1 ORDER BY r.id LIMIT $2", [after, limit])).rows;
-    return { reports: rows.map((r) => ({ id: String(r.id), seq: String(r.id), jobId: r.job_id, deviceId: r.device_id, computerName: r.computer_name, adObjectGuid: r.ad_object_guid, building: r.building, recordedAt: iso(r.recorded_at), ...r.data })), nextCursor: rows.length ? String(rows[rows.length - 1].id) : after };
+    const rows = (await pool.query("SELECT r.*,d.computer_name,d.ad_object_guid,d.heartbeat->>'loggedOnUser' AS logged_on_user FROM building_diagnostics_reports r JOIN building_diagnostics_devices d ON d.id=r.device_id WHERE r.id>$1 ORDER BY r.id LIMIT $2", [after, limit])).rows;
+    return { reports: rows.map((r) => ({ id: String(r.id), seq: String(r.id), jobId: r.job_id, deviceId: r.device_id, computerName: r.computer_name, adObjectGuid: r.ad_object_guid, building: r.building, ...(r.logged_on_user ? { user: r.logged_on_user } : {}), recordedAt: iso(r.recorded_at), ...r.data })), nextCursor: rows.length ? String(rows[rows.length - 1].id) : after };
   },
 };

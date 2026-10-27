@@ -44,7 +44,7 @@ if not bucket:
 sys.path.insert(0, str(bundle))
 from coordinator_worker import DATASOURCE_UID, wireless_dashboard
 model = wireless_dashboard(bucket)
-if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 21:
+if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 22:
     raise SystemExit('Reviewed dashboard contract does not match.')
 
 destination = dashboard_dir / 'sccc-wireless-operations.json'
@@ -105,13 +105,14 @@ for _ in range(20):
     if row:
         loaded = json.loads(row[0])
         titles = {panel.get('title') for panel in loaded.get('panels', [])}
-        required = {'PC download by building/computer', 'PC upload by building/computer',
-                    'PC latency by building/computer', 'PC request loss by building/computer',
-                    'PC external DNS/TCP/TLS/TTFB', 'Latest PC performance'}
-        if len(loaded.get('panels', [])) == 21 and required <= titles:
+        required = {'PC download by building / user / computer', 'PC upload by building / user / computer',
+                    'PC latency by building / user / computer', 'PC request loss by building / user / computer',
+                    'PC external DNS / TCP / TLS / TTFB', 'Building PC speed summary',
+                    'Latest PC performance results'}
+        if len(loaded.get('panels', [])) == 22 and required <= titles:
             break
     time.sleep(2)
-if not loaded or len(loaded.get('panels', [])) != 21 or not required <= titles:
+if not loaded or len(loaded.get('panels', [])) != 22 or not required <= titles:
     raise SystemExit('Grafana did not load the reviewed dashboard.')
 
 for key in ('INFLUX_URL', 'INFLUX_TOKEN', 'INFLUX_ORG'):
@@ -136,7 +137,7 @@ pc = influx(source + ' |> range(start: -7d) |> filter(fn: (r) => r._measurement 
 for label, rows in (('wireless', wireless), ('PC', pc)):
     if not any(row.get('_value') not in (None, '', '_value') for row in rows):
         raise SystemExit('Influx did not return expected ' + label + ' data.')
-print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 21, 'changed': changed,
+print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 22, 'changed': changed,
                   'backup': str(backup) if backup else None, 'grafanaDatabase': 'loaded',
                   'wirelessRows': len(wireless), 'pcRows': len(pc)}))
 PY

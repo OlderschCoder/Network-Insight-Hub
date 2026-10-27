@@ -96,6 +96,7 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
     const overview = await store.overview(), observedAt = new Date().toISOString();
     const devices = overview.devices.map((d) => ({ deviceId: d.deviceId, adObjectGuid: d.adObjectGuid, computerName: d.computerName, domain: d.adDomain,
       enabled: d.adEnabled, enrolled: d.enrolled && !d.revoked, online: d.online, adVerified: d.adVerified, lastSeenAt: d.lastCheckIn,
+      ...(d.loggedOnUser ? { loggedOnUser: d.loggedOnUser } : {}),
       location: { building: d.location.building, kind: d.location.kind, source: d.location.source, observedAt: d.location.observedAt } }));
     return res.json({ observedAt, updatedAt: observedAt, readiness: overview.readiness, devices });
   });
