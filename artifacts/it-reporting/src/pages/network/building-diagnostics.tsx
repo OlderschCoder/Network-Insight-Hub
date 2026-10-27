@@ -17,7 +17,7 @@ type Result = {
   external?: { type: string; targetOrigin: string; path: string; dnsMs: number | null; dnsAddresses?: string[]; remoteAddress?: string; tcpConnectMs: number | null; tlsMs: number | null; ttfbMs?: number | null; httpStatus: number | null; bytesReceived: number; elapsedMs: number; mbps: number | null; timestamp: string; failure?: string; activeAdapter?: { interfaceAlias?: string; kind?: string; mac?: string; localIp?: string; subnetPrefixLength?: number; gateway?: string; ssid?: string; bssid?: string } };
 };
 type Device = {
-  deviceId: string | null; adObjectGuid: string; adDomain: string; enrolled: boolean; revoked?: boolean; computerName: string; adVerified: boolean; online: boolean;
+  deviceId: string | null; adObjectGuid: string; adDomain: string; enrolled: boolean; revoked?: boolean; computerName: string; adVerified: boolean; adEnabled?: boolean | null; online: boolean;
   lastCheckIn: string | null; agentVersion: string | null; loggedOnUser: string | null;
   capabilities?: string[];
   location: { building: string | null; kind: string; source: string | null; observedAt: string | null };
@@ -26,7 +26,7 @@ type Device = {
 };
 type Settings = { schedulerArmed: boolean; rotationIntervalMinutes: number; revision: number; updatedAt: string | null; updatedBy: string | null; persisted: boolean; deploymentSchedulerEnabled: boolean; effectiveSchedulerEnabled: boolean };
 type Overview = {
-  enabled: boolean; schedulerEnabled: boolean; targetLabel: string; inventoryUpdatedAt: string | null;
+  enabled: boolean; schedulerEnabled: boolean; targetLabel: string; inventoryUpdatedAt: string | null; adObservedAt?: string | null;
   externalProbe?: { configured: boolean; origin: string | null; quickBytes: number; sustainedEnabled: boolean; dailyBudgetBytes: number };
   devices: Device[];
   buildings: { building: string; onlineDevices: number; eligibleDevices: number; lastResult: Result | null; noCurrentMeasurement: boolean }[];
@@ -41,6 +41,10 @@ type Overview = {
   };
   audit?: { id: string; deviceId: string | null; computerName: string | null; action: string; actor: string; reason: string; createdAt: string }[];
 };
+type EnrollmentBatch = { requestId: string; status: "queued" | "running" | "completed"; requested: number;
+  counts: Record<"queued" | "claimed" | "installing" | "installed" | "online" | "skipped" | "unreachable" | "failed", number>;
+  worker: { ready: boolean; lastSeenAt: string | null };
+  items: { adObjectGuid: string; computerName: string; status: string; reason?: string }[] };
 
 const API = `${import.meta.env.VITE_API_URL || "/api"}/building-diagnostics`;
 const time = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "Not reported";
@@ -64,6 +68,8 @@ export default function BuildingDiagnostics() {
   const [search, setSearch] = useState("");
   const [building, setBuilding] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [enrollmentSelected, setEnrollmentSelected] = useState<Set<string>>(new Set());
+  const [enrollmentRequestId, setEnrollmentRequestId] = useState(() => diagnosticGuid(new URLSearchParams(window.location.search).get("enrollmentRequest")));
   const [notice, setNotice] = useState("");
   const [entryGuid] = useState(() => new URLSearchParams(window.location.search).get("adObjectGuid"));
   const appliedEntry = useRef(false);
@@ -84,6 +90,16 @@ export default function BuildingDiagnostics() {
     `${d.computerName} ${d.loggedOnUser || ""} ${d.location.building || ""}`.toLowerCase().includes(search.toLowerCase())), [data, building, search]);
   const eligible = (d: Device): d is Device & { deviceId: string } => diagnosticIneligibility(d, jobType) === null;
   const selectedEligible = (data?.devices || []).filter(eligible).filter(d => selected.has(d.deviceId));
+  const visibleMeasurements = devices.filter(eligible);
+  const visibleMeasurementCount = visibleMeasurements.filter(d => selected.has(d.deviceId)).length;
+  const allVisibleMeasurementsSelected = visibleMeasurements.length > 0 && visibleMeasurementCount === visibleMeasurements.length;
+  const directoryAge = data?.adObservedAt ? Date.now() - Date.parse(data.adObservedAt) : Number.NaN;
+  const enrollmentEligible = (d: Device) => !!data?.enabled && Number.isFinite(directoryAge) && directoryAge >= -60_000 && directoryAge <= 24 * 60 * 60_000 &&
+    d.adVerified && d.adEnabled === true && !d.enrolled && !d.revoked && !!diagnosticGuid(d.adObjectGuid) && !!d.adDomain;
+  const visibleEnrollment = devices.filter(enrollmentEligible);
+  const selectedEnrollment = (data?.devices || []).filter(enrollmentEligible).filter(d => enrollmentSelected.has(d.adObjectGuid.toLowerCase()));
+  const visibleEnrollmentCount = visibleEnrollment.filter(d => enrollmentSelected.has(d.adObjectGuid.toLowerCase())).length;
+  const allVisibleEnrollmentSelected = visibleEnrollment.length > 0 && visibleEnrollmentCount === visibleEnrollment.length;
   useEffect(() => {
     if (data?.settings) { setSchedulerArmed(data.settings.schedulerArmed); setRotationIntervalMinutes(data.settings.rotationIntervalMinutes); }
   }, [data?.settings?.revision]);
@@ -134,6 +150,41 @@ export default function BuildingDiagnostics() {
     },
     onSuccess: ({ action, computerName }) => { setCredentialAction(null); setCredentialReason(""); setNotice(action === "revoke" ? `${computerName}: diagnostic credential revoked. Alert reception is unchanged.` : `${computerName}: provisioning file downloaded once. Move this secret file into the protected deployment workflow. Enrollment is not installation; wait for an authenticated agent check-in.`); client.invalidateQueries({ queryKey: ["building-diagnostics"] }); },
   });
+  const enrollBatch = useMutation({
+    retry: false,
+    mutationFn: async ({ requestId, adObjectGuids }: { requestId: string; adObjectGuids: string[] }) => {
+      const response = await authFetch(`${API}/devices/bulk-enrollment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, adObjectGuids }) });
+      if (!response.ok) throw new Error(`Enrollment request could not be confirmed (${response.status}). Check this request's status before starting another.`);
+      const result: EnrollmentBatch = await response.json();
+      if (result.requestId !== requestId) throw new Error("The enrollment request identity could not be confirmed. Check its status before retrying.");
+      return result;
+    },
+    onSuccess: result => { setNotice(`Enrollment request accepted for ${result.requested} computers; ${result.counts.queued} queued for installation and reporting. No measurements were selected or started.`); client.invalidateQueries({ queryKey: ["building-diagnostics"] }); },
+  });
+  const enrollmentStatus = useQuery<EnrollmentBatch>({
+    queryKey: ["diagnostic-bulk-enrollment", enrollmentRequestId], enabled: canManage && !!enrollmentRequestId && !enrollBatch.isPending, retry: false,
+    queryFn: async () => {
+      const response = await authFetch(`${API}/devices/bulk-enrollment/${enrollmentRequestId}`);
+      if (!response.ok) throw new Error("Enrollment status is unavailable. Keep this request ID for IT; do not submit the same computers again.");
+      const result: EnrollmentBatch = await response.json();
+      if (result.requestId !== enrollmentRequestId) throw new Error("Enrollment status identity does not match this request.");
+      return result;
+    },
+    refetchInterval: query => ["completed", "partial", "failed", "cancelled"].includes(query.state.data?.status || "") ? false : 5_000,
+  });
+  const enrollmentBusy = enrollBatch.isPending || (!!enrollmentRequestId && !["completed", "partial", "failed", "cancelled"].includes(enrollmentStatus.data?.status || ""));
+  function selectVisibleEnrollment(value: boolean) {
+    setEnrollmentSelected(previous => { const next = new Set(previous); for (const device of visibleEnrollment) { const id = device.adObjectGuid.toLowerCase(); value ? next.add(id) : next.delete(id); } return next; });
+  }
+  function selectVisibleMeasurements(value: boolean) {
+    setSelected(previous => { const next = new Set(previous); for (const device of visibleMeasurements) { value ? next.add(device.deviceId) : next.delete(device.deviceId); } return next; });
+  }
+  function enrollSelected() {
+    if (!selectedEnrollment.length || selectedEnrollment.length > 1000 || enrollmentBusy) return;
+    const requestId = crypto.randomUUID(); const url = new URL(window.location.href); url.searchParams.set("enrollmentRequest", requestId);
+    window.history.replaceState(null, "", url); setEnrollmentRequestId(requestId); enrollBatch.reset();
+    enrollBatch.mutate({ requestId, adObjectGuids: selectedEnrollment.map(d => d.adObjectGuid.toLowerCase()) });
+  }
   const queue = useMutation({
     mutationFn: async (deviceIds: string[]) => {
       const body = { deviceIds, type: jobType, ...(isSustained ? { maxBytes: sustainedMiB * 1024 * 1024, scheduledAt: new Date(scheduledAt).toISOString(), sustainedConfirmed } : {}) };
@@ -224,8 +275,20 @@ export default function BuildingDiagnostics() {
         <div className="flex flex-wrap gap-3"><Input className="max-w-sm" aria-label="Search computers or users" placeholder="Computer, user, or building" value={search} onChange={e => setSearch(e.target.value)} />
           <select className="rounded-md border bg-background px-3 text-sm" aria-label="Filter building" value={building} onChange={e => setBuilding(e.target.value)}><option value="">All buildings</option>{data.buildings.map(b => <option key={b.building}>{b.building}</option>)}</select>
           <Button variant="outline" onClick={chooseBuildingSamples} disabled={!data.enabled}><Shuffle className="mr-2 h-4 w-4" />Choose one per building</Button>
-          <Button onClick={() => { setNotice(""); queue.mutate(selectedEligible.map(d => d.deviceId)); }} disabled={!data.enabled || !selectedEligible.length || !sustainedReady || queue.isPending}>Measure selected ({selectedEligible.length})</Button>
+          <Button onClick={() => { setNotice(""); queue.mutate(selectedEligible.map(d => d.deviceId)); }} disabled={!data.enabled || !selectedEligible.length || selectedEligible.length > 100 || !sustainedReady || queue.isPending}>Measure selected ({selectedEligible.length})</Button>
         </div>
+        {selectedEligible.length > 100 && <p className="text-sm">A measurement request supports up to 100 computers. Narrow the speed-test selection before measuring.</p>}
+        <section aria-label="Bulk diagnostic enrollment" className="space-y-2 rounded-md border p-3">
+          <div className="flex flex-wrap items-center gap-3"><Button variant="outline" onClick={enrollSelected} disabled={!selectedEnrollment.length || selectedEnrollment.length > 1000 || enrollmentBusy}>Enroll selected ({selectedEnrollment.length})</Button>
+            <span className="text-sm">Install and enroll selected computers for diagnostic reporting. Each Select all applies only to its eligible shown computers; enrollment and speed-test selections are independent. No measurement starts until you choose Measure selected.</span></div>
+          {selectedEnrollment.length > 1000 && <p className="text-sm">Select up to 1,000 computers per enrollment request.</p>}
+          {!Number.isFinite(directoryAge) || directoryAge > 24 * 60 * 60_000 || directoryAge < -60_000 ? <p className="text-sm">Refresh the central AD inventory before bulk enrollment.</p> : null}
+          {enrollBatch.error && <p role="alert" className="text-destructive">{enrollBatch.error.message}</p>}
+          {enrollmentRequestId && <div className="text-sm"><p>Enrollment request <code>{enrollmentRequestId}</code> · {enrollmentStatus.data?.status || "Checking status"}</p>
+            {enrollmentStatus.data?.worker.ready === false && <p>The central deployment worker is unavailable. No installation is confirmed until its result is reported.</p>}
+            {enrollmentStatus.error && <p role="alert" className="text-destructive">{enrollmentStatus.error.message}</p>}
+            {!!enrollmentStatus.data?.items?.length && <details><summary>Enrollment results ({enrollmentStatus.data.items.length})</summary><ul className="mt-2 space-y-1">{enrollmentStatus.data.items.map(item => <li key={item.adObjectGuid}>{item.computerName} · {item.status}{item.reason ? ` · ${item.reason}` : ""}</li>)}</ul></details>}</div>}
+        </section>
         {notice && <p role="status" className="text-sm">{notice}</p>}{queue.error && <p role="alert" className="text-destructive">{queue.error.message}</p>}
         {credentialAction && <section role="region" aria-label="Review diagnostic enrollment" className="space-y-3 rounded-md border bg-muted/30 p-4">
           <h3 className="font-semibold">{credentialAction.action === "enroll" ? "Enroll" : credentialAction.action === "rotate" ? "Replace diagnostic credential for" : "Revoke diagnostic access for"} {credentialAction.device.computerName}</h3>
@@ -235,8 +298,8 @@ export default function BuildingDiagnostics() {
           <div className="flex gap-2"><Button onClick={() => changeCredential.mutate()} disabled={changeCredential.isPending || (credentialAction.action !== "enroll" && credentialReason.trim().length < 3)}>Confirm {credentialAction.action}</Button><Button variant="outline" disabled={changeCredential.isPending} onClick={() => { setCredentialAction(null); setCredentialReason(""); changeCredential.reset(); }}>Cancel credential change</Button></div>
           {changeCredential.error && <p role="alert" className="text-destructive">{changeCredential.error.message}</p>}
         </section>}
-        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Select</TableHead><TableHead>Computer / current user</TableHead><TableHead>Presence / AD</TableHead><TableHead>Building evidence</TableHead><TableHead>Switch / port</TableHead><TableHead>Last check-in / agent</TableHead><TableHead>Diagnostic enrollment</TableHead></TableRow></TableHeader><TableBody>
-          {devices.map(d => <TableRow key={d.deviceId || d.adObjectGuid}><TableCell><input type="checkbox" aria-label={`Select ${d.computerName}`} title={diagnosticIneligibility(d, jobType) || "Select for measurement"} checked={!!d.deviceId && selected.has(d.deviceId)} disabled={!data.enabled || !eligible(d)} onChange={e => { const id = d.deviceId; if (id) setSelected(previous => { const next = new Set(previous); e.target.checked ? next.add(id) : next.delete(id); return next; }); }} /></TableCell>
+        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead><label className="flex items-center gap-2"><input type="checkbox" aria-label="Select all eligible shown computers for enrollment" checked={allVisibleEnrollmentSelected} ref={element => { if (element) element.indeterminate = visibleEnrollmentCount > 0 && !allVisibleEnrollmentSelected; }} disabled={!visibleEnrollment.length || enrollmentBusy} onChange={event => selectVisibleEnrollment(event.target.checked)} />Enroll ({visibleEnrollmentCount}/{visibleEnrollment.length})</label></TableHead><TableHead><label className="flex items-center gap-2"><input type="checkbox" aria-label="Select all eligible shown computers for speed tests" checked={allVisibleMeasurementsSelected} ref={element => { if (element) element.indeterminate = visibleMeasurementCount > 0 && !allVisibleMeasurementsSelected; }} disabled={!data.enabled || !visibleMeasurements.length || queue.isPending} onChange={event => selectVisibleMeasurements(event.target.checked)} />Measure ({visibleMeasurementCount}/{visibleMeasurements.length})</label></TableHead><TableHead>Computer / current user</TableHead><TableHead>Presence / AD</TableHead><TableHead>Building evidence</TableHead><TableHead>Switch / port</TableHead><TableHead>Last check-in / agent</TableHead><TableHead>Diagnostic enrollment</TableHead></TableRow></TableHeader><TableBody>
+          {devices.map(d => <TableRow key={d.deviceId || d.adObjectGuid}><TableCell><input type="checkbox" aria-label={`Select ${d.computerName} for enrollment`} checked={enrollmentSelected.has(d.adObjectGuid.toLowerCase()) && enrollmentEligible(d)} disabled={!enrollmentEligible(d) || enrollmentBusy} onChange={event => setEnrollmentSelected(previous => { const next = new Set(previous); const id = d.adObjectGuid.toLowerCase(); event.target.checked ? next.add(id) : next.delete(id); return next; })} /></TableCell><TableCell><input type="checkbox" aria-label={`Select ${d.computerName}`} title={diagnosticIneligibility(d, jobType) || "Select for measurement"} checked={!!d.deviceId && selected.has(d.deviceId)} disabled={!data.enabled || !eligible(d)} onChange={e => { const id = d.deviceId; if (id) setSelected(previous => { const next = new Set(previous); e.target.checked ? next.add(id) : next.delete(id); return next; }); }} /></TableCell>
             <TableCell><div className="font-medium">{d.computerName}</div><div className="text-xs text-muted-foreground">{d.loggedOnUser || "No user reported"}</div></TableCell>
             <TableCell>{d.online ? "Online" : d.enrolled ? "No recent check-in" : "Not enrolled"}<div className="text-xs">{d.adVerified ? "AD verified" : "AD verification unavailable"}</div>{diagnosticIneligibility(d, jobType) && <div className="mt-1 max-w-52 text-xs text-muted-foreground">{diagnosticIneligibility(d, jobType)}</div>}</TableCell>
             <TableCell>{d.location.building || "Unknown"}<div className="text-xs text-muted-foreground">{locationLabels[d.location.kind] || d.location.kind}{d.location.source ? ` · ${d.location.source}` : ""}</div><div className="text-xs text-muted-foreground">{time(d.location.observedAt)}</div></TableCell>
@@ -244,7 +307,7 @@ export default function BuildingDiagnostics() {
             <TableCell>{time(d.lastCheckIn)}<div className="text-xs text-muted-foreground">{d.agentVersion || "Agent not reported"}</div></TableCell>
             <TableCell><div className="flex flex-col items-start gap-2">{!d.enrolled ? <Button size="sm" variant="outline" disabled={!data.enabled || !d.adVerified || !diagnosticGuid(d.adObjectGuid) || !d.adDomain || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "enroll" }); }}>Enroll {d.computerName}</Button> : <><Button size="sm" variant="outline" disabled={!data.enabled || !diagnosticGuid(d.adObjectGuid) || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "rotate" }); }}>Replace credential</Button><Button size="sm" variant="outline" disabled={!data.enabled || d.revoked || changeCredential.isPending} onClick={() => { changeCredential.reset(); setCredentialReason(""); setCredentialAction({ device: d, action: "revoke" }); }}>Revoke diagnostics</Button></>}</div></TableCell>
           </TableRow>)}
-          {devices.length === 0 && <TableRow><TableCell colSpan={7}>No matching computers. AD inventory and diagnostic enrollment are separate from the alert receiver.</TableCell></TableRow>}
+          {devices.length === 0 && <TableRow><TableCell colSpan={8}>No matching computers. AD inventory and diagnostic enrollment are separate from the alert receiver.</TableCell></TableRow>}
         </TableBody></Table></div>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Recent measurement jobs</CardTitle></CardHeader><CardContent>{data.jobs.length === 0 ? <p>No measurements requested.</p> : <ul className="space-y-2 text-sm">{data.jobs.slice(0, 30).map(job => <li key={job.id}><strong>{job.computerName}</strong> · {job.building || "Unlocated"} · {job.type || "fred"} · {job.status} · {time(job.createdAt)} · {job.requestedBy}{job.scheduledAt && <span> · Scheduled {time(job.scheduledAt)}</span>}{["queued", "running"].includes(job.status) && <Button className="ml-2" variant="outline" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(job.id)}>Cancel {job.computerName}</Button>}</li>)}</ul>}{cancel.error && <p role="alert" className="text-destructive">{cancel.error.message}</p>}</CardContent></Card>

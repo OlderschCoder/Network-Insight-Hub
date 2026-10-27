@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
 import { diagnosticsReadiness, externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, MAX_ROTATION_MINUTES, MIN_ROTATION_MINUTES, schedulerSettings, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
+import { createDiagnosticsEnrollmentRouter } from "./building_diagnostics_enrollment";
 
 const text = z.string().trim().min(1).max(120);
 const mac = z.string().regex(/^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i);
@@ -58,6 +59,7 @@ function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> { 
 
 export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   const router = Router();
+  router.use(createDiagnosticsEnrollmentRouter());
   const workerOnly: RequestHandler = async (req, res, next) => { if (!workerValid(req)) return void res.status(401).json({ error: "Diagnostics worker authentication required" }); await store.workerSeen(); next(); };
   const adminOrWorker: RequestHandler = async (req, res, next) => { if (workerValid(req)) { await store.workerSeen(); next(); } else requireAuth(req, res, () => requireNetworkAdmin(req, res, next)); };
   const actor = (req: any) => workerValid(req) ? "private AD worker" : `Fred user ${req.user.id}`;

@@ -229,7 +229,7 @@ foreach ($requestedName in ($ProvisionComputerName | Sort-Object -Unique)) {
                 throw 'Diagnostics provisioning directory cannot be a reparse point.'
             }
             [pscustomobject]@{ ComputerName = $env:COMPUTERNAME; Domain = $system.Domain; Joined = $system.PartOfDomain
-                AlreadyConfigured = (Test-Path -LiteralPath (Join-Path $env:ProgramData 'SCCC-Diagnostics\Agent\config.json')) }
+                AlreadyConfigured = (Test-Path -LiteralPath (Join-Path $env:ProgramData 'SCCC\Diagnostics\config.json')) }
         }
         if (-not $identity.Joined -or $identity.ComputerName -ine $computer.Name -or
             $identity.Domain -ine $adDomain.DNSRoot) { throw 'Kerberos pilot identity did not match its AD object.' }
