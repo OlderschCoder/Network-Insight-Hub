@@ -1,6 +1,6 @@
 # Existing NOC collector: prepared Telegraf 1.30.3 addition
 
-Status: **Retry v2 prepared, not applied**. The first apply restored the original configuration after ingestion acceptance failed: production Telegraf runs as UID 999 and could not read the owner-1000 token. V2 validates as that actual runtime user and grants only its named read ACL. This source delivery does not activate probe jobs, speed tests or capacity gates. Deployment and real Influx ingestion require separate live acceptance evidence.
+Status: **Retry v3 prepared, not applied**. The first apply restored the original configuration after ingestion acceptance failed: production Telegraf runs as UID 999 and could not read the owner-1000 token. V2 validates as that actual runtime user and grants only its named read ACL. This source delivery does not activate probe jobs, speed tests or capacity gates. Deployment and real Influx ingestion require separate live acceptance evidence.
 
 The input-only [configuration](telegraf-http.conf.example) reuses the existing `.22` Telegraf output. Telegraf 1.30.3 needs three independent HTTP inputs, each with one `json_v2` projection and input-specific `precision = "1ns"`. One input with three projections merged unrelated fields and measurements in the actual parser; default precision also rounded original sample times. Existing global precision, SNMP, ping and output settings must remain unchanged.
 
@@ -15,9 +15,11 @@ python3 collector-native1303/validate_native_telegraf_1303.py --self-check
 
 The native harness accepts only the exact reviewed binary hash and uses loopback synthetic data with `--test`; it has no Influx output. [Recorded native evidence](native-fixtures/native-1303-actual-20261027T030519Z.json) contains four successful gathers: mixed success/failure and nullable health, empty arrays, timestamp precision/offsets, and repeated historical samples. It demonstrates parser behavior, not successful live speed measurements.
 
-## Change tally — 2026-10-26
+## Change tally â€” 2026-10-26
 
 - Preserve independent performance, capacity-window and health measurements and exact original timestamps on the existing Telegraf 1.30.3 binary; reviewed input SHA-256 `A56042A70F455FF56AA0D403AFCE630C4CCC5300778D9FF6A23D08420588A501`.
 - Prepare the additive collector package; record a completed atomic rename before later durability operations so partial file changes remain eligible for rollback. Eleven pure synthetic tests pass.
 - Retain all production services/configuration unchanged during preparation. Live deployment, ingestion and dashboard acceptance are not asserted by this source commit.
 - Prepare the UID-999 file-reader correction and exact reuse of the credential retained by the verified first rollback. Sixteen pure tests pass; the actual image permits UID 999 to read synthetic config/token and independently denies both to unrelated UID 65534. No production ACL or collector change was made during v2 preparation.
+
+V3 refreshes only the baseline PID/start timestamp of the same Grafana container after another authorized chat restarted it. Other source/runtime pins remain unchanged; the v2 guard stopped before production mutation. No dashboard or provisioning file is included in this correction.

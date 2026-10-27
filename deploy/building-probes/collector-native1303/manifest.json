@@ -1,7 +1,7 @@
 {
-  "schema": "sccc.telegraf.guarded-apply-candidate.v2",
+  "schema": "sccc.telegraf.guarded-apply-candidate.v3",
   "status": "PreparedNotApplied",
-  "createdAtUtc": "2026-10-27T04:08:44.516890+00:00",
+  "createdAtUtc": "2026-10-27T04:12:10.472056+00:00",
   "collector": "CiscoDirectoryConnector",
   "collectorIp": "10.0.0.22",
   "tests": {
@@ -23,12 +23,12 @@
     {
       "name": "apply_telegraf_probe.py",
       "bytes": 31794,
-      "sha256": "879E9BE1B624174548D1760F4BEBBA03EBB7CC22AA112F9CC7EE51F24CEC7BC0"
+      "sha256": "911437C9B9E030418BE638CE69A5298B00691F5698071696630F89C92F3ED994"
     },
     {
       "name": "compose-additive-baseline.json",
-      "bytes": 3066,
-      "sha256": "50707738A4C985B921B347E4E289A586ADD6476B51EFF6C02E36B1464CD62BD0"
+      "bytes": 3068,
+      "sha256": "AE0CD4AC9F7BDAD93357C7EC39D69427419E6D46783680746E562123B5C8A8E3"
     },
     {
       "name": "native-reader-actual.json",
@@ -37,8 +37,8 @@
     },
     {
       "name": "README.md",
-      "bytes": 6702,
-      "sha256": "068DBD3C52DA74F10016AC1FF2DCA82906FFB79E4AC9650BDE9903EF4616C926"
+      "bytes": 7289,
+      "sha256": "0BBAD05BB82B5EDA1CAB61B5525FA77B3CF03EDC83779A6BD4C362623B8C315D"
     },
     {
       "name": "telegraf-building-probes.native1303.conf",
@@ -60,5 +60,21 @@
       "bytes": 14995,
       "sha256": "4680094A44F9F5604DD7223B9329F4A99F9B17BEBC8EA50C3DB429BBE9261F50"
     }
-  ]
+  ],
+  "metadataRefresh": {
+    "reason": "Other authorized chat restarted the same Grafana container; v2 guard stopped before production mutation",
+    "onlyBaselineServiceChanged": "grafana",
+    "changedFields": {
+      "pid": {
+        "before": 804500,
+        "after": 2175592
+      },
+      "startedAt": {
+        "before": "2026-10-25T15:29:41.40635602Z",
+        "after": "2026-10-27T04:09:38.575024164Z"
+      }
+    },
+    "previousApplierSha256": "879E9BE1B624174548D1760F4BEBBA03EBB7CC22AA112F9CC7EE51F24CEC7BC0",
+    "allOtherBaselineMetadataAndSourceHashesMatch": true
+  }
 }

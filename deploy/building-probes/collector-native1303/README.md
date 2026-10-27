@@ -1,4 +1,4 @@
-# Guarded additive collector retry v2 — prepared, not applied
+# Guarded additive collector retry v3 â€” prepared, not applied
 
 This retry is prepared after the first apply restored the original configuration and verified rollback. The running image drops privileges to UID/GID 999:999; the first validation ran as UID 1000 and missed the production token permission mismatch. This v2 preparation changed only isolated synthetic scratch files/containers. No production configuration, real credential ACL, service or Influx write was changed while preparing v2.
 
@@ -6,8 +6,8 @@ Scope is the existing `sccc-ops` Telegraf on CiscoDirectoryConnector (`10.0.0.22
 
 Pinned postimages:
 
-- Compose: `E6D8C61891BCB8D737B860085C32738D443CB4D9D8431F8B738F459CD40A0945` → `4F868605E8F04FD383036683698894237A36EED31EBACDAD6679A16F802DCE67`.
-- Telegraf config: `86F741119C6FD70FC7064880DCF7A110D5EBA4CAD456D046FD1559757C12B9E5` → `72E76ABB0E8A895526DA690397874A19AFD009A2319EB192101F8B897E6B5CD5`.
+- Compose: `E6D8C61891BCB8D737B860085C32738D443CB4D9D8431F8B738F459CD40A0945` â†’ `4F868605E8F04FD383036683698894237A36EED31EBACDAD6679A16F802DCE67`.
+- Telegraf config: `86F741119C6FD70FC7064880DCF7A110D5EBA4CAD456D046FD1559757C12B9E5` â†’ `72E76ABB0E8A895526DA690397874A19AFD009A2319EB192101F8B897E6B5CD5`.
 - Input-only addition: `A56042A70F455FF56AA0D403AFCE630C4CCC5300778D9FF6A23D08420588A501`.
 
 After review, the directing thread may create a fresh ITADMIN-owned mode-0700 directory named `/home/ITADMIN/.cache/sccc-telegraf-apply-<unique-run>` and copy these package files there as mode 0600. Preserve exact file bytes. Do not reuse an existing run directory or change hash guards to bypass drift.
@@ -34,3 +34,5 @@ Health/ingestion failure restores the exact old files and recreates only Telegra
 Only metadata is written to the private `receipt.json`. `AppliedVerified` requires ingestion acceptance; a failed rollback or receipt write remains an error. This package does not create a dashboard, change either Fred pipeline, activate speed/capacity jobs, or approve receivers.
 
 Local verification: Python syntax and sixteen pure synthetic tests passed. A real native-image permission fixture also passed: UID 999 read the synthetic config/token and emitted a loopback fixture metric; unrelated UID 65534 was independently denied both config and token access. Its [metadata evidence](native-reader-actual.json) confirms the production container IDs/PIDs/start/restarts and original source hashes remained unchanged. The atomic-replacement regressions distinguish failure before rename from directory open, fsync and close failures after rename; post-rename mutations remain recorded for rollback. No production applier execution, collector configuration mutation, real export-token use or Influx write occurred during v2 preparation. The directing thread must review this script and its file manifest before running it.
+
+V3 metadata refresh: another authorized chat restarted the same Grafana container at 2026-10-27T04:09:38.575024164Z. Only its baseline PID/start timestamp and the baseline-file hash pin change from v2. Compose, Telegraf configuration, resolved environment, all container IDs/images/networks, and Telegraf/Influx runtime metadata were independently rechecked and remain identical. V2 stopped before production mutation on that drift. The permission/native evidence remains the unchanged v2 algorithm; v3 adds no permission or runtime logic. No v3 apply has been executed.
