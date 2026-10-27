@@ -264,6 +264,15 @@ class MetricsTests(unittest.TestCase):
         self.assertIn('"value": "Download"', encoded)
         self.assertIn('"value": "Latency"', encoded)
         self.assertIn("Throughput automatically displays in Mbps or Gbps", encoded)
+        panels_by_title = {panel["title"]: panel for panel in wireless["panels"]}
+        self.assertEqual(panels_by_title["Clients by SSID"]["fieldConfig"]["defaults"]["displayName"],
+                         "${__field.labels.ssid}")
+        for title in ("Clients by building", "Average clients per AP by building",
+                      "Clients without IPv4 by building"):
+            self.assertEqual(panels_by_title[title]["fieldConfig"]["defaults"]["displayName"],
+                             "${__field.labels.building}")
+        self.assertEqual(panels_by_title["AP availability by building"]["fieldConfig"]["defaults"]["displayName"],
+                         "${__field.labels.building} \u00b7 ${__field.labels._field}")
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):

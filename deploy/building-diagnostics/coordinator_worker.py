@@ -267,21 +267,22 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
 
     add_panel("Clients by SSID", "bargauge",
               query("aruba_wireless_ssid", ("clients",), "-10m", ' |> group(columns: ["ssid"]) |> last()'),
-              0, 4, 8, 8)
+              0, 4, 8, 8, display_name="${__field.labels.ssid}")
     add_panel("Clients by building", "bargauge",
               query("aruba_wireless_building", ("clients",), "-10m", ' |> group(columns: ["building"]) |> last()'),
-              8, 4, 8, 8)
+              8, 4, 8, 8, display_name="${__field.labels.building}")
     add_panel("Average clients per AP by building", "bargauge",
               query("aruba_wireless_building", ("avg_clients_per_ap",), "-10m", ' |> group(columns: ["building"]) |> last()'),
-              16, 4, 8, 8, unit="none")
+              16, 4, 8, 8, unit="none", display_name="${__field.labels.building}")
 
     add_panel("Clients without IPv4 by building", "bargauge",
               query("aruba_wireless_building", ("clients_without_ipv4",), "-10m", ' |> group(columns: ["building"]) |> last()'),
               0, 12, 8, 8, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
-              description="Use this to localize DHCP/client-address failures. A zero is healthy; No data is unknown.")
+              description="Use this to localize DHCP/client-address failures. A zero is healthy; No data is unknown.",
+              display_name="${__field.labels.building}")
     add_panel("AP availability by building", "bargauge",
               query("aruba_wireless_building", ("aps_up", "aps_down"), "-10m", ' |> group(columns: ["building", "_field"]) |> last()'),
-              8, 12, 8, 8)
+              8, 12, 8, 8, display_name="${__field.labels.building} · ${__field.labels._field}")
     add_panel("RADIUS outcomes by server", "timeseries",
               query("aruba_radius_server", ("accept_delta", "reject_delta", "timeout_delta"), extra=' |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)'),
               16, 12, 8, 8, description="Accepted, rejected and timed-out authentication activity by on-prem, Azure and VIP target.")
