@@ -6,10 +6,12 @@ if (-not $ExporterPath) { $ExporterPath = Join-Path (Split-Path -Parent $MyInvoc
 $tokens = $null; $parseErrors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($ExporterPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw 'Exporter parse failed.' }
-$definition = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'ConvertTo-DiagnosticsDirectoryFacts' }, $true)
-if (-not $definition) { throw 'Directory helper not found.' }
 # Extract only this pure read helper. The publisher/provisioning script is never executed.
-Invoke-Expression $definition.Extent.Text
+foreach($name in @('Get-DiagnosticsOrganizationalUnits','ConvertTo-DiagnosticsDirectoryFacts')) {
+    $definition = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
+    if (-not $definition) { throw 'Directory helper not found.' }
+    Invoke-Expression $definition.Extent.Text
+}
 $script:reads = 0; $script:mode = 'ok'
 $groupId = 'e9db33a2-8eb2-4aec-a9b0-9b6fdcdd41cb'
 $groupDn = 'CN=Synthetic-Computers,OU=Groups,DC=sccc,DC=edu'
@@ -42,4 +44,12 @@ Assert ($script:reads -eq $before) 'Excess membership must fail before any direc
 $computer.MemberOf = @(); $computer.CanonicalName = $null
 MustThrow { ConvertTo-DiagnosticsDirectoryFacts $computer @{} }
 Assert ([IO.File]::ReadAllText($ExporterPath).Contains("'SCCC-Diagnostics\Agent\config.json'")) 'Preserve the approved deployed existing-config path.'
+$parent=[pscustomobject]@{ObjectGUID=[Guid]'3d0bef44-5623-43e0-91e4-dfcdb07fc5a8';Name='HumanitiesDiv';DistinguishedName='OU=HumanitiesDiv,OU=SC-Computers,DC=sccc,DC=edu'}
+$child=[pscustomobject]@{ObjectGUID=[Guid]'8e09de7b-c5bb-4d4d-bdc8-94b6dd3d1ab3';Name='English';DistinguishedName='OU=English,OU=HumanitiesDiv,OU=SC-Computers,DC=sccc,DC=edu'}
+$ancestors=@(Get-DiagnosticsOrganizationalUnits 'CN=PC,OU=English,OU=HumanitiesDiv,OU=SC-Computers,DC=sccc,DC=edu' @($parent,$child,$child))
+Assert ($ancestors.Count -eq 2 -and $ancestors[0].objectGuid -ceq $child.ObjectGUID.ToString() -and $ancestors[1].objectGuid -ceq $parent.ObjectGUID.ToString()) 'Actual OU identities must be deduplicated and ordered nearest first.'
+$library=[pscustomobject]@{ObjectGUID=[Guid]'b7675080-6a64-44e5-867f-645469944b71';Name='Library';DistinguishedName='OU=Library,OU=SC-Computers,DC=sccc,DC=edu'}
+Assert (@(Get-DiagnosticsOrganizationalUnits 'CN=PC\,OU=Library,OU=SC-Computers,DC=sccc,DC=edu' @($library)).Count -eq 0) 'An escaped comma inside a CN must not fabricate OU ancestry.'
+Assert (@(Get-DiagnosticsOrganizationalUnits 'CN=PC\\,OU=Library,OU=SC-Computers,DC=sccc,DC=edu' @($library)).Count -eq 1) 'A literal escaped backslash followed by an actual separator must match.'
+Assert (@(Get-DiagnosticsOrganizationalUnits 'CN=PC,OU=LIBRARY,OU=SC-COMPUTERS,DC=SCCC,DC=EDU' @($library)).Count -eq 1) 'Actual DN ancestry is case insensitive.'
 [pscustomobject]@{ Tests = $script:passes; Passed = $script:passes; PublisherExecuted = $false; RealDirectoryReads = $false; MembershipWrites = $false; PowerShellVersion = $PSVersionTable.PSVersion.ToString() }

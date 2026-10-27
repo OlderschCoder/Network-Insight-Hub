@@ -40,5 +40,38 @@ because the installed task pins both scripts to the same signing certificate.
 The updater keeps the existing protected worker ciphertext, ACLs and task
 definition. It uses an idle task fence and exact pre-enable rollback checks.
 
-Delivery checkpoint: integrated candidate prepared; live application and publisher
-read-back must be recorded below after deployment.
+## Applied delivery and OU clarification
+
+The user's AD screenshots identify folders/organizational units under
+SC-Computers, rather than security-group membership. The deployed follow-up adds
+actual OU GUID/name/DN ancestry and an editable folder selector. Computer
+overrides take priority, then the nearest explicitly mapped OU, then its mapped
+parents. A folder mapping includes nested computers. Directory ancestry is
+validated against unescaped DN boundaries and sorted independently of feed order.
+Security memberships remain separate facts; their names do not infer buildings.
+
+The OU follow-up passed 50 focused unit/HTTP tests, 7 real PostgreSQL cases and
+6 browser cases. The earlier bulk-checkbox regression suite also passed. The
+production API/UI were rebuilt from 374 pinned live inputs and applied with
+verified hashes, health and authentication boundaries. API PID after release:
+538433. Both source overlays and rollback artifacts are retained in the private
+fred-building-assignment-release-20261027T1018Z-ou release directory.
+
+A complete normal-token AD read was imported through the existing private-worker
+API on 2026-10-27 at 10:24:21Z. Its 675 unique computer identities exactly matched
+the existing roster; all received real OU facts. The source query found 188 OUs;
+142 have computers represented in this snapshot. The worker credential stayed in
+server memory. No AD object, membership, permission or schema was changed.
+
+The paired OU-aware Windows publisher package v2 is signed and prepared, with
+the existing task/credential/ACL preservation checks. It is not applied: the
+publisher laptop's normal management connection is unavailable. Package v1 is
+obsolete. This one-time AD import does not establish continuous OU refresh; a
+newer snapshot from the old exporter can remove optional facts until the signed
+publisher update is applied. Saved building crosswalks and overrides persist.
+
+The authenticated UI saved five confirmed computer corrections (Humanities,
+Student Living T, Mansions, Student Living Center and Student Union). A prior
+LP-F6K6S64 assignment needs review following the user's correction to a different,
+non-AD office laptop. The confirmed OU crosswalk plan is retained privately and
+must be recorded as applied only after its data transaction/read-back completes.

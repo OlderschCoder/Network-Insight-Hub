@@ -88,4 +88,26 @@ describe.skipIf(!configured)("manual assignments in disposable Postgres", () => 
     expect((await store.get()).groupMappings.some(row => row.groupObjectGuid === otherGroup)).toBe(false);
     await expect(store.applyGroup({ groupObjectGuid: randomUUID(), building: null, reason: "Synthetic unknown clear", apply: true }, actor)).rejects.toThrow();
   });
+  it("edits actual OU mappings, inherits to new children, and preserves manual precedence and recorded history", async () => {
+    const parent = { objectGuid: randomUUID(), name: "SC-Computers", distinguishedName: "OU=SC-Computers,DC=sccc,DC=edu" };
+    const child = { objectGuid: randomUUID(), name: "Library", distinguishedName: "OU=Library,OU=SC-Computers,DC=sccc,DC=edu" };
+    const directory = { distinguishedName: "CN=Synthetic,OU=NewLab,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/Library/NewLab/Synthetic", location: null, memberOf: [], organizationalUnits: [parent, child] };
+    const inv = { ...roster, adObservedAt: new Date().toISOString(), adComputers: roster.adComputers.map(computer => ({ ...computer, directory })) };
+    await db.query("UPDATE building_diagnostics_inventory SET data=$1 WHERE id=1", [JSON.stringify(inv)]);
+    const history = (await db.query("SELECT building,recorded_at,data FROM building_diagnostics_reports ORDER BY id")).rows;
+    await store.applyGroup({ groupObjectGuid: parent.objectGuid, building: "Hobble", reason: "Synthetic parent OU mapping", apply: true }, actor);
+    expect((await store.get()).assignments.every(row => row.source === "active-directory-ou" && row.building === "Hobble")).toBe(true);
+    await store.applyGroup({ groupObjectGuid: child.objectGuid, building: "Agriculture", reason: "Synthetic nearest OU mapping", apply: true }, actor);
+    expect((await store.get()).assignments.every(row => row.source === "active-directory-ou" && row.building === "Agriculture")).toBe(true);
+    await store.apply({ adObjectGuids: [ids[0]], building: "Hobble", reason: "Synthetic direct override", apply: true }, actor);
+    expect((await store.get()).assignments.find(row => row.adObjectGuid === ids[0])).toMatchObject({ source: "manual", building: "Hobble" });
+    const futureId = randomUUID();
+    inv.adComputers.push({ adObjectGuid: futureId, computerName: "SYNTHETIC-NEW", domain: "sccc.edu", enabled: true, directory });
+    await db.query("UPDATE building_diagnostics_inventory SET data=$1 WHERE id=1", [JSON.stringify(inv)]);
+    expect((await store.get()).assignments.find(row => row.adObjectGuid === futureId)).toMatchObject({ source: "active-directory-ou", building: "Agriculture" });
+    await store.applyGroup({ groupObjectGuid: child.objectGuid, building: null, reason: "Synthetic nearest mapping clear", apply: true }, actor);
+    expect((await store.get()).assignments.find(row => row.adObjectGuid === futureId)).toMatchObject({ source: "active-directory-ou", building: "Hobble" });
+    expect((await db.query("SELECT building,recorded_at,data FROM building_diagnostics_reports ORDER BY id")).rows).toEqual(history);
+    expect((await db.query("SELECT details FROM building_diagnostics_audit WHERE action='map-building-group' ORDER BY id DESC LIMIT 1")).rows[0].details.kind).toBe("organizational-unit");
+  });
 });

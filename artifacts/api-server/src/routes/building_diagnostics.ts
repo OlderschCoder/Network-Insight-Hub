@@ -6,6 +6,7 @@ import { diagnosticsReadiness, externalProbeConfig, jobProof, MAX_TRANSFER_BYTES
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
 import { createDiagnosticsEnrollmentRouter } from "./building_diagnostics_enrollment";
 import { createBuildingDiagnosticsAssignmentRouter } from "./building_diagnostics_assignment";
+import { validateOrganizationalUnitAncestors } from "../lib/building_diagnostics_assignment";
 
 const text = z.string().trim().min(1).max(120);
 const mac = z.string().regex(/^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i);
@@ -25,7 +26,8 @@ const directoryText = z.string().trim().min(1).max(2048);
 const directorySchema = z.object({ distinguishedName: directoryText, canonicalName: directoryText, location: z.string().trim().max(2048).nullable(),
   memberOf: z.array(z.object({ objectGuid: guid, name: text, distinguishedName: directoryText }).strict()).max(128)
     .transform((groups) => [...new Map(groups.map((group) => [group.objectGuid.toLowerCase(), { ...group, objectGuid: group.objectGuid.toLowerCase() }])).values()]),
-}).strict();
+  organizationalUnits: z.array(z.object({ objectGuid: guid, name: text, distinguishedName: directoryText }).strict()).max(64).optional(),
+}).strict().refine(directory => directory.organizationalUnits === undefined || validateOrganizationalUnitAncestors(directory.distinguishedName, directory.organizationalUnits), "OU facts must be unique actual ancestors of the computer DN");
 const adComputersSchema = z.array(provisionSchema.extend({ enabled: z.boolean(), directory: directorySchema.optional() })).min(1).max(30_000).refine((rows) => new Set(rows.map((row) => row.adObjectGuid.toLowerCase())).size === rows.length, "Duplicate AD object identity");
 const adInventorySchema = z.object({ snapshotComplete: z.literal(true), adObservedAt: timestamp, adComputers: adComputersSchema }).strict();
 const inventorySchema = z.object({

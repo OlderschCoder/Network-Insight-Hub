@@ -7,7 +7,7 @@ const computer = (n: number, extra = {}) => ({ deviceId: guid(n + 100), adObject
   enrolled: true, adVerified: true, adEnabled: true, online: true, lastCheckIn: now, agentVersion: "1.1.0", loggedOnUser: null,
   capabilities: ["external-probe-v2"], location: { building: "Tech Building T", kind: "network-confirmed", source: "switch", observedAt: now }, lastResult: null, ...extra });
 
-async function portal(page: Page, reject = false) {
+async function portal(page: Page, reject = false, legacyBuilding = false) {
   const calls: { assignments: any[]; groupMappings: any[]; otherWrites: string[] } = { assignments: [], groupMappings: [], otherWrites: [] };
   let assignments: any[] = [];
   let mappings: any[] = [];
@@ -19,11 +19,11 @@ async function portal(page: Page, reject = false) {
     let body: unknown = {}, status = 200;
     if (path.endsWith("/auth/me")) body = { id: 1, name: "Fixture", role: "network", email: "fixture@example.invalid", isActive: true };
     else if (path.endsWith("/building-diagnostics/overview")) body = { enabled: true, schedulerEnabled: false, targetLabel: "Fred HTTPS path", adObservedAt: now, inventoryUpdatedAt: now,
-      devices: rows, buildings: [{ building: "Tech Building T", onlineDevices: 1, eligibleDevices: 1, lastResult: null, noCurrentMeasurement: true }], jobs: [] };
+      devices: rows, buildings: [{ building: "Tech Building T", onlineDevices: 1, eligibleDevices: 1, lastResult: null, noCurrentMeasurement: true }, ...(legacyBuilding ? [{ building: "Academic Arts 144", onlineDevices: 0, eligibleDevices: 0, lastResult: null, noCurrentMeasurement: true }] : [])], jobs: [] };
     else if (path.endsWith("/building-group-mappings") && request.method() === "POST") {
       const value = request.postDataJSON(); calls.groupMappings.push(value);
       mappings = value.building ? [{ ...value, updatedAt: now, updatedBy: "Fixture" }] : [];
-      assignments = value.building ? [1, 2].map(n => ({ adObjectGuid: guid(n), building: value.building, source: "active-directory-group", updatedAt: now, updatedBy: "Fixture", reason: value.reason, directoryObservedAt: now, groups: [{ groupObjectGuid: guid(2000), name: "Fixture-Building-Group", distinguishedName: "CN=Fixture,DC=example,DC=invalid" }] })) : [];
+      assignments = value.building ? [1, 2].map(n => ({ adObjectGuid: guid(n), building: value.building, source: "active-directory-ou", updatedAt: now, updatedBy: "Fixture", reason: value.reason, directoryObservedAt: now, groups: [{ groupObjectGuid: guid(2000), name: "Fixture-Building-Folder", kind: "organizational-unit", distinguishedName: "OU=Fixture,DC=example,DC=invalid" }] })) : [];
       body = { ok: true };
     } else if (path.endsWith("/building-assignments")) {
       if (request.method() === "POST") {
@@ -32,7 +32,7 @@ async function portal(page: Page, reject = false) {
         else { assignments = value.building ? value.adObjectGuids.map((id: string) => ({ adObjectGuid: id, building: value.building, source: "manual", updatedAt: now, updatedBy: "Fixture", reason: value.reason })) : [];
           body = { ok: true, updated: value.adObjectGuids.length, assignments }; }
       } else body = { buildings: ["Agriculture", "Hobble", "Tech Building T"], assignments, groupMappings: mappings,
-        directory: { observedAt: now, current: true }, groups: [{ groupObjectGuid: guid(2000), name: "Fixture-Building-Group", distinguishedName: "CN=Fixture,DC=example,DC=invalid", computerCount: 2 }], groupConflicts: [] };
+        directory: { observedAt: now, current: true }, groups: [{ groupObjectGuid: guid(2000), name: "Fixture-Building-Folder", kind: "organizational-unit", distinguishedName: "OU=Fixture,DC=example,DC=invalid", computerCount: 2 }], groupConflicts: [] };
     } else if (request.method() !== "GET") calls.otherWrites.push(path);
     await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   });
@@ -40,6 +40,19 @@ async function portal(page: Page, reject = false) {
   await expect(page.getByRole("heading", { name: "Assign buildings", exact: true })).toBeVisible();
   return calls;
 }
+
+test("canonical assignment filters exclude legacy room labels while recorded labels remain visible", async ({ page }) => {
+  const calls = await portal(page, false, true);
+  await expect(page.getByLabel("Assign building", { exact: true })).toBeEnabled();
+  expect(await page.getByLabel("Filter building", { exact: true }).locator("option").allTextContents()).toEqual(["All buildings", "Building not assigned", "Agriculture", "Hobble", "Tech Building T"]);
+  await expect(page.getByText("Academic Arts 144", { exact: true })).toBeVisible();
+  await expect(page.getByText("Measurements retain the building label and time recorded when they ran. Current assignments do not relabel earlier results.", { exact: true })).toBeVisible();
+  await page.getByRole("checkbox", { name: "Select PC-2 for building assignment", exact: true }).check();
+  await page.getByLabel("Assign building", { exact: true }).selectOption("Hobble");
+  await page.getByRole("button", { name: "Assign building (1)", exact: true }).click();
+  await expect(page.getByText("Building assignment saved for 1 unique computer.", { exact: true })).toBeVisible();
+  expect(calls.assignments).toHaveLength(1); expect(calls.otherWrites).toHaveLength(0);
+});
 
 test("building assignment uses unique AD checkboxes, includes offline unenrolled computers, and waits for Apply", async ({ page }) => {
   const calls = await portal(page);
@@ -61,17 +74,17 @@ test("building assignment uses unique AD checkboxes, includes offline unenrolled
   expect(calls.otherWrites).toHaveLength(0);
 });
 
-test("AD building group mappings can be saved and edited without starting a measurement", async ({ page }) => {
+test("AD building folder mappings can be saved and edited without starting a measurement", async ({ page }) => {
   const calls = await portal(page);
-  await page.getByLabel("AD building group", { exact: true }).selectOption(guid(2000));
-  await page.getByLabel("AD group building", { exact: true }).selectOption("Hobble");
+  await page.getByLabel("AD building folder", { exact: true }).selectOption(guid(2000));
+  await page.getByLabel("AD folder building", { exact: true }).selectOption("Hobble");
   expect(calls.groupMappings).toHaveLength(0);
-  await page.getByRole("button", { name: "Save AD group mapping", exact: true }).click();
+  await page.getByRole("button", { name: "Save AD folder mapping", exact: true }).click();
   await expect.poll(() => calls.groupMappings.length).toBe(1);
   expect(calls.groupMappings[0]).toMatchObject({ apply: true, groupObjectGuid: guid(2000), building: "Hobble" });
-  await expect(page.getByText("AD group: Fixture-Building-Group", { exact: false })).toHaveCount(2);
-  await page.getByLabel("AD group building", { exact: true }).selectOption("Agriculture");
-  await page.getByRole("button", { name: "Save AD group mapping", exact: true }).click();
+  await expect(page.getByText("AD folder: Fixture-Building-Folder", { exact: false })).toHaveCount(2);
+  await page.getByLabel("AD folder building", { exact: true }).selectOption("Agriculture");
+  await page.getByRole("button", { name: "Save AD folder mapping", exact: true }).click();
   await expect.poll(() => calls.groupMappings.length).toBe(2);
   expect(calls.groupMappings[1].building).toBe("Agriculture");
   expect(calls.otherWrites).toHaveLength(0); expect(calls.assignments).toHaveLength(0);
@@ -87,7 +100,7 @@ test("a rejected assignment retains checked computers and starts no other operat
   expect(calls.assignments).toHaveLength(1); expect(calls.otherWrites).toHaveLength(0);
 });
 
-test("network connection evidence alone never assigns the AD building group", async ({ page }) => {
+test("network connection evidence alone never assigns the AD building folder", async ({ page }) => {
   const calls = await portal(page);
   await page.getByRole("button", { name: "Choose one per building", exact: true }).click();
   await expect(page.getByRole("button", { name: "Measure selected (0)", exact: true })).toBeDisabled();

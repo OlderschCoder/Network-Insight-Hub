@@ -116,4 +116,38 @@ describe("canonical manual building assignment metadata", () => {
     client.query.mockImplementation(async (sql, values) => sql.includes("FOR UPDATE") ? { rows: [] } : query(sql, values));
     await expect(code.buildingDiagnosticsAssignmentStore.applyGroup({ groupObjectGuid: secondGroup, building: null, reason: input.reason, apply: true }, actor)).rejects.toThrow();
   });
+  const parentOu = { objectGuid: "dc7e00bd-2b38-49b0-9126-70025d416579", name: "SC-Computers", distinguishedName: "OU=SC-Computers,DC=sccc,DC=edu" };
+  const childOu = { objectGuid: "db9a1f7d-a06f-41b9-9f6d-728e1379f865", name: "Library", distinguishedName: "OU=Library,OU=SC-Computers,DC=sccc,DC=edu" };
+  function withOus(units = [parentOu, childOu]) {
+    const inv = withGroups(inventory);
+    inv.adComputers[0].directory = { ...inv.adComputers[0].directory, distinguishedName: "CN=SYNTHETIC-1,OU=NewLab,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", organizationalUnits: units };
+    return inv;
+  }
+  it("chooses the nearest mapped OU despite unsorted ancestry, ahead of a security group mapping", () => {
+    const result = code.resolveBuildingAssignments(withOus(), [], [mapping(parentOu.objectGuid, "Hobble"), mapping(childOu.objectGuid), mapping(gid, "Hobble")]);
+    expect(result.assignments).toMatchObject([{ source: "active-directory-ou", building: "Agriculture", groups: [{ groupObjectGuid: childOu.objectGuid, kind: "organizational-unit" }] }]);
+    expect(result.groups.map(row => row.kind)).toEqual(["organizational-unit", "organizational-unit", "security-group"]);
+  });
+  it("inherits a mapped ancestor for an unmapped future child, without inferring a building from the OU name", () => {
+    expect(code.resolveBuildingAssignments(withOus(), [], []).assignments).toEqual([]);
+    expect(code.resolveBuildingAssignments(withOus(), [], [mapping(parentOu.objectGuid)]).assignments[0]).toMatchObject({ source: "active-directory-ou", building: "Agriculture", groups: [{ groupObjectGuid: parentOu.objectGuid }] });
+    const manual = { adObjectGuid: id, building: "Hobble", updatedAt: new Date().toISOString(), updatedBy: actor.name, reason: input.reason };
+    expect(code.resolveBuildingAssignments(withOus(), [manual], [mapping(childOu.objectGuid)]).assignments[0]).toMatchObject({ source: "manual", building: "Hobble" });
+    expect(code.resolveBuildingAssignments(withOus(), [], [mapping(gid)]).assignments[0]).toMatchObject({ source: "active-directory-group" });
+  });
+  it("rejects duplicate, unrelated and escaped-CN pseudo-ancestors", () => {
+    const validDn = "CN=Synthetic\\, PC,OU=Library,OU=SC-Computers,DC=sccc,DC=edu";
+    expect(code.validateOrganizationalUnitAncestors(validDn, [parentOu, childOu])).toBe(true);
+    expect(code.validateOrganizationalUnitAncestors(validDn, [childOu, { ...childOu, objectGuid: parentOu.objectGuid }])).toBe(false);
+    expect(code.validateOrganizationalUnitAncestors(validDn, [childOu, { ...parentOu, objectGuid: childOu.objectGuid }])).toBe(false);
+    expect(code.validateOrganizationalUnitAncestors(validDn, [{ ...childOu, distinguishedName: "OU=Elsewhere,OU=SC-Computers,DC=sccc,DC=edu" }])).toBe(false);
+    expect(code.validateOrganizationalUnitAncestors("CN=Fake\\,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", [childOu])).toBe(false);
+    expect(code.resolveBuildingAssignments(withOus([{ ...childOu, distinguishedName: "OU=Elsewhere,DC=sccc,DC=edu" }]), [], [mapping(childOu.objectGuid)]).assignments).toEqual([]);
+  });
+  it("edits an actual OU mapping with explicit folder provenance in its audit", async () => {
+    inventory = withOus();
+    await code.buildingDiagnosticsAssignmentStore.applyGroup({ groupObjectGuid: childOu.objectGuid, building: "Agriculture", reason: input.reason, apply: true }, actor);
+    const audit = client.query.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO building_diagnostics_audit"));
+    expect(JSON.parse(audit?.[1][3])).toMatchObject({ groupObjectGuid: childOu.objectGuid, kind: "organizational-unit", directoryPresent: true });
+  });
 });

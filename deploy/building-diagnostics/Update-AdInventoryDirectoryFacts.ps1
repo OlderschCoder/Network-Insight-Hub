@@ -10,7 +10,7 @@ $taskName = 'SCCC Diagnostics AD Inventory'
 $oldSigner = '9C6F10572711B7BD83AED649B405E239A9F345B0'
 $newSigner = 'A9EA8B0DC141AEC21544359FF3DFD4E9499EA177'
 $baselineHashes = @{'Export-AdDiagnosticsInventory.ps1'='2195ABAEC21EDF590644718131B3C1C933AED1EFCC56EF3A471C08E2278D5093';'Invoke-AdInventoryPublisher.ps1'='671880F5137ABD141B2954A803E4FF1ADAD7AFFE45639AA66E21F21C4FD86CA1';'config.json'='83B4A6A58C2F5AE0EF1E6B3FA5936EAA59A457D5824BF65872F84FDEAD773A48'}
-$candidateHashes = @{'Export-AdDiagnosticsInventory.ps1'='22AA6730E6AB9712DED857196E598BB731A0A3CAC47555F657FC6E68BAC42FF7';'Invoke-AdInventoryPublisher.ps1'='E2611DAD035CC6C16102B90D5FDD67A27992CD18F022BB6CF8318C67E040C454'}
+$candidateHashes = @{'Export-AdDiagnosticsInventory.ps1'='2704F8BCE6101A47A4939902CF5F074FFCE5E02EEAE1DC441CF496040646E8EE';'Invoke-AdInventoryPublisher.ps1'='301966F93E87BB7FDC01F50EE1D68797077700EB0F4ECF6F02C71D79EC0A6EA6'}
 $stage = $null; $phase = 'preflight'; $failure = $null; $mutated = $false; $disabled = $false; $verified = $false; $restored = $false; $rollback = $null; $newConfigHash = $null; $acls = @{}
 function Hash([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash }
 function NoLink([string]$Path) { $cursor=[IO.Path]::GetFullPath($Path); while($cursor){if((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Redirected publisher path.'};$next=Split-Path -Parent $cursor;if($next -eq $cursor){break};$cursor=$next} }
@@ -36,7 +36,7 @@ try {
     if(-not $ad.Enabled -or $ad.Name -ine 'LP-F6K6S64' -or $ad.DNSHostName -ine 'LP-F6K6S64.sccc.edu'){throw 'Pinned publisher AD object mismatch.'}
     NoLink $ManifestPath;if((Hash $ManifestPath) -ine $ExpectedManifestSHA256){throw 'Frozen update manifest mismatch.'}
     $manifest=Get-Content -LiteralPath $ManifestPath -Raw|ConvertFrom-Json
-    if($manifest.schema -cne 'sccc.diagnostics.publisher-directory-update.v1' -or $manifest.ExporterSHA256 -cne $baselineHashes[$names[0]] -or $manifest.WrapperSHA256 -cne $baselineHashes[$names[1]] -or $manifest.ConfigSHA256 -cne $baselineHashes['config.json'] -or $manifest.ConfigSigner -cne $oldSigner -or $manifest.TaskName -cne $taskName -or $manifest.TaskXmlSHA256 -cne '2562DC7F25D315A3FE68C16E544BEB7B196BE7B0A2F55C0EB3C0B53742EEE1C4'){throw 'Manifest baseline is outside this reviewed update.'}
+    if($manifest.schema -cne 'sccc.diagnostics.publisher-directory-update.v1' -or $manifest.ApiDirectorySchemaVersion -ne 2 -or $manifest.ExporterSHA256 -cne $baselineHashes[$names[0]] -or $manifest.WrapperSHA256 -cne $baselineHashes[$names[1]] -or $manifest.ConfigSHA256 -cne $baselineHashes['config.json'] -or $manifest.ConfigSigner -cne $oldSigner -or $manifest.TaskName -cne $taskName -or $manifest.TaskXmlSHA256 -cne '2562DC7F25D315A3FE68C16E544BEB7B196BE7B0A2F55C0EB3C0B53742EEE1C4'){throw 'Manifest baseline is outside this reviewed update.'}
     $rootSddl=Private $root;if(-not (Get-Acl -LiteralPath $root).AreAccessRulesProtected){throw 'Publisher directory must remain protected.'}
     foreach($name in @($names)+@('config.json')){$path=Join-Path $root $name;$acls[$name]=Private $path;if((Hash $path) -cne $baselineHashes[$name]){throw 'Installed publisher baseline drift.'}}
     foreach($name in $names){Signed (Join-Path $root $name) $baselineHashes[$name] $oldSigner;Signed (Join-Path (Split-Path -Parent $ManifestPath) $name) $candidateHashes[$name] $newSigner}
@@ -85,8 +85,8 @@ if($failure){exit 1}
 # SIG # Begin signature block
 # MII9agYJKoZIhvcNAQcCoII9WzCCPVcCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCcCxpCdK8rXcnC
-# yAQ2wysNWpz0ECT1x+TD4sf0ErnAcqCCIiwwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBsV0UdTSJqkaVt
+# eP9z1R7tM+bmWg04RLVlsToZ5mYuYKCCIiwwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -273,20 +273,20 @@ if($failure){exit 1}
 # b24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0EgMDMC
 # EzMACVVR28T+v3UTqdMAAAAJVVEwDQYJYIZIAWUDBAIBBQCgXjAQBgorBgEEAYI3
 # AgEMMQIwADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAvBgkqhkiG9w0BCQQx
-# IgQgDW+dy1wwFxweRz0+wniygQLWzUErDoIEOJlSuCZzXigwDQYJKoZIhvcNAQEB
-# BQAEggGACg4Nhk1Fxv5KsXk1ENAIXY8QwGZSpe6kez3P87C71u/qs1iM6v0vCVkX
-# aYVmnUt9fSbsVi4UEOtyhLycO2eGdIpwm/i/+UlIu6DQXWy5ostmqywQzD2HCaLJ
-# nQ/hY+rMMo3BZ+cBniCpfKOLFwDNY1RGCaJKv/cfMQet8kAaVxSMtiBF5z13bqMn
-# uiq+DlFuMgBB9KGQc45uMeUyw3v2oFio2AX84gscRWnu/Ouu1JWp/3s0vVy3ssUy
-# 8CSSBa7/2fN/IQyAYxXV/bYy5sMSYNg5sZB6FILPWoz9Mu+ZKudXZ6RcZxmhQzxu
-# rkoszKtdHlZmZq/9NccZ1UKWLMd5qEBudn0QTAcLt9OI+mdNmbjW5IfYtH/S0CJK
-# X/iPmijB09W4xccXShG9EO0oNgRfTy9ZhcrCSr0ujIf6zOmbbkm90YfUFKvC2x6F
-# /krQDh0Qo1qH7nC+VmaFTW4jIuiFB7Vi3I2OhMgwWkXx0wL8bEyUON8G2I8UA4ji
-# lFXKOkWboYIYFDCCGBAGCisGAQQBgjcDAwExghgAMIIX/AYJKoZIhvcNAQcCoIIX
+# IgQgLAP1BKxDPCqAZDFkrS8LpAE2jO0pnvntjA8f6uNlBLowDQYJKoZIhvcNAQEB
+# BQAEggGAgMNXhxsosnPM/wjYsYZl9LZCvX7qU2v+AC3iLDvDpI0zUiO3VLBDoblH
+# 7LZIOizlnaQVPSuneHB9GiqpiEoAo0mRd7KE1cpDU1eYjbCJ93IqUpfnYrBzzEhU
+# /32H9XvePb4QKgaMMWsrfXRX13wxL5Js0WqQlg8XoARRBQR9iRjIKqjJ9LT/Ww2N
+# G5i4OS2pYvLcCs9j02RUF2bLU8hz36Zjr2oPuX9Prhclci+Ml9uiDYmhOb6fA57I
+# a3BSWHAX9ZcBma20hCPOFHp+xdv9PfeMCRevwX2ow00BywEaq7DXjAYhq2IV/nL6
+# emvbclwooxIeg3T8hBAydzf46OunymEaSV76KMLWerzU4GuT8ty3eoby8PdrBQVV
+# 3hQy5UzmSafoM4ljRRhmTd3mtQ07wDZ+sWJGfqkB7cJe8+SyXOFk+JiUDpuR8v4l
+# UJbeA12NaCebdT78HnpKefvbwwQ2AyVVOO233eFNqhBd7BFCXeO9GIlxMVuA2SqJ
+# 0ZMiB6lxoYIYFDCCGBAGCisGAQQBgjcDAwExghgAMIIX/AYJKoZIhvcNAQcCoIIX
 # 7TCCF+kCAQMxDzANBglghkgBZQMEAgEFADCCAWIGCyqGSIb3DQEJEAEEoIIBUQSC
-# AU0wggFJAgEBBgorBgEEAYRZCgMBMDEwDQYJYIZIAWUDBAIBBQAEIKMLC7WTSXYT
-# P1FMj70boYBVg85WPBnQMn3agby9ubhnAgZq2055ZMEYEzIwMjYxMDI3MDkzMDQz
-# LjYzNVowBIACAfSggeGkgd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNo
+# AU0wggFJAgEBBgorBgEEAYRZCgMBMDEwDQYJYIZIAWUDBAIBBQAEINtTwHAQs4Mk
+# pSppMSd7oru219GrBVPP1w0TN/z1LM/BAgZq2055gzcYEzIwMjYxMDI3MTAyMzE2
+# LjczOFowBIACAfSggeGkgd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNo
 # aW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29y
 # cG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMx
 # JzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjo3RDAwLTA1RTAtRDk0NzE1MDMGA1UE
@@ -376,8 +376,8 @@ if($failure){exit 1}
 # MTIwMAYDVQQDEylNaWNyb3NvZnQgUHVibGljIFJTQSBUaW1lc3RhbXBpbmcgQ0Eg
 # MjAyMAITMwAAAF8q5PgjRbwaSQAAAAAAXzANBglghkgBZQMEAgEFAKCCBJ8wEQYL
 # KoZIhvcNAQkQAg8xAgUAMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAcBgkq
-# hkiG9w0BCQUxDxcNMjYxMDI3MDkzMDQzWjAvBgkqhkiG9w0BCQQxIgQgC8MELMHV
-# SHrz763HD8hyfuOskcDdWwoc8KyRX/P5qIYwgbkGCyqGSIb3DQEJEAIvMYGpMIGm
+# hkiG9w0BCQUxDxcNMjYxMDI3MTAyMzE2WjAvBgkqhkiG9w0BCQQxIgQgeYjr/9/s
+# xnaFEoq2bIkZYZ9v45ZZOas8suZurs3uRw4wgbkGCyqGSIb3DQEJEAIvMYGpMIGm
 # MIGjMIGgBCBs9gl+q1f0gODShST0SrC3UF5snHnW4n8wXlLHWy4lwzB8MGWkYzBh
 # MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIw
 # MAYDVQQDEylNaWNyb3NvZnQgUHVibGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAy
@@ -399,16 +399,16 @@ if($failure){exit 1}
 # 80wxs6AEn+r9kKBC5p7TaaqbCsXOemm2Fsd+s04LORE07/9bdb2g5dYYUgH2rRmP
 # Q1dAqD4WUCmDD4GCG2HlT/wJXgH20nkcqH1+inQ1axjPter+fyI1+5KauTr6ZNgQ
 # QuuyrTuipDyST8pe6I4b2ecvxh/HZ6hhJgz12QoBkSjPIcRIjHmB6lFQYSfWE4aI
-# wBJ1bzYaV7HN3scYJcKHwCx/c91gRDnIDkw5MA0GCSqGSIb3DQEBAQUABIICAKUU
-# n8aCY0qeUyRGEBklJmqnH96Cr0TF6RbHprPfUOXg0gnPiF2MTDvaMnu1KdwoaXpo
-# bMIljVPCnJM7vpU8wClsid4gwQofXqGmgOVR5Xq2+faF3gVowok4EuhsTswte1dq
-# +aK467G0dbwByZ/2NT8dgzHa6XSx7VMp4kNwR6EUoAzwNMvx4aMizR6ZxF+hDJR4
-# LI3sHEH2S5v62HjNINGQMqszOB+daswL/fszZls94Kdn2bdek4RM+wFGTlIhOOwP
-# gwn0cjWUcxWP8kZ1OHLurLPSZ2q59SB0MiMhGAhlJbftRl/ZjU8keyjEN2KgeEBq
-# mUDovpHlvC+i7D2Rbpf/hkCBm0f8wjcX40juIYbF8JpDMN94c4t55LBbutVugf7o
-# HBVqYjPfff0eyqo1utYbCueOFOXgpAXgls8WTmnpBh+p70Vhrg9J6WsmXydTUriP
-# RQWrL6jZgB7h7bkHfXep9wiy2tcS0FMBzqMd4k8geXs05MjPatWIMeZUEgvzkmJ5
-# 7lw/Y1Lsfa4rJq4TAo5NskjDyIQoDBZo+d9IYOqcEh+o72pOHjV1ZPGJeTGUlAOE
-# NXQBGytZPP9Booi/h6UeuVNNHFXOlVDLVaCre+7iwX5ki+ZtW505KzGpdeFjvRdP
-# UbVZhSORjRtJTS4cUg9kQuHNiVd+VIUJjHR7/O/8
+# wBJ1bzYaV7HN3scYJcKHwCx/c91gRDnIDkw5MA0GCSqGSIb3DQEBAQUABIICAN6z
+# MYeLPXUgtnQ78MRt/PTD494LhRu+AJKDdxcok5HCrwUUn5tkGbwoZ741BNzVHnZd
+# hEwt733zg0woIJHtnEa2VVDN0dbArSVh/VLSbbr6deXgAV0FM5aGnPDxRWlzoxQy
+# lcB4EF37TielTH1XnP2UjyCMLFBrUXBxEYxno2WZDiHXwNBYgl0J0cLmPfwn/oWQ
+# gw3by9H4Zt6r/wNrPvNPk3Iz/PnTB0/VKzZndtj1i71t195ZcufTaR5knWIGv2Ry
+# qoueROrRsU1u9v7dSdVfli8VjXfiEFOChUD0RzOVkCjQLPV4upV2lWbch5xgnw4+
+# X3HsxYecQ07uzVJMDly+gGzWaGj1SIiltRqln6O+pSFrSDgP5UQGM4j9fTXDfgUZ
+# 3R0IbCz/5Nn6vFaGZV18terKiaLnMPXk1xvY5CVmIFrdDUSfm9vy3TQ6Xz7KanDb
+# 8GNer8v6GTQql9JJvRlpNb23uD0GC+UICXVrLLM2yS8bJ/VvqIrCc0emD2mm9hnX
+# drGWpIsSnoCrQmybgDFisS/aa6yWiM7MP/f30GNDen4m46BW8KMCEXoKa8a2bty+
+# rSVGmHoj7wuB7A5YSdf1ftNmKi8xsaZGIu+Vaf50tlkJwRoxgwrXT5cylUXJIQDE
+# 3dhgcCgO4AjTvkN6mLRbc6ogu6OgHX+uk/Kw0F6n
 # SIG # End signature block

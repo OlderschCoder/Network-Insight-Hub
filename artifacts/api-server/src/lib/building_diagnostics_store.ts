@@ -4,7 +4,7 @@ import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
-export type DirectoryFacts = { distinguishedName: string; canonicalName: string; location: string | null; memberOf: { objectGuid: string; name: string; distinguishedName: string }[] };
+export type DirectoryFacts = { distinguishedName: string; canonicalName: string; location: string | null; memberOf: { objectGuid: string; name: string; distinguishedName: string }[]; organizationalUnits?: { objectGuid: string; name: string; distinguishedName: string }[] };
 export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean; directory?: DirectoryFacts }[]; observations: Observation[]; userBuildingAssignments: Assignment[]; collectorStatus?: CollectorStatus };
 type AdInventory = Pick<Inventory, "adObservedAt" | "adComputers">;
 let schemaReady: Promise<unknown> | undefined;
