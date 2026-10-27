@@ -1,2 +1,5 @@
 *.sh text eol=lf
 /deploy/building-diagnostics/Resume-ScopedDiagnosticsEnrollment.ps1 -text
+/deploy/building-diagnostics/Export-AdDiagnosticsInventory.ps1 -text
+/deploy/building-diagnostics/Invoke-AdInventoryPublisher.ps1 -text
+/deploy/building-diagnostics/Update-AdInventoryDirectoryFacts.ps1 -text

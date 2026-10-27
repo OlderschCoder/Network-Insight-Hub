@@ -33,6 +33,22 @@ beforeEach(() => {
   store.checkIn.mockResolvedValue(null); store.transfer.mockResolvedValue({ downloadBytes: 256, uploadBytes: 256 });
 });
 describe("building diagnostics authority boundaries", () => {
+  it("accepts optional trusted directory facts without inventing physical location or duplicating groups", async () => {
+    const directory = { distinguishedName: "CN=PC-1,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/Library/PC-1", location: null,
+      memberOf: [{ objectGuid: jobId, name: "Library-Comps", distinguishedName: "CN=Library-Comps,OU=Groups,DC=sccc,DC=edu" }] };
+    const body = { snapshotComplete: true, adObservedAt: new Date().toISOString(), adComputers: [{ ...adComputer, directory: { ...directory, memberOf: [...directory.memberOf, { ...directory.memberOf[0], objectGuid: jobId.toUpperCase() }] } }] };
+    for (const credential of [token, "fred-session"]) expect((await request(app()).post(`${path}/ad-inventory`).set("Authorization", `Bearer ${credential}`).set("x-role", "cio").send(body)).status).toBe(401);
+    expect((await request(app()).post(`${path}/ad-inventory`).set("Authorization", `Bearer ${worker}`).send(body)).status).toBe(200);
+    expect(store.ingestAd).toHaveBeenLastCalledWith({ adObservedAt: body.adObservedAt, adComputers: [{ ...adComputer, directory }] });
+    expect(store.queue).not.toHaveBeenCalled(); expect(store.provision).not.toHaveBeenCalled();
+  });
+  it("bounds directory evidence and rejects client-supplied building assertions", async () => {
+    const directory = { distinguishedName: "CN=PC-1,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/PC-1", location: null, memberOf: [] };
+    for (const invalid of [{ ...directory, building: "Invented building" }, { ...directory, location: 4 }, { ...directory, distinguishedName: "x".repeat(2049) }, { ...directory, memberOf: [{ objectGuid: "invalid", name: "Group", distinguishedName: "CN=Group,DC=sccc,DC=edu" }] }, { ...directory, memberOf: Array.from({ length: 129 }, () => ({ objectGuid: jobId, name: "Group", distinguishedName: "CN=Group,DC=sccc,DC=edu" })) }]) {
+      expect((await request(app()).post(`${path}/ad-inventory`).set("Authorization", `Bearer ${worker}`).send({ snapshotComplete: true, adObservedAt: new Date().toISOString(), adComputers: [{ ...adComputer, directory: invalid }] })).status).toBe(400);
+    }
+    expect(store.ingestAd).not.toHaveBeenCalled();
+  });
   it("allows network manual work but restricts persisted automatic scheduling to the CIO", async () => {
     const settings = { schedulerArmed: true, rotationIntervalMinutes: 180 };
     for (const role of ["network", "network_engineer", "helpdesk"]) expect((await request(app()).put(`${path}/settings`).set("Authorization", "Bearer fred-session").set("x-role", role).send(settings)).status).toBe(403);

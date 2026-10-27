@@ -5,6 +5,7 @@ import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
 import { diagnosticsReadiness, externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, MAX_ROTATION_MINUTES, MIN_ROTATION_MINUTES, schedulerSettings, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
 import { createDiagnosticsEnrollmentRouter } from "./building_diagnostics_enrollment";
+import { createBuildingDiagnosticsAssignmentRouter } from "./building_diagnostics_assignment";
 
 const text = z.string().trim().min(1).max(120);
 const mac = z.string().regex(/^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$|^[0-9a-f]{12}$/i);
@@ -20,7 +21,12 @@ const observationSchema = z.object({ mac: mac.optional(), bssid: mac.optional(),
   .refine((o) => o.source === "switch" ? !!o.mac : !!o.bssid, "Matching MAC or BSSID required")
   .refine((o) => !o.portTelemetry || (o.source === "switch" && o.edge && !!o.switchName && !!o.port), "Port measurements require an identified access switch port");
 const provisionSchema = z.object({ adObjectGuid: guid, computerName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/), domain: text, enabled: z.literal(true).optional() }).strict();
-const adComputersSchema = z.array(provisionSchema.extend({ enabled: z.boolean() })).min(1).max(30_000).refine((rows) => new Set(rows.map((row) => row.adObjectGuid.toLowerCase())).size === rows.length, "Duplicate AD object identity");
+const directoryText = z.string().trim().min(1).max(2048);
+const directorySchema = z.object({ distinguishedName: directoryText, canonicalName: directoryText, location: z.string().trim().max(2048).nullable(),
+  memberOf: z.array(z.object({ objectGuid: guid, name: text, distinguishedName: directoryText }).strict()).max(128)
+    .transform((groups) => [...new Map(groups.map((group) => [group.objectGuid.toLowerCase(), { ...group, objectGuid: group.objectGuid.toLowerCase() }])).values()]),
+}).strict();
+const adComputersSchema = z.array(provisionSchema.extend({ enabled: z.boolean(), directory: directorySchema.optional() })).min(1).max(30_000).refine((rows) => new Set(rows.map((row) => row.adObjectGuid.toLowerCase())).size === rows.length, "Duplicate AD object identity");
 const adInventorySchema = z.object({ snapshotComplete: z.literal(true), adObservedAt: timestamp, adComputers: adComputersSchema }).strict();
 const inventorySchema = z.object({
   snapshotComplete: z.literal(true),
@@ -60,6 +66,7 @@ function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> { 
 export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   const router = Router();
   router.use(createDiagnosticsEnrollmentRouter());
+  router.use(createBuildingDiagnosticsAssignmentRouter());
   const workerOnly: RequestHandler = async (req, res, next) => { if (!workerValid(req)) return void res.status(401).json({ error: "Diagnostics worker authentication required" }); await store.workerSeen(); next(); };
   const adminOrWorker: RequestHandler = async (req, res, next) => { if (workerValid(req)) { await store.workerSeen(); next(); } else requireAuth(req, res, () => requireNetworkAdmin(req, res, next)); };
   const actor = (req: any) => workerValid(req) ? "private AD worker" : `Fred user ${req.user.id}`;
@@ -99,7 +106,7 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
     const devices = overview.devices.map((d) => ({ deviceId: d.deviceId, adObjectGuid: d.adObjectGuid, computerName: d.computerName, domain: d.adDomain,
       enabled: d.adEnabled, enrolled: d.enrolled && !d.revoked, online: d.online, adVerified: d.adVerified, lastSeenAt: d.lastCheckIn,
       ...(d.loggedOnUser ? { loggedOnUser: d.loggedOnUser } : {}),
-      location: { building: d.location.building, kind: d.location.kind, source: d.location.source, observedAt: d.location.observedAt } }));
+      location: { building: d.location.building, kind: d.location.kind, source: d.location.source, observedAt: d.location.observedAt }, directory: d.directory }));
     return res.json({ observedAt, updatedAt: observedAt, readiness: overview.readiness, devices });
   });
   router.post("/inventory", enabledOnly, workerOnly, async (req, res) => {

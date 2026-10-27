@@ -4,7 +4,8 @@ import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
-export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean }[]; observations: Observation[]; userBuildingAssignments: Assignment[]; collectorStatus?: CollectorStatus };
+export type DirectoryFacts = { distinguishedName: string; canonicalName: string; location: string | null; memberOf: { objectGuid: string; name: string; distinguishedName: string }[] };
+export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean; directory?: DirectoryFacts }[]; observations: Observation[]; userBuildingAssignments: Assignment[]; collectorStatus?: CollectorStatus };
 type AdInventory = Pick<Inventory, "adObservedAt" | "adComputers">;
 let schemaReady: Promise<unknown> | undefined;
 export function ensureDiagnosticsSchema() {
@@ -101,6 +102,11 @@ function adMatch(inv: Inventory, d: any) {
   const a = getIndexes(inv).ad.get(d.ad_object_guid.toLowerCase());
   return !!a?.enabled && a.computerName.toLowerCase() === d.computer_name.toLowerCase() && a.domain.toLowerCase() === d.domain.toLowerCase();
 }
+function directoryFor(inv: Inventory, adObjectGuid: string) {
+  const directory = getIndexes(inv).ad.get(adObjectGuid.toLowerCase())?.directory;
+  // Directory classifications remain separate from observed physical location.
+  return directory ? { ...directory, source: "active-directory" as const, observedAt: inv.adObservedAt } : null;
+}
 function locationFor(heartbeat: Heartbeat, inv: Inventory) {
   const index = getIndexes(inv), observations: Observation[] = [];
   for (const i of heartbeat.interfaces) { observations.push(...(index.macs.get(i.mac.replace(/[^a-f0-9]/gi, "").toLowerCase()) ?? [])); if (i.bssid) observations.push(...(index.aps.get(i.bssid.replace(/[^a-f0-9]/gi, "").toLowerCase()) ?? [])); }
@@ -121,6 +127,7 @@ async function snapshot(client: Client = pool) {
       adVerified: adMatch(inv, d) && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: currentHeartbeat && !d.revoked_at,
       lastCheckIn: iso(d.last_check_in), agentVersion: heartbeat.agentVersion ?? null,
       loggedOnUser: heartbeat.loggedOnUser ?? null, interfaces: heartbeat.interfaces, location,
+      directory: directoryFor(inv, d.ad_object_guid),
       capabilities: heartbeat.capabilities ?? [],
       portTelemetry: currentHeartbeat ? resolvePortTelemetry(heartbeat, inv.observations) : null,
       lastTestAt: iso(d.last_test_at), lastResult: d.report_id ? { id: String(d.report_id), recordedAt: iso(d.recorded_at), ...d.report_data } : null };
@@ -133,6 +140,7 @@ async function snapshot(client: Client = pool) {
       adVerified: a.enabled && fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000), online: false,
       lastCheckIn: null, agentVersion: null, loggedOnUser: null, interfaces: [],
       capabilities: [],
+      directory: directoryFor(inv, a.adObjectGuid),
       portTelemetry: null,
       location: { building: null, kind: "unknown", source: null, observedAt: null }, lastTestAt: null, lastResult: null });
   }
@@ -187,7 +195,16 @@ export const diagnosticsStore = {
       validateAdSnapshot(data, previous);
       if (data.collectorStatus && Date.parse(data.collectorStatus.observedAt) > Date.now() + 30_000) throw new DiagnosticsError(409, "Collector observation cannot be in the future");
       if (data.observations.some((o) => Date.parse(o.observedAt) > Date.now() + 30_000 || (o.portTelemetry && Date.parse(o.portTelemetry.observedAt) > Date.now() + 30_000))) throw new DiagnosticsError(409, "Network observation cannot be in the future");
-      await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify(data)]);
+      // A legacy network collector may omit newly added directory fields. Keep
+      // them only for the identical trusted AD snapshot and immutable identity.
+      const previousAd = getIndexes(previous).ad;
+      const adComputers = data.adComputers.map((computer) => {
+        const existing = previousAd.get(computer.adObjectGuid.toLowerCase());
+        return data.adObservedAt === previous.adObservedAt && computer.directory === undefined && existing?.directory &&
+          computer.computerName.toLowerCase() === existing.computerName.toLowerCase() && computer.domain.toLowerCase() === existing.domain.toLowerCase() && computer.enabled === existing.enabled
+          ? { ...computer, directory: existing.directory } : computer;
+      });
+      await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify({ ...data, adComputers })]);
     });
     inventoryCache = undefined;
     return { ok: true, adComputers: data.adComputers.length, observations: data.observations.length, userBuildingAssignments: data.userBuildingAssignments.length };

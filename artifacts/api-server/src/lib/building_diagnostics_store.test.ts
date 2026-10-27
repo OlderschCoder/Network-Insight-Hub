@@ -312,4 +312,28 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     expect(device?.location).toMatchObject({ kind: "network-confirmed", building: "Controller WiFi", source: "Wi-Fi AP" });
     expect(device?.portTelemetry).toBeNull();
   });
+  it("keeps optional directory classifications for enrolled and uninstalled AD computers separate from network evidence", async () => {
+    const current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    const directory = { distinguishedName: "CN=SYNTHETIC,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/Library/SYNTHETIC", location: null,
+      memberOf: [{ objectGuid: randomUUID(), name: "Library-Comps", distinguishedName: "CN=Library-Comps,OU=Groups,DC=sccc,DC=edu" }] };
+    const reportsBefore = (await db.query("SELECT id,building,data FROM building_diagnostics_reports ORDER BY id")).rows;
+    await store.ingestAd({ adObservedAt: current.adObservedAt, adComputers: current.adComputers.map((computer: any) => ({ ...computer, directory })) });
+    const overview = await store.overview();
+    for (const device of overview.devices) expect(device.directory).toEqual({ ...directory, source: "active-directory", observedAt: current.adObservedAt });
+    expect(overview.devices.find((device) => device.adObjectGuid === guidNeverEnrolled)?.location.kind).toBe("unknown");
+    expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.observations).toEqual(current.observations);
+    expect((await db.query("SELECT id,building,data FROM building_diagnostics_reports ORDER BY id")).rows).toEqual(reportsBefore);
+  });
+  it("preserves omitted directory facts only for the identical AD snapshot and computer identity", async () => {
+    const current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
+    const stripped = current.adComputers.map(({ directory: _directory, ...computer }: any) => computer);
+    await store.ingest({ ...current, adComputers: stripped });
+    expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers.map((computer: any) => computer.directory)).toEqual(current.adComputers.map((computer: any) => computer.directory));
+    const renamed = stripped.map((computer: any, index: number) => index === 0 ? { ...computer, computerName: "SYNTHETIC-RENAMED" } : computer);
+    await store.ingest({ ...current, adComputers: renamed });
+    expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers[0].directory).toBeUndefined();
+    const newer = new Date(Math.max(Date.now(), Date.parse(current.adObservedAt) + 1)).toISOString();
+    await store.ingest({ ...current, adObservedAt: newer, adComputers: stripped });
+    expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers.every((computer: any) => computer.directory === undefined)).toBe(true);
+  });
 });

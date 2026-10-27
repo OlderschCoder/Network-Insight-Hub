@@ -33,6 +33,7 @@ async function portal(page: Page, rows = devices, observedAt = now, entryQuery =
     if (path.endsWith("/auth/me")) body = { id: 1, name: "Fixture", email: "fixture@example.invalid", role: "network", isActive: true };
     else if (path.endsWith("/building-diagnostics/overview")) body = { enabled: true, schedulerEnabled: false, targetLabel: "Fred HTTPS path", inventoryUpdatedAt: now,
       adObservedAt: observedAt, devices: rows, buildings: ["AA", "SU"].map(building => ({ building, onlineDevices: 1, eligibleDevices: 1, lastResult: null, noCurrentMeasurement: true })), jobs: [] };
+    else if (path.endsWith("/building-assignments")) body = { buildings: ["AA", "SU"], assignments: rows.map(row => ({ adObjectGuid: row.adObjectGuid, building: row.location.building, source: "manual", updatedAt: now, updatedBy: "Synthetic fixture", reason: "Explicit synthetic building assignment" })) };
     else if (path.endsWith("/devices/bulk-enrollment") && request.method() === "POST") { const value = request.postDataJSON(); calls.enrollment.push(value); body = batch(value.requestId); }
     else if (path.includes("/devices/bulk-enrollment/")) body = batch(path.split("/").at(-1)!);
     else if (path.endsWith("/building-diagnostics/jobs") && request.method() === "POST") { calls.measurements.push(request.postDataJSON()); body = { queued: 1 }; }
