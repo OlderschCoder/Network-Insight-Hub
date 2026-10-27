@@ -96,3 +96,27 @@ existing authenticated worker API, with read-back at 11:06:40Z. The old publishe
 is still not upgraded; original fact timestamps expire after 24 hours rather than
 being renewed by its later roster posts. No authorization, mapping or job change
 was part of this compatibility release.
+
+## Approved diagnostics rollout and presence correction
+
+The two existing approved queues processed 243 distinct AD identities: 117
+installed, 122 unreachable (89 private-DNS and 33 Kerberos), three failed, and
+one already enrolled. The first client stopped with exit 1; server/proxy evidence
+did not establish its precise external request failure. Only the 15 conclusively
+never-claimed targets were continued, and that client exited 0 with both queues
+empty. No uncertain or unrelated queue was replayed.
+
+Four installed Surface helpers could not generate presence because an enumerated
+adapter had no IP-interface record. The verified production source matched the
+local module body. Version 1.1.1 skips only the two exact missing-interface-index
+errors and rethrows other failures; 58 focused checks passed under PowerShell 5.1
+and 7. The module and four-host updater were independently reviewed and signed.
+The canary then the other three received only that module and one diagnostics-task
+restart. Configuration metadata, task definitions, credentials and MFA were
+preserved. All four subsequently authenticated as 1.1.1 using their original
+enrolled identities. All 117 new installations now have authenticated check-ins.
+
+The existing protected bulk payload remains frozen at 1.1.0; the focused updater
+does not silently replace that deployment package. Receiver 0.4.5 evidence remains
+297 installation receipts and 269 dated runtime checks. The finite LibreSpeed
+baseline and its verified Grafana dashboard are separate from recurring testing.

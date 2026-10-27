@@ -124,6 +124,7 @@ $script:Passed++
 # Exercise presence shape against in-memory cmdlet doubles, including an up
 # adapter whose IP configuration is absent. No local machine/user is queried.
 & (Get-Module Sccc.Diagnostics) {
+    $script:PresenceIpBehavior = 'normal'
     function script:Get-CimInstance {
         param([string]$ClassName)
         if ($ClassName -eq 'Win32_ComputerSystem') {
@@ -138,11 +139,29 @@ $script:Passed++
         )
     }
     function script:Get-NetIPConfiguration {
+        [CmdletBinding()]
         param([int]$InterfaceIndex)
+        if ($script:PresenceIpBehavior -eq 'unrelated-error') {
+            $record = New-Object Management.Automation.ErrorRecord ([InvalidOperationException]::new('Synthetic unrelated failure')), 'UnrelatedInterfaceFailure', ([Management.Automation.ErrorCategory]::NotSpecified), $InterfaceIndex
+            $PSCmdlet.ThrowTerminatingError($record)
+        }
+        if ($script:PresenceIpBehavior -eq 'all-missing' -or ($script:PresenceIpBehavior -in @('mixed-missing', 'configuration-missing') -and $InterfaceIndex -eq 2)) {
+            if ($script:PresenceIpBehavior -eq 'configuration-missing') {
+                $record = New-Object Management.Automation.ErrorRecord ([InvalidOperationException]::new('Synthetic vanished adapter')), 'CmdletizationQuery_NotFound_InterfaceIndex', ([Management.Automation.ErrorCategory]::ObjectNotFound), $InterfaceIndex
+                $PSCmdlet.ThrowTerminatingError($record)
+            }
+            Get-NetIPInterface -InterfaceIndex $InterfaceIndex
+        }
         if ($InterfaceIndex -eq 1) {
             return [pscustomobject]@{ IPv4Address = @([pscustomobject]@{ IPAddress = '10.1.2.3' }); IPv6Address = @([pscustomobject]@{ IPAddress = 'fe80::1234%3' }); IPv4DefaultGateway = @([pscustomobject]@{ NextHop = '10.1.2.1' }) }
         }
         return $null
+    }
+    function script:Get-NetIPInterface {
+        [CmdletBinding()]
+        param([int]$InterfaceIndex)
+        $record = New-Object Management.Automation.ErrorRecord ([InvalidOperationException]::new('Synthetic vanished adapter')), 'CmdletizationQuery_NotFound_InterfaceIndex', ([Management.Automation.ErrorCategory]::ObjectNotFound), $InterfaceIndex
+        $PSCmdlet.ThrowTerminatingError($record)
     }
     function script:Get-DiagnosticsWifiAssociation { return @() }
 }
@@ -152,5 +171,22 @@ Assert-Equal $presence.interfaces[0].mac '00:11:22:33:44:55' 'MAC normalization'
 Assert-Equal $presence.interfaces[0].linkMbps 1000.0 'Negotiated link rate is separate metadata'
 Assert-Equal $presence.interfaces[0].ipAddresses[1] 'fe80::1234' 'IPv6 zone removed from IP-only contract'
 Assert-Equal $presence.loggedOnUser 'EXAMPLE\staff' 'Exact domain-qualified phone mapping identity'
+Assert-Equal $presence.agentVersion '1.1.1' 'Presence fix version is traceable'
+& (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'mixed-missing' }
+$presence = Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'example.edu' })
+Assert-Equal $presence.interfaces.Count 1 'Vanished adapter is skipped while valid adapter remains'
+Assert-Equal $presence.interfaces[0].ipAddresses[0] '10.1.2.3' 'Valid adapter IP survives another adapter disappearing'
+& (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'all-missing' }
+$presence = Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'example.edu' })
+Assert-Equal $presence.interfaces.Count 0 'All vanished adapters yield an empty interface array'
+Assert-Equal (($presence | ConvertTo-Json -Depth 8 -Compress) -match '"interfaces":\[\]') $true 'Empty interfaces serialize to the valid JSON array shape'
+& (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'configuration-missing' }
+$presence = Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'example.edu' })
+Assert-Equal $presence.interfaces.Count 1 'Exact Get-NetIPConfiguration missing-index error is also skipped'
+& (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'unrelated-error' }
+$failureId = $null
+try { Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'example.edu' }) | Out-Null } catch { $failureId = $_.FullyQualifiedErrorId }
+Assert-Equal $failureId 'UnrelatedInterfaceFailure,Get-NetIPConfiguration' 'Unrelated IP failure is rethrown unchanged'
+& (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'normal' }
 Assert-Rejected { Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'different.edu' }) } 'AD domain change stops check-in'
 Write-Output ('PASS: {0} offline diagnostics assertions and script parses; no network or task activation.' -f $script:Passed)

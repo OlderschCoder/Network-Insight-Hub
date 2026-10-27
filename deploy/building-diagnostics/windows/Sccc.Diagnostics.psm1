@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$script:AgentVersion = '1.1.0'
+$script:AgentVersion = '1.1.1'
 $script:MaximumTransferBytes = 32MB
 
 function Get-DiagnosticsServerOrigin {
@@ -222,7 +222,11 @@ function Get-DiagnosticsPresence {
     $wifi = @(Get-DiagnosticsWifiAssociation)
     $interfaces = @()
     foreach ($adapter in $adapters) {
-        $ip = Get-NetIPConfiguration -InterfaceIndex $adapter.ifIndex -ErrorAction SilentlyContinue
+        try { $ip = Get-NetIPConfiguration -InterfaceIndex $adapter.ifIndex -ErrorAction SilentlyContinue }
+        catch {
+            if ($_.FullyQualifiedErrorId -in @('CmdletizationQuery_NotFound_InterfaceIndex,Get-NetIPConfiguration', 'CmdletizationQuery_NotFound_InterfaceIndex,Get-NetIPInterface')) { continue }
+            throw
+        }
         $addresses = @()
         $gateway = @()
         if ($ip) {
