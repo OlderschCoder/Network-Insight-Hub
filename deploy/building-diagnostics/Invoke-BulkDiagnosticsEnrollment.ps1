@@ -64,11 +64,13 @@ try{
   $externalOrigin=[string]$batch.policy.externalProbeOrigin
   if($externalOrigin){$external=[Uri]$externalOrigin;if(-not $external.IsAbsoluteUri -or $external.Scheme -ne 'https' -or -not $external.IsDefaultPort -or $external.HostNameType -ne 'Dns' -or $external.UserInfo -or $external.Query -or $external.Fragment -or $external.AbsolutePath -ne '/'){throw 'The reviewed server external-origin policy did not validate.'}}
   @($batch.items)|ForEach-Object -Parallel {
-   $item=$_;$session=$null;$credential=$null;$phase='directory';$reason='installation-failed';$status='failed';$evidence=$null;$policyEvidence=$null;$credentialAttempted=$false;$remoteStage=$null
+   Set-StrictMode -Version Latest
+   $ErrorActionPreference='Stop'
+   $item=$_;$session=$null;$credential=$null;$phase='directory';$reason='installation-failed';$status='failed';$evidence=$null;$policyEvidence=$null;$failure=$null;$credentialAttempted=$false;$remoteStage=$null
    $apiOrigin=$using:FredOrigin;$authorization=$using:headers;$source=$using:AgentSourceDirectory;$expectedSigner=$using:signer;$hashes=$using:payloadHashes
    $claim=@{requestId=[string]$item.requestId;adObjectGuid=[string]$item.adObjectGuid;claimId=[string]$item.claimId}
    $receiptPath=Join-Path $using:ReceiptDirectory ($item.requestId+'-'+$item.adObjectGuid+'.json')
-   function Receipt([string]$State){$json=[pscustomobject]@{RequestId=$item.requestId;AdObjectGuid=$item.adObjectGuid;ComputerName=$item.computerName;Phase=$phase;Status=$State;Reason=$reason;CheckedUtc=[DateTimeOffset]::UtcNow.ToString('o');Evidence=$evidence;ExecutionPolicy=$policyEvidence;MeasurementRequested=$false}|ConvertTo-Json -Depth 5;$temporary=$receiptPath+'.'+[Guid]::NewGuid().ToString('N')+'.tmp';[IO.File]::WriteAllText($temporary,$json,[Text.UTF8Encoding]::new($false));[IO.File]::Move($temporary,$receiptPath,$true)}
+   function Receipt([string]$State){$json=[pscustomobject]@{RequestId=$item.requestId;AdObjectGuid=$item.adObjectGuid;ComputerName=$item.computerName;Phase=$phase;Status=$State;Reason=$reason;CheckedUtc=[DateTimeOffset]::UtcNow.ToString('o');Evidence=$evidence;ExecutionPolicy=$policyEvidence;Failure=$failure;MeasurementRequested=$false}|ConvertTo-Json -Depth 5;$temporary=$receiptPath+'.'+[Guid]::NewGuid().ToString('N')+'.tmp';[IO.File]::WriteAllText($temporary,$json,[Text.UTF8Encoding]::new($false));[IO.File]::Move($temporary,$receiptPath,$true)}
    function Remote([scriptblock]$Code,[object[]]$Arguments=@(),[int]$Seconds=30){
     $job=Invoke-Command -Session $session -ScriptBlock $Code -ArgumentList $Arguments -AsJob
     try{if(-not (Wait-Job -Job $job -Timeout $Seconds)){throw 'Bounded remote enrollment command timed out.'};Receive-Job -Job $job -ErrorAction Stop}
@@ -160,6 +162,7 @@ try{
     $evidence=@{taskRunning=[bool]$proof.taskRunning;taskSystem=[bool]$proof.taskSystem;helperVersion=[string]$proof.helperVersion;signerThumbprint=[string]$proof.signerThumbprint;payloadSha256=[string]$proof.payloadSha256}
     $status='installed';$reason='installed-awaiting-check-in';$phase='installed-task-verified'
    }catch{
+    $failure=@{ErrorType=$_.Exception.GetType().FullName;ErrorId=[string]$_.FullyQualifiedErrorId;FailureLine=$_.InvocationInfo.ScriptLineNumber;FailureScript=[string]$_.InvocationInfo.ScriptName}
     if($status -ne 'skipped' -and $reason -in @('private-dns-unavailable','kerberos-unavailable')){$status='unreachable'}
     # Do not log raw exception/request/config objects: remoting/HTTP errors can include credentials.
    }finally{

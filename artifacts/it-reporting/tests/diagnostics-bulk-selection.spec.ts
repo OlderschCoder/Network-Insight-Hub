@@ -111,3 +111,24 @@ test("one bulk enrollment request includes a full 675-computer eligible roster",
   expect(new Set(calls.enrollment[0].adObjectGuids).size).toBe(675);
   expect(calls.measurements).toHaveLength(0); expect(calls.downloads).toBe(0);
 });
+
+test("completed installations update to online without reloading or retaining the waiting reason", async ({ page }) => {
+  const calls = await portal(page);
+  let polls = 0;
+  await page.route("**/api/building-diagnostics/devices/bulk-enrollment/*", async route => {
+    const status = ++polls === 1 ? "installed" : "online";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      requestId: new URL(route.request().url()).pathname.split("/").at(-1), status: "completed", requested: 1,
+      counts: { queued: 0, claimed: 0, installing: 0, installed: status === "installed" ? 1 : 0, online: status === "online" ? 1 : 0, skipped: 0, unreachable: 0, failed: 0 },
+      worker: { ready: true, lastSeenAt: now }, items: [{ adObjectGuid: guid(11), computerName: "PC-11", status, reason: "installed-awaiting-check-in", updatedAt: now }],
+    }) });
+  });
+  await page.getByRole("checkbox", { name: "Select PC-11 for enrollment", exact: true }).check();
+  await page.getByRole("button", { name: "Enroll selected (1)", exact: true }).click();
+  await page.getByText("Enrollment results (1)", { exact: true }).click();
+  await expect(page.getByText("PC-11 · installed · installed-awaiting-check-in", { exact: true })).toBeVisible();
+  await expect(page.getByText("PC-11 · online", { exact: true })).toBeVisible();
+  await expect(page.getByText("installed-awaiting-check-in", { exact: false })).toHaveCount(0);
+  expect(polls).toBeGreaterThanOrEqual(2);
+  expect(calls.enrollment).toHaveLength(1); expect(calls.measurements).toHaveLength(0); expect(calls.downloads).toBe(0);
+});

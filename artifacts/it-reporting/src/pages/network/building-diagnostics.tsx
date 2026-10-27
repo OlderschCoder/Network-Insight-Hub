@@ -44,7 +44,7 @@ type Overview = {
 type EnrollmentBatch = { requestId: string; status: "queued" | "running" | "completed"; requested: number;
   counts: Record<"queued" | "claimed" | "installing" | "installed" | "online" | "skipped" | "unreachable" | "failed", number>;
   worker: { ready: boolean; lastSeenAt: string | null };
-  items: { adObjectGuid: string; computerName: string; status: string; reason?: string }[] };
+  items: { adObjectGuid: string; computerName: string; status: string; reason?: string; updatedAt?: string | null }[] };
 
 const API = `${import.meta.env.VITE_API_URL || "/api"}/building-diagnostics`;
 const time = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "Not reported";
@@ -70,6 +70,8 @@ export default function BuildingDiagnostics() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [enrollmentSelected, setEnrollmentSelected] = useState<Set<string>>(new Set());
   const [enrollmentRequestId, setEnrollmentRequestId] = useState(() => diagnosticGuid(new URLSearchParams(window.location.search).get("enrollmentRequest")));
+  const enrollmentStartedAt = useRef(Date.now());
+  const enrollmentCheckInDeadlines = useRef(new Map<string, number>());
   const [notice, setNotice] = useState("");
   const [entryGuid] = useState(() => new URLSearchParams(window.location.search).get("adObjectGuid"));
   const appliedEntry = useRef(false);
@@ -170,7 +172,20 @@ export default function BuildingDiagnostics() {
       if (result.requestId !== enrollmentRequestId) throw new Error("Enrollment status identity does not match this request.");
       return result;
     },
-    refetchInterval: query => ["completed", "partial", "failed", "cancelled"].includes(query.state.data?.status || "") ? false : 5_000,
+    refetchInterval: query => {
+      if (!["completed", "partial", "failed", "cancelled"].includes(query.state.data?.status || "")) return 5_000;
+      const now = Date.now();
+      return query.state.data?.items.some(item => {
+        if (item.status !== "installed" || item.reason !== "installed-awaiting-check-in") return false;
+        const key = `${query.state.data!.requestId}:${item.adObjectGuid}`;
+        if (!enrollmentCheckInDeadlines.current.has(key)) {
+          const updated = Date.parse(item.updatedAt || "");
+          const started = Number.isFinite(updated) && updated <= now ? updated : enrollmentStartedAt.current;
+          enrollmentCheckInDeadlines.current.set(key, started + 15 * 60_000);
+        }
+        return now < enrollmentCheckInDeadlines.current.get(key)!;
+      }) ? 5_000 : false;
+    },
   });
   const enrollmentBusy = enrollBatch.isPending || (!!enrollmentRequestId && !["completed", "partial", "failed", "cancelled"].includes(enrollmentStatus.data?.status || ""));
   function selectVisibleEnrollment(value: boolean) {
@@ -182,7 +197,7 @@ export default function BuildingDiagnostics() {
   function enrollSelected() {
     if (!selectedEnrollment.length || selectedEnrollment.length > 1000 || enrollmentBusy) return;
     const requestId = crypto.randomUUID(); const url = new URL(window.location.href); url.searchParams.set("enrollmentRequest", requestId);
-    window.history.replaceState(null, "", url); setEnrollmentRequestId(requestId); enrollBatch.reset();
+    window.history.replaceState(null, "", url); enrollmentStartedAt.current = Date.now(); enrollmentCheckInDeadlines.current.clear(); setEnrollmentRequestId(requestId); enrollBatch.reset();
     enrollBatch.mutate({ requestId, adObjectGuids: selectedEnrollment.map(d => d.adObjectGuid.toLowerCase()) });
   }
   const queue = useMutation({
@@ -287,7 +302,7 @@ export default function BuildingDiagnostics() {
           {enrollmentRequestId && <div className="text-sm"><p>Enrollment request <code>{enrollmentRequestId}</code> · {enrollmentStatus.data?.status || "Checking status"}</p>
             {enrollmentStatus.data?.worker.ready === false && <p>The central deployment worker is unavailable. No installation is confirmed until its result is reported.</p>}
             {enrollmentStatus.error && <p role="alert" className="text-destructive">{enrollmentStatus.error.message}</p>}
-            {!!enrollmentStatus.data?.items?.length && <details><summary>Enrollment results ({enrollmentStatus.data.items.length})</summary><ul className="mt-2 space-y-1">{enrollmentStatus.data.items.map(item => <li key={item.adObjectGuid}>{item.computerName} · {item.status}{item.reason ? ` · ${item.reason}` : ""}</li>)}</ul></details>}</div>}
+            {!!enrollmentStatus.data?.items?.length && <details><summary>Enrollment results ({enrollmentStatus.data.items.length})</summary><ul className="mt-2 space-y-1">{enrollmentStatus.data.items.map(item => <li key={item.adObjectGuid}>{item.computerName} · {item.status}{item.reason && !(item.status === "online" && item.reason === "installed-awaiting-check-in") ? ` · ${item.reason}` : ""}</li>)}</ul></details>}</div>}
         </section>
         {notice && <p role="status" className="text-sm">{notice}</p>}{queue.error && <p role="alert" className="text-destructive">{queue.error.message}</p>}
         {credentialAction && <section role="region" aria-label="Review diagnostic enrollment" className="space-y-3 rounded-md border bg-muted/30 p-4">
