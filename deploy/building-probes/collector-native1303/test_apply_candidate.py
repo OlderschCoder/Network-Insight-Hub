@@ -2,9 +2,11 @@
 import sys
 sys.dont_write_bytecode = True
 import copy
+import errno
 import io
 from pathlib import Path
 import runpy
+import struct
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -160,6 +162,68 @@ class AtomicMutationTests(unittest.TestCase):
                 observed = self.simulate(location)
                 self.assertTrue(observed['renamed'])
                 self.assertTrue(observed['installed'])
+
+
+class RuntimeReaderAclTests(unittest.TestCase):
+    def fake_grant(self, mode=0o600, acl=None, uid=1000, gid=1000, nlink=1, payload=b'SYNTHETIC_ONLY', expected=None, fail_fsync=False):
+        state = {'mode': mode, 'acl': acl, 'writes': 0, 'marked': False}
+        class Stream(io.BytesIO):
+            def fileno(self):
+                return 17
+        def info(_fd):
+            return SimpleNamespace(st_mode=0o100000 | state['mode'], st_uid=uid, st_gid=gid, st_nlink=nlink, st_size=len(payload))
+        def getxattr(_fd, name):
+            self.assertEqual(name, 'system.posix_acl_access')
+            if state['acl'] is None:
+                raise OSError(errno.ENODATA, 'Synthetic no ACL')
+            return state['acl']
+        def setxattr(_fd, name, value):
+            self.assertEqual(name, 'system.posix_acl_access')
+            state.update(acl=value, mode=0o640, writes=state['writes'] + 1)
+        def fsync(_fd):
+            if fail_fsync:
+                raise OSError('Synthetic durability failure')
+        fake_os = SimpleNamespace(open=lambda *_args: 17, O_RDONLY=0, O_NOFOLLOW=0, fdopen=lambda *_args: Stream(payload),
+                                  fstat=info, getxattr=getxattr, setxattr=setxattr, fsync=fsync)
+        def marked():
+            state['marked'] = True
+        with patch.dict(MODULE['grant_runtime_reader'].__globals__, {'os': fake_os, 'no_links': lambda _path: None}):
+            try:
+                MODULE['grant_runtime_reader']('SYNTHETIC_PATH', expected or MODULE['digest'](payload), marked)
+                state['error'] = None
+            except Exception as error:
+                state['error'] = error
+        return state
+
+    def test_canonical_named_reader_has_no_group_other_or_write_permission(self):
+        value = MODULE['RUNTIME_READ_ACL']
+        self.assertEqual(struct.unpack('<I', value[:4]), (2,))
+        entries = [struct.unpack('<HHI', value[index:index+8]) for index in range(4, len(value), 8)]
+        self.assertEqual(entries, [(1, 6, 0xFFFFFFFF), (2, 4, 999), (4, 0, 0xFFFFFFFF), (16, 4, 0xFFFFFFFF), (32, 0, 0xFFFFFFFF)])
+
+    def test_plain_private_file_becomes_exact_named_reader_acl(self):
+        result = self.fake_grant()
+        self.assertIsNone(result['error'])
+        self.assertEqual((result['mode'], result['acl'], result['writes'], result['marked']), (0o640, MODULE['RUNTIME_READ_ACL'], 1, True))
+
+    def test_exact_existing_reader_acl_is_idempotent(self):
+        result = self.fake_grant(mode=0o640, acl=MODULE['RUNTIME_READ_ACL'])
+        self.assertIsNone(result['error'])
+        self.assertEqual(result['writes'], 0)
+        self.assertFalse(result['marked'])
+
+    def test_unknown_acl_permissions_owner_or_links_fail_before_writes(self):
+        for options in ({'mode': 0o640}, {'acl': b'unknown'}, {'mode': 0o644}, {'uid': 999}, {'gid': 999}, {'nlink': 2}, {'expected': '0' * 64}):
+            with self.subTest(options=options):
+                result = self.fake_grant(**options)
+                self.assertIsInstance(result['error'], MODULE['Guard'])
+                self.assertEqual(result['writes'], 0)
+
+    def test_acl_write_is_recorded_before_later_fsync_failure(self):
+        result = self.fake_grant(fail_fsync=True)
+        self.assertIsInstance(result['error'], OSError)
+        self.assertEqual(result['writes'], 1)
+        self.assertTrue(result['marked'])
 
 
 if __name__ == '__main__':

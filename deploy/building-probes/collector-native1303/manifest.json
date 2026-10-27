@@ -1,15 +1,16 @@
 {
-  "schema": "sccc.telegraf.guarded-apply-candidate.v1",
-  "status": "PreparedNotExecuted",
-  "createdAtUtc": "2026-10-27T03:47:55.626220+00:00",
+  "schema": "sccc.telegraf.guarded-apply-candidate.v2",
+  "status": "PreparedNotApplied",
+  "createdAtUtc": "2026-10-27T04:08:44.516890+00:00",
   "collector": "CiscoDirectoryConnector",
   "collectorIp": "10.0.0.22",
   "tests": {
-    "pureSyntheticTests": 11,
+    "pureSyntheticTests": 16,
     "result": "Passed",
     "pythonSyntax": "Passed",
-    "productionMutationDuringPreparation": false,
-    "realInfluxWritesDuringPreparation": false
+    "nativeReaderPermissionCases": 3,
+    "productionMutationDuringV2Preparation": false,
+    "realInfluxWritesDuringV2Preparation": false
   },
   "nativeEvidence": {
     "path": "../native-fixtures/native-1303-actual-20261027T030519Z.json",
@@ -21,18 +22,23 @@
   "files": [
     {
       "name": "apply_telegraf_probe.py",
-      "bytes": 27949,
-      "sha256": "C351D539CB8B2E4CA9E362A83731C0E01F57F5A94226FF076B32E7D9FB3327D8"
+      "bytes": 31794,
+      "sha256": "879E9BE1B624174548D1760F4BEBBA03EBB7CC22AA112F9CC7EE51F24CEC7BC0"
     },
     {
       "name": "compose-additive-baseline.json",
-      "bytes": 2881,
-      "sha256": "DF8730A9BF3EA52826E3CD49F29D90576C4393364ED48A512AB32D83FAB2A18E"
+      "bytes": 3066,
+      "sha256": "50707738A4C985B921B347E4E289A586ADD6476B51EFF6C02E36B1464CD62BD0"
+    },
+    {
+      "name": "native-reader-actual.json",
+      "bytes": 1330,
+      "sha256": "C365A44F9FBFF559CB560E69236C4E940204A25C59AEC9ECA65D354334B4D0B6"
     },
     {
       "name": "README.md",
-      "bytes": 5520,
-      "sha256": "75502D997A2EB1233E25B5F86D01E07C9B83FAAE4E9EC9C43B91187B147BACFE"
+      "bytes": 6702,
+      "sha256": "068DBD3C52DA74F10016AC1FF2DCA82906FFB79E4AC9650BDE9903EF4616C926"
     },
     {
       "name": "telegraf-building-probes.native1303.conf",
@@ -41,8 +47,13 @@
     },
     {
       "name": "test_apply_candidate.py",
-      "bytes": 9483,
-      "sha256": "E321198126087C0D82578D85EA0EBEE12784F40EB0A07FD4624486D083B2F2FF"
+      "bytes": 12890,
+      "sha256": "0378CDC7A46E46D551CB937D9E3554B1A7EF6AB0BBE44BB08B34F2C3B857B710"
+    },
+    {
+      "name": "test_native_reader_permissions.py",
+      "bytes": 6281,
+      "sha256": "B686BC701314525808F34D50D0529491C6D6AEF3F5B36CBC9290B041C3D0608B"
     },
     {
       "name": "validate_native_telegraf_1303.py",

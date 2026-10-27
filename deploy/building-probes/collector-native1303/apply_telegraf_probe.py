@@ -6,6 +6,7 @@ import argparse
 import copy
 import csv
 import datetime as dt
+import errno
 import hashlib
 import io
 import ipaddress
@@ -18,6 +19,7 @@ import signal
 import socket
 import ssl
 import stat
+import struct
 import subprocess
 import tempfile
 import time
@@ -38,8 +40,12 @@ OLD_CONFIG = '86F741119C6FD70FC7064880DCF7A110D5EBA4CAD456D046FD1559757C12B9E5'
 NEW_CONFIG = '72E76ABB0E8A895526DA690397874A19AFD009A2319EB192101F8B897E6B5CD5'
 INPUT_SHA = 'A56042A70F455FF56AA0D403AFCE630C4CCC5300778D9FF6A23D08420588A501'
 PARSER_SHA = '4680094A44F9F5604DD7223B9329F4A99F9B17BEBC8EA50C3DB429BBE9261F50'
-BASELINE_SHA = 'DF8730A9BF3EA52826E3CD49F29D90576C4393364ED48A512AB32D83FAB2A18E'
-TELEGRAF_ID = '4138a39c7c03a9b636bbd35e9d3054e8f2a5b05f6a7c545c493fb57baa2387d6'
+BASELINE_SHA = '50707738A4C985B921B347E4E289A586ADD6476B51EFF6C02E36B1464CD62BD0'
+TELEGRAF_ID = '8ce06028e4c6d94f0cec3c95b2e09909ea7a80c5416cb9fbf46bfe074477f2cf'
+RUNTIME_UID = RUNTIME_GID = 999
+ACL_XATTR = 'system.posix_acl_access'
+RUNTIME_READ_ACL = struct.pack('<I', 2) + b''.join(struct.pack('<HHI', tag, permissions, identity) for tag, permissions, identity in (
+    (1, 6, 0xFFFFFFFF), (2, 4, RUNTIME_UID), (4, 0, 0xFFFFFFFF), (16, 4, 0xFFFFFFFF), (32, 0, 0xFFFFFFFF)))
 IMAGE = 'sha256:e9fed213aa114dc196fe4cef487e815d7a3e65231cfa5421833b041029e899c6'
 IMAGE_TAG = 'telegraf:1.30'
 NETWORK = '3ba5ca25d485711ce26b07a0cd28b4bb8e59db30152dab8ceb26a00ad6b7a04b'
@@ -95,6 +101,60 @@ def new_file(path, data):
         stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def access_acl(fd):
+    try:
+        return os.getxattr(fd, ACL_XATTR)
+    except OSError as error:
+        if error.errno == errno.ENODATA:
+            return None
+        raise Guard('PosixAclUnavailable') from None
+
+
+def grant_runtime_reader(path, expected, on_changed=None):
+    """Owner-only ACL change on one exact regular file; no group/other access."""
+    no_links(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 1000 or info.st_gid != 1000 or info.st_nlink != 1 or info.st_size > 2 * 1024 * 1024:
+            raise Guard('RuntimeReaderFileMetadataMismatch')
+        data = stream.read(2 * 1024 * 1024 + 1)
+        if digest(data) != expected:
+            raise Guard('RuntimeReaderFileHashMismatch')
+        acl = access_acl(stream.fileno())
+        if stat.S_IMODE(info.st_mode) == 0o600 and acl is None:
+            os.setxattr(stream.fileno(), ACL_XATTR, RUNTIME_READ_ACL)
+            if on_changed is not None:
+                on_changed()
+            os.fsync(stream.fileno())
+        elif stat.S_IMODE(info.st_mode) != 0o640 or acl != RUNTIME_READ_ACL:
+            raise Guard('UnexpectedExistingRuntimeReaderAcl')
+        after = os.fstat(stream.fileno())
+        if (after.st_uid, after.st_gid, after.st_nlink, stat.S_IMODE(after.st_mode)) != (1000, 1000, 1, 0o640) or access_acl(stream.fileno()) != RUNTIME_READ_ACL:
+            raise Guard('RuntimeReaderAclReadbackMismatch')
+        stream.seek(0)
+        if digest(stream.read(2 * 1024 * 1024 + 1)) != expected:
+            raise Guard('RuntimeReaderFileChangedDuringAcl')
+
+
+def reuse_rollback_credential(baseline, token_hash, on_changed=None):
+    evidence = baseline.get('priorRollbackReceipt', {})
+    expected_path = '/home/ITADMIN/.cache/sccc-telegraf-apply-20261027T035025Z/receipt.json'
+    expected_sha = '1CAAE56950EDC01E090F81CB8C8003676D404B7D122A20B498D4E7BAE8BDA818'
+    if evidence != {'path': expected_path, 'sha256': expected_sha}:
+        raise Guard('KnownRollbackEvidenceRequired')
+    prior = json.loads(file_bytes(Path(expected_path), expected_sha, True))
+    if any(prior.get(key) != value for key, value in {'status': 'RolledBack', 'phase': 'RollbackVerified', 'rollbackSourceHashesVerified': True, 'protectedCredentialCreated': True, 'permanentCredentialPath': str(SECRET)}.items()):
+        raise Guard('RollbackCredentialEvidenceMismatch')
+    no_links(SECRET_DIR)
+    info = SECRET_DIR.stat()
+    if not stat.S_ISDIR(info.st_mode) or (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (1000, 1000, 0o700) or set(SECRET_DIR.iterdir()) != {SECRET}:
+        raise Guard('RetainedCredentialDirectoryMismatch')
+    if access_acl(str(SECRET_DIR)) is not None:
+        raise Guard('UnexpectedRetainedDirectoryAcl')
+    grant_runtime_reader(SECRET, token_hash, on_changed)
 
 
 def atomic_replace(path, data, expected_current, on_installed=None):
@@ -196,7 +256,7 @@ def validate_compose(old, proposed):
 def native_validation(stage, token_source, parse_metric, types, run_id):
     name = 'sccc-probe-validate-' + run_id
     args = ['docker', 'run', '--rm', '--pull', 'never', '--name', name, '--label', 'org.sccc.probe-validation=' + run_id,
-            '--network', NETWORK, '--read-only', '--user', '1000:1000', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+            '--network', NETWORK, '--read-only', '--user', str(RUNTIME_UID) + ':' + str(RUNTIME_GID), '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
             '--pids-limit', '64', '--memory', '256m', '--cpus', '0.5', '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=16m',
             '--mount', 'type=bind,src=' + str(stage / 'telegraf-building-probes.native1303.conf') + ',dst=/etc/telegraf/telegraf.conf,readonly',
             '--mount', 'type=bind,src=' + str(token_source) + ',dst=' + TOKEN_DEST + ',readonly',
@@ -369,6 +429,9 @@ def main():
                 raise Guard('RunningContainerBaselineChanged')
         if before['telegraf']['id'] != TELEGRAF_ID:
             raise Guard('OriginalTelegrafContainerChanged')
+        runtime_lines = command(['docker', 'top', TELEGRAF_ID, '-eo', 'uid,gid,comm']).decode().splitlines()
+        if len(runtime_lines) != 2 or runtime_lines[1].split() != [str(RUNTIME_UID), str(RUNTIME_GID), 'telegraf']:
+            raise Guard('ActualTelegrafRuntimeIdentityChanged')
         cached_image()
         old_normalized = normalized_compose(COMPOSE)
         if digest(json.dumps(old_normalized, sort_keys=True, separators=(',', ':')).encode()) != baseline['composeNormalized']['sha256']:
@@ -393,17 +456,17 @@ def main():
         if len(token_bytes) != 43 or not re.fullmatch(rb'[A-Za-z0-9_-]{43}', token_bytes) or not re.fullmatch(r'[A-F0-9]{64}', token_hash) or digest(token_bytes) != token_hash:
             raise Guard('DeliveredExportCredentialDigestMismatch')
         helper = runpy.run_path(str(stage / 'validate_native_telegraf_1303.py'))
+        grant_runtime_reader(stage / 'telegraf-building-probes.native1303.conf', INPUT_SHA)
+        grant_runtime_reader(token_source, token_hash)
         expected = native_validation(stage, token_source, helper['parse_metric'], helper['TYPES'], receipt['runId'])
+        receipt['nativeRuntimeIdentity'] = '999:999'
         receipt['nativeMetricCounts'] = {name: sum(record[0] == name for record in expected) for name in helper['TYPES']}
         influx_secret = influx_access(old_config, TELEGRAF_ID)
         # Read permission is required before any production mutation.
         query_influx(influx_secret, 'from(bucket: "telegraf") |> range(start: -1m) |> filter(fn: (r) => r._measurement == "sccc_building_probe_health") |> limit(n: 1)')
-        if SECRET_DIR.exists() or SECRET_DIR.is_symlink():
-            raise Guard('PermanentCredentialDirectoryAlreadyExists')
-        SECRET_DIR.mkdir(mode=0o700)
-        os.chmod(SECRET_DIR, 0o700)
-        new_file(SECRET, token_bytes)
-        receipt['protectedCredentialCreated'] = True
+        reuse_rollback_credential(baseline, token_hash, lambda: receipt.update(protectedCredentialAclChanged=True))
+        receipt['protectedCredentialReusedFromVerifiedRollback'] = True
+        receipt['protectedCredentialReaderUid'] = RUNTIME_UID
         receipt['permanentCredentialPath'] = str(SECRET)
         if digest(file_bytes(COMPOSE)) != OLD_COMPOSE or digest(file_bytes(CONFIG)) != OLD_CONFIG or inspect_running() != before:
             raise Guard('BaselineChangedAfterValidation')
@@ -458,7 +521,7 @@ def main():
                 if digest(file_bytes(COMPOSE)) != OLD_COMPOSE or digest(file_bytes(CONFIG)) != OLD_CONFIG or restored['grafana'] != before['grafana'] or restored['influxdb'] != before['influxdb'] or restored['telegraf']['imageId'] != IMAGE:
                     raise Guard('RollbackReadbackMismatch')
                 receipt.update(status='RolledBack', phase='RollbackVerified', rollbackSourceHashesVerified=True)
-                receipt['protectedCredentialRetainedUnreferenced'] = receipt.get('protectedCredentialCreated', False)
+                receipt['protectedCredentialRetainedUnreferenced'] = any(receipt.get(key, False) for key in ('protectedCredentialCreated', 'protectedCredentialReusedFromVerifiedRollback', 'protectedCredentialAclChanged'))
             except Exception as rollback_error:
                 receipt.update(status='RollbackRequiresOperator', rollbackErrorCode=str(rollback_error) if isinstance(rollback_error, Guard) else 'RollbackOperationFailed')
     finally:
