@@ -73,7 +73,19 @@ export default function BuildingDiagnostics() {
   const enrollmentStartedAt = useRef(Date.now());
   const enrollmentCheckInDeadlines = useRef(new Map<string, number>());
   const [notice, setNotice] = useState("");
-  const [entryGuid] = useState(() => new URLSearchParams(window.location.search).get("adObjectGuid"));
+  const [entrySelection] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const single = params.get("adObjectGuid"), multiple = params.get("adObjectGuids");
+    const invalid = { guids: [] as string[], multiple: false, error: "The selected receivers did not include a valid selection of up to 100 AD identities. Select computers from the verified inventory below." };
+    if (single !== null && multiple !== null) return invalid;
+    if (single === null && multiple === null) return { guids: [] as string[], multiple: false, error: null };
+    const parts = multiple !== null ? multiple.split(",") : [single!];
+    if (!parts.length || parts.length > 100) return invalid;
+    const validated = parts.map(diagnosticGuid);
+    if (multiple === null && !validated[0]) return { ...invalid, error: "The selected receiver did not include a valid AD computer identity. Select a computer from the verified inventory below." };
+    if (validated.some(guid => !guid)) return invalid;
+    return { guids: [...new Set(validated as string[])], multiple: multiple !== null, error: null };
+  });
   const appliedEntry = useRef(false);
   const [schedulerArmed, setSchedulerArmed] = useState(false);
   const [rotationIntervalMinutes, setRotationIntervalMinutes] = useState(360);
@@ -88,8 +100,9 @@ export default function BuildingDiagnostics() {
   const jobType = measurementType === "auto" ? (data?.externalProbe?.configured ? "external-quick" : "fred") : measurementType;
   const isSustained = jobType === "external-sustained";
   const devices = useMemo(() => (data?.devices || []).filter(d =>
+    (!entrySelection.multiple || !entrySelection.guids.length || entrySelection.guids.includes(d.adObjectGuid.toLowerCase())) &&
     (!building || d.location.building === building) &&
-    `${d.computerName} ${d.loggedOnUser || ""} ${d.location.building || ""}`.toLowerCase().includes(search.toLowerCase())), [data, building, search]);
+    `${d.computerName} ${d.loggedOnUser || ""} ${d.location.building || ""}`.toLowerCase().includes(search.toLowerCase())), [data, building, search, entrySelection]);
   const eligible = (d: Device): d is Device & { deviceId: string } => diagnosticIneligibility(d, jobType) === null;
   const selectedEligible = (data?.devices || []).filter(eligible).filter(d => selected.has(d.deviceId));
   const visibleMeasurements = devices.filter(eligible);
@@ -109,17 +122,25 @@ export default function BuildingDiagnostics() {
     if (!data || appliedEntry.current) return;
     appliedEntry.current = true;
     sessionStorage.removeItem(DIAGNOSTICS_SSO_ATTEMPT_KEY);
-    if (entryGuid === null) return;
-    const guid = diagnosticGuid(entryGuid);
-    if (!guid) { setNotice("The selected receiver did not include a valid AD computer identity. Select a computer from the verified inventory below."); return; }
-    const match = data.devices.find(d => diagnosticGuid(d.adObjectGuid) === guid);
-    if (!match) { setNotice("This AD computer is not in the current diagnostics inventory. Refresh the central AD inventory before enrolling it."); return; }
-    setSearch(match.computerName);
-    const reason = diagnosticIneligibility(match, jobType);
-    if (!data.enabled || reason) { setNotice(`${match.computerName}: ${!data.enabled ? "reporting is not enabled" : reason}. No measurement was started.`); return; }
-    setSelected(new Set([match.deviceId!]));
-    setNotice(`${match.computerName} selected using its verified AD identity. Choose a measurement and review the selection; no test has started.`);
-  }, [data, entryGuid, jobType]);
+    if (entrySelection.error) { setNotice(entrySelection.error); return; }
+    if (!entrySelection.guids.length) return;
+    if (!entrySelection.multiple) {
+      const match = data.devices.find(d => diagnosticGuid(d.adObjectGuid) === entrySelection.guids[0]);
+      if (!match) { setNotice("This AD computer is not in the current diagnostics inventory. Refresh the central AD inventory before enrolling it."); return; }
+      setSearch(match.computerName);
+      const reason = diagnosticIneligibility(match, jobType);
+      if (!data.enabled || reason) { setNotice(`${match.computerName}: ${!data.enabled ? "reporting is not enabled" : reason}. No measurement was started.`); return; }
+      setSelected(new Set([match.deviceId!]));
+      setNotice(`${match.computerName} selected using its verified AD identity. Choose a measurement and review the selection; no test has started.`);
+      return;
+    }
+    const requested = new Set(entrySelection.guids);
+    const matches = data.devices.filter(d => requested.has(diagnosticGuid(d.adObjectGuid) || ""));
+    const available = data.enabled ? matches.filter(d => diagnosticIneligibility(d, jobType) === null) : [];
+    setSelected(new Set(available.map(d => d.deviceId!)));
+    const missing = requested.size - new Set(matches.map(d => d.adObjectGuid.toLowerCase())).size;
+    setNotice(`${available.length} of ${requested.size} unique AD computers selected for measurement; ${matches.length - available.length} currently ineligible and ${missing} absent from the diagnostics inventory. Review the selection and choose Measure selected; no test has started.`);
+  }, [data, entrySelection, jobType]);
   const saveSettings = useMutation({
     mutationFn: async () => {
       const response = await authFetch(`${API}/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schedulerArmed, rotationIntervalMinutes }) });

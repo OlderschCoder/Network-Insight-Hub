@@ -17,7 +17,7 @@ const devices = [computer(1, "AA"), computer(2, "AA"), computer(3, "SU"),
   computer(14, "AA", { deviceId: null, enrolled: false, online: false, adVerified: false }),
   computer(15, "AA", { deviceId: null, enrolled: false, online: false, revoked: true })];
 
-async function portal(page: Page, rows = devices, observedAt = now) {
+async function portal(page: Page, rows = devices, observedAt = now, entryQuery = "") {
   const calls: { enrollment: { requestId: string; adObjectGuids: string[] }[]; measurements: unknown[]; downloads: number } = { enrollment: [], measurements: [], downloads: 0 };
   page.on("download", () => calls.downloads++);
   await page.addInitScript(() => localStorage.setItem("auth_token", "synthetic-session"));
@@ -39,7 +39,7 @@ async function portal(page: Page, rows = devices, observedAt = now) {
     else if (path.includes("/todos") || path.includes("/notifications")) body = [];
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/network/diagnostics");
+  await page.goto("/network/diagnostics" + entryQuery);
   await expect(page.getByRole("heading", { name: "Building speed & computers" })).toBeVisible();
   return calls;
 }
@@ -65,6 +65,32 @@ test("the two master checkboxes are independent and bulk enrollment starts no me
   await expect(page.getByText("The central deployment worker is unavailable.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Measure selected (3)", exact: true })).toBeEnabled();
   expect(calls.measurements).toHaveLength(0); expect(calls.downloads).toBe(0);
+});
+
+test("sender multi-computer handoff deduplicates and selects eligible identities without starting work", async ({ page }) => {
+  const calls = await portal(page, devices, now, `?adObjectGuids=${[guid(1), guid(1).toUpperCase(), guid(3), guid(4), guid(99)].join(",")}`);
+  await expect(page.getByRole("button", { name: "Measure selected (2)", exact: true })).toBeEnabled();
+  await expect(page.getByRole("checkbox", { name: "Select PC-1", exact: true })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Select PC-3", exact: true })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Select PC-4", exact: true })).toBeDisabled();
+  await expect(page.getByRole("checkbox", { name: "Select PC-2", exact: true })).toHaveCount(0);
+  await expect(page.getByText("2 of 4 unique AD computers selected", { exact: false })).toBeVisible();
+  expect(calls.measurements).toHaveLength(0); expect(calls.enrollment).toHaveLength(0);
+});
+
+test("sender handoff rejects malformed or oversized identity selections", async ({ page }) => {
+  const calls = await portal(page, devices, now, `?adObjectGuids=${Array.from({ length: 101 }, (_, n) => guid(n + 1)).join(",")}`);
+  await expect(page.getByRole("button", { name: "Measure selected (0)", exact: true })).toBeDisabled();
+  await expect(page.getByText("valid selection of up to 100 AD identities", { exact: false })).toBeVisible();
+  expect(calls.measurements).toHaveLength(0); expect(calls.enrollment).toHaveLength(0);
+});
+
+test("sender handoff never partly accepts a malformed multi-computer selection", async ({ page }) => {
+  const calls = await portal(page, devices, now, `?adObjectGuids=${guid(1)},not-an-ad-guid`);
+  await expect(page.getByRole("button", { name: "Measure selected (0)", exact: true })).toBeDisabled();
+  await expect(page.getByText("valid selection of up to 100 AD identities", { exact: false })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Select PC-1", exact: true })).not.toBeChecked();
+  expect(calls.measurements).toHaveLength(0); expect(calls.enrollment).toHaveLength(0);
 });
 
 test("select all respects shown filters and renders a partial selection as indeterminate", async ({ page }) => {

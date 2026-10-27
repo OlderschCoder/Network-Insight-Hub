@@ -19,8 +19,8 @@ for node in tree.body:
     definitions.append(node)
 base={};exec(compile(ast.Module(body=definitions,type_ignores=[]),str(library),'exec'),base)
 APP=base['APP'];PUBLIC=base['PUBLIC'];UI=Path('artifacts/it-reporting/src/pages/network/building-diagnostics.tsx')
-OLD='0cf3c7c90175933af7f45e8d57ccf74742abd6bafbcc3d100d2d18c9a7a55f12'
-NEW='a47aee95fd303a11f0f297841ec77a997c26934b0712ce5ba3c93130d6894b80'
+OLD='a47aee95fd303a11f0f297841ec77a997c26934b0712ce5ba3c93130d6894b80'
+NEW='dbb2afeefa0a6f64de33fc57e566db7d683bef62677faf3c784af4670b9e189d'
 digest=base['digest'];metadata=base['metadata'];replace=base['replace_file']
 def pid(): return subprocess.check_output(['systemctl','show','sccc-api.service','-p','MainPID','--value'],text=True).strip()
 def prepare(root):
