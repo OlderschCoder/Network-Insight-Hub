@@ -150,4 +150,16 @@ describe("canonical manual building assignment metadata", () => {
     const audit = client.query.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO building_diagnostics_audit"));
     expect(JSON.parse(audit?.[1][3])).toMatchObject({ groupObjectGuid: childOu.objectGuid, kind: "organizational-unit", directoryPresent: true });
   });
+  it("requires both fresh base AD and independently fresh facts, and reports the original fact time", () => {
+    const inv = withOus(), factTime = new Date(Date.now() - 2 * 3600_000).toISOString();
+    inv.adComputers[0].directory.observedAt = factTime;
+    const result = code.resolveBuildingAssignments(inv, [], [mapping(childOu.objectGuid)]);
+    expect(result.assignments[0]).toMatchObject({ source: "active-directory-ou", directoryObservedAt: factTime });
+    expect(result.directory.observedAt).toBe(factTime); expect(result.directory.adObservedAt).toBe(inv.adObservedAt);
+    const stale = new Date(Date.now() - 25 * 3600_000).toISOString();
+    inv.adComputers[0].directory.observedAt = stale;
+    expect(code.resolveBuildingAssignments(inv, [], [mapping(childOu.objectGuid), mapping(gid)]).groups).toEqual([]);
+    inv.adComputers[0].directory.observedAt = factTime; inv.adObservedAt = stale;
+    expect(code.resolveBuildingAssignments(inv, [], [mapping(childOu.objectGuid)]).assignments).toEqual([]);
+  });
 });

@@ -12,10 +12,11 @@ Conflicting group mappings remain unresolved. Mappings can be edited or cleared,
 including a saved mapping whose group no longer has current members.
 
 The optional directory feed records actual computer DN, canonical path, Location
-and direct group GUID/name/DN. Old publishers remain compatible. Missing facts
-are retained only for the same trusted AD snapshot and unchanged computer identity;
-a new snapshot cannot inherit old facts. Network location and historical results
-remain separate from the assigned building. No AD membership is modified.
+and direct group GUID/name/DN. Old publishers remain compatible. Omitted facts
+are retained for unchanged GUID/name/domain/enabled identities while their original
+observation remains within 24 hours; newer rosters and collector roundtrips never
+renew that timestamp. Network location and historical results remain separate
+from the assigned building. No AD membership is modified.
 
 Writes require the existing network administrator role, an Entra-linked actor,
 fresh AD facts, a reason and an explicit Apply request. Changes are transactional
@@ -66,12 +67,29 @@ server memory. No AD object, membership, permission or schema was changed.
 The paired OU-aware Windows publisher package v2 is signed and prepared, with
 the existing task/credential/ACL preservation checks. It is not applied: the
 publisher laptop's normal management connection is unavailable. Package v1 is
-obsolete. This one-time AD import does not establish continuous OU refresh; a
-newer snapshot from the old exporter can remove optional facts until the signed
-publisher update is applied. Saved building crosswalks and overrides persist.
+obsolete. The old optional-omission publisher remains installed and has not been
+upgraded. This one-time import does not establish continuous OU refresh: the
+compatibility correction below retains facts only until their original 24-hour
+expiry. Saved building crosswalks and overrides persist.
 
 The authenticated UI saved five confirmed computer corrections (Humanities,
 Student Living T, Mansions, Student Living Center and Student Union). A prior
 LP-F6K6S64 assignment needs review following the user's correction to a different,
 non-AD office laptop. The confirmed OU crosswalk plan is retained privately and
 must be recorded as applied only after its data transaction/read-back completes.
+
+## Legacy publisher retention correction — applied
+
+After a newer legacy roster cleared optional OU facts, the API gained a separate
+`directory.observedAt`. Both ingestion paths retain unchanged identities' fresh
+facts without refreshing their age; snapshots and OU defaults use that original
+time and still require a fresh base AD roster. Fifty-six focused unit/HTTP checks
+and 22 disposable PostgreSQL cases passed, with independent source review.
+
+The guarded retention release was applied and verified with API PID 553995;
+artifacts remain in `fred-building-assignment-release-20261027T1103Z-retention`.
+Fresh facts for 675 computers were captured at 11:03:53Z and imported through the
+existing authenticated worker API, with read-back at 11:06:40Z. The old publisher
+is still not upgraded; original fact timestamps expire after 24 hours rather than
+being renewed by its later roster posts. No authorization, mapping or job change
+was part of this compatibility release.

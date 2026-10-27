@@ -100,9 +100,13 @@ export function resolveBuildingAssignments(inv: Inventory | undefined, manualRow
   const groupIndex = new Map<string, GroupFact & { computers: Set<string> }>();
   const memberships = new Map<string, Set<string>>();
   const ouMemberships = new Map<string, string[]>();
+  const factTimes = new Map<string, string>();
   if (current) for (const computer of inv!.adComputers) {
     if (!computer.enabled || computer.domain.toLowerCase() !== "sccc.edu") continue;
     const id = computer.adObjectGuid.toLowerCase(), directory = computer.directory, groups = directory?.memberOf;
+    const observedAt = directory?.observedAt ?? inv!.adObservedAt;
+    if (!directory || !fresh(observedAt, now, 24 * 60 * 60_000)) continue;
+    factTimes.set(id, observedAt);
     const member = new Set<string>();
     for (const group of Array.isArray(groups) ? groups : []) {
       if (!uuid.test(group?.objectGuid || "") || typeof group.name !== "string" || !group.name.trim() || typeof group.distinguishedName !== "string" || !group.distinguishedName.trim()) continue;
@@ -128,7 +132,7 @@ export function resolveBuildingAssignments(inv: Inventory | undefined, manualRow
     const nearestMappedOu = ouMemberships.get(id)?.find(gid => mappings.has(gid));
     if (nearestMappedOu) {
       const mapped = mappings.get(nearestMappedOu)!, { computers: _, ...fact } = groupIndex.get(nearestMappedOu)!;
-      effective.set(id, { adObjectGuid: id, building: mapped.building, source: "active-directory-ou", updatedAt: mapped.updatedAt, updatedBy: mapped.updatedBy, reason: mapped.reason, directoryObservedAt: inv!.adObservedAt, groups: [fact] });
+      effective.set(id, { adObjectGuid: id, building: mapped.building, source: "active-directory-ou", updatedAt: mapped.updatedAt, updatedBy: mapped.updatedBy, reason: mapped.reason, directoryObservedAt: factTimes.get(id)!, groups: [fact] });
       continue;
     }
     const matched = [...member].filter(gid => mappings.has(gid));
@@ -137,14 +141,14 @@ export function resolveBuildingAssignments(inv: Inventory | undefined, manualRow
     if (names.length > 1) { groupConflicts.push({ adObjectGuid: id, reason: "conflicting-group-buildings", buildings: names, groups }); continue; }
     if (names.length === 1) {
       const newest = matched.map(gid => mappings.get(gid)!).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
-      effective.set(id, { adObjectGuid: id, building: names[0], source: "active-directory-group", updatedAt: newest.updatedAt, updatedBy: newest.updatedBy, reason: newest.reason, directoryObservedAt: inv!.adObservedAt, groups });
+      effective.set(id, { adObjectGuid: id, building: names[0], source: "active-directory-group", updatedAt: newest.updatedAt, updatedBy: newest.updatedBy, reason: newest.reason, directoryObservedAt: factTimes.get(id)!, groups });
     }
   }
   return {
     assignments: [...effective.values()].sort((a, b) => a.adObjectGuid.localeCompare(b.adObjectGuid)),
     groups: [...groupIndex.values()].map(({ computers, ...fact }) => ({ ...fact, computerCount: computers.size })).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "organizational-unit" ? -1 : 1) || a.name.localeCompare(b.name) || a.groupObjectGuid.localeCompare(b.groupObjectGuid)),
     groupMappings: [...mappings.values()].sort((a, b) => a.groupObjectGuid.localeCompare(b.groupObjectGuid)), groupConflicts,
-    directory: { observedAt: inv?.adObservedAt || null, current },
+    directory: { observedAt: [...factTimes.values()].sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null, adObservedAt: inv?.adObservedAt || null, current },
   };
 }
 async function buildings() {

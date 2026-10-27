@@ -24,6 +24,7 @@ const observationSchema = z.object({ mac: mac.optional(), bssid: mac.optional(),
 const provisionSchema = z.object({ adObjectGuid: guid, computerName: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/), domain: text, enabled: z.literal(true).optional() }).strict();
 const directoryText = z.string().trim().min(1).max(2048);
 const directorySchema = z.object({ distinguishedName: directoryText, canonicalName: directoryText, location: z.string().trim().max(2048).nullable(),
+  observedAt: timestamp.optional(),
   memberOf: z.array(z.object({ objectGuid: guid, name: text, distinguishedName: directoryText }).strict()).max(128)
     .transform((groups) => [...new Map(groups.map((group) => [group.objectGuid.toLowerCase(), { ...group, objectGuid: group.objectGuid.toLowerCase() }])).values()]),
   organizationalUnits: z.array(z.object({ objectGuid: guid, name: text, distinguishedName: directoryText }).strict()).max(64).optional(),

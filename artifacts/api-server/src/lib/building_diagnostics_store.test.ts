@@ -324,7 +324,7 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.observations).toEqual(current.observations);
     expect((await db.query("SELECT id,building,data FROM building_diagnostics_reports ORDER BY id")).rows).toEqual(reportsBefore);
   });
-  it("preserves omitted directory facts only for the identical AD snapshot and computer identity", async () => {
+  it("preserves omitted directory facts across newer legacy rosters without renewing their observation time", async () => {
     const current = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data;
     const stripped = current.adComputers.map(({ directory: _directory, ...computer }: any) => computer);
     await store.ingest({ ...current, adComputers: stripped });
@@ -334,6 +334,14 @@ describe.skipIf(!configured)("diagnostics Postgres leases and inventory", () => 
     expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers[0].directory).toBeUndefined();
     const newer = new Date(Math.max(Date.now(), Date.parse(current.adObservedAt) + 1)).toISOString();
     await store.ingest({ ...current, adObservedAt: newer, adComputers: stripped });
-    expect((await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers.every((computer: any) => computer.directory === undefined)).toBe(true);
+    const retained = (await db.query("SELECT data FROM building_diagnostics_inventory WHERE id=1")).rows[0].data.adComputers;
+    expect(retained[0].directory).toBeUndefined();
+    expect(retained.slice(1).map((computer: any) => computer.directory.observedAt)).toEqual(current.adComputers.slice(1).map((computer: any) => computer.directory.observedAt));
+    const newerAgain = new Date(Math.max(Date.now(), Date.parse(newer) + 1)).toISOString();
+    await store.ingestAd({ adObservedAt: newerAgain, adComputers: stripped });
+    const readback = await store.adInventory();
+    expect(readback.adComputers.slice(1).map(computer => computer.directory?.observedAt)).toEqual(retained.slice(1).map((computer: any) => computer.directory.observedAt));
+    await store.ingest({ ...current, adObservedAt: newerAgain, adComputers: readback.adComputers });
+    expect((await store.overview()).devices.filter(device => device.directory).every(device => device.directory?.observedAt === current.adObservedAt)).toBe(true);
   });
 });

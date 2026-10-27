@@ -51,10 +51,11 @@ describe("building diagnostics authority boundaries", () => {
   });
   it("accepts actual OU ancestry and rejects duplicate or unrelated OU identities", async () => {
     const unit = { objectGuid: jobId, name: "Library", distinguishedName: "OU=Library,OU=SC-Computers,DC=sccc,DC=edu" };
-    const directory = { distinguishedName: "CN=PC-1,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/Library/PC-1", location: null, memberOf: [], organizationalUnits: [unit] };
+    const directory = { distinguishedName: "CN=PC-1,OU=Library,OU=SC-Computers,DC=sccc,DC=edu", canonicalName: "sccc.edu/SC-Computers/Library/PC-1", location: null, observedAt: new Date(Date.now() - 3600_000).toISOString(), memberOf: [], organizationalUnits: [unit] };
     const post = (facts: any) => request(app()).post(`${path}/ad-inventory`).set("Authorization", `Bearer ${worker}`).send({ snapshotComplete: true, adObservedAt: new Date().toISOString(), adComputers: [{ ...adComputer, directory: facts }] });
     expect((await post(directory)).status).toBe(200);
     expect(store.ingestAd.mock.lastCall?.[0].adComputers[0].directory.organizationalUnits).toEqual([unit]);
+    expect(store.ingestAd.mock.lastCall?.[0].adComputers[0].directory.observedAt).toBe(directory.observedAt);
     for (const units of [[unit, unit], [{ ...unit, distinguishedName: "OU=Elsewhere,DC=sccc,DC=edu" }], [{ ...unit, distinguishedName: "CN=Library,OU=SC-Computers,DC=sccc,DC=edu" }]]) expect((await post({ ...directory, organizationalUnits: units })).status).toBe(400);
     expect((await post({ ...directory, distinguishedName: "CN=Fake\\,OU=Library,OU=SC-Computers,DC=sccc,DC=edu" })).status).toBe(400);
   });

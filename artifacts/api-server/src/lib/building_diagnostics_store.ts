@@ -4,9 +4,22 @@ import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
-export type DirectoryFacts = { distinguishedName: string; canonicalName: string; location: string | null; memberOf: { objectGuid: string; name: string; distinguishedName: string }[]; organizationalUnits?: { objectGuid: string; name: string; distinguishedName: string }[] };
+export type DirectoryFacts = { distinguishedName: string; canonicalName: string; location: string | null; observedAt?: string; memberOf: { objectGuid: string; name: string; distinguishedName: string }[]; organizationalUnits?: { objectGuid: string; name: string; distinguishedName: string }[] };
 export type Inventory = { adObservedAt: string; adComputers: { adObjectGuid: string; computerName: string; domain: string; enabled: boolean; directory?: DirectoryFacts }[]; observations: Observation[]; userBuildingAssignments: Assignment[]; collectorStatus?: CollectorStatus };
 type AdInventory = Pick<Inventory, "adObservedAt" | "adComputers">;
+export function mergeDirectoryFacts(data: AdInventory, previous: Inventory, now = Date.now()) {
+  const old = new Map(previous.adComputers.map(computer => [computer.adObjectGuid.toLowerCase(), computer]));
+  return data.adComputers.map(computer => {
+    const existing = old.get(computer.adObjectGuid.toLowerCase());
+    const retained = computer.directory === undefined && existing?.directory && computer.computerName.toLowerCase() === existing.computerName.toLowerCase() && computer.domain.toLowerCase() === existing.domain.toLowerCase() && computer.enabled === existing.enabled;
+    const directory = computer.directory ?? (retained ? existing!.directory : undefined);
+    // Omitted fields in a legacy roster cannot renew independently observed facts.
+    const observedAt = directory?.observedAt ?? (computer.directory ? data.adObservedAt : previous.adObservedAt);
+    if (directory && fresh(observedAt, now, 24 * 60 * 60_000)) return { ...computer, directory: { ...directory, observedAt } };
+    const { directory: _directory, ...withoutFacts } = computer;
+    return withoutFacts;
+  });
+}
 let schemaReady: Promise<unknown> | undefined;
 export function ensureDiagnosticsSchema() {
   // Lazy, separate schema: normal Fred startup is unchanged while the feature is disabled.
@@ -105,7 +118,8 @@ function adMatch(inv: Inventory, d: any) {
 function directoryFor(inv: Inventory, adObjectGuid: string) {
   const directory = getIndexes(inv).ad.get(adObjectGuid.toLowerCase())?.directory;
   // Directory classifications remain separate from observed physical location.
-  return directory ? { ...directory, source: "active-directory" as const, observedAt: inv.adObservedAt } : null;
+  const observedAt = directory?.observedAt ?? inv.adObservedAt;
+  return directory && fresh(observedAt, Date.now(), 24 * 60 * 60_000) ? { ...directory, source: "active-directory" as const, observedAt } : null;
 }
 function locationFor(heartbeat: Heartbeat, inv: Inventory) {
   const index = getIndexes(inv), observations: Observation[] = [];
@@ -172,7 +186,7 @@ export const diagnosticsStore = {
   async adInventory() {
     await ensureDiagnosticsSchema();
     const inv = await inventory();
-    return { snapshotComplete: !!inv.adObservedAt && inv.adComputers.length > 0, adObservedAt: inv.adObservedAt || null, adComputers: inv.adComputers, fresh: fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000) };
+    return { snapshotComplete: !!inv.adObservedAt && inv.adComputers.length > 0, adObservedAt: inv.adObservedAt || null, adComputers: mergeDirectoryFacts(inv, inv), fresh: fresh(inv.adObservedAt, Date.now(), 24 * 60 * 60_000) };
   },
   async ingestAd(data: AdInventory) {
     await ensureDiagnosticsSchema();
@@ -181,7 +195,7 @@ export const diagnosticsStore = {
       validateAdSnapshot(data, previous);
       // Share the full-inventory transaction lock. A concurrent private SNMP join
       // cannot be erased by an AD-only exporter, nor roll this directory back.
-      const merged: Inventory = { ...data, observations: previous.observations, userBuildingAssignments: previous.userBuildingAssignments,
+      const merged: Inventory = { ...data, adComputers: mergeDirectoryFacts(data, previous), observations: previous.observations, userBuildingAssignments: previous.userBuildingAssignments,
         ...(previous.collectorStatus ? { collectorStatus: previous.collectorStatus } : {}) };
       await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify(merged)]);
     });
@@ -195,15 +209,7 @@ export const diagnosticsStore = {
       validateAdSnapshot(data, previous);
       if (data.collectorStatus && Date.parse(data.collectorStatus.observedAt) > Date.now() + 30_000) throw new DiagnosticsError(409, "Collector observation cannot be in the future");
       if (data.observations.some((o) => Date.parse(o.observedAt) > Date.now() + 30_000 || (o.portTelemetry && Date.parse(o.portTelemetry.observedAt) > Date.now() + 30_000))) throw new DiagnosticsError(409, "Network observation cannot be in the future");
-      // A legacy network collector may omit newly added directory fields. Keep
-      // them only for the identical trusted AD snapshot and immutable identity.
-      const previousAd = getIndexes(previous).ad;
-      const adComputers = data.adComputers.map((computer) => {
-        const existing = previousAd.get(computer.adObjectGuid.toLowerCase());
-        return data.adObservedAt === previous.adObservedAt && computer.directory === undefined && existing?.directory &&
-          computer.computerName.toLowerCase() === existing.computerName.toLowerCase() && computer.domain.toLowerCase() === existing.domain.toLowerCase() && computer.enabled === existing.enabled
-          ? { ...computer, directory: existing.directory } : computer;
-      });
+      const adComputers = mergeDirectoryFacts(data, previous);
       await client.query("INSERT INTO building_diagnostics_inventory(id,data) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET data=$1,updated_at=now()", [JSON.stringify({ ...data, adComputers })]);
     });
     inventoryCache = undefined;
