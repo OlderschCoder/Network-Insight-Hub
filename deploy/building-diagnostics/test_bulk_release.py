@@ -74,5 +74,16 @@ class ReleaseGuards(unittest.TestCase):
         module['boundary_check'] = boundary
         with patch.object(module['time'], 'sleep', lambda _: None): module['restore'](self.release, self.manifest)
         self.assertEqual(2, len(attempts))
+    def test_apply_permission_preflight_refuses_nonroot_before_writes(self):
+        before=module['tree'](self.app)
+        with patch.object(module['os'],'geteuid',lambda:1000,create=True):
+            with self.assertRaisesRegex(RuntimeError,'euid=0'): module['permission_preflight']({},require_root=True)
+        self.assertEqual(before,module['tree'](self.app)); self.assertEqual([],self.restarts)
+    def test_restore_preserves_original_file_permissions(self):
+        module['os'].chmod(self.app/'src/old.ts',0o640)
+        original=module['metadata'](self.app/'src/old.ts')
+        self.manifest['oldSourceMetadata']={'src/old.ts':original,'src/new.ts':None}
+        module['restore'](self.release,self.manifest)
+        self.assertEqual(original,module['metadata'](self.app/'src/old.ts'))
 
 if __name__ == '__main__': unittest.main()

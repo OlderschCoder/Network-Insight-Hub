@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import time
 import urllib.error
@@ -44,6 +45,50 @@ def tree(root):
         elif path.is_symlink():
             raise RuntimeError('Artifact symlink refused: ' + str(path))
     return result
+
+def metadata(path):
+    value=path.stat()
+    return {'uid':value.st_uid,'gid':value.st_gid,'mode':stat.S_IMODE(value.st_mode)}
+
+def metadata_tree(root):
+    return {'.':metadata(root),**{p.relative_to(root).as_posix():metadata(p) for p in sorted(root.rglob('*'))}}
+
+def set_metadata(path,value):
+    current=path.stat()
+    if (current.st_uid,current.st_gid)!=(value['uid'],value['gid']): os.chown(path,value['uid'],value['gid'])
+    os.chmod(path,value['mode'])
+
+def add_metadata(manifest,candidate):
+    manifest['oldSourceMetadata']={r:metadata(APP/r) if (APP/r).exists() else None for r in SOURCE}
+    manifest['parentMetadata']={str(p.relative_to(APP)):metadata(p) for p in {*( (APP/r).parent for r in SOURCE),APP/API_DIST.parent,APP/PUBLIC,APP/PUBLIC/'assets'}}
+    manifest['oldApiMetadata']=metadata_tree(APP/API_DIST)
+    manifest['oldIndexMetadata']=metadata(APP/PUBLIC/'index.html')
+    root_meta=manifest['oldApiMetadata']['.']
+    manifest['newApiMetadata']={r:manifest['oldApiMetadata'].get(r,{'uid':root_meta['uid'],'gid':root_meta['gid'],'mode':0o755 if (candidate/API_DIST/r).is_dir() else 0o644}) for r in metadata_tree(candidate/API_DIST)}
+    manifest['requiresEuid']=0
+
+def permission_preflight(manifest,require_root=False):
+    if require_root and os.geteuid()!=0: raise RuntimeError('Apply/rollback requires approved sudo/root euid=0; no live writes attempted')
+    for relative,value in manifest['parentMetadata'].items():
+        path=APP/relative
+        if path.is_symlink() or not path.is_dir() or metadata(path)!=value: raise RuntimeError('Live parent ownership/mode drift; no permission changes allowed')
+    for relative,value in manifest['oldSourceMetadata'].items():
+        if value is not None and metadata(APP/relative)!=value: raise RuntimeError('Live source ownership/mode drift')
+    if metadata_tree(APP/API_DIST)!=manifest['oldApiMetadata'] or metadata(APP/PUBLIC/'index.html')!=manifest['oldIndexMetadata']: raise RuntimeError('Live artifact ownership/mode drift')
+
+def reuse_candidate(release,prior):
+    manifest=json.loads((prior/'manifest.json').read_text())
+    guard(prior,manifest)
+    candidate=release/'candidate';candidate.mkdir(mode=0o700)
+    shutil.copytree(prior/'candidate'/API_DIST,candidate/API_DIST)
+    for relative in [*SOURCE,str(PUBLIC/'index.html'),*(str(PUBLIC/a) for a in manifest['assets'])]:
+        target=candidate/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(prior/'candidate'/relative,target)
+    add_metadata(manifest,candidate)
+    manifest['reusedFrom']=str(prior);manifest['priorManifestSha256']=digest(prior/'manifest.json');manifest['preparedAt']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+    (release/'manifest.json').write_text(json.dumps(manifest,indent=2))
+    shutil.copy2(prior/'build.log',release/'build.log')
+    guard(release,manifest);permission_preflight(manifest)
+    print(json.dumps({'prepared':str(release),'immutableCandidateReused':True,'requiresEuid':0,'productionChanged':False}))
 
 def inputs():
     paths = []
@@ -86,12 +131,13 @@ def boundary_check(include_bulk=True):
         if request_status('/api/building-diagnostics/devices/bulk-enrollment', 'POST') != 401: raise RuntimeError('Bulk user-session boundary failed')
         if request_status('/api/building-diagnostics/devices/bulk-enrollment/worker/claim', 'POST') != 401: raise RuntimeError('Bulk private-worker boundary failed')
 
-def replace_file(source, destination):
+def replace_file(source, destination, preserve=None):
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + '.bulk-release-new')
     if temporary.exists() or temporary.is_symlink(): raise RuntimeError('Unexpected replacement staging file: ' + str(temporary))
+    target_metadata=preserve or (metadata(destination) if destination.exists() else {**metadata(destination.parent),'mode':0o644})
     shutil.copy2(source, temporary)
-    os.chmod(temporary, 0o644)
+    set_metadata(temporary,target_metadata)
     os.replace(temporary, destination)
 
 def prepare(release):
@@ -130,6 +176,7 @@ def prepare(release):
       'oldSources': {r: digest(APP/r) if (APP/r).exists() else None for r in SOURCE}, 'newSources': {r: digest(candidate/r) for r in SOURCE},
       'oldApi': tree(APP/API_DIST), 'newApi': tree(candidate/API_DIST), 'oldIndex': digest(APP/PUBLIC/'index.html'), 'newIndex': digest(candidate/PUBLIC/'index.html'),
       'assets': {a: digest(candidate/PUBLIC/a) for a in sorted(assets)}, 'productionChanged': False}
+    add_metadata(manifest,candidate)
     (release / 'manifest.json').write_text(json.dumps(manifest, indent=2))
     print(json.dumps({'prepared': str(release), 'sourceInputsPinned': len(before), 'apiArtifacts': len(manifest['newApi']), 'generatedFrontendAssets': len(assets), 'productionChanged': False}))
 
@@ -166,8 +213,8 @@ def restore(release, manifest):
             if (APP/relative).exists():
                 if digest(APP/relative) != manifest['newSources'][relative]: raise RuntimeError('Source changed after apply; manual rollback review required')
                 (APP/relative).unlink()
-        else: replace_file(backup/'source'/relative, APP/relative)
-    replace_file(backup/'index.html', APP/PUBLIC/'index.html')
+        else: replace_file(backup/'source'/relative, APP/relative, manifest.get('oldSourceMetadata',{}).get(relative))
+    replace_file(backup/'index.html', APP/PUBLIC/'index.html', manifest.get('oldIndexMetadata'))
     if old.is_dir() and current_api!=manifest['oldApi']:
         displaced = release/'api-replaced-during-rollback'
         if (APP/API_DIST).is_dir(): os.replace(APP/API_DIST, displaced)
@@ -181,18 +228,25 @@ def restore(release, manifest):
     if tree(APP/API_DIST)!=manifest['oldApi'] or digest(APP/PUBLIC/'index.html')!=manifest['oldIndex']: raise RuntimeError('Rollback artifact hash read-back failed')
     for relative, previous in manifest['oldSources'].items():
         if (digest(APP/relative) if (APP/relative).exists() else None)!=previous: raise RuntimeError('Rollback source hash read-back failed')
+    if 'oldApiMetadata' in manifest: permission_preflight(manifest)
 
 def apply(release, manifest):
     guard(release, manifest)
+    permission_preflight(manifest,require_root=True)
     subprocess.run(['sudo', '-n', 'true'], check=True)
     backup = release/'backup'; backup.mkdir(mode=0o700)
     for relative, previous in manifest['oldSources'].items():
         if previous is not None:
             destination=backup/'source'/relative; destination.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(APP/relative,destination)
     shutil.copy2(APP/PUBLIC/'index.html',backup/'index.html')
+    (backup/'metadata.json').write_text(json.dumps({key:value for key,value in manifest.items() if 'Metadata' in key},indent=2))
     staged = release/'api-staged'; shutil.copytree(release/'candidate'/API_DIST,staged)
+    for relative,value in manifest['newApiMetadata'].items(): set_metadata(staged/relative,value)
+    mutated=False
     try:
-        for relative in SOURCE: replace_file(release/'candidate'/relative,APP/relative)
+        for relative in SOURCE:
+            replace_file(release/'candidate'/relative,APP/relative)
+            mutated=True
         os.replace(APP/API_DIST,release/'api-original')
         os.replace(staged,APP/API_DIST)
         subprocess.run(['sudo','-n','systemctl','restart','sccc-api.service'],check=True,timeout=45)
@@ -211,22 +265,35 @@ def apply(release, manifest):
             if digest(APP/relative)!=value: raise RuntimeError('Installed affected-source hash read-back failed')
         for asset, value in manifest['assets'].items():
             if digest(APP/PUBLIC/asset)!=value: raise RuntimeError('Installed generated-asset hash read-back failed')
+        if metadata_tree(APP/API_DIST)!=manifest['newApiMetadata'] or metadata(APP/PUBLIC/'index.html')!=manifest['oldIndexMetadata']: raise RuntimeError('Installed artifact ownership/mode read-back failed')
+        for relative,value in manifest['oldSourceMetadata'].items():
+            if value is not None and metadata(APP/relative)!=value: raise RuntimeError('Installed source ownership/mode read-back failed')
         (release/'applied.json').write_text(json.dumps({'appliedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'health':'passed','enrollmentRequestsCreated':0,'endpointChanges':False},indent=2))
         print('Applied code only; health/auth/frontend/hash checks passed. No enrollment, endpoint activation, GPO or measurement was requested.')
     except Exception:
-        restore(release,manifest)
+        if mutated: restore(release,manifest)
+        else: print('No live target was mutated; rollback and service restart were not attempted.')
         raise
 
 parser=argparse.ArgumentParser()
-parser.add_argument('mode',choices=['prepare','check','apply','rollback'])
+parser.add_argument('mode',choices=['prepare','reuse','check','apply','rollback'])
 parser.add_argument('release')
+parser.add_argument('--reuse-from')
 args=parser.parse_args()
 release=Path(args.release).resolve()
-if release.parent!=Path('/home/scccadmin') or not release.name.startswith('fred-bulk-enrollment-release-') or not release.is_dir() or release.stat().st_uid!=os.getuid(): raise RuntimeError('Expected this operator owned, private reviewed release directory')
+import pwd
+owner=pwd.getpwnam('scccadmin').pw_uid
+if release.parent!=Path('/home/scccadmin') or not release.name.startswith('fred-bulk-enrollment-release-') or not release.is_dir() or release.stat().st_uid!=owner or os.geteuid() not in {owner,0}: raise RuntimeError('Expected reviewed scccadmin-owned release and operator/root execution')
 os.chmod(release,0o700)
 if args.mode=='prepare': prepare(release)
+elif args.mode=='reuse':
+    prior=Path(args.reuse_from).resolve()
+    if prior.parent!=Path('/home/scccadmin') or not prior.name.startswith('fred-bulk-enrollment-release-') or prior.stat().st_uid!=owner: raise RuntimeError('Invalid reviewed prior release')
+    reuse_candidate(release,prior)
 else:
     manifest=json.loads((release/'manifest.json').read_text())
-    if args.mode=='check': guard(release,manifest); print('Exact live/candidate source and artifact hashes match; no production changes.')
+    if args.mode=='check': guard(release,manifest); permission_preflight(manifest); print('Exact hashes and original ownership/modes match; apply requires sudo/root euid=0; no production changes.')
     elif args.mode=='apply': apply(release,manifest)
-    else: restore(release,manifest)
+    else:
+        if os.geteuid()!=0: raise RuntimeError('Rollback requires approved sudo/root euid=0; no live writes attempted')
+        restore(release,manifest)
