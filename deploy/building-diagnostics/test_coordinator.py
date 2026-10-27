@@ -87,6 +87,13 @@ class PrivateSnmpTests(unittest.TestCase):
         self.assertEqual(len(exclude_shared_port_observations(rows(8))), 8)
         self.assertEqual(exclude_shared_port_observations(rows(9)), [])
         self.assertEqual(exclude_shared_port_observations(rows(158)), [])
+        self.assertEqual(len(exclude_shared_port_observations(rows(8) + [rows(8)[0]])), 8)
+
+    def test_fanout_is_counted_before_location_row_limit(self):
+        shared = [{"switchName": "SWA-AA105", "port": "1/1/51", "mac": f"00:11:22:33:44:{value:02x}"} for value in range(1, 10)]
+        ordinary = [{"switchName": "SWA-AA105", "port": f"1/1/{value}", "mac": f"00:22:33:44:55:{value:02x}"} for value in range(1, 5)]
+        result = exclude_shared_port_observations([shared[0], *ordinary, *shared[1:]], limit=3)
+        self.assertEqual([row["port"] for row in result], ["1/1/1", "1/1/2", "1/1/3"])
 
     def test_high_fanout_suppression_preserves_port_telemetry(self):
         agent = FakeAgent()

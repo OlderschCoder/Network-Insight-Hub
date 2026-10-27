@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-from collections import Counter
 from datetime import datetime, timezone
 import importlib.util
 import ipaddress
@@ -176,10 +175,24 @@ def access_interfaces(snapshot: dict, names: set[str]) -> dict[int, dict]:
     return result
 
 
-def exclude_shared_port_observations(observations: list[dict]) -> list[dict]:
-    """Keep location evidence only for ports with bounded endpoint fan-out."""
-    counts = Counter((row["switchName"], row["port"]) for row in observations)
-    return [row for row in observations if counts[(row["switchName"], row["port"])] <= MAX_EDGE_MACS_PER_PORT]
+def exclude_shared_port_observations(observations: list[dict], limit=MAX_OBSERVATIONS) -> list[dict]:
+    """Keep bounded, unique location evidence only for low-fan-out ports."""
+    macs_by_port: dict[tuple[str, str], set[str]] = {}
+    for row in observations:
+        key = (row["switchName"], row["port"])
+        macs_by_port.setdefault(key, set()).add(str(row["mac"]).lower())
+    shared = {key for key, macs in macs_by_port.items() if len(macs) > MAX_EDGE_MACS_PER_PORT}
+    filtered, seen = [], set()
+    for row in observations:
+        key = (row["switchName"], row["port"])
+        identity = (*key, str(row["mac"]).lower())
+        if key in shared or identity in seen:
+            continue
+        seen.add(identity)
+        filtered.append(row)
+        if len(filtered) >= limit:
+            break
+    return filtered
 
 
 def bounded_process(command: list[str], environment: dict, timeout=15, max_bytes=MAX_OUTPUT) -> tuple[str, str | None]:
@@ -299,8 +312,6 @@ def collect_one(target: dict, agent, previous: dict, boot_id: str, names: set[st
         if not port:
             continue
         observations.append({"mac": ":".join(f"{byte:02x}" for byte in key[1:]), "building": target["building"], "switchName": target["hostname"], "port": port["port"], "source": "switch", "edge": True, "observedAt": observed_at, "portTelemetry": port["telemetry"]})
-        if len(observations) >= MAX_OBSERVATIONS:
-            break
     fdb_ok = all(captures.get(oid, {}).get("text") and not captures[oid]["error"] and not re.search(r"No Such", captures[oid]["text"], re.I) for oid in (FDB_PORT, FDB_STATUS, BRIDGE_MAP)) and bool(bridge) and bool(snapshot.get("interfaces"))
     # A port with many learned endpoint MACs is a downstream aggregation path,
     # even when incomplete interface metadata calls it access and LLDP is silent.
