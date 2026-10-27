@@ -73,10 +73,13 @@ compatibility correction below retains facts only until their original 24-hour
 expiry. Saved building crosswalks and overrides persist.
 
 The authenticated UI saved five confirmed computer corrections (Humanities,
-Student Living T, Mansions, Student Living Center and Student Union). A prior
-LP-F6K6S64 assignment needs review following the user's correction to a different,
-non-AD office laptop. The confirmed OU crosswalk plan is retained privately and
-must be recorded as applied only after its data transaction/read-back completes.
+Student Living T, Mansions, Student Living Center and Student Union), then saved
+and individually read back nine confirmed OU mappings covering 88 unique enabled
+computers. The live editor showed 142 unique populated AD folders. The confirmed
+crosswalk and original AD facts are retained privately; unknown folders were not
+assigned by hostname. A prior LP-F6K6S64 override remains disputed following the
+user's correction to a different, non-AD office laptop. Clearing that one override
+is waiting for the UI's required action-time confirmation.
 
 ## Legacy publisher retention correction — applied
 
