@@ -1,0 +1,1 @@
+{"step": "runtime_identity_with_required_pid", "exit": 0, "exactIdentityMatched": true, "expectedPid": 2166936, "uid": 999, "gid": 999, "processName": "telegraf", "readOnly": true}

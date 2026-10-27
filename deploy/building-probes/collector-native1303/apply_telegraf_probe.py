@@ -237,6 +237,13 @@ def cached_image():
         raise Guard('CachedImageTagChanged')
 
 
+def verify_runtime_identity(container_id, expected_pid):
+    # Docker top itself requires PID in the selected ps columns.
+    lines = command(['docker', 'top', container_id, '-eo', 'uid,gid,pid,comm']).decode().splitlines()
+    if len(lines) != 2 or lines[1].split() != [str(RUNTIME_UID), str(RUNTIME_GID), str(expected_pid), 'telegraf']:
+        raise Guard('ActualTelegrafRuntimeIdentityChanged')
+
+
 def normalized_compose(path):
     args = ['docker', 'compose', '--project-directory', str(ROOT), '-p', 'sccc-ops', '-f', str(path), 'config', '--format', 'json']
     return json.loads(command(args))
@@ -429,9 +436,7 @@ def main():
                 raise Guard('RunningContainerBaselineChanged')
         if before['telegraf']['id'] != TELEGRAF_ID:
             raise Guard('OriginalTelegrafContainerChanged')
-        runtime_lines = command(['docker', 'top', TELEGRAF_ID, '-eo', 'uid,gid,comm']).decode().splitlines()
-        if len(runtime_lines) != 2 or runtime_lines[1].split() != [str(RUNTIME_UID), str(RUNTIME_GID), 'telegraf']:
-            raise Guard('ActualTelegrafRuntimeIdentityChanged')
+        verify_runtime_identity(TELEGRAF_ID, before['telegraf']['pid'])
         cached_image()
         old_normalized = normalized_compose(COMPOSE)
         if digest(json.dumps(old_normalized, sort_keys=True, separators=(',', ':')).encode()) != baseline['composeNormalized']['sha256']:

@@ -226,5 +226,22 @@ class RuntimeReaderAclTests(unittest.TestCase):
         self.assertTrue(result['marked'])
 
 
+class DockerRuntimeIdentityTests(unittest.TestCase):
+    def test_actual_docker_top_format_includes_required_pid_and_matches_identity(self):
+        calls = []
+        def command(args):
+            calls.append(args)
+            return b'UID GID PID COMMAND\n999 999 2166936 telegraf\n'
+        with patch.dict(MODULE['verify_runtime_identity'].__globals__, {'command': command}):
+            MODULE['verify_runtime_identity']('SYNTHETIC_CONTAINER', 2166936)
+        self.assertEqual(calls, [['docker', 'top', 'SYNTHETIC_CONTAINER', '-eo', 'uid,gid,pid,comm']])
+
+    def test_wrong_uid_gid_pid_name_or_extra_process_is_rejected(self):
+        for line in ('1000 999 2166936 telegraf', '999 1000 2166936 telegraf', '999 999 1 telegraf', '999 999 2166936 other', '999 999 2166936 telegraf\n999 999 2 telegraf'):
+            with self.subTest(line=line), patch.dict(MODULE['verify_runtime_identity'].__globals__, {'command': lambda _args: ('UID GID PID COMMAND\n' + line + '\n').encode()}):
+                with self.assertRaises(MODULE['Guard']):
+                    MODULE['verify_runtime_identity']('SYNTHETIC_CONTAINER', 2166936)
+
+
 if __name__ == '__main__':
     unittest.main()
