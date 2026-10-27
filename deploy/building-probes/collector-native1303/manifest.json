@@ -1,0 +1,53 @@
+{
+  "schema": "sccc.telegraf.guarded-apply-candidate.v1",
+  "status": "PreparedNotExecuted",
+  "createdAtUtc": "2026-10-27T03:47:55.626220+00:00",
+  "collector": "CiscoDirectoryConnector",
+  "collectorIp": "10.0.0.22",
+  "tests": {
+    "pureSyntheticTests": 11,
+    "result": "Passed",
+    "pythonSyntax": "Passed",
+    "productionMutationDuringPreparation": false,
+    "realInfluxWritesDuringPreparation": false
+  },
+  "nativeEvidence": {
+    "path": "../native-fixtures/native-1303-actual-20261027T030519Z.json",
+    "sha256": "3DB9E93140062B3595566F026DDED4FC42BA1546AFD442DDFDBF6B5AA82A25E5",
+    "testGathers": 4,
+    "binaryVersion": "1.30.3",
+    "binarySha256": "5860752753B41DB3AA9F05C44902BECEA6C2C4CB9D6BFF1432174B26DE067B04"
+  },
+  "files": [
+    {
+      "name": "apply_telegraf_probe.py",
+      "bytes": 27949,
+      "sha256": "C351D539CB8B2E4CA9E362A83731C0E01F57F5A94226FF076B32E7D9FB3327D8"
+    },
+    {
+      "name": "compose-additive-baseline.json",
+      "bytes": 2881,
+      "sha256": "DF8730A9BF3EA52826E3CD49F29D90576C4393364ED48A512AB32D83FAB2A18E"
+    },
+    {
+      "name": "README.md",
+      "bytes": 5520,
+      "sha256": "75502D997A2EB1233E25B5F86D01E07C9B83FAAE4E9EC9C43B91187B147BACFE"
+    },
+    {
+      "name": "telegraf-building-probes.native1303.conf",
+      "bytes": 4123,
+      "sha256": "A56042A70F455FF56AA0D403AFCE630C4CCC5300778D9FF6A23D08420588A501"
+    },
+    {
+      "name": "test_apply_candidate.py",
+      "bytes": 9483,
+      "sha256": "E321198126087C0D82578D85EA0EBEE12784F40EB0A07FD4624486D083B2F2FF"
+    },
+    {
+      "name": "validate_native_telegraf_1303.py",
+      "bytes": 14995,
+      "sha256": "4680094A44F9F5604DD7223B9329F4A99F9B17BEBC8EA50C3DB429BBE9261F50"
+    }
+  ]
+}

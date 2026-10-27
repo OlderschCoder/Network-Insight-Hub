@@ -2,9 +2,11 @@
 # Reuses its existing outputs.influxdb_v2; this is not a second agent or collector.
 # Supply the independent export token via a protected service-readable token file.
 # export is a bounded recent-window pull. Repeated samples retain original times.
+# Telegraf 1.30.3 requires independent parser inputs; preserve original sample precision.
 [[inputs.http]]
   urls = ["https://app-server2.centralus.cloudapp.azure.com/api/building-probes/results/export?recent=true&limit=1000"]
   interval = "15s"
+  precision = "1ns"
   timeout = "10s"
   method = "GET"
   token_file = "/etc/telegraf/building-probe-export.token"
@@ -32,6 +34,17 @@
         rangeCount = "int"
         linkSpeedBps = "int"
 
+[[inputs.http]]
+  urls = ["https://app-server2.centralus.cloudapp.azure.com/api/building-probes/results/export?recent=true&limit=1000"]
+  interval = "15s"
+  precision = "1ns"
+  timeout = "10s"
+  method = "GET"
+  token_file = "/etc/telegraf/building-probe-export.token"
+  headers = {"Cache-Control" = "no-store"}
+  tagexclude = ["url", "host"]
+  data_format = "json_v2"
+
   [[inputs.http.json_v2]]
     measurement_name = "sccc_building_probe_capacity_window"
     [[inputs.http.json_v2.object]]
@@ -49,6 +62,17 @@
         attemptCount = "int"
         complete = "bool"
         deadlineAtMs = "int"
+
+[[inputs.http]]
+  urls = ["https://app-server2.centralus.cloudapp.azure.com/api/building-probes/results/export?recent=true&limit=1000"]
+  interval = "15s"
+  precision = "1ns"
+  timeout = "10s"
+  method = "GET"
+  token_file = "/etc/telegraf/building-probe-export.token"
+  headers = {"Cache-Control" = "no-store"}
+  tagexclude = ["url", "host"]
+  data_format = "json_v2"
 
   [[inputs.http.json_v2]]
     measurement_name = "sccc_building_probe_health"

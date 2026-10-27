@@ -1,0 +1,4 @@
+# Keep the reviewed input LF and frozen package hashes identical across checkouts.
+telegraf-http.conf.example text eol=lf
+collector-native1303/* -text whitespace=cr-at-eol
+native-fixtures/* -text whitespace=cr-at-eol
