@@ -226,21 +226,40 @@ def collect_snapshot() -> ArubaSnapshot:
 
 
 BUILDING_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"SLC|NorthMansion|SouthMansion", re.I), "Student Living Center"),
+    (re.compile(r"NorthMansion|SouthMansions?", re.I), "Mansions"),
+    (re.compile(r"SLC[- ]?F(?:$|[-\d])", re.I), "Student Living F"),
+    (re.compile(r"SLC[- ]?G(?:$|[-\d])", re.I), "Student Living G"),
+    (re.compile(r"SLC[- ]?H(?:$|[-\d])", re.I), "Student Living H"),
+    (re.compile(r"SLC[- ]?J(?:$|[-\d])", re.I), "Student Living J"),
+    (re.compile(r"SLC[- ]?R(?:$|[-\d])", re.I), "Student Living R"),
+    (re.compile(r"SLC[- ]?S(?:$|[-\d])", re.I), "Student Living S"),
+    (re.compile(r"SLC[- ]?T(?:$|[-\d])", re.I), "Student Living T"),
+    (re.compile(r"SLC", re.I), "Student Living Center"),
     (re.compile(r"COS", re.I), "Cosmetology"),
-    (re.compile(r"CAH|HealthCenter|\bAH", re.I), "Colvin Adult Health"),
-    (re.compile(r"(?:^|[- ])(?:SA|SW|SU|SCC)(?:[- ]|\d)", re.I), "Student Union / Activities"),
-    (re.compile(r"(?:^|[- ])(?:TA|TB|TD|T)(?:[- ]|\d)", re.I), "Technical School"),
+    (re.compile(r"CAH|\bAH(?:[- ]|\d)", re.I), "Allied Health"),
+    (re.compile(r"HealthCenter", re.I), "Student Health Center"),
+    (re.compile(r"(?:^|[- ])V(?:[- ]|\d)", re.I), "Agriculture"),
+    (re.compile(r"(?:^|[- ])TA(?:[- ]|\d)", re.I), "Tech Building A"),
+    (re.compile(r"(?:^|[- ])TB(?:[- ]|\d)", re.I), "Tech Building B"),
+    (re.compile(r"(?:^|[- ])TD(?:[- ]|\d)", re.I), "Tech Building D"),
+    (re.compile(r"(?:^|[- ])T(?:[- ]|\d)", re.I), "Tech Building T"),
+    (re.compile(r"(?:^|[- ])SA(?:[- ]|\d)", re.I), "Student Activities"),
+    (re.compile(r"(?:^|[- ])(?:SU|SW)(?:[- ]|\d)", re.I), "Student Union"),
+    (re.compile(r"(?:^|[- ])SCC(?:[- ]|\d)", re.I), "Sharp Champion Center"),
+    (re.compile(r"(?:^|[- ])B(?:[- ]|\d)", re.I), "Business"),
+    (re.compile(r"(?:^|[- ])M(?:[- ]|\d)", re.I), "Maintenance Building"),
     (re.compile(r"(?:^|[- ])H(?:[- ]|\d)", re.I), "Humanities"),
-    (re.compile(r"(?:^|[- ])(?:AA|A)(?:[- ]|\d)", re.I), "Main Campus"),
+    (re.compile(r"(?:^|[- ])(?:AA|A)(?:[- ]|\d)", re.I), "Hobble"),
     (re.compile(r"West", re.I), "West Campus"),
-    (re.compile(r"SoftBall|GYM|Baseball|Soccer|Stadium", re.I), "Athletics"),
+    (re.compile(r"SoftBall", re.I), "Softball Field"),
+    (re.compile(r"Baseball", re.I), "Baseball Field"),
+    (re.compile(r"GYM", re.I), "Student Activities"),
 )
 GROUP_BUILDINGS = {
     "slc-apgrp": "Student Living Center", "cos-apgrp": "Cosmetology",
-    "ah-apgrp": "Colvin Adult Health", "h-apgrp": "Humanities",
-    "t-apgrp": "Technical School", "a-apgrp": "Main Campus",
-    "s-apgrp": "Student Union / Activities",
+    "ah-apgrp": "Allied Health", "h-apgrp": "Humanities",
+    "t-apgrp": "Industrial Technology Campus", "a-apgrp": "Hobble",
+    "s-apgrp": "Student Union", "e-apgrp": "Epworth ALC",
 }
 
 
@@ -336,7 +355,9 @@ def build_metrics(snapshot: ArubaSnapshot, previous_state: dict[str, Any]) -> tu
         "aps_up": total_up_aps,
         "aps_down": sum(1 for ap in snapshot.aps.values() if not ap["up"]),
         "avg_clients_per_ap": (total_clients / total_up_aps) if total_up_aps else 0.0,
-        "median_clients_per_ap": statistics.median(clients_per_up_ap) if clients_per_up_ap else 0.0,
+        # Influx field types are immutable per measurement. statistics.median()
+        # returns int for an odd sample count, so normalize every write to float.
+        "median_clients_per_ap": float(statistics.median(clients_per_up_ap)) if clients_per_up_ap else 0.0,
         "p95_clients_per_ap": percentile(clients_per_up_ap, 0.95),
         "max_clients_per_ap": max(clients_per_up_ap, default=0),
         "clients_2_4ghz": sum(value for key, value in band_counts.items() if key.startswith("2.4")),

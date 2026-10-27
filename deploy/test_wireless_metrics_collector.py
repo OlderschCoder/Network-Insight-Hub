@@ -17,7 +17,7 @@ class WirelessMetricsParserTests(unittest.TestCase):
                  "Unknown-AP": {"up": True}, "AP-H101": {"up": False, "group": "h-apgrp"}}, radius={})
         result = collector.diagnostics_observations(snapshot, "2026-10-25T20:00:00Z")
         self.assertEqual(result["observations"], [{"source": "wifi", "edge": True,
-            "bssid": "00:11:22:33:44:66", "building": "Main Campus", "observedAt": "2026-10-25T20:00:00Z"}])
+            "bssid": "00:11:22:33:44:66", "building": "Hobble", "observedAt": "2026-10-25T20:00:00Z"}])
         self.assertNotIn("must-not-be-exported", str(result))
 
     def test_diagnostics_sidecar_joins_current_client_mac_without_exporting_username(self):
@@ -66,10 +66,34 @@ class WirelessMetricsParserTests(unittest.TestCase):
         self.assertEqual(collector.counter_delta(3, 100), 3)
         self.assertEqual(collector.counter_delta(3, None), 0)
 
+    def test_summary_median_is_always_a_float_for_influx(self):
+        snapshot = collector.ArubaSnapshot(
+            users=[], bsses={},
+            aps={"AP-AA113": {"ap": "AP-AA113", "up": True, "group": "a-apgrp", "type": "635"}},
+            radius={},
+        )
+        metrics, _ = collector.build_metrics(snapshot, {})
+        summary = next(row for row in metrics if row["measurement"] == "aruba_wireless_summary")
+        self.assertIsInstance(summary["fields"]["median_clients_per_ap"], float)
+
     def test_building_rules(self):
         self.assertEqual(collector.building_for("AAP-SLC-635-9", "slc-apgrp"), "Student Living Center")
+        self.assertEqual(collector.building_for("AP-SLCF", "slc-apgrp"), "Student Living F")
+        self.assertEqual(collector.building_for("AAP-SLCJ", "slc-apgrp"), "Student Living J")
+        self.assertEqual(collector.building_for("AP-CAH143", "ah-apgrp"), "Allied Health")
+        self.assertEqual(collector.building_for("AAP-HealthCenter-2", "h-apgrp"), "Student Health Center")
         self.assertEqual(collector.building_for("AP-COS109", "cos-apgrp"), "Cosmetology")
-        self.assertEqual(collector.building_for("Mystery", "a-apgrp"), "Main Campus")
+        self.assertEqual(collector.building_for("AP-V105-635-AG", "t-apgrp"), "Agriculture")
+        self.assertEqual(collector.building_for("AP-TA121", "t-apgrp"), "Tech Building A")
+        self.assertEqual(collector.building_for("AP-TB152", "t-apgrp"), "Tech Building B")
+        self.assertEqual(collector.building_for("AP-TD109", "t-apgrp"), "Tech Building D")
+        self.assertEqual(collector.building_for("AP-T118", "t-apgrp"), "Tech Building T")
+        self.assertEqual(collector.building_for("AP-SA120", "s-apgrp"), "Student Activities")
+        self.assertEqual(collector.building_for("AP-SU110", "s-apgrp"), "Student Union")
+        self.assertEqual(collector.building_for("SCC-375-1", "s-apgrp"), "Sharp Champion Center")
+        self.assertEqual(collector.building_for("AP-B101", "s-apgrp"), "Business")
+        self.assertEqual(collector.building_for("AP-M205", "s-apgrp"), "Maintenance Building")
+        self.assertEqual(collector.building_for("Mystery", "a-apgrp"), "Hobble")
         self.assertEqual(collector.building_for("Mystery", "default"), "Unknown")
 
     def test_line_protocol_escapes_tags(self):
