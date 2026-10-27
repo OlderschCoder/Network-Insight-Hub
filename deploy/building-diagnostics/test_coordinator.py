@@ -238,7 +238,11 @@ class MetricsTests(unittest.TestCase):
         InfluxClient("http://127.0.0.1:8086", "synthetic-token", "synthetic-org", "telegraf")
         value = dashboard("telegraf")
         self.assertEqual(value["uid"], "sccc-device-performance")
+        self.assertEqual(len(value["panels"]), 15)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in value["panels"]))
+        encoded_performance = json.dumps(value)
+        for field in ("download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"):
+            self.assertIn(field, encoded_performance)
         self.assertNotIn("synthetic-token", json.dumps(value))
 
         wireless = wireless_dashboard("telegraf")

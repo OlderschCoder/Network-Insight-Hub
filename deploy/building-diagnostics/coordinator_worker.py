@@ -185,8 +185,14 @@ def export_reports(influx, results_path: Path, checkpoint_path: Path) -> int:
 def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     bucket_literal = json.dumps(text(bucket, 120))
     panels = []
-    definitions = [("Endpoint download by building (Mbps)", "sccc_device_performance", "download_mbps", "Mbits"),
-                   ("Endpoint upload by building (Mbps)", "sccc_device_performance", "upload_mbps", "Mbits"),
+    definitions = [("Endpoint download by building / computer (Mbps)", "sccc_device_performance", "download_mbps", "Mbits"),
+                   ("Endpoint upload by building / computer (Mbps)", "sccc_device_performance", "upload_mbps", "Mbits"),
+                   ("Endpoint latency by building / computer", "sccc_device_performance", "latency_ms", "ms"),
+                   ("Endpoint request loss by building / computer", "sccc_device_performance", "request_loss_percent", "percent"),
+                   ("External DNS time by building / computer", "sccc_device_performance", "dns_ms", "ms"),
+                   ("External TCP connect time by building / computer", "sccc_device_performance", "tcp_connect_ms", "ms"),
+                   ("External TLS time by building / computer", "sccc_device_performance", "tls_ms", "ms"),
+                   ("External time to first byte by building / computer", "sccc_device_performance", "ttfb_ms", "ms"),
                    ("Access-port received traffic (bps)", "sccc_device_performance_port", "in_bps", "bps"),
                    ("Access-port transmitted traffic (bps)", "sccc_device_performance_port", "out_bps", "bps"),
                    ("Actual access-port error counters", "sccc_device_performance_port", "in_errors", "short"),
@@ -199,7 +205,8 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "{field}") |> group(columns: ["ad_guid"]) |> last() |> map(fn: (r) => ({{r with _value: if r._value then 1 else 0}})) |> group(columns: ["building"]) |> sum()'
         panels.append({"id": index + 1, "title": title, "type": "stat", "description": "Latest authenticated Fred snapshot per AD GUID within fifteen minutes. Missing/stale snapshots remain No data; Unlocated does not claim a current building.", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "targets": [{"refId": "A", "query": query}]})
     query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> group(columns: ["ad_guid", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
-    panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": 0, "y": 32, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
+    table_y = math.ceil(len(panels) / 2) * 8
+    panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
     return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "1m", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint HTTPS measurements and private SNMP access-port evidence. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
 
 
