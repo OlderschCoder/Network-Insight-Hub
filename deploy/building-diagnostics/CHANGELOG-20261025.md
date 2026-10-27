@@ -31,6 +31,7 @@ The earlier staging status above is historical. Current design, verification che
 - Added the SSO-first workbench/native entry, canonical callback routing and verified AD GUID preselection.
 - Added CIO-persisted scheduler arming/revision fences, queue audit, readiness and restricted worker presence projection.
 - Added the separate hourly AD publisher, atomic AD-only exchange, private bounded SNMP/controller correlation, protected report/presence state, Influx export and Grafana dashboard generation.
+- Added guarded reporting release 1.2.2: current Aruba/ClearPass and building panels, atomic two-dashboard provisioning with backups, live Influx/Grafana read-back, and stale Fred performance rejection. Existing Telegraf SNMP targets and endpoint scheduling gates remain unchanged.
 - Added trusted controller client-MAC location support for SYSTEM sessions without BSSID permission; applied only the two reviewed backend files/API build after fresh live hash guards and backup.
 - Named helper/CIO SSO pilot verified; private collector/controller follow-up first cycle, publisher UAC and end-to-end reporting remain separate acceptance steps. Scheduler/sustained gates and fleet rollout remain off.
 - First private cycle subsequently delivered 675 presence points and two reports, with SNMP coverage explicitly degraded. Read-only SW-BB proof led to a tested bounded FDB-bulk follow-up; its successful candidate still yielded no eligible edge ports, so no access policy was relaxed.

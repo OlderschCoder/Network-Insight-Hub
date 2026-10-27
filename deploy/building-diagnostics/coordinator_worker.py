@@ -203,6 +203,96 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "1m", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint HTTPS measurements and private SNMP access-port evidence. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
 
 
+def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
+    """Grafana model for the existing Aruba/ClearPass measurements in Influx.
+
+    Wireless/controller metrics already arrive through their dedicated collector.
+    This dashboard deliberately does not add Fred data to the SNMP input path.
+    """
+    bucket_literal = json.dumps(text(bucket, 120))
+    datasource = {"type": "influxdb", "uid": datasource_uid}
+
+    def query(measurement: str, fields: tuple[str, ...], start="v.timeRangeStart", extra="") -> str:
+        field_filter = " or ".join(f'r._field == "{field}"' for field in fields)
+        return (f'from(bucket: {bucket_literal}) |> range(start: {start}, stop: v.timeRangeStop) '
+                f'|> filter(fn: (r) => r._measurement == "{measurement}" and ({field_filter})) {extra}')
+
+    panels = []
+
+    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None):
+        defaults = {"unit": unit}
+        if thresholds:
+            defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
+        panel = {"id": len(panels) + 1, "title": title, "type": panel_type,
+                 "datasource": datasource, "gridPos": {"x": x, "y": y, "w": w, "h": h},
+                 "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": flux}]}
+        if description:
+            panel["description"] = description
+        panels.append(panel)
+
+    current = ' |> group(columns: ["_field"]) |> last()'
+    add_panel("Current wireless clients", "stat",
+              query("aruba_wireless_summary", ("clients_total",), "-10m", current),
+              0, 0, 4, 4, description="Latest controller total within ten minutes. No data means the collector is stale or unavailable.")
+    add_panel("Authenticated clients", "stat",
+              query("aruba_wireless_summary", ("authenticated_clients",), "-10m", current),
+              4, 0, 4, 4)
+    add_panel("Guest clients", "stat",
+              query("aruba_wireless_summary", ("guest_clients",), "-10m", current),
+              8, 0, 4, 4)
+    add_panel("SCCC + West Wireless", "stat",
+              query("aruba_wireless_summary", ("sccc_wireless_clients", "west_wireless_clients"), "-10m", current),
+              12, 0, 4, 4)
+    add_panel("Clients missing IPv4", "stat",
+              query("aruba_wireless_summary", ("clients_without_ipv4",), "-10m", current),
+              16, 0, 4, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
+    add_panel("APs up / down", "stat",
+              query("aruba_wireless_summary", ("aps_up", "aps_down"), "-10m", current),
+              20, 0, 4, 4, description="Separate current values for APs up and down.")
+
+    add_panel("Clients by SSID", "bargauge",
+              query("aruba_wireless_ssid", ("clients",), "-10m", ' |> group(columns: ["ssid"]) |> last()'),
+              0, 4, 8, 8)
+    add_panel("Clients by building", "bargauge",
+              query("aruba_wireless_building", ("clients",), "-10m", ' |> group(columns: ["building"]) |> last()'),
+              8, 4, 8, 8)
+    add_panel("Average clients per AP by building", "bargauge",
+              query("aruba_wireless_building", ("avg_clients_per_ap",), "-10m", ' |> group(columns: ["building"]) |> last()'),
+              16, 4, 8, 8, unit="none")
+
+    add_panel("Clients without IPv4 by building", "bargauge",
+              query("aruba_wireless_building", ("clients_without_ipv4",), "-10m", ' |> group(columns: ["building"]) |> last()'),
+              0, 12, 8, 8, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
+              description="Use this to localize DHCP/client-address failures. A zero is healthy; No data is unknown.")
+    add_panel("AP availability by building", "bargauge",
+              query("aruba_wireless_building", ("aps_up", "aps_down"), "-10m", ' |> group(columns: ["building", "_field"]) |> last()'),
+              8, 12, 8, 8)
+    add_panel("RADIUS outcomes by server", "timeseries",
+              query("aruba_radius_server", ("accept_delta", "reject_delta", "timeout_delta"), extra=' |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)'),
+              16, 12, 8, 8, description="Accepted, rejected and timed-out authentication activity by on-prem, Azure and VIP target.")
+
+    add_panel("RADIUS response time by server", "timeseries",
+              query("aruba_radius_server", ("avg_response_ms",), extra=' |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)'),
+              0, 20, 12, 8, unit="ms")
+    add_panel("Wireless client trend", "timeseries",
+              query("aruba_wireless_summary", ("clients_total", "guest_clients", "authenticated_clients", "clients_without_ipv4"),
+                    extra=' |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)'),
+              12, 20, 12, 8)
+
+    ap_query = query("aruba_wireless_ap", ("clients", "up"), "-10m",
+                     ' |> group(columns: ["ap", "building", "model", "_field"]) |> last() |> group() '
+                     '|> pivot(rowKey: ["ap", "building", "model", "_time"], columnKey: ["_field"], valueColumn: "_value") '
+                     '|> keep(columns: ["_time", "ap", "building", "model", "clients", "up"])')
+    add_panel("Current AP state", "table", ap_query, 0, 28, 24, 10,
+              description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
+
+    return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
+            "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},
+            "tags": ["SCCC", "wireless", "ClearPass"],
+            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health from the existing private Influx collector. Fred endpoint performance remains on the separate SCCC Device Performance dashboard; SNMP target collection is unchanged.",
+            "panels": panels}
+
+
 def wifi_observations(path: Path | None, now=None) -> tuple[list, bool]:
     if path is None or not path.exists():
         return [], True
@@ -246,6 +336,7 @@ def cycle(client, influx, state_dir: Path, targets: list[dict], agent_path: Path
     atomic_write(inventory_path, json_bytes(inventory))
     atomic_write(state_dir / "collector-snapshot.json", json_bytes(snapshot))
     atomic_write(state_dir / "grafana-device-performance.json", json_bytes(dashboard(bucket)))
+    atomic_write(state_dir / "grafana-wireless-operations.json", json_bytes(wireless_dashboard(bucket)))
     # Keep actual presence/evidence current even if Influx subsequently fails.
     client.request(API + "/inventory", validate_inventory(inventory))
     presence = client.request(API + "/reporting-snapshot")

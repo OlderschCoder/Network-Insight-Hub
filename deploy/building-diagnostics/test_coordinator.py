@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from coordinator_worker import (DATASOURCE_UID, InfluxClient, collector_points, cycle,
                                 dashboard, export_reports, presence_points, report_point, time_ns,
-                                wifi_observations)
+                                wifi_observations, wireless_dashboard)
 from private_snmp_collector import (BRIDGE_MAP, FDB_PORT, FDB_STATUS, IF_TABLE,
                                     IFX_TABLE, access_interfaces, collect_one,
                                     collect_targets, explicit_profiles, load_targets,
@@ -241,6 +241,15 @@ class MetricsTests(unittest.TestCase):
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in value["panels"]))
         self.assertNotIn("synthetic-token", json.dumps(value))
 
+        wireless = wireless_dashboard("telegraf")
+        self.assertEqual(wireless["uid"], "sccc-wireless-overview")
+        self.assertEqual(len(wireless["panels"]), 15)
+        self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
+        encoded = json.dumps(wireless)
+        for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
+            self.assertIn(measurement, encoded)
+        self.assertNotIn("synthetic-token", encoded)
+
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "wifi.json"
@@ -288,6 +297,7 @@ class CoordinatorTests(unittest.TestCase):
             self.assertFalse(any("/jobs" in path for path, _payload in client.calls))
             self.assertTrue(any("sccc_device_performance," in line for line in influx.lines))
             self.assertEqual(read_json(root / "grafana-device-performance.json")["uid"], "sccc-device-performance")
+            self.assertEqual(read_json(root / "grafana-wireless-operations.json")["uid"], "sccc-wireless-overview")
             self.assertEqual(read_json(root / "presence.json")["observedAt"], STAMP)
             self.assertTrue(any("sccc_device_presence," in line for line in influx.lines))
 
