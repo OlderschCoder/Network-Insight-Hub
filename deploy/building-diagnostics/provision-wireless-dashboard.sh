@@ -47,7 +47,7 @@ model = wireless_dashboard(bucket)
 if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 22:
     raise SystemExit('Reviewed dashboard contract does not match.')
 
-destination = dashboard_dir / 'sccc-wireless-operations.json'
+destination = dashboard_dir / 'sccc-wireless-overview.json'
 raw = json.dumps(model, separators=(',', ':')).encode()
 if destination.exists() and (not destination.is_file() or destination.is_symlink()):
     raise SystemExit('Existing dashboard is not a regular file.')
@@ -56,12 +56,12 @@ backup = None
 if changed and destination.exists():
     backup_root = dashboard_dir.parent / 'backups'
     backup_root.mkdir(mode=0o700, exist_ok=True)
-    backup = backup_root / ('sccc-wireless-operations-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.json')
+    backup = backup_root / ('sccc-wireless-overview-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.json')
     if backup.exists():
         raise SystemExit('Dashboard backup path already exists.')
     shutil.copy2(destination, backup)
 if changed:
-    temporary = dashboard_dir / '.sccc-wireless-operations.json.new'
+    temporary = dashboard_dir / '.sccc-wireless-overview.json.new'
     if temporary.exists() or temporary.is_symlink():
         raise SystemExit('Stale dashboard temporary path exists.')
     with temporary.open('xb') as handle:
