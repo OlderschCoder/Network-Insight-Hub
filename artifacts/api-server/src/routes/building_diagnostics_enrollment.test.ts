@@ -35,4 +35,12 @@ describe("protected bulk diagnostics enrollment", () => {
     expect((await request(app()).post(path).set("Authorization", "Bearer fred-session").set("x-role", "network").send({ requestId, adObjectGuids: [id] })).status).toBe(503);
     expect(store.create).not.toHaveBeenCalled();
   });
+  it("supports an optional bounded UUID request filter without changing worker authorization", async () => {
+    expect((await request(app()).post(`${path}/worker/claim`).set("Authorization", `Bearer ${worker}`).send({ workerId: "TEST-WORKER" })).status).toBe(200);
+    expect(store.claim).toHaveBeenLastCalledWith("TEST-WORKER", undefined);
+    expect((await request(app()).post(`${path}/worker/claim`).set("Authorization", `Bearer ${worker}`).send({ workerId: "TEST-WORKER", requestIds: [requestId.toUpperCase(), requestId] })).status).toBe(200);
+    expect(store.claim).toHaveBeenLastCalledWith("TEST-WORKER", [requestId]);
+    for (const requestIds of [[], ["bad-guid"], Array(17).fill(requestId), null, requestId]) expect((await request(app()).post(`${path}/worker/claim`).set("Authorization", `Bearer ${worker}`).send({ workerId: "TEST-WORKER", requestIds })).status).toBe(400);
+    expect(store.claim).toHaveBeenCalledTimes(2);
+  });
 });

@@ -4,6 +4,7 @@ import { externalProbeConfig, fresh, newToken, ONLINE_MS, tokenHash } from "./bu
 import { DiagnosticsError, ensureDiagnosticsSchema, type Inventory } from "./building_diagnostics_store";
 
 export const MAX_ENROLLMENT_DEVICES = 1000;
+export const MAX_ENROLLMENT_REQUEST_FILTER = 16;
 export const enrollmentStatuses = ["queued", "claimed", "installing", "installed", "online", "skipped", "unreachable", "failed"] as const;
 export const enrollmentReasons = ["already-enrolled", "revoked-identity-preserved", "already-queued", "existing-configuration-preserved", "directory-changed", "unsupported-windows", "private-dns-unavailable", "kerberos-unavailable", "identity-mismatch", "payload-signature-invalid", "unsafe-installation-path", "execution-policy-restricted", "trusted-publisher-missing", "execution-policy-review-required", "installation-failed", "task-not-running", "installed-awaiting-check-in", "worker-interrupted-review-required", "credential-delivery-unknown"] as const;
 type Client = Pick<typeof pool, "query">;
@@ -13,6 +14,12 @@ type Evidence = { taskRunning: boolean; taskSystem: boolean; helperVersion: stri
 let ready: Promise<unknown> | undefined;
 const iso = (v: any) => v ? new Date(v).toISOString() : null;
 const hashSelection = (guids: string[]) => createHash("sha256").update([...guids].map(g => g.toLowerCase()).sort().join("\n")).digest("hex");
+
+export function normalizeEnrollmentRequestIds(requestIds?: string[]) {
+  if (requestIds === undefined) return undefined;
+  if (!Array.isArray(requestIds) || !requestIds.length || requestIds.length > MAX_ENROLLMENT_REQUEST_FILTER || requestIds.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) throw new DiagnosticsError(400, "Select valid bulk request IDs within the claim filter limit");
+  return [...new Set(requestIds.map(id => id.toLowerCase()))];
+}
 
 async function schema() {
   await ensureDiagnosticsSchema();
@@ -91,13 +98,14 @@ export const diagnosticsEnrollmentStore = {
     const worker = (await pool.query("SELECT max(last_seen_at) AS seen FROM building_diagnostics_enrollment_workers")).rows[0]?.seen;
     return { requestId, status: counts.queued === items.length ? "queued" : counts.queued + counts.claimed + counts.installing ? "running" : "completed", requested: items.length, queued: counts.queued, counts, items, worker: { ready: fresh(iso(worker), Date.now(), ONLINE_MS), lastSeenAt: iso(worker) } };
   },
-  async claim(workerId: string) {
+  async claim(workerId: string, requestIds?: string[]) {
+    const selectedRequests = normalizeEnrollmentRequestIds(requestIds);
     return transaction(async client => {
       await client.query("INSERT INTO building_diagnostics_enrollment_workers(id) VALUES($1) ON CONFLICT(id) DO UPDATE SET last_seen_at=now()", [workerId]);
       await expireClaims(client);
       const inv = await roster(client);
       const slots = Math.max(0, 4 - Number((await client.query("SELECT count(*) AS n FROM building_diagnostics_enrollment_items WHERE status IN ('claimed','installing')")).rows[0].n));
-      const rows = slots ? (await client.query("SELECT * FROM building_diagnostics_enrollment_items WHERE status='queued' ORDER BY updated_at,computer_name LIMIT $1 FOR UPDATE SKIP LOCKED", [slots])).rows : [];
+      const rows = slots ? (await client.query("SELECT * FROM building_diagnostics_enrollment_items WHERE status='queued' AND ($2::uuid[] IS NULL OR request_id=ANY($2::uuid[])) ORDER BY updated_at,computer_name LIMIT $1 FOR UPDATE SKIP LOCKED", [slots, selectedRequests ?? null])).rows : [];
       const items = [];
       for (const row of rows) {
         const a = inv.adComputers.find(a => a.adObjectGuid.toLowerCase() === row.ad_object_guid && a.enabled && a.computerName.toLowerCase() === row.computer_name.toLowerCase() && a.domain.toLowerCase() === row.domain.toLowerCase());
@@ -107,7 +115,8 @@ export const diagnosticsEnrollmentStore = {
         await client.query("UPDATE building_diagnostics_enrollment_items SET status='claimed',claim_id=$3,claimed_at=now(),updated_at=now() WHERE request_id=$1 AND ad_object_guid=$2", [row.request_id, row.ad_object_guid, claimId]);
         items.push({ requestId: row.request_id, adObjectGuid: row.ad_object_guid, computerName: row.computer_name, domain: row.domain, claimId });
       }
-      return { items, concurrency: 4, policy: { externalProbeOrigin: externalProbeConfig().origin ?? "", permitSustained: false }, measurementsQueued: false };
+      const scope = selectedRequests === undefined ? undefined : { requestIds: selectedRequests, queuedRemaining: Number((await client.query("SELECT count(*) AS n FROM building_diagnostics_enrollment_items WHERE status='queued' AND request_id=ANY($1::uuid[])", [selectedRequests])).rows[0].n) };
+      return { items, concurrency: 4, policy: { externalProbeOrigin: externalProbeConfig().origin ?? "", permitSustained: false }, measurementsQueued: false, ...(scope ? { scope } : {}) };
     });
   },
   async provision(claim: Claim) {
