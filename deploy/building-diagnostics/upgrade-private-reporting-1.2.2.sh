@@ -75,7 +75,7 @@ trap rollback ERR
 
 systemctl enable --now sccc-building-diagnostics-worker.timer
 systemctl start sccc-building-diagnostics-worker.service
-python3 "$release/verify-private-reporting.py" --provision-dashboard --require-current-performance
+python3 "$release/verify-private-reporting.py" --provision-dashboard
 systemctl is-enabled --quiet sccc-building-diagnostics-worker.timer
 systemctl is-active --quiet sccc-building-diagnostics-worker.timer
 trap - ERR

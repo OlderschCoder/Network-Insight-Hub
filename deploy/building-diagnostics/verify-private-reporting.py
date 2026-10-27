@@ -70,10 +70,15 @@ def main():
     performance_current = performance_age_minutes <= 15
     if args.require_current_performance and not performance_current:
         raise ValueError("Fred performance measurements are stale")
-    presence = query(performance_prefix + ' |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "online") |> group(columns: ["ad_guid"]) |> last() |> group() |> count()')
+    current_prefix = bucket_source + " |> range(start: -15m)"
+    presence = query(current_prefix + ' |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "online") |> group(columns: ["ad_guid"]) |> last() |> group() |> count()')
     count = next((int(row["_value"]) for row in presence if row.get("_value", "").isdigit()), 0)
     if count == 0:
-        raise ValueError("No actual AD presence points returned")
+        raise ValueError("No current AD presence points returned")
+    collector = query(current_prefix + ' |> filter(fn: (r) => r._measurement == "sccc_device_performance_collector" and r._field == "switches_observed") |> last()')
+    collector_values = [int(float(row["_value"])) for row in collector if row.get("_value") not in (None, "", "_value")]
+    if not collector_values:
+        raise ValueError("No current private collector point returned")
     wireless = query(bucket_source + ' |> range(start: -10m) |> filter(fn: (r) => r._measurement == "aruba_wireless_summary" and r._field == "clients_total") |> last()')
     if not any(row.get("_value") not in (None, "", "_value") for row in wireless):
         raise ValueError("Current Aruba wireless summary is not visible in Influx")
@@ -150,6 +155,7 @@ def main():
     print(json.dumps({"ok": True, "presenceComputers": count, "throughputValuesMbps": values,
                       "performanceCurrent": performance_current,
                       "performanceAgeMinutes": round(performance_age_minutes, 1),
+                      "collectorSwitchesObserved": max(collector_values),
                       "wirelessCurrent": True, "grafanaDashboards": loaded_dashboards,
                       "grafanaDataFrames": len(frames)}))
 
