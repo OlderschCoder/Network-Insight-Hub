@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from collections import Counter
 from datetime import datetime, timezone
 import importlib.util
 import ipaddress
@@ -32,6 +33,7 @@ COUNTER_DISCONTINUITY = IFX_TABLE + ".19"
 MAX_SAFE = 9007199254740991
 MAX_OUTPUT = 12 * 1024 * 1024
 MAX_OBSERVATIONS = 60000
+MAX_EDGE_MACS_PER_PORT = 8
 MAX_TARGET_WORKERS = 4
 NETWORK_PEER = re.compile(r"switch|router|nexus|arubaos|procurve|ios[- ]xe|cisco ios software|access point|wireless controller", re.I)
 UPLINK = re.compile(r"(?:^|[\s_/-])(?:uplink|trunk|stack|port[- ]?channel|lag|to[-_ ]?sw\w*)(?:$|[\s_/-])", re.I)
@@ -174,6 +176,12 @@ def access_interfaces(snapshot: dict, names: set[str]) -> dict[int, dict]:
     return result
 
 
+def exclude_shared_port_observations(observations: list[dict]) -> list[dict]:
+    """Keep location evidence only for ports with bounded endpoint fan-out."""
+    counts = Counter((row["switchName"], row["port"]) for row in observations)
+    return [row for row in observations if counts[(row["switchName"], row["port"])] <= MAX_EDGE_MACS_PER_PORT]
+
+
 def bounded_process(command: list[str], environment: dict, timeout=15, max_bytes=MAX_OUTPUT) -> tuple[str, str | None]:
     """Bound SNMP output while it is produced; never expose raw stderr."""
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
@@ -294,6 +302,11 @@ def collect_one(target: dict, agent, previous: dict, boot_id: str, names: set[st
         if len(observations) >= MAX_OBSERVATIONS:
             break
     fdb_ok = all(captures.get(oid, {}).get("text") and not captures[oid]["error"] and not re.search(r"No Such", captures[oid]["text"], re.I) for oid in (FDB_PORT, FDB_STATUS, BRIDGE_MAP)) and bool(bridge) and bool(snapshot.get("interfaces"))
+    # A port with many learned endpoint MACs is a downstream aggregation path,
+    # even when incomplete interface metadata calls it access and LLDP is silent.
+    # Preserve its interface telemetry, but never use it as exact endpoint
+    # location evidence. Apply this only after a complete FDB snapshot.
+    observations = exclude_shared_port_observations(observations) if fdb_ok else []
     return {"ok": bool(fdb_ok), "observations": observations, "ports": ports, "counters": counters}
 
 

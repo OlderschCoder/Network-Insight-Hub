@@ -16,8 +16,9 @@ from coordinator_worker import (DATASOURCE_UID, InfluxClient, collector_points, 
                                 wifi_observations, wireless_dashboard)
 from private_snmp_collector import (BRIDGE_MAP, FDB_PORT, FDB_STATUS, IF_TABLE,
                                     IFX_TABLE, access_interfaces, collect_one,
-                                    collect_targets, explicit_profiles, load_targets,
-                                    rate, bounded_process, run_bulkwalk)
+                                    collect_targets, exclude_shared_port_observations,
+                                    explicit_profiles, load_targets, rate,
+                                    bounded_process, run_bulkwalk)
 from pull_worker import API, atomic_write, read_json, validate_inventory
 
 NOW = datetime.now(timezone.utc)
@@ -78,6 +79,27 @@ class PrivateSnmpTests(unittest.TestCase):
         self.assertNotIn("outErrors", row["portTelemetry"])
         self.assertNotIn("inBitsPerSecond", row["portTelemetry"])
         self.assertEqual(row["observedAt"], STAMP)
+
+    def test_high_fanout_port_is_not_endpoint_location_evidence(self):
+        def rows(count):
+            return [{"switchName": "SWA-AA105", "port": "1/1/51", "mac": f"00:11:22:33:44:{value:02x}"} for value in range(count)]
+        self.assertEqual(len(exclude_shared_port_observations(rows(3))), 3)
+        self.assertEqual(len(exclude_shared_port_observations(rows(8))), 8)
+        self.assertEqual(exclude_shared_port_observations(rows(9)), [])
+        self.assertEqual(exclude_shared_port_observations(rows(158)), [])
+
+    def test_high_fanout_suppression_preserves_port_telemetry(self):
+        agent = FakeAgent()
+        learned = {(1, 0, 17, 34, 51, 68, value): "1" for value in range(1, 159)}
+        agent.tables[FDB_PORT] = learned
+        agent.tables[FDB_STATUS] = {key: "3" for key in learned}
+        with patch("private_snmp_collector.stamp", return_value=STAMP), patch("private_snmp_collector.time.monotonic", return_value=100):
+            result = collect_one(TARGET, agent, {}, "boot", {TARGET["hostname"]})
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["observations"], [])
+        self.assertEqual(len(result["ports"]), 1)
+        self.assertEqual(result["ports"][0]["port"], "1/1/2")
+        self.assertEqual(result["ports"][0]["telemetry"]["linkMbps"], 1000)
 
     def test_excludes_lag_trunk_unknown_down_uplink_and_known_lldp_switch_ports(self):
         base = FakeAgent().interface
