@@ -247,11 +247,13 @@ class MetricsTests(unittest.TestCase):
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
-        self.assertEqual(len(wireless["panels"]), 15)
+        self.assertEqual(len(wireless["panels"]), 21)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
         encoded = json.dumps(wireless)
         for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
             self.assertIn(measurement, encoded)
+        self.assertIn("Latest PC performance results", encoded)
+        self.assertIn("sccc_device_performance", encoded)
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):

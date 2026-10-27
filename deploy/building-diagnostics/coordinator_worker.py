@@ -293,10 +293,35 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     add_panel("Current AP state", "table", ap_query, 0, 28, 24, 10,
               description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
 
+    pc_description = ("Fred endpoint test results retain building and computer tags but no username. "
+                      "No recent points means no current endpoint test has reported; it is not a healthy zero.")
+    add_panel("PC download by building / computer", "timeseries",
+              query("sccc_device_performance", ("download_mbps",)),
+              0, 38, 12, 8, unit="Mbits", description=pc_description)
+    add_panel("PC upload by building / computer", "timeseries",
+              query("sccc_device_performance", ("upload_mbps",)),
+              12, 38, 12, 8, unit="Mbits", description=pc_description)
+    add_panel("PC latency by building / computer", "timeseries",
+              query("sccc_device_performance", ("latency_ms",)),
+              0, 46, 8, 8, unit="ms", description=pc_description)
+    add_panel("PC request loss by building / computer", "timeseries",
+              query("sccc_device_performance", ("request_loss_percent",)),
+              8, 46, 8, 8, unit="percent", description=pc_description)
+    add_panel("PC external DNS / TCP / TLS / TTFB", "timeseries",
+              query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms")),
+              16, 46, 8, 8, unit="ms", description=pc_description)
+    pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms",
+                                                          "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
+                     extra=' |> group(columns: ["report_id", "computer", "building", "type", "_field"]) |> last() |> group() '
+                           '|> pivot(rowKey: ["report_id", "computer", "building", "type", "_time"], columnKey: ["_field"], valueColumn: "_value") '
+                           '|> keep(columns: ["_time", "computer", "building", "type", "download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
+    add_panel("Latest PC performance results", "table", pc_table, 0, 54, 24, 10,
+              description=pc_description)
+
     return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
             "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},
             "tags": ["SCCC", "wireless", "ClearPass"],
-            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health from the existing private Influx collector. Fred endpoint performance remains on the separate SCCC Device Performance dashboard; SNMP target collection is unchanged.",
+            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health plus Fred PC performance by building/computer from the existing private Influx data. SNMP target collection is unchanged.",
             "panels": panels}
 
 
