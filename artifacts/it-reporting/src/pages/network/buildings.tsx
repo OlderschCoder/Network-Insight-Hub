@@ -30,6 +30,21 @@ interface BuildingSummary {
   vlanCount: number;
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  performance: BuildingPerformance | null;
+}
+
+interface BuildingPerformance {
+  status: "measured" | "stale" | "failed";
+  recordedAt: string;
+  computerName: string | null;
+  user: string | null;
+  downloadMbps: number | null;
+  uploadMbps: number | null;
+  latencyMs: number | null;
+  lossPercent: number | null;
+  testType: string | null;
+  targetLabel: string | null;
+  error: string | null;
 }
 
 interface NetNodeSummary {
@@ -64,6 +79,7 @@ interface BuildingDetail {
   links: any[];
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  performance: BuildingPerformance | null;
 }
 
 interface OverlayPosition {
@@ -299,6 +315,37 @@ function lineColorForHealth(healthColor: BuildingSummary["healthColor"] | undefi
     default:
       return "#9ca3af";
   }
+}
+
+function formatThroughput(mbps: number | null): string | null {
+  if (mbps === null || !Number.isFinite(mbps)) return null;
+  if (mbps >= 1000) {
+    const gbps = mbps / 1000;
+    return `${gbps >= 10 ? gbps.toFixed(0) : gbps.toFixed(1)} Gbps`;
+  }
+  return `${Math.round(mbps)} Mbps`;
+}
+
+function performanceHeadline(performance: BuildingPerformance | null): string {
+  if (!performance) return "No endpoint baseline yet";
+  if (performance.status === "failed") return "Latest test failed";
+  const download = formatThroughput(performance.downloadMbps);
+  const upload = formatThroughput(performance.uploadMbps);
+  if (!download && !upload) return "No usable speed result";
+  const speed = [download ? `↓ ${download}` : null, upload ? `↑ ${upload}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  return performance.status === "stale" ? `Previous: ${speed}` : speed;
+}
+
+function performanceAge(recordedAt: string): string {
+  const elapsedMs = Date.now() - new Date(recordedAt).getTime();
+  if (!Number.isFinite(elapsedMs)) return "unknown time";
+  const minutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function LiveBadge({ status }: { status: "up" | "degraded" | "down" | "unknown" }) {
@@ -717,7 +764,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
               <div
                 className={`absolute z-10 ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                 style={{ left: `${overlay.x}%`, top: `${overlay.y}%` }}
-                title={`${match?.name ?? overlay.buildingName} — ${style.label}`}
+                title={`${match?.name ?? overlay.buildingName} — ${style.label}${match ? ` — ${performanceHeadline(match.performance)}` : ""}`}
                 onPointerDown={(event) => beginDrag(event, overlay.code)}
               >
                 <div className="relative">
@@ -752,6 +799,11 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                       {match?.name ?? overlay.buildingName}
                     </div>
                     <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
+                    {match && (
+                      <div className="mt-1 text-[9px] font-semibold leading-tight text-foreground">
+                        {performanceHeadline(match.performance)}
+                      </div>
+                    )}
                   </div>}
                 </div>
               </div>
@@ -928,6 +980,22 @@ function BuildingsGrid() {
                           <Server className="h-3 w-3 inline mr-0.5" />{b.nodeCount}
                         </span>
                         <span className="text-xs text-muted-foreground">VLANs: {b.vlanCount}</span>
+                      </div>
+                      <div className={`rounded-md border px-2 py-1.5 text-xs ${
+                        b.performance?.status === "failed"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : b.performance?.status === "stale"
+                            ? "border-amber-200 bg-amber-50 text-amber-800"
+                            : b.performance
+                              ? "border-green-200 bg-green-50 text-green-800"
+                              : "border-gray-200 bg-white/60 text-muted-foreground"
+                      }`}>
+                        <div className="font-semibold">{performanceHeadline(b.performance)}</div>
+                        {b.performance && (
+                          <div className="mt-0.5 truncate opacity-80" title={b.performance.computerName ?? undefined}>
+                            {performanceAge(b.performance.recordedAt)}{b.performance.computerName ? ` · ${b.performance.computerName}` : ""}
+                          </div>
+                        )}
                       </div>
                       <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
                     </div>
@@ -1302,6 +1370,54 @@ function BuildingDetailView({ name }: { name: string }) {
           </div>
         )}
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Activity className="h-5 w-5 text-primary" />
+            Latest endpoint performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {detail.performance ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Download</div>
+                <div className="mt-1 text-2xl font-bold">{formatThroughput(detail.performance.downloadMbps) ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Upload</div>
+                <div className="mt-1 text-2xl font-bold">{formatThroughput(detail.performance.uploadMbps) ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Latency</div>
+                <div className="mt-1 text-2xl font-bold">
+                  {detail.performance.latencyMs === null ? "—" : `${Math.round(detail.performance.latencyMs)} ms`}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Measured from</div>
+                <div className="mt-1 font-semibold">{detail.performance.computerName ?? "Unknown endpoint"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {performanceAge(detail.performance.recordedAt)}
+                  {detail.performance.user ? ` · ${detail.performance.user}` : ""}
+                </div>
+              </div>
+              {detail.performance.status !== "measured" && (
+                <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {detail.performance.status === "failed"
+                    ? `Latest test failed${detail.performance.error ? `: ${detail.performance.error}` : "."}`
+                    : "This result is older than 12 hours and should be treated as historical."}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No network-confirmed endpoint baseline is available for this building yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="devices">
