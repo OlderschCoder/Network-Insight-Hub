@@ -230,7 +230,8 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
 
     panels = []
 
-    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None, display_name=None):
+    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None,
+                  display_name=None, overrides=None):
         defaults = {"unit": unit}
         if thresholds:
             defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
@@ -238,7 +239,8 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
             defaults["displayName"] = display_name
         panel = {"id": len(panels) + 1, "title": title, "type": panel_type,
                  "datasource": datasource, "gridPos": {"x": x, "y": y, "w": w, "h": h},
-                 "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": flux}]}
+                 "fieldConfig": {"defaults": defaults, "overrides": overrides or []},
+                 "targets": [{"refId": "A", "query": flux}]}
         if description:
             panel["description"] = description
         panels.append(panel)
@@ -300,15 +302,19 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
 
     pc_description = ("Fred endpoint test results identify building, last known logged-on user and computer. "
+                      "Throughput automatically displays in Mbps or Gbps; latency is milliseconds and loss is percent. "
                       "Missing user identity is shown as Unknown user. No recent point is not a healthy zero.")
-    pc_series = ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) |> group(columns: ["building", "user", "computer", "_field"])'
+    pc_series = (' |> map(fn: (r) => ({r with '
+                 '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
+                 'user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
+                 '|> group(columns: ["building", "user", "computer", "_field"])')
     pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer}"
     add_panel("PC download by building / user / computer", "timeseries",
               query("sccc_device_performance", ("download_mbps",), extra=pc_series),
-              0, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+              0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC upload by building / user / computer", "timeseries",
               query("sccc_device_performance", ("upload_mbps",), extra=pc_series),
-              12, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+              12, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC latency by building / user / computer", "timeseries",
               query("sccc_device_performance", ("latency_ms",), extra=pc_series),
               0, 46, 8, 8, unit="ms", description=pc_description, display_name=pc_display)
@@ -320,20 +326,41 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               16, 46, 8, 8, unit="ms", description=pc_description,
               display_name=pc_display + " · ${__field.labels._field}")
     building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms"),
-                           extra=' |> group(columns: ["building", "computer", "_field"]) |> last() '
+                           extra=' |> map(fn: (r) => ({r with _value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value})) '
+                                 '|> group(columns: ["building", "computer", "_field"]) |> last() '
                                  '|> group(columns: ["building", "_field"]) |> mean() |> group() '
                                  '|> pivot(rowKey: ["building"], columnKey: ["_field"], valueColumn: "_value") '
                                  '|> keep(columns: ["building", "download_mbps", "upload_mbps", "latency_ms"])')
+    speed_table_overrides = [
+        {"matcher": {"id": "byName", "options": "building"},
+         "properties": [{"id": "displayName", "value": "Building"}]},
+        {"matcher": {"id": "byName", "options": "download_mbps"},
+         "properties": [{"id": "displayName", "value": "Download"}, {"id": "unit", "value": "bps"},
+                        {"id": "decimals", "value": 1}]},
+        {"matcher": {"id": "byName", "options": "upload_mbps"},
+         "properties": [{"id": "displayName", "value": "Upload"}, {"id": "unit", "value": "bps"},
+                        {"id": "decimals", "value": 1}]},
+        {"matcher": {"id": "byName", "options": "latency_ms"},
+         "properties": [{"id": "displayName", "value": "Latency"}, {"id": "unit", "value": "ms"},
+                        {"id": "decimals", "value": 1}]},
+    ]
     add_panel("Building PC speed summary", "table", building_speed, 0, 54, 24, 9,
-              description="Average of each computer's latest result in the selected time range, grouped by building.")
+              description="Average of each computer's latest result in the selected time range, grouped by building. Throughput automatically displays in Mbps or Gbps.",
+              overrides=speed_table_overrides)
     pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms",
                                                           "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
-                     extra=' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
+                     extra=' |> map(fn: (r) => ({r with '
+                           '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
+                           'user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
                            '|> group(columns: ["report_id", "computer", "building", "user", "type", "_field"]) |> last() |> group() '
                            '|> pivot(rowKey: ["report_id", "computer", "building", "user", "type", "_time"], columnKey: ["_field"], valueColumn: "_value") '
                            '|> keep(columns: ["_time", "building", "user", "computer", "type", "download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
     add_panel("Latest PC performance results", "table", pc_table, 0, 63, 24, 10,
-              description=pc_description)
+              description=pc_description, overrides=speed_table_overrides + [
+                  {"matcher": {"id": "byName", "options": "request_loss_percent"},
+                   "properties": [{"id": "displayName", "value": "Loss"}, {"id": "unit", "value": "percent"},
+                                  {"id": "decimals", "value": 1}]},
+              ])
 
     return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
             "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},

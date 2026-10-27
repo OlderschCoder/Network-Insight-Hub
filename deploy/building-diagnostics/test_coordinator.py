@@ -260,6 +260,10 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("Building PC speed summary", encoded)
         self.assertIn("Unknown user", encoded)
         self.assertIn("sccc_device_performance", encoded)
+        self.assertIn('"unit": "bps"', encoded)
+        self.assertIn('"value": "Download"', encoded)
+        self.assertIn('"value": "Latency"', encoded)
+        self.assertIn("Throughput automatically displays in Mbps or Gbps", encoded)
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):
