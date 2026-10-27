@@ -44,7 +44,7 @@ if not bucket:
 sys.path.insert(0, str(bundle))
 from coordinator_worker import DATASOURCE_UID, wireless_dashboard
 model = wireless_dashboard(bucket)
-if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 24:
+if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 26:
     raise SystemExit('Reviewed dashboard contract does not match.')
 
 destination = dashboard_dir / 'sccc-wireless-overview.json'
@@ -110,10 +110,10 @@ for _ in range(20):
                     'PC external DNS / TCP / TLS / TTFB', 'Building PC speed summary',
                     'Latest PC performance results', 'ClearPass Overall Health',
                     'ClearPass Server Health'}
-        if len(loaded.get('panels', [])) == 24 and required <= titles:
+        if len(loaded.get('panels', [])) == 26 and required <= titles:
             break
     time.sleep(2)
-if not loaded or len(loaded.get('panels', [])) != 24 or not required <= titles:
+if not loaded or len(loaded.get('panels', [])) != 26 or not required <= titles:
     raise SystemExit('Grafana did not load the reviewed dashboard.')
 
 for key in ('INFLUX_URL', 'INFLUX_TOKEN', 'INFLUX_ORG'):
@@ -138,7 +138,7 @@ pc = influx(source + ' |> range(start: -7d) |> filter(fn: (r) => r._measurement 
 for label, rows in (('wireless', wireless), ('PC', pc)):
     if not any(row.get('_value') not in (None, '', '_value') for row in rows):
         raise SystemExit('Influx did not return expected ' + label + ' data.')
-print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 24, 'changed': changed,
+print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 26, 'changed': changed,
                   'backup': str(backup) if backup else None, 'grafanaDatabase': 'loaded',
                   'wirelessRows': len(wireless), 'pcRows': len(pc)}))
 PY

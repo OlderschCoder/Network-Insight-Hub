@@ -7,3 +7,4 @@
 - Changed refresh from two hours to one minute and moved the dashboard to a version-controlled file provider.
 - Preserved a full Grafana database backup and the original live dashboard JSON before provisioning.
 - Added explicit ClearPass overall and per-server health panels. Missing/stale nodes are unhealthy; degraded response/timeouts are warning; healthy requires fresh low-latency data with no new timeouts.
+- Replaced misleading Grafana default red coloring on neutral client counts with blue and split the ambiguous AP total into labeled `APs Up` and `APs Down` health tiles.

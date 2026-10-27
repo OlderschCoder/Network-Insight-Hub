@@ -231,8 +231,10 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     panels = []
 
     def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None,
-                  display_name=None, overrides=None, mappings=None, options=None):
+                  display_name=None, overrides=None, mappings=None, options=None, color=None):
         defaults = {"unit": unit}
+        if color:
+            defaults["color"] = {"mode": "fixed", "fixedColor": color}
         if thresholds:
             defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
         if display_name:
@@ -252,22 +254,31 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     current = ' |> group(columns: ["_field"]) |> last()'
     add_panel("Current wireless clients", "stat",
               query("aruba_wireless_summary", ("clients_total",), "-10m", current),
-              0, 0, 4, 4, description="Latest controller total within ten minutes. No data means the collector is stale or unavailable.")
+              0, 0, 3, 4, color="blue",
+              description="Latest controller total within ten minutes. This is a neutral count; No data means the collector is stale or unavailable.")
     add_panel("Authenticated clients", "stat",
               query("aruba_wireless_summary", ("authenticated_clients",), "-10m", current),
-              4, 0, 4, 4)
+              3, 0, 3, 4, color="blue")
     add_panel("Guest clients", "stat",
               query("aruba_wireless_summary", ("guest_clients",), "-10m", current),
-              8, 0, 4, 4)
-    add_panel("SCCC + West Wireless", "stat",
-              query("aruba_wireless_summary", ("sccc_wireless_clients", "west_wireless_clients"), "-10m", current),
-              12, 0, 4, 4)
+              6, 0, 3, 4, color="blue")
+    add_panel("SCCC Wireless clients", "stat",
+              query("aruba_wireless_summary", ("sccc_wireless_clients",), "-10m", current),
+              9, 0, 3, 4, color="blue")
+    add_panel("West Wireless clients", "stat",
+              query("aruba_wireless_summary", ("west_wireless_clients",), "-10m", current),
+              12, 0, 3, 4, color="blue")
     add_panel("Clients missing IPv4", "stat",
               query("aruba_wireless_summary", ("clients_without_ipv4",), "-10m", current),
-              16, 0, 4, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
-    add_panel("APs up / down", "stat",
-              query("aruba_wireless_summary", ("aps_up", "aps_down"), "-10m", current),
-              20, 0, 4, 4, description="Separate current values for APs up and down.")
+              15, 0, 3, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
+    add_panel("APs Up", "stat",
+              query("aruba_wireless_summary", ("aps_up",), "-10m", current),
+              18, 0, 3, 4, thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
+              description="Current APs reporting up. Zero is unhealthy; missing telemetry remains No data.")
+    add_panel("APs Down", "stat",
+              query("aruba_wireless_summary", ("aps_down",), "-10m", current),
+              21, 0, 3, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
+              description="Current APs reporting down. Any nonzero value is unhealthy and should be investigated.")
 
     add_panel("Clients by SSID", "bargauge",
               query("aruba_wireless_ssid", ("clients",), "-10m", ' |> group(columns: ["ssid"]) |> last()'),
