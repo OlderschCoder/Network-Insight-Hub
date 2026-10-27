@@ -95,6 +95,12 @@ export function getNavGroups(
         icon: Gauge,
       },
       {
+        href: "/network/building-probes",
+        label: "GPO Monitor",
+        desc: "Selected building computers, SCCC Key & Alert, and paging tests",
+        icon: Activity,
+      },
+      {
         href: "/it-apps/cisco-calling",
         label: "Cisco Webex Phones",
         desc: "Phone directory, device status, buildings, and E-911",

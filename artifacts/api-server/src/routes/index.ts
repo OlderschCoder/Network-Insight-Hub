@@ -34,6 +34,7 @@ import learnRouter from "./learn";
 import teamTodosRouter from "./team_todos";
 import printersRouter from "./printers";
 import buildingDiagnosticsRouter from "./building_diagnostics";
+import buildingProbesRouter from "./building_probes";
 
 const router: IRouter = Router();
 
@@ -62,6 +63,7 @@ router.use("/cio-shadow-notes", cioShadowNotesRouter);
 router.use("/fred-files", fredFilesRouter);
 router.use("/network/printers", printersRouter);
 router.use("/building-diagnostics", buildingDiagnosticsRouter);
+router.use("/building-probes", buildingProbesRouter);
 router.use("/network/configs", deviceConfigsRouter);
 router.use("/network", networkNodesRouter);
 router.use("/incidents", incidentsRouter);

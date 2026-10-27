@@ -16,8 +16,10 @@ describe("primary navigation", () => {
       "Buildings",
       "Network Map",
       "Monitoring",
+      "GPO Monitor",
       "Cisco Webex Phones",
       "Azure",
+      "Building Speed & Computers",
       "Network Tools",
     ]);
   });

@@ -2,10 +2,6 @@
 
 A step-by-step guide to using the platform. The IT team uses this app to record daily and weekly work, track tasks and projects, log risks and incidents, keep network and Azure inventory, and roll everything up into weekly executive reports for the CIO.
 
-New to the rearranged portal? Open **Troubleshooting → Quick Start** for the
-10-minute version. It explains the top-menu categories, the daily work loop,
-supervised Zendesk drafting, and how to teach Fred.
-
 ---
 
 ## 1. Signing in
@@ -19,24 +15,22 @@ supervised Zendesk drafting, and how to teach Fred.
 
 ## 2. Getting around (navigation)
 
-Use the top menu to move between the Hub's major work areas. You can also use
-Search in the header when you know the destination by name.
+The Home page presents four first-class workspaces: **Status & Reporting**, **Campus Technology**, **IT Apps**, and **Troubleshooting**. Select **Applications** to open the complete App Directory.
 
-The top menu is organized into category dropdowns. Click a **category title**
-to open its landing page; click its separate chevron to open the category's
+On inner pages, use the fixed sidebar or the workspace switcher at its top. **Apps** remains visible in that switcher from every workspace. Search in the top header can also find a destination by name.
+
+The fixed sidebar is organized into category dropdowns. Click a **category title**
+to open its landing page; click the separate chevron to expand or collapse its
 options:
 
 - **Status & Reporting** — Status Dashboard and Weekly Reports
 - **Campus Technology** — Buildings, Network Map, Monitoring, Cisco Webex Phones, Azure, and role-restricted Network Tools
-- **Troubleshooting** — Quick Start, Support Center, Zendesk Monitor, Incident Rooms, Risks & Issues, Post-Incident Reviews, Process Library, Learn, and the full User Guide
+- **Troubleshooting** — Support Center, Incident Rooms, Risks & Issues, Post-Incident Reviews, Process Library, and Learn
 - **My Work** — To-do List, Completed Work, and Weekly Log
 - **IT Apps** — App Directory, Banner, and High School Students
 - **Administration** (CIO) — Projects, Department Goals, Usage Analytics, and Admin
 
-The header also has a persistent **Fred** shortcut. Fred can list your accessible
-to-dos and, after you confirm the exact change, create, edit, or complete them.
-Mark and Tracy can also ask Fred to move a to-do to another team member.
-Dashboard actions live together in the Quick Actions card.
+The header also has a persistent **Fred** shortcut. Dashboard actions live together in the Quick Actions card.
 
 ### Dashboard ticket counts and Cisco Webex Phones
 
@@ -47,9 +41,8 @@ Dashboard actions live together in the Quick Actions card.
 
 1. Open **Campus Technology → Buildings**. Start on the live campus map; select a building marker to drill in. The same health-sorted building cards appear immediately below the map.
 2. Select a building card—or its marker on the campus map—to open the building detail page.
-3. Mark and Tracy can select **Edit Map**, change **Building visibility**, drag markers, and choose **Save Map**. The saved view is used by both Buildings and Monitoring. Mansions is shown by default.
-4. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
-5. Use **Campus Technology → Network Map → Port Map** for the unfiltered, campus-wide engineering view.
+3. Review the building's **Devices**, **VLANs**, or **Port Map** tab. The Port Map is scoped to that building's switches and stacks while retaining physical interface and LLDP/CDP evidence.
+4. Use **Campus Technology → Network Map → Port Map** for the unfiltered, campus-wide engineering view.
 
 Long dropdown lists are height-limited and scrollable. Use the mouse wheel, the visible scrollbar, arrow keys, Page Up/Page Down, or type the first letters of a switch name to move through the list.
 
@@ -76,16 +69,11 @@ At the end of the week, consolidate your work.
 
 1. Open **Weekly Log**.
 2. Create or **generate** the current week's entry — all of that week's **Completed Work items are rolled in automatically**.
-3. Wait for **Zendesk Tickets You Resolved This Week** to finish loading, then review the linked tickets.
-4. Add the headline, summary, challenges, and support needed.
-5. Choose **Save Draft** if you are still working, or **Submit Weekly Log** to include it in the department report.
+3. Review, add accomplishments/challenges/support-needed, and **submit**.
 
 Notes:
 
 - There is **one weekly log per person per week**.
-- A draft is visible to the CIO but is not included in the department rollup until it is submitted.
-- If Zendesk cannot load, save a draft and click **Retry tickets** before submitting; the app will not silently submit an incomplete ticket list.
-- Solved tickets stay with the week in which they were solved, even if someone updates the ticket later.
 - Once rolled in, past logs stay stable even if you edit the underlying items later.
 - To write a log directly, use **Weekly Log → New**.
 
@@ -117,58 +105,18 @@ These can be included in the relevant week's report so leadership sees lessons l
 
 ---
 
-## 7. Troubleshooting, systems, and tools
-
-### Zendesk Monitor
-
-1. Open **Troubleshooting → Zendesk Monitor** to watch the open conversation queue and select a ticket.
-2. Mark, Tracy, or the CIO can use the two supervisor switches to turn **Fred drafting** and **Zendesk replies** on or off for everyone. Each change requires confirmation and records who changed it.
-3. Select **Prepare open drafts** to let Fred review up to 25 loaded open tickets one at a time. She skips existing drafts, pending tickets, staff-last replies, internal-only activity, and escalation-only cases. The progress panel shows saved, skipped, and failed totals; nothing sends.
-4. Read the live Conversation Log, then select **Draft with Fred** for a single ticket. Fred saves the suggested response in the shared approval queue; she does not send it.
-5. Edit Fred's draft, replace it with your own response, or select **Save for approval** so another signed-in team member can review it.
-6. For email, web form, and other Support tickets, select **Approve & send** and approve the exact saved draft.
-7. For a Messaging ticket, select **Copy & open Zendesk**, paste the copied draft into the Zendesk Messaging composer, review it, and send it there. Insights will not falsely report a Messaging ticket comment as delivered chat.
-8. Use **Zendesk** in the ticket header whenever you need the full native agent workspace.
-9. To hand off the issue, choose an active teammate under **Escalate to a team member**, add an optional private note, then review and confirm the reassignment.
-
-Fred's SCCC ticket-drafting rules:
-
-- Read the complete ticket and do not repeat questions the requester already answered.
-- Zendesk already supplies the requester's name and email address. Do not ask for either again when it is present in the ticket.
-- SCCC wireless uses the requester's SCCC network username and password. Fred may tell the requester which credentials to use, but must never ask them to send, paste, or disclose the password or an MFA code.
-- SCCC IT can add, remove, or update Microsoft 365 (Office 365) licenses. Ask only which application or entitlement is missing when the ticket does not already say.
-- For an active-student password-reset or locked-account ticket, a CIO or help-desk operator can open **Fred**, provide the exact Zendesk ticket ID plus the student's legal name, full 800 number, and SCCC username, and identify the independent verification method used: in-person photo ID, callback to a number already on file, or live video with photo ID. The values in the ticket are matching data, not independent proof. Fred verifies that the ticket is active, presents the exact proposed action, and waits for confirmation before preparing a ten-minute, single-use OnlineKiosk link. Fred then saves the link response to that same ticket's supervised draft queue without sending or replacing an existing pending draft. The student opens the approved link and chooses the password privately. Never put a password, MFA code, or Temporary Access Pass in Fred or Zendesk.
-
-The queue and shared drafts refresh every 15 seconds; the selected Conversation
-Log refreshes every 5 seconds. Every public reply is confirmation-gated in both
-the interface and the server API, so the operator can always stop or override
-Fred.
-Fred can also recommend an escalation in chat and, after you approve the exact
-assignee, reassign the Zendesk ticket to that team member.
-Only say the account is unlocked after the student completes the assisted reset.
-Completing that reset clears Entra Smart Lockout. It does not
-re-enable an account that was administratively disabled or made ineligible by
-the student source of truth; escalate those cases for eligibility review.
-Turning **Zendesk replies** off blocks public comments at the server even if a
-browser is stale. Turning **Fred drafting** off also blocks Fred's Zendesk write
-tools and stops the combined assisted-recovery workflow before a link is
-created. Escalation stays available so a supervisor can still hand urgent work
-to a person.
+## 7. Systems & Tools
 
 ### Network
 
 - **Network** — searchable reference for **switches and VLANs** (hostname, building, IP, model; VLAN ID, subnet, gateway).
 - **Network → Visualize** — the topology **diagram**. Node positions are saved and shared across the team.
-- Open a FortiGate node to see its measured **Port Map**, live CPU, memory,
-  sessions, and uptime, plus the dedicated **VPN Tunnels** tab. If the NOC poll
-  has not returned the required IF-MIB or Fortinet Phase 2 rows, Insights says
-  the evidence has not arrived; it does not turn missing data into zero ports,
-  zero tunnels, or a healthy status.
 
 ### Network Tools (network-admin roles only)
 
 - **FortiGate website whitelist** — add a URL to the FortiGate web-filter exemption list. Works only when the server can reach the FortiGate (on the SCCC network/VPN).
-- **PowerShell generators** — Install Printer, Add Laptop, Remove Equipment. These produce a **downloadable `.ps1` file** to run on the target Windows machine; nothing runs on the server.
+- **Install Printer** — authorized network staff select an exact driver registered on `prntsp2.sccc.edu`, then create or update the shared queue directly from Fred. Fred accepts only private campus IPv4 addresses, verifies TCP/9100 first, and displays the client UNC path. It never installs or guesses driver packages.
+- **PowerShell generators** — Add Laptop and Remove Equipment produce a **downloadable `.ps1` file** to run on the target Windows machine.
 
 ### Azure
 
@@ -178,7 +126,7 @@ to a person.
 ### Monitoring & IT Apps
 
 - **Monitoring** — live Grafana dashboards embedded in the app.
-- **IT Apps** — the top-menu category for the application directory, protected Banner/EUP operations, and High School Students access tools.
+- **IT Apps** — a first-class workspace available from Home, the workspace switcher, and the sidebar. Its App Directory launches Cisco Webex Phones, Banner/EUP operations, reports, ACR tools, and student-access systems.
 
 ### Process Library
 
@@ -188,14 +136,13 @@ to a person.
 
 ## 8. Weekly Reports (CIO)
 
-Reports aggregate everyone's **submitted** weekly logs into one department report per week. A CIO's personal Weekly Log is separate from the department report.
+Reports aggregate everyone's weekly logs into one department report per week.
 
-1. First submit your own contribution under **My Work → Weekly Log** (this applies to Tracy and every other CIO too).
-2. Open **Status & Reporting → Weekly Reports** and select the week.
-3. In the report editor, choose the **extras** to include: Post-Incident Reviews, network maintenance windows, a goal-progress snapshot, and open risks.
-4. Review the assembled report. Resolved **Zendesk tickets** are pulled by solved date for that exact week.
-5. **Finalize** to lock it.
-6. **Export** as DOCX, XLSX, or PDF — or **Email Report** to send a PDF/DOCX to recipients (requires SMTP to be configured).
+1. Open **Reports** and select the week.
+2. In the report editor, choose the **extras** to include: Post-Incident Reviews, network maintenance windows, a goal-progress snapshot, and open risks.
+3. Review the assembled report. Resolved **Zendesk tickets** for that week are pulled in automatically.
+4. **Finalize** to lock it.
+5. **Export** as DOCX, XLSX, or PDF — or **Email Report** to send a PDF/DOCX to recipients (requires SMTP to be configured).
 
 ---
 
@@ -210,24 +157,9 @@ Reports aggregate everyone's **submitted** weekly logs into one department repor
 
 Open **Fred**. It has these tabs:
 
-- **Status Report** (CIO only) — generate an executive status report.
-- **Architecture** — inspect enterprise architecture evidence and relationships.
 - **Ask Fred** — chat with read access to your entries, risks, post-incident reviews, and network inventory. Great for summaries and questions ("Summarize the top 3 risks right now").
-- **CIO Insights** (CIO only) — review leadership-level operational signals.
+- **Status Report** (CIO only) — generate an executive status report.
 - **Fred Memory** — Fred's **persistent knowledge** about the SCCC environment. Every active entry is fed into Fred's context.
-
-Fred has a release-owned capability catalog covering every Insights page. Ask
-where a page lives, what each control does, who can use it, or how to complete a
-workflow. Fred will give the current top-menu path and direct route. When an
-approved tool exists for your role, Fred can use it under the normal evidence
-and confirmation rules. Otherwise, Fred says that the action remains
-page-controlled and gives the exact click-by-click steps instead of claiming it
-was performed.
-
-For an active regular-student account, CIO and help-desk staff can also ask Fred
-to prepare the guarded OnlineKiosk recovery link described under **Zendesk
-Monitor**. Fred does not set or see the password. Disabled, withdrawn, and
-otherwise ineligible accounts remain blocked for human source-of-truth review.
 
 Using Fred Memory:
 
@@ -236,11 +168,7 @@ Using Fred Memory:
 3. **Edit** any entry, or use the **toggle** to activate/deactivate it (inactive = ignored by the AI).
 4. Only the **CIO can delete** entries.
 
-Fred can also **save memories herself** — tell her a durable fact or say
-"remember this," and verify the saved entry. Editing a ticket draft does not by
-itself train Fred; save the correction to Memory when it should affect future
-answers. Use the **Process Library** for full repeatable procedures. **Never
-store passwords or secrets;** the system blocks credential-like content.
+The AI can also **save memories itself** — just tell it a durable fact or say "remember this," and you'll see a confirmation. **Never store passwords or secrets;** the system blocks credential-like content.
 
 ---
 
@@ -257,9 +185,9 @@ store passwords or secrets;** the system blocks credential-like content.
 
 1. Track outstanding assignments in **To-do List**, then record finished work under **Completed Work**.
 2. Log **Risks & Issues** and write **Post-Incident Reviews** for any incidents.
-3. End of week: open **Weekly Log**, generate the entry, verify the Zendesk list, then click **Submit Weekly Log** (completed-work items roll in automatically).
+3. End of week: open **Weekly Log**, generate/submit the entry (completed-work items roll in automatically).
 
-**CIO:** 4. After submitting your own Weekly Log, open the week's department **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
+**CIO:** 4. Open the week's **Report**, select the extras to include, review, then **Finalize** and **Export/Email**.
 
 At any point, use **Fred** to draft summaries or answer questions about the data.
 
