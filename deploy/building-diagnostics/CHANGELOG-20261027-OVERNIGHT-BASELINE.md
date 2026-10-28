@@ -46,3 +46,19 @@ not substituted into this baseline. A true active Ethernet/Wi-Fi comparison
 requires reconciling the reviewed module into SCCC-Key, building and signing
 the release with SCCC's approved code-signing identity, and completing a
 separately approved pilot before broader activation.
+
+## Methodology correction
+
+The 8 MiB single HTTPS transfer was stopped after field comparison showed that
+its results were not comparable with Speedtest or nPerf. TCP/TLS startup and a
+short single stream dominated the sample, producing rates far below the
+700+ Mbps observed in direct building tests. At correction time, 140 jobs had
+completed, five had expired, and 123 remaining queued/running jobs were
+cancelled with audit records. Completed data was preserved rather than erased.
+
+Private reporting 1.3.3 excludes the superseded `type=fred` samples from every
+panel labeled as endpoint or building speed. Those panels now accept only the
+reviewed `type=librespeed-v2`, `method=MultiStreamV2` contract. Timing-only Fred
+evidence remains available where it is explicitly labeled as external path
+timing. Until the signed MultiStreamV2 endpoint capability is deployed, speed
+panels intentionally show no validated data.

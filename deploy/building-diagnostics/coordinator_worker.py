@@ -241,14 +241,14 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         ("Computers online now", "Current authenticated endpoint presence within fifteen minutes. Missing or stale check-ins are not counted.",
          f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "online") |> group(columns: ["ad_guid"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
          "green", None),
-        ("Computers measured", "Distinct computers with an endpoint performance sample in the selected time range. This is coverage, not a speed score.",
-         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["computer"]) |> last() |> group() |> count()',
+        ("Computers with validated speed tests", "Distinct computers with a validated MultiStreamV2 speed sample in the selected time range. Superseded bounded Fred path samples are excluded.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r.type == "librespeed-v2" and r._field == "measurement_ok") |> group(columns: ["computer"]) |> last() |> group() |> count()',
          "blue", None),
-        ("Successful endpoint samples", "Unique authenticated endpoint tests that completed in the selected time range.",
-         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
+        ("Successful validated speed tests", "Unique authenticated MultiStreamV2 endpoint tests that completed in the selected time range.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r.type == "librespeed-v2" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
          "green", None),
-        ("Failed endpoint samples", "Unique endpoint tests that reported failure in the selected time range. Zero is healthy; missing data remains No data.",
-         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == false) |> group() |> count()',
+        ("Failed validated speed tests", "Unique MultiStreamV2 endpoint tests that reported failure in the selected time range. Zero is healthy; missing data remains No data.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r.type == "librespeed-v2" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == false) |> group() |> count()',
          None, {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "red", "value": 1}]})
     ]
     for index, (title, description, query, color, thresholds) in enumerate(summary_panels):
@@ -278,6 +278,8 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         query = f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")'
         defaults = {"unit": unit}
         if measurement == "sccc_device_performance":
+            if field in ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps"):
+                query += ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")'
             query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
             defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
         panels.append({"id": len(panels) + 1, "title": title, "type": "timeseries", "datasource": datasource,
@@ -396,36 +398,38 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     add_panel("Current AP state", "table", ap_query, 0, 28, 24, 10,
               description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
 
-    pc_description = ("Fred endpoint test results identify building, last known logged-on user and computer. "
+    pc_description = ("Validated MultiStreamV2 endpoint results identify building, last known logged-on user and computer. "
                       "Throughput automatically displays in Mbps or Gbps; latency is milliseconds and loss is percent. "
                       "Missing user identity is shown as Unknown user. No recent point is not a healthy zero.")
-    pc_series = (' |> map(fn: (r) => ({r with '
+    pc_identity_series = (' |> map(fn: (r) => ({r with '
                  '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
                  'user: if exists r.user and r.user != "" then r.user else "Unknown user", '
                  'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
                  '|> group(columns: ["building", "user", "computer", "adapter", "_field"])')
+    pc_speed_series = ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")' + pc_identity_series
     pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
     add_panel("PC download by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("download_mbps",), extra=pc_series),
+              query("sccc_device_performance", ("download_mbps",), extra=pc_speed_series),
               0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC upload by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("upload_mbps",), extra=pc_series),
+              query("sccc_device_performance", ("upload_mbps",), extra=pc_speed_series),
               12, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC latency by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("latency_ms",), extra=pc_series),
+              query("sccc_device_performance", ("latency_ms",), extra=pc_speed_series),
               0, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
     add_panel("PC jitter by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("jitter_ms",), extra=pc_series),
+              query("sccc_device_performance", ("jitter_ms",), extra=pc_speed_series),
               6, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
     add_panel("PC negotiated link speed", "timeseries",
-              query("sccc_device_performance", ("link_mbps",), extra=pc_series),
+              query("sccc_device_performance", ("link_mbps",), extra=pc_speed_series),
               12, 46, 6, 8, unit="Mbits", description="Endpoint adapter negotiation, not measured Internet throughput.", display_name=pc_display)
     add_panel("PC external DNS / TCP / TLS / TTFB", "timeseries",
-              query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"), extra=pc_series),
+              query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"), extra=pc_identity_series),
               18, 46, 6, 8, unit="ms", description=pc_description,
               display_name=pc_display + " · ${__field.labels._field}")
     building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms"),
-                           extra=' |> map(fn: (r) => ({r with _value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value})) '
+                           extra=' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2") '
+                                 '|> map(fn: (r) => ({r with _value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value})) '
                                  '|> group(columns: ["building", "computer", "adapter", "_field"]) |> last() '
                                  '|> group(columns: ["building", "adapter", "_field"]) |> mean() |> group() '
                                  '|> pivot(rowKey: ["building", "adapter"], columnKey: ["_field"], valueColumn: "_value") '
@@ -449,7 +453,8 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               overrides=speed_table_overrides)
     pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps",
                                                           "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
-                     extra=' |> map(fn: (r) => ({r with '
+                     extra=' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2") '
+                           '|> map(fn: (r) => ({r with '
                            '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
                            'user: if exists r.user and r.user != "" then r.user else "Unknown user", '
                            'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
