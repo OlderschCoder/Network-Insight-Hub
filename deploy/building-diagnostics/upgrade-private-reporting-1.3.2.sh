@@ -74,6 +74,7 @@ rollback() {
   rm -f "$replacement"
   ln -s "$prior" "$replacement"
   mv -Tf "$replacement" "$current"
+  rm -rf -- "$release"
   rm -f "$state/grafana-device-performance.json" "$state/grafana-wireless-operations.json"
   [[ -f "$backup/state-grafana-device-performance.json" ]] && cp -a "$backup/state-grafana-device-performance.json" "$state/grafana-device-performance.json"
   [[ -f "$backup/state-grafana-wireless-operations.json" ]] && cp -a "$backup/state-grafana-wireless-operations.json" "$state/grafana-wireless-operations.json"
