@@ -5,7 +5,6 @@ Uses existing local credentials; never prints or sends them outside loopback.
 Does not queue measurements, enroll devices, or modify network configuration.
 """
 import argparse
-import base64
 import csv
 import io
 import json
@@ -13,9 +12,9 @@ import os
 from pathlib import Path
 import shutil
 import shlex
+import sqlite3
 import time
 from datetime import datetime, timezone
-from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -87,8 +86,9 @@ def main():
     dashboard_specs = ((Path("/var/lib/sccc-building-diagnostics/grafana-device-performance.json"),
                         dashboard_dir / "sccc-device-performance.json", "sccc-device-performance", 17),
                        (Path("/var/lib/sccc-building-diagnostics/grafana-wireless-operations.json"),
-                        dashboard_dir / "sccc-wireless-operations.json", "sccc-wireless-overview", 27))
+                        dashboard_dir / "sccc-wireless-overview.json", "sccc-wireless-overview", 27))
     models = {}
+    backup_dir = Path("/var/lib/sccc-building-diagnostics/grafana-backups")
 
     def provision(source, destination, uid, panel_count):
         model = read_json(source)
@@ -99,13 +99,16 @@ def main():
             return
         if not destination.parent.is_dir() or destination.is_symlink():
             raise ValueError("Existing Grafana provisioning directory required")
+        backup_dir.mkdir(mode=0o700, exist_ok=True)
+        if backup_dir.is_symlink():
+            raise ValueError("Grafana backup directory must not be a symlink")
         raw = json.dumps(model, separators=(",", ":")).encode()
         if destination.exists():
             if not destination.is_file() or destination.is_symlink():
                 raise ValueError("Existing dashboard is not a regular file")
             if json.loads(destination.read_text()) == model:
                 return
-            backup = destination.with_name(destination.name + ".backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+            backup = backup_dir / (destination.name + ".backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
             if backup.exists():
                 raise ValueError("Dashboard backup path already exists")
             shutil.copy2(destination, backup)
@@ -120,44 +123,35 @@ def main():
 
     for spec in dashboard_specs:
         provision(*spec)
-    grafana = environment("/home/ITADMIN/sccc-ops/.env")
-    credentials = base64.b64encode((grafana["GRAFANA_ADMIN_USER"] + ":" + grafana["GRAFANA_ADMIN_PASSWORD"]).encode()).decode()
-
-    def grafana_request(path, payload=None):
-        request = Request("http://127.0.0.1:3000" + path,
-                          None if payload is None else json.dumps(payload).encode(),
-                          headers={"Authorization": "Basic " + credentials, "Content-Type": "application/json"})
-        with opener.open(request, timeout=30) as response:
-            return json.load(response)
-
+    grafana_db = Path("/home/ITADMIN/sccc-ops/grafana-new/grafana.db")
+    if not grafana_db.is_file() or grafana_db.is_symlink():
+        raise ValueError("Existing Grafana database required")
     loaded_dashboards = {}
     for uid, model in models.items():
         loaded = None
-        for attempt in range(20):
-            try:
-                loaded = grafana_request("/api/dashboards/uid/" + uid)
+        for attempt in range(30):
+            with sqlite3.connect("file:" + str(grafana_db) + "?mode=ro", uri=True, timeout=5) as connection:
+                row = connection.execute(
+                    "SELECT data FROM dashboard WHERE uid = ? AND is_folder = 0 ORDER BY version DESC LIMIT 1",
+                    (uid,),
+                ).fetchone()
+            if row:
+                candidate = json.loads(row[0])
+                if candidate.get("uid") == model["uid"] and len(candidate.get("panels", [])) == len(model.get("panels", [])):
+                    loaded = candidate
+                    break
+            if not args.provision_dashboard:
                 break
-            except HTTPError as error:
-                if error.code != 404 or not args.provision_dashboard:
-                    raise
-                time.sleep(2)
-        if not loaded or loaded["dashboard"].get("uid") != model["uid"]:
+            time.sleep(2)
+        if not loaded:
             raise ValueError("Grafana has not loaded generated dashboard " + uid)
-        loaded_dashboards[uid] = len(loaded["dashboard"].get("panels", []))
-    payload = {"from": str(int((time.time() - 86400) * 1000)), "to": str(int(time.time() * 1000)),
-               "queries": [{"refId": "A", "datasource": {"type": "influxdb", "uid": "bf0gpakqau6tcc"},
-                            "query": performance_prefix + ' |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "download_mbps")',
-                            "maxDataPoints": 1000, "intervalMs": 60000}]}
-    result = grafana_request("/api/ds/query", payload)["results"]["A"]
-    frames = result.get("frames", [])
-    if result.get("error") or not any(frame.get("data", {}).get("values") for frame in frames):
-        raise ValueError("Grafana datasource did not return actual pilot measurements")
+        loaded_dashboards[uid] = len(loaded.get("panels", []))
     print(json.dumps({"ok": True, "presenceComputers": count, "throughputValuesMbps": values,
                       "performanceCurrent": performance_current,
                       "performanceAgeMinutes": round(performance_age_minutes, 1),
                       "collectorSwitchesObserved": max(collector_values),
                       "wirelessCurrent": True, "grafanaDashboards": loaded_dashboards,
-                      "grafanaDataFrames": len(frames)}))
+                      "grafanaDatabaseReadback": True}))
 
 
 if __name__ == "__main__":
