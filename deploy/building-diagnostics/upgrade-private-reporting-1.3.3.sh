@@ -16,6 +16,24 @@ for file in coordinator_worker.py private_snmp_collector.py pull_worker.py build
   [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || { echo "Missing reviewed file: $file" >&2; exit 1; }
 done
 
+# Deploy only between collector cycles. Starting verification while the prior
+# five-minute run is still active can verify a mixed release or inherit a
+# transient SNMP failure. Keep the timer recoverable if this bounded wait fails.
+restore_timer_on_preflight_error() {
+  systemctl restart sccc-building-diagnostics-worker.timer || true
+}
+trap restore_timer_on_preflight_error ERR
+systemctl stop sccc-building-diagnostics-worker.timer
+for _ in $(seq 1 72); do
+  systemctl is-active --quiet sccc-building-diagnostics-worker.service || break
+  sleep 5
+done
+if systemctl is-active --quiet sccc-building-diagnostics-worker.service; then
+  echo 'Collector did not reach a clean release boundary within six minutes.' >&2
+  false
+fi
+trap - ERR
+
 prior=$(readlink -f "$current")
 backup=$root/reporting-backup-$(date -u +%Y%m%dT%H%M%SZ)
 install -d -m 0700 "$backup"
