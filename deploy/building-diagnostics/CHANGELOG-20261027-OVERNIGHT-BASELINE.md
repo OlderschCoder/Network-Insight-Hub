@@ -33,6 +33,11 @@ The existing per-building/computer download, upload, latency, loss, endpoint,
 and access-port panels are preserved. The dashboard text distinguishes this
 bounded Fred path from the separately versioned MultiStreamV2 method.
 
+The guarded verifier also ignores repeated Influx annotated-CSV header rows
+when calculating the newest performance timestamp. The first promotion attempt
+exposed that parser defect and rolled back automatically before this narrow
+correction was applied.
+
 ## Deliberate boundary
 
 No enrolled computer currently advertises the signed `librespeed-v2`

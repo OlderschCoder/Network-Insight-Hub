@@ -63,7 +63,8 @@ def main():
     values = [float(row["_value"]) for row in measurements if row.get("_value") not in (None, "", "_value")]
     if len(values) < 2:
         raise ValueError("Accepted pilot report samples are not visible in Influx")
-    measurement_times = [datetime.fromisoformat(row["_time"].replace("Z", "+00:00")) for row in measurements if row.get("_time")]
+    measurement_times = [datetime.fromisoformat(row["_time"].replace("Z", "+00:00"))
+                         for row in measurements if row.get("_time") not in (None, "", "_time")]
     performance_age_minutes = ((datetime.now(timezone.utc) - max(measurement_times)).total_seconds() / 60
                                if measurement_times else float("inf"))
     performance_current = performance_age_minutes <= 15
