@@ -124,4 +124,13 @@ Assert-ExternalThrows { Test-DiagnosticsJob -Job $job -DeviceId $device -DeviceT
 $valid = Test-DiagnosticsJob -Job $job -DeviceId $device -DeviceToken $token -ExternalProbeOrigin 'https://probe.example.com' -PermitSustained $true
 Assert-External ($valid.DownloadBytes -eq 64MB -and $valid.TimeoutSeconds -eq 180) 'Explicit sustained permission'
 Assert-ExternalThrows { Test-DiagnosticsJob -Job $job -DeviceId ([Guid]::NewGuid().ToString()) -DeviceToken $token -ExternalProbeOrigin 'https://probe.example.com' -PermitSustained $true } 'External job is device bound'
+$job = New-ExternalJob 'librespeed-v2' 0 180
+$job.targetOrigin = 'https://denspeed.sharktech.net'
+$canonical = 'v2|{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}' -f $job.id,$device,$job.expiresAt,$job.type,$job.targetOrigin,$job.downloadBytes,$job.uploadBytes,$job.pingCount,$job.timeoutSeconds
+$hmac = New-Object Security.Cryptography.HMACSHA256(,[Text.Encoding]::UTF8.GetBytes($token))
+try { $job.proof = [Convert]::ToBase64String($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($canonical))).TrimEnd('=').Replace('+','-').Replace('/','_') } finally { $hmac.Dispose() }
+$valid = Test-DiagnosticsJob -Job $job -DeviceId $device -DeviceToken $token
+Assert-External ($valid.Type -ceq 'librespeed-v2' -and $valid.TargetOrigin -ceq 'https://denspeed.sharktech.net' -and $valid.DownloadBytes -eq 0 -and $valid.UploadBytes -eq 0 -and $valid.TimeoutSeconds -eq 180) 'Pinned zero-budget LibreSpeed V2 job'
+$job.targetOrigin = 'https://probe.example.com'
+Assert-ExternalThrows { Test-DiagnosticsJob -Job $job -DeviceId $device -DeviceToken $token } 'LibreSpeed server substitution rejected'
 Write-Output ('PASS: {0} external-probe offline assertions; no DNS, TCP, TLS or transfer was run.' -f $script:checks)

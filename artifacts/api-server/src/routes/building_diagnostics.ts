@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
-import { diagnosticsReadiness, externalProbeConfig, jobProof, MAX_TRANSFER_BYTES, MAX_ROTATION_MINUTES, MIN_ROTATION_MINUTES, schedulerSettings, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
+import { diagnosticsReadiness, externalProbeConfig, jobProof, libreSpeedConfig, MAX_TRANSFER_BYTES, MAX_ROTATION_MINUTES, MIN_ROTATION_MINUTES, schedulerSettings, secretsEqual, SUSTAINED_OBJECT_BYTES, TARGET_LABEL } from "../lib/building_diagnostics";
 import { diagnosticsStore, DiagnosticsError } from "../lib/building_diagnostics_store";
 import { createDiagnosticsEnrollmentRouter } from "./building_diagnostics_enrollment";
 import { createBuildingDiagnosticsAssignmentRouter } from "./building_diagnostics_assignment";
@@ -41,10 +41,11 @@ const inventorySchema = z.object({
 }).strict();
 const checkInSchema = z.object({
   deviceId: guid, computerName: text, adDomain: text, adJoined: z.boolean(), uptimeSeconds: z.number().finite().nonnegative(), agentVersion: z.string().max(40), loggedOnUser: text.optional(),
-  capabilities: z.array(z.literal("external-probe-v2")).max(1).optional(),
+  capabilities: z.array(z.enum(["external-probe-v2", "librespeed-v2"])).max(2).optional(),
   interfaces: z.array(z.object({ mac, ipAddresses: z.array(z.string().ip()).max(16), gateway: z.string().ip().optional(), kind: z.enum(["ethernet", "wifi", "other"]), bssid: mac.optional(), ssid: z.string().max(64).optional(), linkMbps: z.number().finite().nonnegative().max(1_000_000).optional() }).strict()).max(16),
 }).strict();
 const metric = z.number().finite().nonnegative().max(1_000_000).optional();
+const requiredMetric = z.number().finite().nonnegative().max(1_000_000);
 const phaseMs = z.number().finite().min(0).max(195_000).nullable().optional();
 const externalResultSchema = z.object({
   type: z.enum(["external-quick", "external-sustained"]), targetOrigin: z.string().url().max(255), path: z.enum(["/probe-5mb.bin", "/probe-1gb.bin"]),
@@ -53,8 +54,18 @@ const externalResultSchema = z.object({
   remoteAddress: z.string().ip().optional(), localAddress: z.string().ip().optional(), dnsAddresses: z.array(z.string().ip()).max(16).optional(), failure: z.string().min(1).max(120).optional(),
   activeAdapter: z.object({ interfaceAlias: text.optional(), kind: z.enum(["ethernet", "wifi", "other"]).optional(), mac: mac.optional(), localIp: z.string().ip().optional(), subnetPrefixLength: z.number().int().min(0).max(128).optional(), gateway: z.string().ip().optional(), ssid: z.string().max(64).optional(), bssid: mac.optional() }).strict().optional(),
 }).strict();
-const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional(), external: externalResultSchema.optional() }).strict().refine((r) => !!r.error || !!r.external || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
-const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional(), type: z.enum(["fred", "external-quick", "external-sustained"]).optional(), maxBytes: z.number().int().min(5_242_880).max(SUSTAINED_OBJECT_BYTES).optional(), scheduledAt: timestamp.optional(), sustainedConfirmed: z.boolean().optional() }).strict()
+const libreSpeedMeasurementSchema = z.object({
+  sourceIp: z.string().ip(), adapterKind: z.enum(["ethernet", "wifi"]), mac, interfaceAlias: text, linkMbps: requiredMetric,
+  ssid: z.string().max(64).optional(), bssid: mac.optional(), downloadMbps: requiredMetric, uploadMbps: requiredMetric,
+  pingMs: requiredMetric, jitterMs: requiredMetric, bytesReceived: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER), bytesSent: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  elapsedMs: z.number().finite().min(1).max(195_000), transferClosed: z.literal(true), rawJson: z.string().min(2).max(32_768),
+}).strict().refine((m) => m.adapterKind === "wifi" ? !!m.bssid : !m.bssid && !m.ssid, "Wi-Fi association evidence is required only for Wi-Fi measurements");
+const libreSpeedResultSchema = z.object({
+  schema: z.literal("sccc.librespeed.multistream-v2.v1"), method: z.literal("MultiStreamV2"), concurrent: z.literal(3), durationSecondsPerDirection: z.literal(15),
+  serverId: z.literal(92), serverOrigin: z.literal("https://denspeed.sharktech.net"), measurements: z.array(libreSpeedMeasurementSchema).min(1).max(2),
+}).strict().refine((r) => new Set(r.measurements.map((m) => m.sourceIp)).size === r.measurements.length, "Each source interface may be measured once");
+const resultsSchema = z.object({ deviceId: guid, jobId: guid, downloadMbps: metric, uploadMbps: metric, latencyMs: z.number().finite().min(0).max(120_000).optional(), requestLossPercent: z.number().finite().min(0).max(100).optional(), downloadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), uploadBytes: z.number().int().min(0).max(MAX_TRANSFER_BYTES).optional(), error: z.string().min(1).max(500).optional(), external: externalResultSchema.optional(), libreSpeed: libreSpeedResultSchema.optional() }).strict().refine((r) => !!r.error || !!r.external || !!r.libreSpeed || (r.downloadMbps !== undefined && r.uploadMbps !== undefined && r.latencyMs !== undefined && r.requestLossPercent !== undefined), "Successful result requires all measurements");
+const queueSchema = z.object({ deviceIds: z.array(guid).min(1).max(100).optional(), building: text.optional(), type: z.enum(["fred", "external-quick", "external-sustained", "librespeed-v2"]).optional(), maxBytes: z.number().int().min(5_242_880).max(SUSTAINED_OBJECT_BYTES).optional(), scheduledAt: timestamp.optional(), sustainedConfirmed: z.boolean().optional() }).strict()
   .refine((v) => !!v.deviceIds !== !!v.building, "Select devices or a building, not both")
   .refine((v) => !v.deviceIds || new Set(v.deviceIds).size === v.deviceIds.length, "Duplicate device selection");
 const settingsSchema = z.object({ schedulerArmed: z.boolean(), rotationIntervalMinutes: z.number().int().min(MIN_ROTATION_MINUTES).max(MAX_ROTATION_MINUTES) }).strict();
@@ -62,7 +73,7 @@ const credentialActionSchema = z.object({ reason: z.string().trim().min(3).max(3
 
 function bearer(req: any): string { const value = req.headers.authorization; return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : ""; }
 function workerValid(req: any) { const expected = process.env.BUILDING_DIAGNOSTICS_WORKER_TOKEN ?? ""; return expected.length >= 32 && secretsEqual(bearer(req), expected); }
-function flags() { const enabled = process.env.BUILDING_DIAGNOSTICS_ENABLED === "true"; return { enabled, schedulerEnabled: enabled && process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED === "true" }; }
+function flags() { const enabled = process.env.BUILDING_DIAGNOSTICS_ENABLED === "true"; return { enabled, schedulerEnabled: enabled && process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED === "true", libreSpeedEnabled: libreSpeedConfig().enabled }; }
 const enabledOnly: RequestHandler = (_req, res, next) => flags().enabled ? next() : void res.status(503).json({ error: "Building diagnostics is not enabled" });
 function parse<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> { const result = schema.safeParse(value); if (!result.success) throw new DiagnosticsError(400, "Invalid diagnostics request"); return result.data; }
 
@@ -145,7 +156,8 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
   router.post("/agent/check-in", async (req: any, res) => {
     const input = parse(checkInSchema, req.body), identity = req.diagnosticDevice;
     if (input.deviceId !== identity.deviceId || input.computerName.toLowerCase() !== identity.computerName.toLowerCase() || input.adDomain.toLowerCase() !== identity.domain.toLowerCase() || !input.adJoined) throw new DiagnosticsError(403, "Diagnostics identity does not match provisioned AD computer");
-    const job = await store.checkIn(input, flags().schedulerEnabled);
+    const config = flags();
+    const job = await store.checkIn(input, { legacySchedulerEnabled: config.schedulerEnabled, libreSpeedSchedulerEnabled: config.libreSpeedEnabled });
     return res.json({ ok: true, job: job ? { ...job, proof: jobProof(bearer(req), input.deviceId, job) } : null });
   });
   router.get("/agent/jobs/:jobId", async (req: any, res) => res.json(await store.jobStatus(req.diagnosticDevice.deviceId, parse(guid, req.params.jobId))));

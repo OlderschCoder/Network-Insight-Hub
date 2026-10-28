@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from coordinator_worker import (DATASOURCE_UID, InfluxClient, collector_points, cycle,
-                                dashboard, export_reports, presence_points, report_point, time_ns,
+                                dashboard, export_reports, presence_points, report_point, report_points, time_ns,
                                 wifi_observations, wireless_dashboard)
 from private_snmp_collector import (BRIDGE_MAP, FDB_PORT, FDB_STATUS, IF_TABLE,
                                     IFX_TABLE, access_interfaces, collect_one,
@@ -28,6 +28,21 @@ MAC_KEY = (1, 0, 17, 34, 51, 68, 85)
 
 def report(seq=1):
     return {"seq": str(seq), "deviceId": "synthetic-device", "jobId": "synthetic-job", "computerName": "SYNTHETIC", "building": "Synthetic A", "user": "EXAMPLE\\staff", "recordedAt": STAMP, "downloadMbps": 25.5, "uploadMbps": 10, "latencyMs": 2, "requestLossPercent": 0, "downloadBytes": 1024}
+
+
+def librespeed_report(seq=2):
+    return {"seq": str(seq), "deviceId": "synthetic-device", "jobId": "synthetic-job-v2", "computerName": "SYNTHETIC",
+            "building": "Synthetic A", "user": "EXAMPLE\\staff", "recordedAt": STAMP, "type": "librespeed-v2",
+            "libreSpeed": {"schema": "sccc.librespeed.multistream-v2.v1", "method": "MultiStreamV2", "concurrent": 3,
+                           "durationSecondsPerDirection": 15, "serverId": 92, "serverOrigin": "https://denspeed.sharktech.net",
+                           "measurements": [
+                               {"sourceIp": "10.11.50.10", "adapterKind": "ethernet", "mac": "00:11:22:33:44:55", "interfaceAlias": "Ethernet",
+                                "linkMbps": 1000, "downloadMbps": 889.2, "uploadMbps": 726.1, "pingMs": 22.4, "jitterMs": 1.2,
+                                "bytesReceived": 1_000_000, "bytesSent": 900_000, "elapsedMs": 31_100, "transferClosed": True, "rawJson": "{}"},
+                               {"sourceIp": "10.70.33.69", "adapterKind": "wifi", "mac": "66:77:88:99:aa:bb", "interfaceAlias": "Wi-Fi",
+                                "linkMbps": 1201, "ssid": "SCCC Wireless", "bssid": "aa:bb:cc:dd:ee:ff", "downloadMbps": 399.4,
+                                "uploadMbps": 420.3, "pingMs": 25.1, "jitterMs": 2.1, "bytesReceived": 800_000, "bytesSent": 850_000,
+                                "elapsedMs": 31_250, "transferClosed": True, "rawJson": "{}"}]}}
 
 
 def presence():
@@ -198,7 +213,8 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertTrue(all(line.endswith(" " + str(time_ns(STAMP))) for line in lines))
         self.assertEqual(lines, presence_points(snapshot))
-        self.assertIn("building=Unlocated", lines[1])
+        self.assertIn("building=Assigned\\ Office", lines[1])
+        self.assertIn("location_kind=assigned", lines[1])
         self.assertIn("user=never-export-user", lines[1])
         self.assertIn("user=EXAMPLE\\\\staff", lines[0])
         self.assertIn("ad_enabled_known=false", lines[1])
@@ -220,20 +236,36 @@ class MetricsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 report_point({**report(), "downloadMbps": invalid})
 
+    def test_librespeed_exports_one_evidence_preserving_point_per_interface(self):
+        lines = report_points(librespeed_report())
+        self.assertEqual(len(lines), 2)
+        self.assertIn("adapter=ethernet", lines[0])
+        self.assertIn("adapter=wifi", lines[1])
+        self.assertIn("ssid=SCCC\\ Wireless", lines[1])
+        self.assertIn("download_mbps=889.20000000000005", lines[0])
+        self.assertIn("upload_mbps=420.30000000000001", lines[1])
+        self.assertTrue(all("method=MultiStreamV2" in line and "transfer_closed=true" in line for line in lines))
+        self.assertTrue(all(line.endswith(" " + str(time_ns(STAMP))) for line in lines))
+        bad = copy.deepcopy(librespeed_report())
+        bad["libreSpeed"]["measurements"][1]["sourceIp"] = "10.11.50.10"
+        with self.assertRaises(ValueError):
+            report_points(bad)
+
     def test_uncertain_influx_write_replays_same_points_then_advances_cursor_once(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             state, checkpoint = root / "results.json", root / "influx.json"
-            atomic_write(state, json.dumps({"reports": [report()], "cursor": "1"}).encode())
+            atomic_write(state, json.dumps({"reports": [report(), librespeed_report()], "cursor": "2"}).encode())
             failed = FakeInflux(True)
             with self.assertRaises(RuntimeError):
                 export_reports(failed, state, checkpoint)
             self.assertFalse(checkpoint.exists())
             success = FakeInflux()
-            self.assertEqual(export_reports(success, state, checkpoint), 1)
+            self.assertEqual(export_reports(success, state, checkpoint), 2)
             self.assertEqual(success.lines, failed.lines)
+            self.assertEqual(len(success.lines), 3)
             self.assertEqual(export_reports(success, state, checkpoint), 0)
-            self.assertEqual(read_json(checkpoint)["cursor"], "1")
+            self.assertEqual(read_json(checkpoint)["cursor"], "2")
 
     def test_influx_origin_and_grafana_source_are_fixed_and_no_auth_is_in_dashboard(self):
         for origin in ("http://public.example.org", "https://user:secret@example.org", "https://example.org/path", "https://example.org/?token=x"):
@@ -242,16 +274,18 @@ class MetricsTests(unittest.TestCase):
         InfluxClient("http://127.0.0.1:8086", "synthetic-token", "synthetic-org", "telegraf")
         value = dashboard("telegraf")
         self.assertEqual(value["uid"], "sccc-device-performance")
-        self.assertEqual(len(value["panels"]), 15)
+        self.assertEqual(len(value["panels"]), 17)
+        self.assertEqual(value["refresh"], "30s")
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in value["panels"]))
         encoded_performance = json.dumps(value)
-        for field in ("download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"):
+        for field in ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"):
             self.assertIn(field, encoded_performance)
         self.assertNotIn("synthetic-token", json.dumps(value))
+        self.assertIn("labels.adapter", encoded_performance)
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
-        self.assertEqual(len(wireless["panels"]), 22)
+        self.assertEqual(len(wireless["panels"]), 23)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
         encoded = json.dumps(wireless)
         for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
@@ -260,6 +294,9 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("Building PC speed summary", encoded)
         self.assertIn("Unknown user", encoded)
         self.assertIn("sccc_device_performance", encoded)
+        self.assertIn("PC jitter by building / user / computer", encoded)
+        self.assertIn("PC negotiated link speed", encoded)
+        self.assertIn("labels.adapter", encoded)
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):

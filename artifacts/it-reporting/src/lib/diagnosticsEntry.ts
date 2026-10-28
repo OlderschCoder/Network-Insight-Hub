@@ -32,6 +32,7 @@ export function diagnosticIneligibility(device: DiagnosticCandidate, type: strin
   if (!device.adVerified) return "Current AD verification required";
   if (!device.enrolled || !device.deviceId) return "Diagnostic agent not enrolled";
   if (!device.online) return "No recent authenticated check-in";
-  if (type !== "fred" && !device.capabilities?.includes("external-probe-v2")) return "Update the diagnostic agent for external measurements";
+  if (type === "librespeed-v2" && !device.capabilities?.includes("librespeed-v2")) return "Update the diagnostic agent for LibreSpeed V2 measurements";
+  if ((type === "external-quick" || type === "external-sustained") && !device.capabilities?.includes("external-probe-v2")) return "Update the diagnostic agent for external path checks";
   return null;
 }

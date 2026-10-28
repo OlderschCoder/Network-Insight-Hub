@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, jobProof, newToken, normalizeMac, resolveLocation, resolvePortTelemetry, schedulerSettings, secretsEqual, tokenHash, type Candidate, type Observation } from "./building_diagnostics";
+import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, jobProof, libreSpeedBucket, libreSpeedConfig, newToken, normalizeMac, resolveLocation, resolvePortTelemetry, schedulerSettings, secretsEqual, tokenHash, type Candidate, type Observation } from "./building_diagnostics";
 afterEach(() => vi.unstubAllEnvs());
 
 const now = Date.parse("2026-10-25T12:00:00Z"), observedAt = new Date(now - 60_000).toISOString();
@@ -53,6 +53,26 @@ describe("external probe configuration", () => {
       expect(() => externalProbeConfig()).toThrow("public HTTPS DNS origin");
     }
     delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_ORIGIN;
+  });
+});
+describe("LibreSpeed V2 deployment guard", () => {
+  it("requires both feature gates and bounds canary concurrency", () => {
+    vi.stubEnv("BUILDING_DIAGNOSTICS_ENABLED", "true");
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED", "true");
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "3");
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "6");
+    expect(libreSpeedConfig()).toMatchObject({ enabled: true, maxConcurrent: 3, canaryMax: 6, intervalMinutes: 180, bucketMinutes: 10 });
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "600");
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "0");
+    expect(libreSpeedConfig()).toMatchObject({ maxConcurrent: 2, canaryMax: 4 });
+    vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED", "false");
+    expect(libreSpeedConfig().enabled).toBe(false);
+  });
+  it("assigns a stable three-hour bucket without exposing device identity", () => {
+    const first = libreSpeedBucket("device-123");
+    expect(first).toBe(libreSpeedBucket("DEVICE-123"));
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(18);
   });
 });
 describe("building diagnostics location evidence", () => {

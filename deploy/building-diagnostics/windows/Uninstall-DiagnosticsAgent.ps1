@@ -16,11 +16,25 @@ if ($task) {
 if (Test-Path -LiteralPath $destination) {
     if ((Get-Item -LiteralPath $destination -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing to remove a reparse-point directory.' }
     # Refuse unexpected content instead of traversing a computed arbitrary tree.
-    $allowed = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll', 'config.json')
+    $allowed = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll', 'config.json', 'LibreSpeed')
     foreach ($item in Get-ChildItem -LiteralPath $destination -Force) {
-        if ($item.PSIsContainer -or $item.Name -notin $allowed -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected diagnostics content; manual review required.' }
+        if ($item.Name -notin $allowed -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            ($item.PSIsContainer -and $item.Name -cne 'LibreSpeed')) { throw 'Unexpected diagnostics content; manual review required.' }
     }
-    foreach ($name in $allowed) {
+    $libreSpeed = Join-Path $destination 'LibreSpeed'
+    if (Test-Path -LiteralPath $libreSpeed) {
+        if ((Get-Item -LiteralPath $libreSpeed -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing to remove a reparse-point LibreSpeed directory.' }
+        $libreAllowed = @('librespeed-cli.exe', 'LICENSE')
+        foreach ($item in Get-ChildItem -LiteralPath $libreSpeed -Force) {
+            if ($item.PSIsContainer -or $item.Name -notin $libreAllowed -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected LibreSpeed content; manual review required.' }
+        }
+        foreach ($name in $libreAllowed) {
+            $target = Join-Path $libreSpeed $name
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target }
+        }
+        Remove-Item -LiteralPath $libreSpeed
+    }
+    foreach ($name in @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll', 'config.json')) {
         $target = Join-Path $destination $name
         if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target }
     }

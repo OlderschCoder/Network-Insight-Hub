@@ -32,6 +32,24 @@ interface BuildingSummary {
   influxConfigured: boolean;
 }
 
+interface BuildingPerformanceSummary {
+  building: string;
+  noCurrentMeasurement: boolean;
+  lastResult: {
+    recordedAt: string;
+    libreSpeed?: {
+      measurements?: Array<{
+        adapterKind: "ethernet" | "wifi";
+        downloadMbps: number;
+        uploadMbps: number;
+        pingMs: number;
+        jitterMs: number;
+        transferClosed: boolean;
+      }>;
+    };
+  } | null;
+}
+
 interface NetNodeSummary {
   id: string;
   hostname: string;
@@ -772,30 +790,41 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
 
 function BuildingsGrid() {
   const [buildings, setBuildings] = useState<BuildingSummary[]>([]);
+  const [performance, setPerformance] = useState<BuildingPerformanceSummary[]>([]);
   const [callingSupport, setCallingSupport] = useState<CallingSupportSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
   const canEdit = !!user;
+  const canViewDiagnostics = ["cio", "network", "network_engineer"].includes(user?.role || "");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [buildingsResponse, callingResponse] = await Promise.all([
+      const [buildingsResponse, callingResponse, diagnosticsResponse] = await Promise.all([
         authFetch(`${API}/network/buildings`, { credentials: "include", cache: "no-store" }),
         authFetch(`${API}/network/calling/support`, { credentials: "include", cache: "no-store" }),
+        canViewDiagnostics
+          ? authFetch(`${API}/building-diagnostics/overview`, { credentials: "include", cache: "no-store" }).catch(() => null)
+          : Promise.resolve(null),
       ]);
       if (!buildingsResponse.ok) throw new Error(await buildingsResponse.text());
       if (!callingResponse.ok) throw new Error(await callingResponse.text());
       setBuildings(await buildingsResponse.json());
       setCallingSupport(await callingResponse.json());
+      if (diagnosticsResponse?.ok) {
+        const diagnostics = await diagnosticsResponse.json();
+        setPerformance(Array.isArray(diagnostics.buildings) ? diagnostics.buildings : []);
+      } else {
+        setPerformance([]);
+      }
     } catch (e: any) {
       toast({ title: "Failed to load buildings", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [canViewDiagnostics, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -810,6 +839,10 @@ function BuildingsGrid() {
     if (diff !== 0) return diff;
     return a.name.localeCompare(b.name);
   });
+
+  const performanceByBuilding = new Map(
+    performance.map((item) => [normalizeBuildingName(item.building), item]),
+  );
 
   const callingAttentionBuildings = (callingSupport?.buildings ?? []).filter(
     (building) => building.healthColor === "red" || building.healthColor === "amber",
@@ -904,10 +937,14 @@ function BuildingsGrid() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {sorted.map(b => {
               const style = healthStyles[b.healthColor];
+              const buildingPerformance = performanceByBuilding.get(normalizeBuildingName(b.name));
+              const interfaces = buildingPerformance?.lastResult?.libreSpeed?.measurements?.filter(
+                (measurement) => measurement.transferClosed,
+              ) ?? [];
               return (
                 <Link key={b.name} href={`/network/buildings/${encodeURIComponent(b.name)}`}>
                   <div className={`
-                    group relative min-h-36 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
+                    group relative min-h-44 rounded-xl border-2 p-4 cursor-pointer transition-all duration-150
                     ${style.bg} ${style.border}
                     hover:shadow-md hover:scale-[1.02] focus-within:ring-2 ${style.ring}
                   `}>
@@ -929,6 +966,21 @@ function BuildingsGrid() {
                         </span>
                         <span className="text-xs text-muted-foreground">VLANs: {b.vlanCount}</span>
                       </div>
+                      {interfaces.length > 0 ? (
+                        <div className="space-y-0.5 border-t border-current/10 pt-2 text-[11px] text-muted-foreground">
+                          {interfaces.map((measurement) => (
+                            <div key={measurement.adapterKind} className="flex items-center justify-between gap-2">
+                              <span className="capitalize">{measurement.adapterKind}</span>
+                              <span className="font-medium text-foreground">
+                                ↓ {measurement.downloadMbps.toFixed(0)} / ↑ {measurement.uploadMbps.toFixed(0)} Mbps
+                              </span>
+                            </div>
+                          ))}
+                          <p>{buildingPerformance?.noCurrentMeasurement ? "Previous verified result" : "Current verified result"}</p>
+                        </div>
+                      ) : canViewDiagnostics ? (
+                        <p className="border-t border-current/10 pt-2 text-[11px] text-muted-foreground">Performance not measured</p>
+                      ) : null}
                       <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
                     </div>
                   </div>

@@ -171,7 +171,7 @@ Assert-Equal $presence.interfaces[0].mac '00:11:22:33:44:55' 'MAC normalization'
 Assert-Equal $presence.interfaces[0].linkMbps 1000.0 'Negotiated link rate is separate metadata'
 Assert-Equal $presence.interfaces[0].ipAddresses[1] 'fe80::1234' 'IPv6 zone removed from IP-only contract'
 Assert-Equal $presence.loggedOnUser 'EXAMPLE\staff' 'Exact domain-qualified phone mapping identity'
-Assert-Equal $presence.agentVersion '1.1.1' 'Presence fix version is traceable'
+Assert-Equal $presence.agentVersion '1.2.0-rc1' 'LibreSpeed V2 agent version is traceable'
 & (Get-Module Sccc.Diagnostics) { $script:PresenceIpBehavior = 'mixed-missing' }
 $presence = Get-DiagnosticsPresence -Config ([pscustomobject]@{ DeviceId = $deviceId; Domain = 'example.edu' })
 Assert-Equal $presence.interfaces.Count 1 'Vanished adapter is skipped while valid adapter remains'

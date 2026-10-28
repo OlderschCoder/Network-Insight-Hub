@@ -26,6 +26,8 @@ describe("sender performance entry", () => {
     expect(diagnosticIneligibility({ ...device, enrolled: false }, "fred")).toMatch(/not enrolled/);
     expect(diagnosticIneligibility({ ...device, online: false }, "fred")).toMatch(/check-in/);
     expect(diagnosticIneligibility({ ...device, capabilities: [] }, "external-quick")).toMatch(/Update/);
+    expect(diagnosticIneligibility({ ...device, capabilities: [] }, "librespeed-v2")).toMatch(/LibreSpeed/);
+    expect(diagnosticIneligibility({ ...device, capabilities: ["librespeed-v2"] }, "librespeed-v2")).toBeNull();
     expect(diagnosticIneligibility({ ...device, capabilities: [] }, "fred")).toBeNull();
   });
 });

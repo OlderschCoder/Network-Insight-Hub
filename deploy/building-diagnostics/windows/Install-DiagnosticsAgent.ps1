@@ -22,6 +22,18 @@ $token = [string]$provisioning.deviceToken
 if ($token -cnotmatch '^sccc-diag\.[A-Za-z0-9_-]{43}$') { throw 'Invalid independent diagnostics credential.' }
 $sourceFiles = @('Sccc.Diagnostics.psm1', 'Invoke-DiagnosticsAgent.ps1', 'ExternalProbe.dll')
 foreach ($name in $sourceFiles) { if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $name) -PathType Leaf)) { throw 'The complete reviewed diagnostics release is required, including ExternalProbe.dll.' } }
+$libreSpeedFiles = [ordered]@{
+    'librespeed-cli.exe' = '5E01DF3986486419FEE84238204C3030FBBBE2E3145D4A2F5EF5EBCBAD7598D4'
+    'LICENSE' = 'E3A994D82E644B03A792A930F574002658412F62407F5FEE083F2555C5F23118'
+}
+$libreSpeedSource = Join-Path $PSScriptRoot 'LibreSpeed'
+foreach ($entry in $libreSpeedFiles.GetEnumerator()) {
+    $source = Join-Path $libreSpeedSource $entry.Key
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ine $entry.Value) {
+        throw 'The reviewed LibreSpeed 1.0.14 payload and license are required with their pinned hashes.'
+    }
+}
 $externalOrigin = ''
 $permitSustained = $false
 if ($provisioning.PSObject.Properties['externalProbeOrigin'] -and $provisioning.externalProbeOrigin) { $externalOrigin = Get-DiagnosticsServerOrigin -ServerUrl ([string]$provisioning.externalProbeOrigin); if (-not ([Uri]$externalOrigin).IsDefaultPort) { throw 'External probe requires HTTPS port 443.' } }
@@ -57,6 +69,17 @@ foreach ($name in $sourceFiles) {
     if ($Activate) {
         $signature = Get-AuthenticodeSignature -LiteralPath $target
         if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ine $SignerThumbprint) { throw 'Installed diagnostics script signature does not match the approved signer.' }
+    }
+}
+$libreSpeedDestination = Join-Path $destination 'LibreSpeed'
+[void](New-Item -ItemType Directory -Path $libreSpeedDestination)
+Set-DiagnosticsProtectedAcl -Path $libreSpeedDestination -Directory
+foreach ($entry in $libreSpeedFiles.GetEnumerator()) {
+    $target = Join-Path $libreSpeedDestination $entry.Key
+    Copy-Item -LiteralPath (Join-Path $libreSpeedSource $entry.Key) -Destination $target
+    Set-DiagnosticsProtectedAcl -Path $target
+    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ine $entry.Value) {
+        throw 'Installed LibreSpeed payload read-back did not match the reviewed release.'
     }
 }
 Add-Type -AssemblyName System.Security

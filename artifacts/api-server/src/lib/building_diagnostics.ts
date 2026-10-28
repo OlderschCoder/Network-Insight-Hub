@@ -24,8 +24,30 @@ export function schedulerSettings(row?: { scheduler_armed: boolean; rotation_int
 }
 export const QUICK_BYTES = 5 * 1024 * 1024;
 export const SUSTAINED_OBJECT_BYTES = 1024 * 1024 * 1024;
-export type JobType = "fred" | "external-quick" | "external-sustained";
+export const LIBRESPEED_ORIGIN = "https://denspeed.sharktech.net";
+export const LIBRESPEED_SERVER_ID = 92;
+export const LIBRESPEED_METHOD = "MultiStreamV2";
+export const LIBRESPEED_INTERVAL_MINUTES = 180;
+export const LIBRESPEED_BUCKET_MINUTES = 10;
+export const LIBRESPEED_TIMEOUT_SECONDS = 180;
+export type JobType = "fred" | "external-quick" | "external-sustained" | "librespeed-v2";
 export type QueueInput = { deviceIds?: string[]; building?: string; type?: JobType; maxBytes?: number; scheduledAt?: string; sustainedConfirmed?: boolean };
+export function libreSpeedConfig() {
+  const requested = Number(process.env.BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT ?? 2);
+  const maxConcurrent = Number.isInteger(requested) && requested >= 1 && requested <= 4 ? requested : 2;
+  const requestedCanary = Number(process.env.BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX ?? 4);
+  const canaryMax = Number.isInteger(requestedCanary) && requestedCanary >= 1 && requestedCanary <= 20 ? requestedCanary : 4;
+  return {
+    enabled: process.env.BUILDING_DIAGNOSTICS_ENABLED === "true" && process.env.BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED === "true",
+    maxConcurrent, canaryMax, intervalMinutes: LIBRESPEED_INTERVAL_MINUTES, bucketMinutes: LIBRESPEED_BUCKET_MINUTES,
+    origin: LIBRESPEED_ORIGIN, serverId: LIBRESPEED_SERVER_ID, method: LIBRESPEED_METHOD,
+  };
+}
+export function libreSpeedBucket(deviceId: string, bucketCount = LIBRESPEED_INTERVAL_MINUTES / LIBRESPEED_BUCKET_MINUTES) {
+  if (!Number.isInteger(bucketCount) || bucketCount < 1) throw new Error("Invalid LibreSpeed bucket count");
+  const value = createHash("sha256").update(deviceId.toLowerCase()).digest().readUInt32BE(0);
+  return value % bucketCount;
+}
 export function externalProbeConfig() {
   let origin: string | null = null;
   const value = process.env.BUILDING_DIAGNOSTICS_EXTERNAL_ORIGIN;

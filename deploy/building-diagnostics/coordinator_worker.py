@@ -73,10 +73,52 @@ def point(measurement: str, tags: dict, fields: dict, observed_at: str) -> str:
     return measurement + ("," + identity if identity else "") + " " + ",".join(encoded) + " " + str(time_ns(observed_at))
 
 
-def report_point(report: dict) -> str:
+def report_points(report: dict) -> list[str]:
     identifier = str(sequence(report.get("seq")))
     if identifier == "0":
         raise ValueError("Report sequence must be positive")
+    base_tags = {"report_id": identifier, "device_id": text(report.get("deviceId")), "job_id": text(report.get("jobId")),
+                 "computer": text(report.get("computerName") or report.get("deviceId")), "building": text(report.get("building") or "Unlocated"),
+                 "user": text(report.get("user") or "Unknown user"), "type": text(report.get("type") or "fred")}
+    libre = report.get("libreSpeed")
+    if libre:
+        if (libre.get("schema") != "sccc.librespeed.multistream-v2.v1" or libre.get("method") != "MultiStreamV2"
+                or libre.get("concurrent") != 3 or libre.get("durationSecondsPerDirection") != 15
+                or libre.get("serverId") != 92 or libre.get("serverOrigin") != "https://denspeed.sharktech.net"):
+            raise ValueError("LibreSpeed report does not match the approved V2 method")
+        measurements = libre.get("measurements")
+        if not isinstance(measurements, list) or not 1 <= len(measurements) <= 2:
+            raise ValueError("LibreSpeed report must contain one or two interface measurements")
+        lines, sources = [], set()
+        for measurement in measurements:
+            source_ip = text(measurement.get("sourceIp"), 64)
+            if source_ip in sources:
+                raise ValueError("LibreSpeed report repeats a source interface")
+            sources.add(source_ip)
+            adapter = text(measurement.get("adapterKind"), 16)
+            if adapter not in ("ethernet", "wifi"):
+                raise ValueError("LibreSpeed adapter type is not approved")
+            tags = {**base_tags, "adapter": adapter, "interface": text(measurement.get("interfaceAlias"), 120),
+                    "source_ip": source_ip, "mac": text(measurement.get("mac"), 32), "method": "MultiStreamV2",
+                    "server": "Sharktech-Denver"}
+            if adapter == "wifi":
+                tags["bssid"] = text(measurement.get("bssid"), 32)
+                if measurement.get("ssid"):
+                    tags["ssid"] = text(measurement["ssid"], 64)
+            fields = {"measurement_ok": True,
+                      "download_mbps": metric(measurement.get("downloadMbps")),
+                      "upload_mbps": metric(measurement.get("uploadMbps")),
+                      "latency_ms": metric(measurement.get("pingMs")),
+                      "jitter_ms": metric(measurement.get("jitterMs")),
+                      "download_bytes": metric(measurement.get("bytesReceived"), MAX_SAFE),
+                      "upload_bytes": metric(measurement.get("bytesSent"), MAX_SAFE),
+                      "link_mbps": metric(measurement.get("linkMbps")),
+                      "elapsed_ms": metric(measurement.get("elapsedMs"), 195_000),
+                      "transfer_closed": measurement.get("transferClosed") is True}
+            if not fields["transfer_closed"]:
+                raise ValueError("LibreSpeed transfer closure was not verified")
+            lines.append(point("sccc_device_performance", tags, fields, report.get("recordedAt")))
+        return lines
     fields = {"measurement_ok": not bool(report.get("error"))}
     mapping = {"downloadMbps": "download_mbps", "uploadMbps": "upload_mbps", "latencyMs": "latency_ms", "requestLossPercent": "request_loss_percent", "downloadBytes": "download_bytes", "uploadBytes": "upload_bytes"}
     for source, destination in mapping.items():
@@ -88,7 +130,15 @@ def report_point(report: dict) -> str:
             fields[destination] = metric(external[source])
     if len(fields) == 1 and fields["measurement_ok"]:
         raise ValueError("Successful report has no actual measurement")
-    return point("sccc_device_performance", {"report_id": identifier, "device_id": text(report.get("deviceId")), "job_id": text(report.get("jobId")), "computer": text(report.get("computerName") or report.get("deviceId")), "building": text(report.get("building") or "Unlocated"), "user": text(report.get("user") or "Unknown user"), "type": text(report.get("type") or "fred")}, fields, report.get("recordedAt"))
+    return [point("sccc_device_performance", {**base_tags, "adapter": "unknown"}, fields, report.get("recordedAt"))]
+
+
+def report_point(report: dict) -> str:
+    """Compatibility helper for the original single-measurement report contract."""
+    lines = report_points(report)
+    if len(lines) != 1:
+        raise ValueError("Report contains multiple interface measurements")
+    return lines[0]
 
 
 def collector_points(snapshot: dict) -> list[str]:
@@ -130,8 +180,8 @@ def presence_points(snapshot: dict) -> list[str]:
         if enabled is not None:
             fields["ad_enabled"] = enabled
         location = device.get("location") or {}
-        building = location.get("building") if location.get("kind") == "network-confirmed" else "Unlocated"
-        rows.append(point("sccc_device_presence", {"ad_guid": identity, "computer": text(device.get("computerName")), "building": text(building or "Unlocated", 120), "user": text(device.get("loggedOnUser") or "Unknown user")}, fields, observed_at))
+        building = location.get("building") if location.get("kind") in ("network-confirmed", "assigned") else "Unlocated"
+        rows.append(point("sccc_device_presence", {"ad_guid": identity, "computer": text(device.get("computerName")), "building": text(building or "Unlocated", 120), "user": text(device.get("loggedOnUser") or "Unknown user"), "location_kind": text(location.get("kind") or "unknown", 32)}, fields, observed_at))
     return rows
 
 
@@ -176,7 +226,7 @@ def export_reports(influx, results_path: Path, checkpoint_path: Path) -> int:
         batch = rows[offset:offset + MAX_LINES_PER_WRITE]
         # Original immutable recordedAt + report identity makes an uncertain retry
         # overwrite the same Influx points. Advance only after acknowledged write.
-        influx.write_lines([report_point(row) for row in batch])
+        influx.write_lines([line for row in batch for line in report_points(row)])
         atomic_write(checkpoint_path, json_bytes({"cursor": str(sequence(batch[-1]["seq"]))}))
         count += len(batch)
     return count
@@ -188,6 +238,8 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     definitions = [("Endpoint download by building / computer (Mbps)", "sccc_device_performance", "download_mbps", "Mbits"),
                    ("Endpoint upload by building / computer (Mbps)", "sccc_device_performance", "upload_mbps", "Mbits"),
                    ("Endpoint latency by building / computer", "sccc_device_performance", "latency_ms", "ms"),
+                   ("Endpoint jitter by building / computer", "sccc_device_performance", "jitter_ms", "ms"),
+                   ("Negotiated endpoint link speed", "sccc_device_performance", "link_mbps", "Mbits"),
                    ("Endpoint request loss by building / computer", "sccc_device_performance", "request_loss_percent", "percent"),
                    ("External DNS time by building / computer", "sccc_device_performance", "dns_ms", "ms"),
                    ("External TCP connect time by building / computer", "sccc_device_performance", "tcp_connect_ms", "ms"),
@@ -201,8 +253,8 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         query = f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")'
         defaults = {"unit": unit}
         if measurement == "sccc_device_performance":
-            query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) |> group(columns: ["building", "user", "computer", "_field"])'
-            defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer}"
+            query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
+            defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
         panels.append({"id": index + 1, "title": title, "type": "timeseries", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
     for field, title in (("online", "Current online computers by building"), ("enrolled", "Current enrolled computers by building")):
         index = len(panels)
@@ -211,7 +263,7 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> map(fn: (r) => ({{r with user: if exists r.user and r.user != "" then r.user else "Unknown user"}})) |> group(columns: ["ad_guid", "user", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "user", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "user", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
     table_y = math.ceil(len(panels) / 2) * 8
     panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
-    return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "1m", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint HTTPS measurements and private SNMP access-port evidence. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
+    return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint LibreSpeed MultiStreamV2 measurements by active Ethernet/Wi-Fi interface plus private SNMP access-port evidence. Values are shown in Mbps or Gbps where appropriate. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
 
 
 def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
@@ -301,8 +353,8 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
 
     pc_description = ("Fred endpoint test results identify building, last known logged-on user and computer. "
                       "Missing user identity is shown as Unknown user. No recent point is not a healthy zero.")
-    pc_series = ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) |> group(columns: ["building", "user", "computer", "_field"])'
-    pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer}"
+    pc_series = ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
+    pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
     add_panel("PC download by building / user / computer", "timeseries",
               query("sccc_device_performance", ("download_mbps",), extra=pc_series),
               0, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
@@ -311,27 +363,30 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               12, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
     add_panel("PC latency by building / user / computer", "timeseries",
               query("sccc_device_performance", ("latency_ms",), extra=pc_series),
-              0, 46, 8, 8, unit="ms", description=pc_description, display_name=pc_display)
-    add_panel("PC request loss by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("request_loss_percent",), extra=pc_series),
-              8, 46, 8, 8, unit="percent", description=pc_description, display_name=pc_display)
+              0, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
+    add_panel("PC jitter by building / user / computer", "timeseries",
+              query("sccc_device_performance", ("jitter_ms",), extra=pc_series),
+              6, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
+    add_panel("PC negotiated link speed", "timeseries",
+              query("sccc_device_performance", ("link_mbps",), extra=pc_series),
+              12, 46, 6, 8, unit="Mbits", description="Endpoint adapter negotiation, not measured Internet throughput.", display_name=pc_display)
     add_panel("PC external DNS / TCP / TLS / TTFB", "timeseries",
               query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"), extra=pc_series),
-              16, 46, 8, 8, unit="ms", description=pc_description,
+              18, 46, 6, 8, unit="ms", description=pc_description,
               display_name=pc_display + " · ${__field.labels._field}")
-    building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms"),
-                           extra=' |> group(columns: ["building", "computer", "_field"]) |> last() '
-                                 '|> group(columns: ["building", "_field"]) |> mean() |> group() '
-                                 '|> pivot(rowKey: ["building"], columnKey: ["_field"], valueColumn: "_value") '
-                                 '|> keep(columns: ["building", "download_mbps", "upload_mbps", "latency_ms"])')
+    building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms"),
+                           extra=' |> group(columns: ["building", "computer", "adapter", "_field"]) |> last() '
+                                 '|> group(columns: ["building", "adapter", "_field"]) |> mean() |> group() '
+                                 '|> pivot(rowKey: ["building", "adapter"], columnKey: ["_field"], valueColumn: "_value") '
+                                 '|> keep(columns: ["building", "adapter", "download_mbps", "upload_mbps", "latency_ms", "jitter_ms"])')
     add_panel("Building PC speed summary", "table", building_speed, 0, 54, 24, 9,
               description="Average of each computer's latest result in the selected time range, grouped by building.")
-    pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms",
+    pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps",
                                                           "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
                      extra=' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
-                           '|> group(columns: ["report_id", "computer", "building", "user", "type", "_field"]) |> last() |> group() '
-                           '|> pivot(rowKey: ["report_id", "computer", "building", "user", "type", "_time"], columnKey: ["_field"], valueColumn: "_value") '
-                           '|> keep(columns: ["_time", "building", "user", "computer", "type", "download_mbps", "upload_mbps", "latency_ms", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
+                           '|> group(columns: ["report_id", "computer", "building", "user", "type", "adapter", "source_ip", "method", "_field"]) |> last() |> group() '
+                           '|> pivot(rowKey: ["report_id", "computer", "building", "user", "type", "adapter", "source_ip", "method", "_time"], columnKey: ["_field"], valueColumn: "_value") '
+                           '|> keep(columns: ["_time", "building", "user", "computer", "adapter", "source_ip", "method", "download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
     add_panel("Latest PC performance results", "table", pc_table, 0, 63, 24, 10,
               description=pc_description)
 

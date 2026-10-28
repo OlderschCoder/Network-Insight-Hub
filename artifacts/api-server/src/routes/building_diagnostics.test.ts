@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks(); process.env.BUILDING_DIAGNOSTICS_ENABLED = "true"; process.env.BUILDING_DIAGNOSTICS_SCHEDULER_ENABLED = "false"; process.env.BUILDING_DIAGNOSTICS_WORKER_TOKEN = worker;
   delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_ORIGIN;
   delete process.env.BUILDING_DIAGNOSTICS_EXTERNAL_SUSTAINED_ENABLED;
+  delete process.env.BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED;
   store.checkIn.mockResolvedValue(null); store.transfer.mockResolvedValue({ downloadBytes: 256, uploadBytes: 256 });
 });
 describe("building diagnostics authority boundaries", () => {
@@ -133,6 +134,26 @@ describe("building diagnostics authority boundaries", () => {
     expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external })).status).toBe(200);
     expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external: { ...external, bytesReceived: 1073741825 } })).status).toBe(400);
     expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, external: { ...external, headers: { Authorization: "secret" } } })).status).toBe(400);
+  });
+  it("accepts only the pinned bounded LibreSpeed V2 interface evidence", async () => {
+    process.env.BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED = "true";
+    const job = { id: jobId, expiresAt: new Date(Date.now() + 240000).toISOString(), downloadBytes: 0, uploadBytes: 0, pingCount: 1, proofVersion: 2,
+      type: "librespeed-v2" as const, targetOrigin: "https://denspeed.sharktech.net", timeoutSeconds: 180 };
+    store.checkIn.mockResolvedValue(job);
+    const checkIn = await request(app()).post(`${path}/agent/check-in`).set("Authorization", `Bearer ${token}`).send({ ...heartbeat, capabilities: ["librespeed-v2"] });
+    expect(checkIn.status).toBe(200); expect(checkIn.body.job.proof).toBe(jobProof(token, id, job));
+    expect(store.checkIn.mock.lastCall?.[1]).toEqual({ legacySchedulerEnabled: false, libreSpeedSchedulerEnabled: true });
+    const measurement = { sourceIp: "10.0.0.4", adapterKind: "ethernet", mac: "aa:bb:cc:dd:ee:ff", interfaceAlias: "Ethernet", linkMbps: 1000,
+      downloadMbps: 889.2, uploadMbps: 726.1, pingMs: 22.4, jitterMs: 1.2, bytesReceived: 1000000, bytesSent: 900000,
+      elapsedMs: 31100, transferClosed: true, rawJson: "{}" };
+    const libreSpeed = { schema: "sccc.librespeed.multistream-v2.v1", method: "MultiStreamV2", concurrent: 3, durationSecondsPerDirection: 15,
+      serverId: 92, serverOrigin: "https://denspeed.sharktech.net", measurements: [measurement] };
+    const accepted = await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, libreSpeed });
+    expect(accepted.status).toBe(200); expect(store.result).toHaveBeenLastCalledWith(id, { deviceId: id, jobId, libreSpeed });
+    for (const invalid of [{ ...libreSpeed, serverId: 91 }, { ...libreSpeed, concurrent: 1 }, { ...libreSpeed, measurements: [{ ...measurement, transferClosed: false }] },
+      { ...libreSpeed, measurements: [{ ...measurement, rawJson: "x" }] }]) {
+      expect((await request(app()).post(`${path}/agent/results`).set("Authorization", `Bearer ${token}`).send({ deviceId: id, jobId, libreSpeed: invalid })).status).toBe(400);
+    }
   });
   it("requires Fred network administrator access for viewing and queueing", async () => {
     expect((await request(app()).get(`${path}/overview`)).status).toBe(401);

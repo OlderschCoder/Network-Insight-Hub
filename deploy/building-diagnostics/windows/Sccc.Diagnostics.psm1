@@ -1,7 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$script:AgentVersion = '1.1.1'
+$script:AgentVersion = '1.2.0-rc1'
 $script:MaximumTransferBytes = 32MB
+$script:LibreSpeedHash = '5E01DF3986486419FEE84238204C3030FBBBE2E3145D4A2F5EF5EBCBAD7598D4'
+$script:LibreSpeedOrigin = 'https://denspeed.sharktech.net'
 
 function Get-DiagnosticsServerOrigin {
     param([Parameter(Mandatory = $true)][string]$ServerUrl)
@@ -104,8 +106,9 @@ function Test-DiagnosticsJob {
     $type = 'fred'
     if ($Job.PSObject.Properties['type']) { $type = [string]$Job.type }
     $external = $type -in @('external-quick', 'external-sustained')
-    if ($type -notin @('fred', 'external-quick', 'external-sustained')) { throw 'Unknown diagnostics job type.' }
-    $maximum = if ($external) { 1GB } else { $script:MaximumTransferBytes }
+    $libre = $type -eq 'librespeed-v2'
+    if ($type -notin @('fred', 'external-quick', 'external-sustained', 'librespeed-v2')) { throw 'Unknown diagnostics job type.' }
+    $maximum = if ($external) { 1GB } elseif ($libre) { 0 } else { $script:MaximumTransferBytes }
     foreach ($field in @('downloadBytes', 'uploadBytes')) {
         $value = 0L
         if (-not [long]::TryParse([string]$Job.$field, [ref]$value) -or $value -lt 0 -or $value -gt $maximum) {
@@ -118,15 +121,17 @@ function Test-DiagnosticsJob {
     }
     $canonical = '{0}|{1}|{2}|{3}|{4}|{5}' -f [string]$Job.id, $DeviceId, [string]$Job.expiresAt, [string]$Job.downloadBytes, [string]$Job.uploadBytes, [string]$Job.pingCount
     $targetOrigin = ''; $seconds = 30
-    if ($external) {
-        if (-not $ExternalProbeOrigin -or $Job.proofVersion -ne 2) { throw 'External probing is not configured for this device.' }
+    if ($external -or $libre) {
+        if ($Job.proofVersion -ne 2) { throw 'Versioned external probing is required.' }
         $targetOrigin = Get-DiagnosticsServerOrigin -ServerUrl ([string]$Job.targetOrigin)
         if (-not ([Uri]$targetOrigin).IsDefaultPort) { throw 'External probe requires HTTPS port 443.' }
-        if ($targetOrigin -cne $ExternalProbeOrigin -or [long]$Job.uploadBytes -ne 0 -or $pingCount -ne 1) { throw 'External target does not match the protected device configuration.' }
+        if (($external -and (-not $ExternalProbeOrigin -or $targetOrigin -cne $ExternalProbeOrigin -or [long]$Job.uploadBytes -ne 0)) -or
+            ($libre -and ($targetOrigin -cne $script:LibreSpeedOrigin -or [long]$Job.downloadBytes -ne 0 -or [long]$Job.uploadBytes -ne 0)) -or $pingCount -ne 1) { throw 'External target does not match the protected device configuration.' }
         $seconds = 0
         if (-not [int]::TryParse([string]$Job.timeoutSeconds, [ref]$seconds) -or $seconds -lt 1 -or
             ($type -eq 'external-quick' -and ($seconds -gt 30 -or [long]$Job.downloadBytes -ne 5MB)) -or
-            ($type -eq 'external-sustained' -and (-not $PermitSustained -or $seconds -gt 180 -or [long]$Job.downloadBytes -lt 1))) { throw 'External job exceeds its local permission or limits.' }
+            ($type -eq 'external-sustained' -and (-not $PermitSustained -or $seconds -gt 180 -or [long]$Job.downloadBytes -lt 1)) -or
+            ($libre -and $seconds -ne 180)) { throw 'External job exceeds its local permission or limits.' }
         $canonical = 'v2|{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}' -f [string]$Job.id, $DeviceId, [string]$Job.expiresAt, $type, [string]$Job.targetOrigin, [string]$Job.downloadBytes, [string]$Job.uploadBytes, [string]$Job.pingCount, [string]$Job.timeoutSeconds
     }
     $proof = [string]$Job.proof
@@ -254,7 +259,13 @@ function Get-DiagnosticsPresence {
         agentVersion = $script:AgentVersion; interfaces = $interfaces
     }
     if ($computer.UserName) { $presence.loggedOnUser = [string]$computer.UserName }
-    if ($Config.PSObject.Properties['ExternalProbeOrigin'] -and $Config.ExternalProbeOrigin) { $presence.capabilities = @('external-probe-v2') }
+    $capabilities = @()
+    if ($Config.PSObject.Properties['ExternalProbeOrigin'] -and $Config.ExternalProbeOrigin) { $capabilities += 'external-probe-v2' }
+    $libre = Join-Path $PSScriptRoot 'LibreSpeed\librespeed-cli.exe'
+    if (Test-Path -LiteralPath $libre -PathType Leaf) {
+        try { Test-DiagnosticsProtectedPath -Path $libre; if ((Get-FileHash -LiteralPath $libre -Algorithm SHA256).Hash -ceq $script:LibreSpeedHash) { $capabilities += 'librespeed-v2' } } catch { }
+    }
+    if ($capabilities.Count) { $presence.capabilities = $capabilities }
     return $presence
 }
 
@@ -289,9 +300,114 @@ function Invoke-DiagnosticsJson {
     } finally { if ($response) { $response.Dispose() }; $content.Dispose() }
 }
 
+function Invoke-DiagnosticsLibreSpeedMeasurement {
+    param([Parameter(Mandatory = $true)][string]$DeviceId, [Parameter(Mandatory = $true)]$Validated)
+    $exe = Join-Path $PSScriptRoot 'LibreSpeed\librespeed-cli.exe'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { return @{ deviceId = $DeviceId; jobId = $Validated.Id; error = 'librespeed_binary_unavailable' } }
+    $runtime = $null
+    try {
+        Test-DiagnosticsProtectedPath -Path $exe
+        if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -cne $script:LibreSpeedHash) { throw 'Pinned LibreSpeed executable changed.' }
+        $serverAddresses = @(Resolve-DnsName ([Uri]$script:LibreSpeedOrigin).DnsSafeHost -Type A -DnsOnly -ErrorAction Stop | Where-Object { $_.IPAddress } | Select-Object -ExpandProperty IPAddress -Unique)
+        if (-not $serverAddresses.Count) { throw 'LibreSpeed server DNS is unavailable.' }
+        $wifi = @(Get-DiagnosticsWifiAssociation)
+        $candidates = @()
+        foreach ($adapter in @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' -and $_.MacAddress } | Sort-Object ifIndex)) {
+            $kind = if ([int]$adapter.NdisPhysicalMedium -in @(1, 9)) { 'wifi' } elseif ([int]$adapter.NdisPhysicalMedium -eq 14 -or [int]$adapter.MediaType -eq 0) { 'ethernet' } else { 'other' }
+            if ($kind -eq 'other') { continue }
+            $configuration = Get-NetIPConfiguration -InterfaceIndex $adapter.ifIndex -ErrorAction SilentlyContinue
+            if (-not $configuration -or -not @($configuration.IPv4DefaultGateway).Count) { continue }
+            $association = @()
+            if ($kind -eq 'wifi') {
+                $association = @($wifi | Where-Object { $_.InterfaceGuid -ieq ([Guid]$adapter.InterfaceGuid).ToString() } | Select-Object -First 1)
+                if (-not $association.Count -or -not $association[0].Bssid) { continue }
+            }
+            foreach ($address in @($configuration.IPv4Address | Where-Object { $_.IPAddress -and $_.IPAddress -notlike '169.254.*' })) {
+                $routed = $false
+                foreach ($remote in $serverAddresses) {
+                    try { if (@(Find-NetRoute -RemoteIPAddress $remote -LocalIPAddress $address.IPAddress -ErrorAction Stop | Where-Object { $_.InterfaceIndex -eq $adapter.ifIndex }).Count) { $routed = $true; break } } catch { }
+                }
+                if (-not $routed) { continue }
+                $candidates += [pscustomobject]@{
+                    Adapter = $adapter; Kind = $kind; SourceIp = [string]$address.IPAddress
+                    Mac = ($adapter.MacAddress -replace '-', ':').ToLowerInvariant()
+                    Bssid = if ($association.Count) { [string]$association[0].Bssid } else { $null }
+                    Ssid = if ($association.Count) { [string]$association[0].Ssid } else { $null }
+                }
+                break
+            }
+        }
+        # At most one current wired and one current wireless route are tested.
+        $selected = @($candidates | Group-Object Kind | ForEach-Object { $_.Group | Sort-Object { $_.Adapter.ifIndex } | Select-Object -First 1 })
+        if (-not $selected.Count) { throw 'No routable Ethernet or Wi-Fi adapter is available.' }
+        $runtime = Join-Path $env:ProgramData ('SCCC\Diagnostics\Runtime\' + $Validated.Id)
+        [void][IO.Directory]::CreateDirectory($runtime)
+        Set-DiagnosticsProtectedAcl -Path $runtime -Directory
+        $serverJson = @'
+[{"name":"Denver, USA (Sharktech)","server":"https://denspeed.sharktech.net","id":92,"dlURL":"backend/garbage.php","ulURL":"backend/empty.php","pingURL":"backend/empty.php","getIpURL":"backend/getIP.php","sponsorName":"Sharktech","sponsorURL":"https://sharktech.net"}]
+'@
+        $serverPath = Join-Path $runtime 'server.json'
+        [IO.File]::WriteAllText($serverPath, $serverJson, (New-Object Text.UTF8Encoding($false)))
+        Set-DiagnosticsProtectedAcl -Path $serverPath
+        $measurements = @()
+        foreach ($candidate in $selected) {
+            if ([DateTimeOffset]::UtcNow.AddSeconds(80) -ge $Validated.ExpiresAt) { throw 'LibreSpeed job admission window closed.' }
+            $beforeAdapter = Get-NetAdapter -InterfaceIndex $candidate.Adapter.ifIndex -ErrorAction Stop
+            $beforeWifi = if ($candidate.Kind -eq 'wifi') { @(Get-DiagnosticsWifiAssociation | Where-Object { $_.InterfaceGuid -ieq ([Guid]$beforeAdapter.InterfaceGuid).ToString() } | Select-Object -First 1) } else { @() }
+            if ($candidate.Kind -eq 'wifi' -and (-not $beforeWifi.Count -or $beforeWifi[0].Bssid -ine $candidate.Bssid)) { throw 'Wi-Fi association changed before measurement.' }
+            $start = New-Object Diagnostics.ProcessStartInfo
+            $start.FileName = $exe; $start.WorkingDirectory = $runtime; $start.UseShellExecute = $false; $start.CreateNoWindow = $true
+            $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+            $start.Arguments = '--json --ipv4 --secure --no-icmp --concurrent 3 --duration 15 --timeout 5 --telemetry-level disabled --local-json "' + $serverPath + '" --server 92 --source ' + $candidate.SourceIp
+            $process = New-Object Diagnostics.Process; $process.StartInfo = $start
+            $peers = @{}; $watch = [Diagnostics.Stopwatch]::StartNew()
+            try {
+                if (-not $process.Start()) { throw 'LibreSpeed process did not start.' }
+                $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+                while (-not $process.WaitForExit(250)) {
+                    if ($watch.Elapsed.TotalSeconds -ge 75 -or [DateTimeOffset]::UtcNow -ge $Validated.ExpiresAt) { $process.Kill(); [void]$process.WaitForExit(5000); throw 'LibreSpeed process exceeded its bounded deadline.' }
+                    foreach ($connection in @(Get-NetTCPConnection -OwningProcess $process.Id -State Established -ErrorAction SilentlyContinue)) {
+                        if ($connection.LocalAddress -cne $candidate.SourceIp -or $connection.RemoteAddress -notin $serverAddresses -or $connection.RemotePort -ne 443) { throw 'LibreSpeed opened an unexpected network connection.' }
+                        $peers[$connection.LocalAddress + ':' + $connection.LocalPort + '-' + $connection.RemoteAddress + ':' + $connection.RemotePort] = $true
+                    }
+                }
+                $watch.Stop(); $raw = $stdout.GetAwaiter().GetResult(); $errorText = $stderr.GetAwaiter().GetResult()
+                if ($process.ExitCode -ne 0 -or $errorText.Length -gt 4096 -or $raw.Length -gt 32768 -or -not $peers.Count) { throw 'LibreSpeed did not produce an accepted bounded result.' }
+                $values = @($raw | ConvertFrom-Json)
+                if ($values.Count -ne 1 -or $values[0].server.url -notlike ($script:LibreSpeedOrigin + '*')) { throw 'LibreSpeed returned an unexpected server.' }
+                foreach ($key in @('download','upload','ping','jitter')) { if ($null -eq $values[0].$key -or [double]$values[0].$key -lt 0 -or [double]::IsNaN([double]$values[0].$key) -or [double]::IsInfinity([double]$values[0].$key)) { throw 'LibreSpeed returned an invalid metric.' } }
+                if ([long]$values[0].bytes_received -lt 1 -or [long]$values[0].bytes_sent -lt 1) { throw 'LibreSpeed returned an empty transfer.' }
+                $afterAdapter = Get-NetAdapter -InterfaceIndex $candidate.Adapter.ifIndex -ErrorAction Stop
+                if ($afterAdapter.Status -ne 'Up' -or $afterAdapter.MacAddress -ine $beforeAdapter.MacAddress) { throw 'Network adapter changed during measurement.' }
+                $entry = [ordered]@{
+                    sourceIp = $candidate.SourceIp; adapterKind = $candidate.Kind; mac = $candidate.Mac
+                    interfaceAlias = ([string]$beforeAdapter.Name).Substring(0, [Math]::Min(120, ([string]$beforeAdapter.Name).Length))
+                    linkMbps = [Math]::Round($afterAdapter.ReceiveLinkSpeed / 1000000.0, 3)
+                    downloadMbps = [double]$values[0].download; uploadMbps = [double]$values[0].upload
+                    pingMs = [double]$values[0].ping; jitterMs = [double]$values[0].jitter
+                    bytesReceived = [long]$values[0].bytes_received; bytesSent = [long]$values[0].bytes_sent
+                    elapsedMs = [Math]::Round($watch.Elapsed.TotalMilliseconds, 3); transferClosed = [bool]$process.HasExited; rawJson = $raw
+                }
+                if ($candidate.Kind -eq 'wifi') {
+                    $afterWifi = @(Get-DiagnosticsWifiAssociation | Where-Object { $_.InterfaceGuid -ieq ([Guid]$afterAdapter.InterfaceGuid).ToString() } | Select-Object -First 1)
+                    if (-not $afterWifi.Count -or $afterWifi[0].Bssid -ine $candidate.Bssid) { throw 'Wi-Fi association changed during measurement.' }
+                    $entry.bssid = $candidate.Bssid; if ($candidate.Ssid) { $entry.ssid = $candidate.Ssid }
+                }
+                $measurements += $entry
+            } finally { if ($process -and -not $process.HasExited) { try { $process.Kill(); [void]$process.WaitForExit(5000) } catch { } }; if ($process) { $process.Dispose() } }
+        }
+        return @{ deviceId = $DeviceId; jobId = $Validated.Id; libreSpeed = @{ schema = 'sccc.librespeed.multistream-v2.v1'; method = 'MultiStreamV2'; concurrent = 3; durationSecondsPerDirection = 15; serverId = 92; serverOrigin = $script:LibreSpeedOrigin; measurements = $measurements } }
+    } catch {
+        return @{ deviceId = $DeviceId; jobId = $Validated.Id; error = 'librespeed_v2_failed' }
+    } finally {
+        if ($runtime -and (Test-Path -LiteralPath $runtime)) { Remove-Item -LiteralPath $runtime -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Invoke-DiagnosticsMeasurement {
     param($Client, [string]$Origin, [string]$DeviceId, [string]$DeviceToken, $Job, [string]$ExternalProbeOrigin = '', [bool]$PermitSustained = $false)
     $validated = Test-DiagnosticsJob -Job $Job -DeviceId $DeviceId -DeviceToken $DeviceToken -ExternalProbeOrigin $ExternalProbeOrigin -PermitSustained $PermitSustained
+    if ($validated.Type -eq 'librespeed-v2') { return Invoke-DiagnosticsLibreSpeedMeasurement -DeviceId $DeviceId -Validated $validated }
     if ($validated.Type -ne 'fred') { return Invoke-DiagnosticsExternalMeasurement -Client $Client -Origin $Origin -DeviceId $DeviceId -Validated $validated }
     $prefix = $Origin + '/api/building-diagnostics/agent/'
     $result = @{ deviceId = $DeviceId; jobId = $validated.Id; downloadBytes = 0L; uploadBytes = 0L }

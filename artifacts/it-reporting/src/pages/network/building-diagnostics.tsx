@@ -13,7 +13,8 @@ import { DIAGNOSTICS_SSO_ATTEMPT_KEY, diagnosticGuid, diagnosticIneligibility } 
 
 type Result = {
   id: string; recordedAt: string; downloadMbps: number | null; uploadMbps: number | null;
-  latencyMs: number | null; requestLossPercent: number | null; error: string | null; targetLabel: string;
+  latencyMs: number | null; jitterMs?: number | null; requestLossPercent: number | null; error: string | null; targetLabel: string;
+  libreSpeed?: { method: string; serverOrigin: string; measurements: { adapterKind: "ethernet" | "wifi"; interfaceAlias: string; sourceIp: string; ssid?: string; downloadMbps: number; uploadMbps: number; pingMs: number; jitterMs: number; linkMbps: number; transferClosed: boolean }[] };
   external?: { type: string; targetOrigin: string; path: string; dnsMs: number | null; dnsAddresses?: string[]; remoteAddress?: string; tcpConnectMs: number | null; tlsMs: number | null; ttfbMs?: number | null; httpStatus: number | null; bytesReceived: number; elapsedMs: number; mbps: number | null; timestamp: string; failure?: string; activeAdapter?: { interfaceAlias?: string; kind?: string; mac?: string; localIp?: string; subnetPrefixLength?: number; gateway?: string; ssid?: string; bssid?: string } };
 };
 type Device = {
@@ -27,7 +28,7 @@ type Device = {
 };
 type Settings = { schedulerArmed: boolean; rotationIntervalMinutes: number; revision: number; updatedAt: string | null; updatedBy: string | null; persisted: boolean; deploymentSchedulerEnabled: boolean; effectiveSchedulerEnabled: boolean };
 type Overview = {
-  enabled: boolean; schedulerEnabled: boolean; targetLabel: string; inventoryUpdatedAt: string | null; adObservedAt?: string | null;
+  enabled: boolean; schedulerEnabled: boolean; libreSpeedEnabled?: boolean; targetLabel: string; inventoryUpdatedAt: string | null; adObservedAt?: string | null;
   externalProbe?: { configured: boolean; origin: string | null; quickBytes: number; sustainedEnabled: boolean; dailyBudgetBytes: number };
   devices: Device[];
   buildings: { building: string; onlineDevices: number; eligibleDevices: number; lastResult: Result | null; noCurrentMeasurement: boolean }[];
@@ -105,7 +106,7 @@ export default function BuildingDiagnostics() {
   const [rotationIntervalMinutes, setRotationIntervalMinutes] = useState(360);
   const [credentialAction, setCredentialAction] = useState<{ device: Device; action: "enroll" | "rotate" | "revoke" } | null>(null);
   const [credentialReason, setCredentialReason] = useState("");
-  const [measurementType, setMeasurementType] = useState("auto");
+  const [measurementType, setMeasurementType] = useState("librespeed-v2");
   const [sustainedMiB, setSustainedMiB] = useState(64);
   const [sustainedConfirmed, setSustainedConfirmed] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + 5 * 60_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
@@ -134,7 +135,7 @@ export default function BuildingDiagnostics() {
   };
   const groupingBuilding = (d: Device) => assignedBuilding(d);
   const buildingChoices = useMemo(() => [...new Set(assignmentsQuery.data ? assignmentsQuery.data.buildings : (data?.buildings || []).map(b => b.building))].sort((a, b) => a.localeCompare(b)), [assignmentsQuery.data, data?.buildings]);
-  const jobType = measurementType === "auto" ? (data?.externalProbe?.configured ? "external-quick" : "fred") : measurementType;
+  const jobType = measurementType;
   const isSustained = jobType === "external-sustained";
   const devices = useMemo(() => uniqueDevices.filter(d =>
     (!entrySelection.multiple || !entrySelection.guids.length || entrySelection.guids.includes(d.adObjectGuid.toLowerCase())) &&
@@ -323,7 +324,7 @@ export default function BuildingDiagnostics() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><Link href="/network/buildings" className="text-sm text-muted-foreground hover:underline">Campus buildings</Link>
         <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold"><Activity className="h-6 w-6" /> Building speed & computers</h1>
-        <p className="mt-1 text-sm text-muted-foreground">AD computer presence, current building evidence, and measured HTTPS performance.</p></div>
+        <p className="mt-1 text-sm text-muted-foreground">AD computer presence, current building evidence, and measured Ethernet/Wi-Fi performance.</p></div>
       <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching || !canManage}><RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />Refresh</Button>
     </div>
     {!canManage && <p role="alert">Network administrator access is required.</p>}
@@ -334,7 +335,7 @@ export default function BuildingDiagnostics() {
         <Badge variant="outline">Automatic Fred-path measurements {data.schedulerEnabled ? "enabled" : "paused"}</Badge>
         <Badge variant="outline">{uniqueDevices.filter(d => d.online).length} reporting online / {uniqueDevices.length} unique computers</Badge>
       </div>
-      <p className="text-sm text-muted-foreground">Inventory updated {time(data.inventoryUpdatedAt)}. Online means a recent authenticated check-in; AD membership is verified centrally. External probes measure end-to-end HTTPS download performance. Endpoint hardware, Wi-Fi, hosting and the Internet path can limit the result; these measurements do not certify a 10 Gb link.</p>
+      <p className="text-sm text-muted-foreground">Inventory updated {time(data.inventoryUpdatedAt)}. Online means a recent authenticated check-in; AD membership is verified centrally. LibreSpeed V2 measures each active Ethernet and Wi-Fi interface separately with a pinned 3-stream, 15-second-per-direction method. Endpoint hardware, Wi-Fi and the Internet path can limit the result; these measurements do not certify a 10 Gb campus link.</p>
       <Card><CardHeader><CardTitle>Reporting readiness</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
         {data.readiness ? <><div className="grid gap-3 md:grid-cols-3">
           <div><strong>AD inventory · {data.readiness.inventory.state}</strong><p>Directory observed {time(data.readiness.inventory.adObservedAt)}</p><p>Network evidence {time(data.readiness.inventory.networkObservedAt)}</p></div>
@@ -354,19 +355,31 @@ export default function BuildingDiagnostics() {
       <Card><CardHeader><CardTitle>Building measurements</CardTitle></CardHeader><CardContent>
         <p className="mb-3 text-sm text-muted-foreground">Measurements retain the building label and time recorded when they ran. Current assignments do not relabel earlier results.</p>
         {data.buildings.length === 0 ? <p>No building evidence has been imported yet.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Building</TableHead><TableHead>Online / eligible</TableHead><TableHead>Download</TableHead><TableHead>Upload</TableHead><TableHead>Latency / request loss</TableHead><TableHead>Measured</TableHead></TableRow></TableHeader><TableBody>
-          {data.buildings.map(b => <TableRow key={b.building}><TableCell className="font-medium">{b.building}</TableCell><TableCell>{b.onlineDevices} / {b.eligibleDevices}</TableCell><TableCell>{metric(b.lastResult?.downloadMbps, "Mbps")}<div className="text-xs text-muted-foreground">{b.lastResult?.external ? `${b.lastResult.external.type} · ${b.lastResult.external.targetOrigin}` : b.lastResult?.targetLabel}</div></TableCell><TableCell>{metric(b.lastResult?.uploadMbps, "Mbps")}</TableCell><TableCell>{metric(b.lastResult?.latencyMs, "ms")} / {metric(b.lastResult?.requestLossPercent, "%")}</TableCell><TableCell>{b.noCurrentMeasurement ? "No current measurement" : time(b.lastResult?.recordedAt)}{b.lastResult?.error && <p className="text-destructive">{b.lastResult.error}</p>}</TableCell></TableRow>)}
+          {data.buildings.map(b => {
+            const interfaces = b.lastResult?.libreSpeed?.measurements || [];
+            const values = (field: "downloadMbps" | "uploadMbps" | "pingMs" | "jitterMs") => interfaces.length
+              ? interfaces.map(item => <div key={`${item.adapterKind}-${field}`}><strong>{item.adapterKind === "wifi" ? "Wi-Fi" : "Ethernet"}:</strong> {metric(item[field], field.endsWith("Mbps") ? "Mbps" : "ms")}</div>)
+              : null;
+            return <TableRow key={b.building}><TableCell className="font-medium">{b.building}</TableCell><TableCell>{b.onlineDevices} / {b.eligibleDevices}</TableCell>
+              <TableCell>{values("downloadMbps") || metric(b.lastResult?.downloadMbps, "Mbps")}<div className="text-xs text-muted-foreground">{b.lastResult?.external ? `${b.lastResult.external.type} · ${b.lastResult.external.targetOrigin}` : b.lastResult?.targetLabel}</div></TableCell>
+              <TableCell>{values("uploadMbps") || metric(b.lastResult?.uploadMbps, "Mbps")}</TableCell>
+              <TableCell>{interfaces.length ? <>{values("pingMs")}{values("jitterMs")}</> : <>{metric(b.lastResult?.latencyMs, "ms")} / {metric(b.lastResult?.requestLossPercent, "%")}</>}</TableCell>
+              <TableCell>{b.noCurrentMeasurement ? "No current measurement" : time(b.lastResult?.recordedAt)}{b.lastResult?.error && <p className="text-destructive">{b.lastResult.error}</p>}</TableCell></TableRow>;
+          })}
         </TableBody></Table></div>}
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Computer inventory</CardTitle></CardHeader><CardContent className="space-y-4">
         <div className="space-y-3 rounded-md border p-3">
           <label className="flex flex-wrap items-center gap-3 text-sm">Measurement
             <select aria-label="Measurement type" className="rounded-md border bg-background p-2" value={jobType} onChange={e => { setMeasurementType(e.target.value); setSustainedConfirmed(false); setSelected(new Set()); }}>
-              <option value="external-quick" disabled={!data.externalProbe?.configured}>External quick download · 5 MiB</option>
-              <option value="external-sustained" disabled={!data.externalProbe?.sustainedEnabled}>Scheduled external download</option>
-              <option value="fred">Fred HTTPS download and upload · 8 MiB each</option>
+              <option value="librespeed-v2" disabled={!data.libreSpeedEnabled}>LibreSpeed V2 · Ethernet and Wi-Fi</option>
+              <option value="external-quick" disabled={!data.externalProbe?.configured}>Legacy external path check · 5 MiB download</option>
+              <option value="external-sustained" disabled={!data.externalProbe?.sustainedEnabled}>Legacy scheduled external download</option>
+              <option value="fred">Legacy Fred HTTPS path · 8 MiB each direction</option>
             </select>
           </label>
-          {jobType !== "fred" && <p className="text-sm text-muted-foreground">Target: {data.externalProbe?.origin || "Not configured"}. External probes run only on selected computers. Automatic Fred-path rotation does not schedule external downloads.</p>}
+          {jobType === "librespeed-v2" && <p className="text-sm text-muted-foreground">Pinned target: Sharktech Denver. Each active routable Ethernet and Wi-Fi interface is measured separately; missing agent capability remains ineligible rather than silently falling back.</p>}
+          {(jobType === "external-quick" || jobType === "external-sustained") && <p className="text-sm text-muted-foreground">Legacy path-check target: {data.externalProbe?.origin || "Not configured"}. This bounded file download is not a link-speed test.</p>}
           {isSustained && <div className="space-y-3 text-sm">
             <p>Select exactly one computer and schedule at least one minute ahead. Tests are serialized and subject to the daily data limit.</p>
             <div className="flex flex-wrap gap-3"><label>Data limit <select aria-label="Sustained data limit" className="rounded-md border bg-background p-2" value={sustainedMiB} onChange={e => { setSustainedMiB(Number(e.target.value)); setSustainedConfirmed(false); }}>{[64, 128, 256, 512, 1024].map(size => <option key={size} value={size}>{size} MiB</option>)}</select></label>
