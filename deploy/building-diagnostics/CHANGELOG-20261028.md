@@ -1,3 +1,4 @@
 # 2026-10-28
 
 - Simplified endpoint Grafana series names to the computer hostname. Panels now show names such as `LP-F6K6S64` instead of Grafana's `_value` field name or a long building/user/computer/adapter composite. Building, user, and adapter remain available as query labels and in the detailed result table.
+- Updated `sccc-device-performance` panels 19 and 20 to horizontal bars with the building name above each bar and no legend. Used the approved live dashboard baseline, preserving all other panel edits and the existing AD-GUID deduplication, counts, and 15-minute freshness queries. Applied to `/srv/sccc-ops/sccc-dashboards/sccc-device-performance.json`; Grafana loaded version 4 and both panels were visually verified. Backup: `/srv/sccc-ops/backups/20261028T200647Z-device-building-bars`. `format-device-building-bars.py` reapplies this formatting to a live/exported model without replacing it with the separate generator checkout.
