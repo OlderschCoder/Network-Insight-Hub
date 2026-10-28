@@ -32,6 +32,7 @@ COUNTER_DISCONTINUITY = IFX_TABLE + ".19"
 MAX_SAFE = 9007199254740991
 MAX_OUTPUT = 12 * 1024 * 1024
 MAX_OBSERVATIONS = 60000
+MAX_EDGE_MACS_PER_PORT = 8
 MAX_TARGET_WORKERS = 4
 NETWORK_PEER = re.compile(r"switch|router|nexus|arubaos|procurve|ios[- ]xe|cisco ios software|access point|wireless controller", re.I)
 UPLINK = re.compile(r"(?:^|[\s_/-])(?:uplink|trunk|stack|port[- ]?channel|lag|to[-_ ]?sw\w*)(?:$|[\s_/-])", re.I)
@@ -174,6 +175,26 @@ def access_interfaces(snapshot: dict, names: set[str]) -> dict[int, dict]:
     return result
 
 
+def exclude_shared_port_observations(observations: list[dict], limit=MAX_OBSERVATIONS) -> list[dict]:
+    """Keep bounded, unique location evidence only for low-fan-out ports."""
+    macs_by_port: dict[tuple[str, str], set[str]] = {}
+    for row in observations:
+        key = (row["switchName"], row["port"])
+        macs_by_port.setdefault(key, set()).add(str(row["mac"]).lower())
+    shared = {key for key, macs in macs_by_port.items() if len(macs) > MAX_EDGE_MACS_PER_PORT}
+    filtered, seen = [], set()
+    for row in observations:
+        key = (row["switchName"], row["port"])
+        identity = (*key, str(row["mac"]).lower())
+        if key in shared or identity in seen:
+            continue
+        seen.add(identity)
+        filtered.append(row)
+        if len(filtered) >= limit:
+            break
+    return filtered
+
+
 def bounded_process(command: list[str], environment: dict, timeout=15, max_bytes=MAX_OUTPUT) -> tuple[str, str | None]:
     """Bound SNMP output while it is produced; never expose raw stderr."""
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
@@ -291,9 +312,12 @@ def collect_one(target: dict, agent, previous: dict, boot_id: str, names: set[st
         if not port:
             continue
         observations.append({"mac": ":".join(f"{byte:02x}" for byte in key[1:]), "building": target["building"], "switchName": target["hostname"], "port": port["port"], "source": "switch", "edge": True, "observedAt": observed_at, "portTelemetry": port["telemetry"]})
-        if len(observations) >= MAX_OBSERVATIONS:
-            break
     fdb_ok = all(captures.get(oid, {}).get("text") and not captures[oid]["error"] and not re.search(r"No Such", captures[oid]["text"], re.I) for oid in (FDB_PORT, FDB_STATUS, BRIDGE_MAP)) and bool(bridge) and bool(snapshot.get("interfaces"))
+    # A port with many learned endpoint MACs is a downstream aggregation path,
+    # even when incomplete interface metadata calls it access and LLDP is silent.
+    # Preserve its interface telemetry, but never use it as exact endpoint
+    # location evidence. Apply this only after a complete FDB snapshot.
+    observations = exclude_shared_port_observations(observations) if fdb_ok else []
     return {"ok": bool(fdb_ok), "observations": observations, "ports": ports, "counters": counters}
 
 

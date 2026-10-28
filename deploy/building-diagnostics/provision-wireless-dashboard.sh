@@ -44,10 +44,10 @@ if not bucket:
 sys.path.insert(0, str(bundle))
 from coordinator_worker import DATASOURCE_UID, wireless_dashboard
 model = wireless_dashboard(bucket)
-if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 23:
+if model.get('uid') != 'sccc-wireless-overview' or len(model.get('panels', [])) != 27:
     raise SystemExit('Reviewed dashboard contract does not match.')
 
-destination = dashboard_dir / 'sccc-wireless-operations.json'
+destination = dashboard_dir / 'sccc-wireless-overview.json'
 raw = json.dumps(model, separators=(',', ':')).encode()
 if destination.exists() and (not destination.is_file() or destination.is_symlink()):
     raise SystemExit('Existing dashboard is not a regular file.')
@@ -56,12 +56,12 @@ backup = None
 if changed and destination.exists():
     backup_root = dashboard_dir.parent / 'backups'
     backup_root.mkdir(mode=0o700, exist_ok=True)
-    backup = backup_root / ('sccc-wireless-operations-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.json')
+    backup = backup_root / ('sccc-wireless-overview-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.json')
     if backup.exists():
         raise SystemExit('Dashboard backup path already exists.')
     shutil.copy2(destination, backup)
 if changed:
-    temporary = dashboard_dir / '.sccc-wireless-operations.json.new'
+    temporary = dashboard_dir / '.sccc-wireless-overview.json.new'
     if temporary.exists() or temporary.is_symlink():
         raise SystemExit('Stale dashboard temporary path exists.')
     with temporary.open('xb') as handle:
@@ -109,11 +109,12 @@ for _ in range(20):
                     'PC latency by building / user / computer', 'PC jitter by building / user / computer',
                     'PC negotiated link speed',
                     'PC external DNS / TCP / TLS / TTFB', 'Building PC speed summary',
-                    'Latest PC performance results'}
-        if len(loaded.get('panels', [])) == 23 and required <= titles:
+                    'Latest PC performance results', 'ClearPass Overall Health',
+                    'ClearPass Server Health'}
+        if len(loaded.get('panels', [])) == 27 and required <= titles:
             break
     time.sleep(2)
-if not loaded or len(loaded.get('panels', [])) != 23 or not required <= titles:
+if not loaded or len(loaded.get('panels', [])) != 27 or not required <= titles:
     raise SystemExit('Grafana did not load the reviewed dashboard.')
 
 for key in ('INFLUX_URL', 'INFLUX_TOKEN', 'INFLUX_ORG'):
@@ -138,7 +139,7 @@ pc = influx(source + ' |> range(start: -7d) |> filter(fn: (r) => r._measurement 
 for label, rows in (('wireless', wireless), ('PC', pc)):
     if not any(row.get('_value') not in (None, '', '_value') for row in rows):
         raise SystemExit('Influx did not return expected ' + label + ' data.')
-print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 23, 'changed': changed,
+print(json.dumps({'ok': True, 'uid': model['uid'], 'panels': 27, 'changed': changed,
                   'backup': str(backup) if backup else None, 'grafanaDatabase': 'loaded',
                   'wirelessRows': len(wireless), 'pcRows': len(pc)}))
 PY

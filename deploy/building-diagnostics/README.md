@@ -68,6 +68,10 @@ Network administrators or the dedicated worker can revoke a device with `POST /a
 
 `provision-wireless-dashboard.sh` is the narrower dashboard-only path. It regenerates the current Wireless Operations model from the reviewed source and existing bucket name, backs up a changed provisioned JSON file outside the watched dashboard directory, replaces it atomically, and verifies both current wireless data and retained PC performance through Grafana's datasource. It does not restart or modify Telegraf, InfluxDB, Fred, the private collector, or endpoint schedules.
 
+### Executive network overview maintenance
+
+`cleanup-network-overview-dashboard.py` converts a live export of `A - SCCC Network Overview` into the reviewed executive layout while preserving dashboard UID `e7633483-9f63-4a1f-9d8e-84a5164954837`. It removes only the known duplicate, hard-coded, or dead-query panels; corrects titles and units; and sets a one-minute refresh. Use `sccc-network-overview-provider.yml` as the root-folder file provider. Back up both `grafana.db` and the original dashboard JSON before replacing the provisioned file. Missing telemetry must remain visible as missing or `No data`; do not map it to healthy status.
+
 ## Named workstation pilot and GPO preparation
 
 The Windows helper is in `windows/`; see its README for exact installation, signing, validation, activation, and removal commands. Keep it separate from the consumer website/Store installer.

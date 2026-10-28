@@ -282,15 +282,23 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
 
     panels = []
 
-    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None, display_name=None):
+    def add_panel(title, panel_type, flux, x, y, w, h, unit="short", description="", thresholds=None,
+                  display_name=None, overrides=None, mappings=None, options=None, color=None):
         defaults = {"unit": unit}
+        if color:
+            defaults["color"] = {"mode": "fixed", "fixedColor": color}
         if thresholds:
             defaults["thresholds"] = {"mode": "absolute", "steps": thresholds}
         if display_name:
             defaults["displayName"] = display_name
+        if mappings:
+            defaults["mappings"] = mappings
         panel = {"id": len(panels) + 1, "title": title, "type": panel_type,
                  "datasource": datasource, "gridPos": {"x": x, "y": y, "w": w, "h": h},
-                 "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": flux}]}
+                 "fieldConfig": {"defaults": defaults, "overrides": overrides or []},
+                 "targets": [{"refId": "A", "query": flux}]}
+        if options:
+            panel["options"] = options
         if description:
             panel["description"] = description
         panels.append(panel)
@@ -298,40 +306,50 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     current = ' |> group(columns: ["_field"]) |> last()'
     add_panel("Current wireless clients", "stat",
               query("aruba_wireless_summary", ("clients_total",), "-10m", current),
-              0, 0, 4, 4, description="Latest controller total within ten minutes. No data means the collector is stale or unavailable.")
+              0, 0, 3, 4, color="blue",
+              description="Latest controller total within ten minutes. This is a neutral count; No data means the collector is stale or unavailable.")
     add_panel("Authenticated clients", "stat",
               query("aruba_wireless_summary", ("authenticated_clients",), "-10m", current),
-              4, 0, 4, 4)
+              3, 0, 3, 4, color="blue")
     add_panel("Guest clients", "stat",
               query("aruba_wireless_summary", ("guest_clients",), "-10m", current),
-              8, 0, 4, 4)
-    add_panel("SCCC + West Wireless", "stat",
-              query("aruba_wireless_summary", ("sccc_wireless_clients", "west_wireless_clients"), "-10m", current),
-              12, 0, 4, 4)
+              6, 0, 3, 4, color="blue")
+    add_panel("SCCC Wireless clients", "stat",
+              query("aruba_wireless_summary", ("sccc_wireless_clients",), "-10m", current),
+              9, 0, 3, 4, color="blue")
+    add_panel("West Wireless clients", "stat",
+              query("aruba_wireless_summary", ("west_wireless_clients",), "-10m", current),
+              12, 0, 3, 4, color="blue")
     add_panel("Clients missing IPv4", "stat",
               query("aruba_wireless_summary", ("clients_without_ipv4",), "-10m", current),
-              16, 0, 4, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
-    add_panel("APs up / down", "stat",
-              query("aruba_wireless_summary", ("aps_up", "aps_down"), "-10m", current),
-              20, 0, 4, 4, description="Separate current values for APs up and down.")
+              15, 0, 3, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}])
+    add_panel("APs Up", "stat",
+              query("aruba_wireless_summary", ("aps_up",), "-10m", current),
+              18, 0, 3, 4, thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
+              description="Current APs reporting up. Zero is unhealthy; missing telemetry remains No data.")
+    add_panel("APs Down", "stat",
+              query("aruba_wireless_summary", ("aps_down",), "-10m", current),
+              21, 0, 3, 4, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
+              description="Current APs reporting down. Any nonzero value is unhealthy and should be investigated.")
 
     add_panel("Clients by SSID", "bargauge",
               query("aruba_wireless_ssid", ("clients",), "-10m", ' |> group(columns: ["ssid"]) |> last()'),
-              0, 4, 8, 8)
+              0, 4, 8, 8, display_name="${__field.labels.ssid}")
     add_panel("Clients by building", "bargauge",
               query("aruba_wireless_building", ("clients",), "-10m", ' |> group(columns: ["building"]) |> last()'),
-              8, 4, 8, 8)
+              8, 4, 8, 8, display_name="${__field.labels.building}")
     add_panel("Average clients per AP by building", "bargauge",
               query("aruba_wireless_building", ("avg_clients_per_ap",), "-10m", ' |> group(columns: ["building"]) |> last()'),
-              16, 4, 8, 8, unit="none")
+              16, 4, 8, 8, unit="none", display_name="${__field.labels.building}")
 
     add_panel("Clients without IPv4 by building", "bargauge",
               query("aruba_wireless_building", ("clients_without_ipv4",), "-10m", ' |> group(columns: ["building"]) |> last()'),
               0, 12, 8, 8, thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
-              description="Use this to localize DHCP/client-address failures. A zero is healthy; No data is unknown.")
+              description="Use this to localize DHCP/client-address failures. A zero is healthy; No data is unknown.",
+              display_name="${__field.labels.building}")
     add_panel("AP availability by building", "bargauge",
               query("aruba_wireless_building", ("aps_up", "aps_down"), "-10m", ' |> group(columns: ["building", "_field"]) |> last()'),
-              8, 12, 8, 8)
+              8, 12, 8, 8, display_name="${__field.labels.building} · ${__field.labels._field}")
     add_panel("RADIUS outcomes by server", "timeseries",
               query("aruba_radius_server", ("accept_delta", "reject_delta", "timeout_delta"), extra=' |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)'),
               16, 12, 8, 8, description="Accepted, rejected and timed-out authentication activity by on-prem, Azure and VIP target.")
@@ -352,15 +370,20 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               description="Current AP state and client load. Missing APs remain missing rather than being reported healthy.")
 
     pc_description = ("Fred endpoint test results identify building, last known logged-on user and computer. "
+                      "Throughput automatically displays in Mbps or Gbps; latency is milliseconds and loss is percent. "
                       "Missing user identity is shown as Unknown user. No recent point is not a healthy zero.")
-    pc_series = ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
+    pc_series = (' |> map(fn: (r) => ({r with '
+                 '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
+                 'user: if exists r.user and r.user != "" then r.user else "Unknown user", '
+                 'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
+                 '|> group(columns: ["building", "user", "computer", "adapter", "_field"])')
     pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
     add_panel("PC download by building / user / computer", "timeseries",
               query("sccc_device_performance", ("download_mbps",), extra=pc_series),
-              0, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+              0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC upload by building / user / computer", "timeseries",
               query("sccc_device_performance", ("upload_mbps",), extra=pc_series),
-              12, 38, 12, 8, unit="Mbits", description=pc_description, display_name=pc_display)
+              12, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
     add_panel("PC latency by building / user / computer", "timeseries",
               query("sccc_device_performance", ("latency_ms",), extra=pc_series),
               0, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
@@ -375,25 +398,98 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
               18, 46, 6, 8, unit="ms", description=pc_description,
               display_name=pc_display + " · ${__field.labels._field}")
     building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms"),
-                           extra=' |> group(columns: ["building", "computer", "adapter", "_field"]) |> last() '
+                           extra=' |> map(fn: (r) => ({r with _value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value})) '
+                                 '|> group(columns: ["building", "computer", "adapter", "_field"]) |> last() '
                                  '|> group(columns: ["building", "adapter", "_field"]) |> mean() |> group() '
                                  '|> pivot(rowKey: ["building", "adapter"], columnKey: ["_field"], valueColumn: "_value") '
                                  '|> keep(columns: ["building", "adapter", "download_mbps", "upload_mbps", "latency_ms", "jitter_ms"])')
+    speed_table_overrides = [
+        {"matcher": {"id": "byName", "options": "building"},
+         "properties": [{"id": "displayName", "value": "Building"}]},
+        {"matcher": {"id": "byName", "options": "adapter"},
+         "properties": [{"id": "displayName", "value": "Adapter"}]},
+        {"matcher": {"id": "byName", "options": "download_mbps"},
+         "properties": [{"id": "displayName", "value": "Download"}, {"id": "unit", "value": "bps"}, {"id": "decimals", "value": 1}]},
+        {"matcher": {"id": "byName", "options": "upload_mbps"},
+         "properties": [{"id": "displayName", "value": "Upload"}, {"id": "unit", "value": "bps"}, {"id": "decimals", "value": 1}]},
+        {"matcher": {"id": "byName", "options": "latency_ms"},
+         "properties": [{"id": "displayName", "value": "Latency"}, {"id": "unit", "value": "ms"}, {"id": "decimals", "value": 1}]},
+        {"matcher": {"id": "byName", "options": "jitter_ms"},
+         "properties": [{"id": "displayName", "value": "Jitter"}, {"id": "unit", "value": "ms"}, {"id": "decimals", "value": 1}]},
+    ]
     add_panel("Building PC speed summary", "table", building_speed, 0, 54, 24, 9,
-              description="Average of each computer's latest result in the selected time range, grouped by building.")
+              description="Average of each computer's latest result in the selected time range, grouped by building and adapter. Throughput automatically displays in Mbps or Gbps.",
+              overrides=speed_table_overrides)
     pc_table = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps",
                                                           "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"),
-                     extra=' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user"})) '
+                     extra=' |> map(fn: (r) => ({r with '
+                           '_value: if r._field == "download_mbps" or r._field == "upload_mbps" then r._value * 1000000.0 else r._value, '
+                           'user: if exists r.user and r.user != "" then r.user else "Unknown user", '
+                           'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
                            '|> group(columns: ["report_id", "computer", "building", "user", "type", "adapter", "source_ip", "method", "_field"]) |> last() |> group() '
                            '|> pivot(rowKey: ["report_id", "computer", "building", "user", "type", "adapter", "source_ip", "method", "_time"], columnKey: ["_field"], valueColumn: "_value") '
                            '|> keep(columns: ["_time", "building", "user", "computer", "adapter", "source_ip", "method", "download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"])')
     add_panel("Latest PC performance results", "table", pc_table, 0, 63, 24, 10,
-              description=pc_description)
+              description=pc_description, overrides=speed_table_overrides + [
+                  {"matcher": {"id": "byName", "options": "request_loss_percent"},
+                   "properties": [{"id": "displayName", "value": "Loss"}, {"id": "unit", "value": "percent"},
+                                  {"id": "decimals", "value": 1}]},
+              ])
+
+    # Put current ClearPass health first. Every expected on-prem, Azure and VIP
+    # target receives an explicit unhealthy fallback, so a missing node cannot
+    # disappear and leave the cluster looking green. Recent response time and
+    # timeout deltas then raise that fallback to warning or healthy.
+    for panel in panels:
+        panel["gridPos"]["y"] += 4
+    health_query = f'''import "array"
+expected = array.from(rows: [
+  {{server: "SCCC_CPPM01", _value: 0}},
+  {{server: "SCCC_CPPM02", _value: 0}},
+  {{server: "SCCC_CPPM_AZ01", _value: 0}},
+  {{server: "SCCC_CPPM_AZ02", _value: 0}},
+  {{server: "SCCC_CPPM_VIP", _value: 0}}
+])
+observed = from(bucket: {bucket_literal})
+  |> range(start: -10m)
+  |> filter(fn: (r) => r._measurement == "aruba_radius_server" and (r._field == "avg_response_ms" or r._field == "timeout_delta"))
+  |> map(fn: (r) => ({{r with _value: float(v: r._value)}}))
+  |> group(columns: ["server", "_field"])
+  |> last()
+  |> group(columns: ["server"])
+  |> pivot(rowKey: ["server"], columnKey: ["_field"], valueColumn: "_value")
+  |> map(fn: (r) => ({{server: r.server, _value: if exists r.avg_response_ms and exists r.timeout_delta and r.avg_response_ms < 500.0 and r.timeout_delta == 0.0 then 2 else if exists r.avg_response_ms and exists r.timeout_delta and r.avg_response_ms < 1000.0 and r.timeout_delta <= 5.0 then 1 else 0}}))
+health = union(tables: [expected, observed])
+  |> group(columns: ["server"])
+  |> max(column: "_value")'''
+    health_mappings = [{"type": "value", "options": {
+        "0": {"text": "UNHEALTHY", "color": "red"},
+        "1": {"text": "WARNING", "color": "orange"},
+        "2": {"text": "HEALTHY", "color": "green"},
+    }}]
+    health_thresholds = [{"color": "red", "value": None}, {"color": "orange", "value": 1},
+                         {"color": "green", "value": 2}]
+    health_options = {"reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": ""},
+                      "orientation": "horizontal", "textMode": "value_and_name",
+                      "colorMode": "background", "graphMode": "none", "justifyMode": "auto",
+                      "wideLayout": True}
+    server_health_options = {**health_options, "orientation": "vertical"}
+    add_panel("ClearPass Overall Health", "stat",
+              health_query + '\nhealth |> group() |> min(column: "_value") |> map(fn: (r) => ({_value: r._value})) |> yield(name: "overall")',
+              0, 0, 6, 4, unit="none",
+              description="Worst current state across both on-prem nodes, both Azure nodes and the RADIUS VIP. Missing/stale data is unhealthy.",
+              thresholds=health_thresholds, mappings=health_mappings,
+              display_name="ClearPass cluster", options=health_options)
+    add_panel("ClearPass Server Health", "stat", health_query + '\nhealth |> yield(name: "servers")',
+              6, 0, 18, 4, unit="none",
+              description="Healthy: fresh data, response under 500 ms and zero new timeouts. Warning: response under 1,000 ms and at most five new timeouts. Missing/stale or worse is unhealthy.",
+              thresholds=health_thresholds, mappings=health_mappings,
+              display_name="${__field.labels.server}", options=server_health_options)
 
     return {"uid": "sccc-wireless-overview", "title": "SCCC Wireless Operations", "schemaVersion": 39,
             "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-6h", "to": "now"},
             "tags": ["SCCC", "wireless", "ClearPass"],
-            "description": "Current Aruba wireless, building, SSID and ClearPass/RADIUS health plus Fred PC performance by building, last known user and computer from the existing private Influx data. SNMP target collection is unchanged.",
+            "description": "Current Aruba wireless, building, SSID and explicit ClearPass/RADIUS health plus Fred PC performance by building, last known user and computer from the existing private Influx data. Missing ClearPass telemetry is unhealthy rather than silently omitted. SNMP target collection is unchanged.",
             "panels": panels}
 
 

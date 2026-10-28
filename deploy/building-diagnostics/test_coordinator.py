@@ -16,8 +16,9 @@ from coordinator_worker import (DATASOURCE_UID, InfluxClient, collector_points, 
                                 wifi_observations, wireless_dashboard)
 from private_snmp_collector import (BRIDGE_MAP, FDB_PORT, FDB_STATUS, IF_TABLE,
                                     IFX_TABLE, access_interfaces, collect_one,
-                                    collect_targets, explicit_profiles, load_targets,
-                                    rate, bounded_process, run_bulkwalk)
+                                    collect_targets, exclude_shared_port_observations,
+                                    explicit_profiles, load_targets, rate,
+                                    bounded_process, run_bulkwalk)
 from pull_worker import API, atomic_write, read_json, validate_inventory
 
 NOW = datetime.now(timezone.utc)
@@ -93,6 +94,34 @@ class PrivateSnmpTests(unittest.TestCase):
         self.assertNotIn("outErrors", row["portTelemetry"])
         self.assertNotIn("inBitsPerSecond", row["portTelemetry"])
         self.assertEqual(row["observedAt"], STAMP)
+
+    def test_high_fanout_port_is_not_endpoint_location_evidence(self):
+        def rows(count):
+            return [{"switchName": "SWA-AA105", "port": "1/1/51", "mac": f"00:11:22:33:44:{value:02x}"} for value in range(count)]
+        self.assertEqual(len(exclude_shared_port_observations(rows(3))), 3)
+        self.assertEqual(len(exclude_shared_port_observations(rows(8))), 8)
+        self.assertEqual(exclude_shared_port_observations(rows(9)), [])
+        self.assertEqual(exclude_shared_port_observations(rows(158)), [])
+        self.assertEqual(len(exclude_shared_port_observations(rows(8) + [rows(8)[0]])), 8)
+
+    def test_fanout_is_counted_before_location_row_limit(self):
+        shared = [{"switchName": "SWA-AA105", "port": "1/1/51", "mac": f"00:11:22:33:44:{value:02x}"} for value in range(1, 10)]
+        ordinary = [{"switchName": "SWA-AA105", "port": f"1/1/{value}", "mac": f"00:22:33:44:55:{value:02x}"} for value in range(1, 5)]
+        result = exclude_shared_port_observations([shared[0], *ordinary, *shared[1:]], limit=3)
+        self.assertEqual([row["port"] for row in result], ["1/1/1", "1/1/2", "1/1/3"])
+
+    def test_high_fanout_suppression_preserves_port_telemetry(self):
+        agent = FakeAgent()
+        learned = {(1, 0, 17, 34, 51, 68, value): "1" for value in range(1, 159)}
+        agent.tables[FDB_PORT] = learned
+        agent.tables[FDB_STATUS] = {key: "3" for key in learned}
+        with patch("private_snmp_collector.stamp", return_value=STAMP), patch("private_snmp_collector.time.monotonic", return_value=100):
+            result = collect_one(TARGET, agent, {}, "boot", {TARGET["hostname"]})
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["observations"], [])
+        self.assertEqual(len(result["ports"]), 1)
+        self.assertEqual(result["ports"][0]["port"], "1/1/2")
+        self.assertEqual(result["ports"][0]["telemetry"]["linkMbps"], 1000)
 
     def test_excludes_lag_trunk_unknown_down_uplink_and_known_lldp_switch_ports(self):
         base = FakeAgent().interface
@@ -285,7 +314,7 @@ class MetricsTests(unittest.TestCase):
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
-        self.assertEqual(len(wireless["panels"]), 23)
+        self.assertEqual(len(wireless["panels"]), 27)
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in wireless["panels"]))
         encoded = json.dumps(wireless)
         for measurement in ("aruba_wireless_summary", "aruba_wireless_ssid", "aruba_wireless_building", "aruba_wireless_ap", "aruba_radius_server"):
@@ -297,6 +326,29 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("PC jitter by building / user / computer", encoded)
         self.assertIn("PC negotiated link speed", encoded)
         self.assertIn("labels.adapter", encoded)
+        self.assertIn('"unit": "bps"', encoded)
+        self.assertIn('"value": "Download"', encoded)
+        self.assertIn('"value": "Latency"', encoded)
+        self.assertIn("Throughput automatically displays in Mbps or Gbps", encoded)
+        panels_by_title = {panel["title"]: panel for panel in wireless["panels"]}
+        self.assertEqual(panels_by_title["Guest clients"]["fieldConfig"]["defaults"]["color"]["fixedColor"], "blue")
+        self.assertIn("APs Up", panels_by_title)
+        self.assertIn("APs Down", panels_by_title)
+        self.assertEqual(panels_by_title["APs Down"]["fieldConfig"]["defaults"]["thresholds"]["steps"][1]["value"], 1)
+        self.assertIn("ClearPass Overall Health", panels_by_title)
+        self.assertIn("ClearPass Server Health", panels_by_title)
+        self.assertIn("SCCC_CPPM_AZ02", panels_by_title["ClearPass Server Health"]["targets"][0]["query"])
+        self.assertIn('yield(name: "overall")', panels_by_title["ClearPass Overall Health"]["targets"][0]["query"])
+        self.assertIn('yield(name: "servers")', panels_by_title["ClearPass Server Health"]["targets"][0]["query"])
+        self.assertEqual(panels_by_title["ClearPass Overall Health"]["fieldConfig"]["defaults"]["mappings"][0]["options"]["0"]["text"], "UNHEALTHY")
+        self.assertEqual(panels_by_title["Clients by SSID"]["fieldConfig"]["defaults"]["displayName"],
+                         "${__field.labels.ssid}")
+        for title in ("Clients by building", "Average clients per AP by building",
+                      "Clients without IPv4 by building"):
+            self.assertEqual(panels_by_title[title]["fieldConfig"]["defaults"]["displayName"],
+                             "${__field.labels.building}")
+        self.assertEqual(panels_by_title["AP availability by building"]["fieldConfig"]["defaults"]["displayName"],
+                         "${__field.labels.building} \u00b7 ${__field.labels._field}")
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):

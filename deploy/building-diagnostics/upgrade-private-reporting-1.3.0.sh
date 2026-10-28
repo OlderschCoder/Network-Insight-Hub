@@ -42,7 +42,7 @@ if not bucket:
 sys.path.insert(0, str(release))
 from coordinator_worker import dashboard, wireless_dashboard
 models = (('grafana-device-performance.json', dashboard(bucket), 17),
-          ('grafana-wireless-operations.json', wireless_dashboard(bucket), 23))
+          ('grafana-wireless-operations.json', wireless_dashboard(bucket), 27))
 for name, model, count in models:
     if len(model.get('panels', [])) != count:
         raise SystemExit('Generated dashboard panel contract does not match.')

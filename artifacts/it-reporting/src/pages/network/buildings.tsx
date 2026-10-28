@@ -30,24 +30,29 @@ interface BuildingSummary {
   vlanCount: number;
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  performance: BuildingPerformance | null;
 }
 
-interface BuildingPerformanceSummary {
-  building: string;
-  noCurrentMeasurement: boolean;
-  lastResult: {
-    recordedAt: string;
-    libreSpeed?: {
-      measurements?: Array<{
-        adapterKind: "ethernet" | "wifi";
-        downloadMbps: number;
-        uploadMbps: number;
-        pingMs: number;
-        jitterMs: number;
-        transferClosed: boolean;
-      }>;
-    };
-  } | null;
+interface BuildingPerformance {
+  status: "measured" | "stale" | "failed";
+  recordedAt: string;
+  computerName: string | null;
+  user: string | null;
+  downloadMbps: number | null;
+  uploadMbps: number | null;
+  latencyMs: number | null;
+  lossPercent: number | null;
+  testType: string | null;
+  targetLabel: string | null;
+  error: string | null;
+  interfaces: Array<{
+    adapterKind: "ethernet" | "wifi";
+    downloadMbps: number;
+    uploadMbps: number;
+    pingMs: number;
+    jitterMs: number;
+    transferClosed: boolean;
+  }>;
 }
 
 interface NetNodeSummary {
@@ -82,6 +87,7 @@ interface BuildingDetail {
   links: any[];
   healthColor: "green" | "amber" | "red" | "unknown";
   influxConfigured: boolean;
+  performance: BuildingPerformance | null;
 }
 
 interface OverlayPosition {
@@ -317,6 +323,46 @@ function lineColorForHealth(healthColor: BuildingSummary["healthColor"] | undefi
     default:
       return "#9ca3af";
   }
+}
+
+function formatThroughput(mbps: number | null): string | null {
+  if (mbps === null || !Number.isFinite(mbps)) return null;
+  if (mbps >= 1000) {
+    const gbps = mbps / 1000;
+    return `${gbps >= 10 ? gbps.toFixed(0) : gbps.toFixed(1)} Gbps`;
+  }
+  return `${Math.round(mbps)} Mbps`;
+}
+
+function performanceHeadline(performance: BuildingPerformance | null): string {
+  if (!performance) return "No endpoint baseline yet";
+  if (performance.status === "failed") return "Latest test failed";
+  const verified = performance.interfaces.filter((measurement) => measurement.transferClosed);
+  if (verified.length > 0) {
+    return verified
+      .map((measurement) => {
+        const label = measurement.adapterKind === "ethernet" ? "Ethernet" : "Wi-Fi";
+        return `${label} ↓ ${formatThroughput(measurement.downloadMbps)} · ↑ ${formatThroughput(measurement.uploadMbps)}`;
+      })
+      .join(" | ");
+  }
+  const download = formatThroughput(performance.downloadMbps);
+  const upload = formatThroughput(performance.uploadMbps);
+  if (!download && !upload) return "No usable speed result";
+  const speed = [download ? `↓ ${download}` : null, upload ? `↑ ${upload}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  return performance.status === "stale" ? `Previous: ${speed}` : speed;
+}
+
+function performanceAge(recordedAt: string): string {
+  const elapsedMs = Date.now() - new Date(recordedAt).getTime();
+  if (!Number.isFinite(elapsedMs)) return "unknown time";
+  const minutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function LiveBadge({ status }: { status: "up" | "degraded" | "down" | "unknown" }) {
@@ -735,7 +781,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
               <div
                 className={`absolute z-10 ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                 style={{ left: `${overlay.x}%`, top: `${overlay.y}%` }}
-                title={`${match?.name ?? overlay.buildingName} — ${style.label}`}
+                title={`${match?.name ?? overlay.buildingName} — ${style.label}${match ? ` — ${performanceHeadline(match.performance)}` : ""}`}
                 onPointerDown={(event) => beginDrag(event, overlay.code)}
               >
                 <div className="relative">
@@ -770,6 +816,11 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                       {match?.name ?? overlay.buildingName}
                     </div>
                     <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
+                    {match && (
+                      <div className="mt-1 text-[9px] font-semibold leading-tight text-foreground">
+                        {performanceHeadline(match.performance)}
+                      </div>
+                    )}
                   </div>}
                 </div>
               </div>
@@ -790,41 +841,30 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
 
 function BuildingsGrid() {
   const [buildings, setBuildings] = useState<BuildingSummary[]>([]);
-  const [performance, setPerformance] = useState<BuildingPerformanceSummary[]>([]);
   const [callingSupport, setCallingSupport] = useState<CallingSupportSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
   const canEdit = !!user;
-  const canViewDiagnostics = ["cio", "network", "network_engineer"].includes(user?.role || "");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [buildingsResponse, callingResponse, diagnosticsResponse] = await Promise.all([
+      const [buildingsResponse, callingResponse] = await Promise.all([
         authFetch(`${API}/network/buildings`, { credentials: "include", cache: "no-store" }),
         authFetch(`${API}/network/calling/support`, { credentials: "include", cache: "no-store" }),
-        canViewDiagnostics
-          ? authFetch(`${API}/building-diagnostics/overview`, { credentials: "include", cache: "no-store" }).catch(() => null)
-          : Promise.resolve(null),
       ]);
       if (!buildingsResponse.ok) throw new Error(await buildingsResponse.text());
       if (!callingResponse.ok) throw new Error(await callingResponse.text());
       setBuildings(await buildingsResponse.json());
       setCallingSupport(await callingResponse.json());
-      if (diagnosticsResponse?.ok) {
-        const diagnostics = await diagnosticsResponse.json();
-        setPerformance(Array.isArray(diagnostics.buildings) ? diagnostics.buildings : []);
-      } else {
-        setPerformance([]);
-      }
     } catch (e: any) {
       toast({ title: "Failed to load buildings", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [canViewDiagnostics, toast]);
+  }, [toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -839,10 +879,6 @@ function BuildingsGrid() {
     if (diff !== 0) return diff;
     return a.name.localeCompare(b.name);
   });
-
-  const performanceByBuilding = new Map(
-    performance.map((item) => [normalizeBuildingName(item.building), item]),
-  );
 
   const callingAttentionBuildings = (callingSupport?.buildings ?? []).filter(
     (building) => building.healthColor === "red" || building.healthColor === "amber",
@@ -937,8 +973,7 @@ function BuildingsGrid() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {sorted.map(b => {
               const style = healthStyles[b.healthColor];
-              const buildingPerformance = performanceByBuilding.get(normalizeBuildingName(b.name));
-              const interfaces = buildingPerformance?.lastResult?.libreSpeed?.measurements?.filter(
+              const interfaces = b.performance?.interfaces?.filter(
                 (measurement) => measurement.transferClosed,
               ) ?? [];
               return (
@@ -976,11 +1011,28 @@ function BuildingsGrid() {
                               </span>
                             </div>
                           ))}
-                          <p>{buildingPerformance?.noCurrentMeasurement ? "Previous verified result" : "Current verified result"}</p>
+                          <p>{b.performance?.status === "stale" ? "Previous verified result" : "Current verified result"}</p>
                         </div>
-                      ) : canViewDiagnostics ? (
+                      ) : b.performance ? (
+                        <div className={`rounded-md border px-2 py-1.5 text-xs ${
+                        b.performance?.status === "failed"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : b.performance?.status === "stale"
+                            ? "border-amber-200 bg-amber-50 text-amber-800"
+                            : b.performance
+                              ? "border-green-200 bg-green-50 text-green-800"
+                              : "border-gray-200 bg-white/60 text-muted-foreground"
+                      }`}>
+                        <div className="font-semibold">Legacy endpoint result: {performanceHeadline(b.performance)}</div>
+                        {b.performance && (
+                          <div className="mt-0.5 truncate opacity-80" title={b.performance.computerName ?? undefined}>
+                            {performanceAge(b.performance.recordedAt)}{b.performance.computerName ? ` · ${b.performance.computerName}` : ""}
+                          </div>
+                        )}
+                        </div>
+                      ) : (
                         <p className="border-t border-current/10 pt-2 text-[11px] text-muted-foreground">Performance not measured</p>
-                      ) : null}
+                      )}
                       <span className="text-xs font-medium text-primary group-hover:underline">Open building →</span>
                     </div>
                   </div>
@@ -1354,6 +1406,66 @@ function BuildingDetailView({ name }: { name: string }) {
           </div>
         )}
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Activity className="h-5 w-5 text-primary" />
+            Latest endpoint performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {detail.performance ? (
+            <div className="space-y-4">
+              {detail.performance.interfaces.filter((measurement) => measurement.transferClosed).length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {detail.performance.interfaces
+                    .filter((measurement) => measurement.transferClosed)
+                    .map((measurement) => (
+                      <div key={measurement.adapterKind} className="rounded-lg border bg-muted/20 p-4">
+                        <div className="mb-3 flex items-center gap-2 font-semibold">
+                          {measurement.adapterKind === "ethernet" ? <Server className="h-4 w-4 text-blue-600" /> : <Wifi className="h-4 w-4 text-green-600" />}
+                          {measurement.adapterKind === "ethernet" ? "Ethernet" : "Wi-Fi"}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+                          <div><div className="text-xs uppercase text-muted-foreground">Download</div><div className="font-bold">{formatThroughput(measurement.downloadMbps)}</div></div>
+                          <div><div className="text-xs uppercase text-muted-foreground">Upload</div><div className="font-bold">{formatThroughput(measurement.uploadMbps)}</div></div>
+                          <div><div className="text-xs uppercase text-muted-foreground">Ping</div><div className="font-bold">{measurement.pingMs.toFixed(1)} ms</div></div>
+                          <div><div className="text-xs uppercase text-muted-foreground">Jitter</div><div className="font-bold">{measurement.jitterMs.toFixed(1)} ms</div></div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                  <div className="text-xs font-semibold uppercase tracking-wide">Legacy endpoint result — historical only</div>
+                  <div className="mt-1 text-xl font-bold">{performanceHeadline(detail.performance)}</div>
+                  <div className="mt-1 text-xs">Superseded by the per-interface LibreSpeed MultiStreamV2 method.</div>
+                </div>
+              )}
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Measured from</div>
+                <div className="mt-1 font-semibold">{detail.performance.computerName ?? "Unknown endpoint"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {performanceAge(detail.performance.recordedAt)}
+                  {detail.performance.user ? ` · ${detail.performance.user}` : ""}
+                </div>
+              </div>
+              {detail.performance.status !== "measured" && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {detail.performance.status === "failed"
+                    ? `Latest test failed${detail.performance.error ? `: ${detail.performance.error}` : "."}`
+                    : "This result is older than 12 hours and should be treated as historical."}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No network-confirmed endpoint baseline is available for this building yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="devices">
