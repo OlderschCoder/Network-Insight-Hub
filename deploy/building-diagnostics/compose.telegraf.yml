@@ -1,0 +1,18 @@
+services:
+  telegraf:
+    image: telegraf:1.30
+    container_name: telegraf
+    user: "0:0"
+    env_file:
+      - /etc/sccc-ops/stack.env
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - /srv/sccc-ops/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    command: ["--config", "/etc/telegraf/telegraf.conf"]
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
