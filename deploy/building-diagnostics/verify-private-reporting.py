@@ -84,7 +84,7 @@ def main():
 
     dashboard_dir = Path("/home/ITADMIN/sccc-ops/grafana-new/dashboards")
     dashboard_specs = ((Path("/var/lib/sccc-building-diagnostics/grafana-device-performance.json"),
-                        dashboard_dir / "sccc-device-performance.json", "sccc-device-performance", 17),
+                        dashboard_dir / "sccc-device-performance.json", "sccc-device-performance", 21),
                        (Path("/var/lib/sccc-building-diagnostics/grafana-wireless-operations.json"),
                         dashboard_dir / "sccc-wireless-overview.json", "sccc-wireless-overview", 27))
     models = {}

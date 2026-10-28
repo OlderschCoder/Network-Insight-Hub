@@ -234,7 +234,32 @@ def export_reports(influx, results_path: Path, checkpoint_path: Path) -> int:
 
 def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     bucket_literal = json.dumps(text(bucket, 120))
+    datasource = {"type": "influxdb", "uid": datasource_uid}
     panels = []
+
+    summary_panels = [
+        ("Computers online now", "Current authenticated endpoint presence within fifteen minutes. Missing or stale check-ins are not counted.",
+         f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "online") |> group(columns: ["ad_guid"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
+         "green", None),
+        ("Computers measured", "Distinct computers with an endpoint performance sample in the selected time range. This is coverage, not a speed score.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["computer"]) |> last() |> group() |> count()',
+         "blue", None),
+        ("Successful endpoint samples", "Unique authenticated endpoint tests that completed in the selected time range.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
+         "green", None),
+        ("Failed endpoint samples", "Unique endpoint tests that reported failure in the selected time range. Zero is healthy; missing data remains No data.",
+         f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r._field == "measurement_ok") |> group(columns: ["report_id"]) |> last() |> filter(fn: (r) => r._value == false) |> group() |> count()',
+         None, {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "red", "value": 1}]})
+    ]
+    for index, (title, description, query, color, thresholds) in enumerate(summary_panels):
+        defaults = {"unit": "short"}
+        if color:
+            defaults["color"] = {"mode": "fixed", "fixedColor": color}
+        if thresholds:
+            defaults["thresholds"] = thresholds
+        panels.append({"id": index + 1, "title": title, "type": "stat", "description": description,
+                       "datasource": datasource, "gridPos": {"x": index * 6, "y": 0, "w": 6, "h": 4},
+                       "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
     definitions = [("Endpoint download by building / computer (Mbps)", "sccc_device_performance", "download_mbps", "Mbits"),
                    ("Endpoint upload by building / computer (Mbps)", "sccc_device_performance", "upload_mbps", "Mbits"),
                    ("Endpoint latency by building / computer", "sccc_device_performance", "latency_ms", "ms"),
@@ -255,15 +280,17 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         if measurement == "sccc_device_performance":
             query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
             defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
-        panels.append({"id": index + 1, "title": title, "type": "timeseries", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
+        panels.append({"id": len(panels) + 1, "title": title, "type": "timeseries", "datasource": datasource,
+                       "gridPos": {"x": (index % 2) * 12, "y": 4 + (index // 2) * 8, "w": 12, "h": 8},
+                       "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
     for field, title in (("online", "Current online computers by building"), ("enrolled", "Current enrolled computers by building")):
         index = len(panels)
         query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "{field}") |> group(columns: ["ad_guid"]) |> last() |> map(fn: (r) => ({{r with _value: if r._value then 1 else 0}})) |> group(columns: ["building"]) |> sum()'
-        panels.append({"id": index + 1, "title": title, "type": "stat", "description": "Latest authenticated Fred snapshot per AD GUID within fifteen minutes. Missing/stale snapshots remain No data; Unlocated does not claim a current building.", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": (index % 2) * 12, "y": (index // 2) * 8, "w": 12, "h": 8}, "targets": [{"refId": "A", "query": query}]})
+        panels.append({"id": index + 1, "title": title, "type": "stat", "description": "Latest authenticated Fred snapshot per AD GUID within fifteen minutes. Missing/stale snapshots remain No data; Unlocated does not claim a current building.", "datasource": datasource, "gridPos": {"x": (index % 2) * 12, "y": 4 + ((index - len(summary_panels)) // 2) * 8, "w": 12, "h": 8}, "targets": [{"refId": "A", "query": query}]})
     query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> map(fn: (r) => ({{r with user: if exists r.user and r.user != "" then r.user else "Unknown user"}})) |> group(columns: ["ad_guid", "user", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "user", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "user", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
-    table_y = math.ceil(len(panels) / 2) * 8
-    panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": {"type": "influxdb", "uid": datasource_uid}, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
-    return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint LibreSpeed MultiStreamV2 measurements by active Ethernet/Wi-Fi interface plus private SNMP access-port evidence. Values are shown in Mbps or Gbps where appropriate. These measurements do not certify campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
+    table_y = 4 + math.ceil((len(panels) - len(summary_panels)) / 2) * 8
+    panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": datasource, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
+    return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint path measurements plus private SNMP access-port evidence. Current Fred HTTPS samples measure a bounded transfer path and identify the adapter as unknown; separately versioned MultiStreamV2 samples identify active Ethernet/Wi-Fi interfaces when that signed capability is deployed. Values are shown in Mbps or Gbps where appropriate. Neither method alone certifies campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
 
 
 def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
