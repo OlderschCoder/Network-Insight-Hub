@@ -80,7 +80,7 @@ def check(release, manifest_sha):
     return manifest
 
 def verify_boundaries():
-    for path, method in [('/overview', 'GET'), ('/agent/results', 'POST'), ('/measure', 'POST')]:
+    for path, method in [('/overview', 'GET'), ('/agent/results', 'POST'), ('/jobs', 'POST')]:
         if base['request_status']('/api/building-diagnostics' + path, method) != 401:
             raise RuntimeError('Diagnostics authentication boundary changed: ' + path)
 
