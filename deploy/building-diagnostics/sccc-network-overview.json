@@ -28,10 +28,10 @@
         "uid": "bf0gpakqau6tcc"
       },
       "gridPos": {
+        "h": 18,
+        "w": 9,
         "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 8
+        "y": 0
       },
       "id": 43,
       "options": {
@@ -45,8 +45,7 @@
       },
       "pluginVersion": "10.2.2",
       "title": "Live Campus Status Map",
-      "type": "text",
-      "description": "Current building status and campus location context."
+      "type": "text"
     },
     {
       "datasource": {
@@ -55,9 +54,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -68,30 +64,29 @@
               },
               {
                 "color": "red",
-                "value": 28
+                "value": 80
               },
               {
-                "color": "yellow",
-                "value": 29
+                "color": "#EAB839",
+                "value": 90
               },
               {
-                "color": "green",
-                "value": 30
+                "color": "#6ED0E0",
+                "value": 100
               }
             ]
           },
-          "unit": "short",
-          "displayName": "Buildings Online"
+          "unit": "bps"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 3,
-        "h": 4
+        "h": 4,
+        "w": 4,
+        "x": 9,
+        "y": 0
       },
-      "id": 30,
+      "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -114,87 +109,13 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -30m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"sysUpTime\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()          // one row per device\r\n  |> group()         // \u2190 collapse to ONE table\r\n  |> count()\r\n\r\n",
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: -10m)\n  |> filter(fn: (r) =>\n    r._measurement == \"interface_legacy\" and\n    (r._field == \"ifInOctets\" or r._field == \"ifOutOctets\")\n  )\n  |> derivative(unit: 1s, nonNegative: true)\n  |> last()\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0 }))\n  |> group(columns: [])\n  |> sum(column: \"_value\")\n  |> yield(name: \"total_bps\")",
+          "queryType": "flux",
           "refId": "A"
         }
       ],
-      "title": "Buildings Online",
-      "type": "stat",
-      "description": "Buildings currently represented by reporting infrastructure."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "dark-red",
-                "value": 23
-              },
-              {
-                "color": "orange",
-                "value": 24
-              },
-              {
-                "color": "blue",
-                "value": 25
-              }
-            ]
-          },
-          "unit": "short",
-          "displayName": "UPS Devices Online"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "x": 15,
-        "y": 0,
-        "w": 3,
-        "h": 4
-      },
-      "id": 35,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -24h)\r\n  |> filter(fn: (r) => r._measurement == \"ups\")\r\n  |> filter(fn: (r) => r._field == \"ups_up\")\r\n  |> group(columns: [\"building\", \"ups_name\"])\r\n  |> last()\r\n  |> group(columns: [])\r\n  |> filter(fn: (r) => r._value == 1)\r\n  |> count()",
-          "refId": "A"
-        }
-      ],
-      "title": "UPS Devices Online",
-      "type": "stat",
-      "description": "UPS devices currently reporting telemetry."
+      "title": "Campus Backbone Load (bps)",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -230,16 +151,15 @@
               }
             ]
           },
-          "unit": "percent",
-          "displayName": "Internet Packet Loss"
+          "unit": "percent"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 18,
-        "y": 0,
+        "h": 4,
         "w": 3,
-        "h": 4
+        "x": 13,
+        "y": 0
       },
       "id": 11,
       "options": {
@@ -269,9 +189,107 @@
           "refId": "A"
         }
       ],
-      "title": "Internet Packet Loss",
-      "type": "stat",
-      "description": "Current measured internet packet loss."
+      "title": "Internet Packet Loss (%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "blue",
+                  "index": 0,
+                  "text": "All Systems Go"
+                },
+                "4": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "Major DIsruption"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 1,
+                "result": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "Minor Degradation of Service "
+                },
+                "to": 3
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "#EAB839",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 7,
+        "x": 16,
+        "y": 0
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "import \"array\"\r\n\r\narray.from(rows: [\r\n  {\r\n    metric: \"CampusStatus\",\r\n    value:\r\n      if 35 == 35 and 35 == 35 and 4 == 4 and 1 == 1 and 25 == 25 then 0\r\n      else if 4 < 4 or 1 < 1 then 2\r\n      else 1\r\n  }\r\n])",
+          "refId": "A"
+        }
+      ],
+      "title": "System Status",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -297,16 +315,15 @@
               }
             ]
           },
-          "unit": "bps",
-          "displayName": "Current Firewall Throughput"
+          "unit": "bps"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 21,
-        "y": 0,
-        "w": 3,
-        "h": 4
+        "h": 4,
+        "w": 4,
+        "x": 9,
+        "y": 4
       },
       "id": 37,
       "options": {
@@ -335,9 +352,8 @@
           "refId": "A"
         }
       ],
-      "title": "Current Firewall Throughput",
-      "type": "stat",
-      "description": "Combined current ingress and egress traffic through the FortiGate."
+      "title": "Firewall Throughput",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -346,6 +362,9 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -356,30 +375,29 @@
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 37
               },
               {
-                "color": "#EAB839",
-                "value": 90
+                "color": "yellow",
+                "value": 38
               },
               {
-                "color": "#6ED0E0",
-                "value": 100
+                "color": "blue",
+                "value": 40
               }
             ]
           },
-          "unit": "bps",
-          "displayName": "Current Campus Backbone Load"
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 12,
-        "y": 4,
-        "w": 6,
-        "h": 4
+        "h": 4,
+        "w": 1,
+        "x": 13,
+        "y": 4
       },
-      "id": 3,
+      "id": 12,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -402,14 +420,551 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "from(bucket: \"telegraf\")\n  |> range(start: -10m)\n  |> filter(fn: (r) =>\n    r._measurement == \"interface_legacy\" and\n    (r._field == \"ifInOctets\" or r._field == \"ifOutOctets\")\n  )\n  |> derivative(unit: 1s, nonNegative: true)\n  |> last()\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0 }))\n  |> group(columns: [])\n  |> sum(column: \"_value\")\n  |> yield(name: \"total_bps\")",
+          "query": "import \"array\"\nimport \"join\"\n\nexpected =\n    array.from(\n        rows: [\n             {SwitchIP: \"192.168.2.73\", Building: \"Tech T122 (SVI)\", Role: \"SVI\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"10.70.1.1\", Building: \"Hobble Building (Server Room)\", Role: \"SVI\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"10.70.34.1\", Building: \"Hobble AA105 SVI\", Role: \"SVI\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"10.70.89.1\", Building: \"Humanities H128\", Role: \"SVI\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"10.80.33.1\", Building: \"Hobble Core SVI (AA-144)\", Role: \"Core SVI\", DeviceType: \"Aruba\"},\n\n            {SwitchIP: \"192.168.1.1\", Building: \"FortiGate Firewall (Hobble AA-158)\", Role: \"Firewall\", DeviceType: \"FortiGate\"},\n\n            {SwitchIP: \"192.168.2.1\", Building: \"Hobble Core Access (AA-144)\", Role: \"Core Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.24\", Building: \"Epworth ALC Building\", Role: \"Access\", DeviceType: \"Cisco\"},\n            {SwitchIP: \"192.168.2.27\", Building: \"Baseball Field Pressbox\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.40\", Building: \"Hobble 6100 Access (AA-144)\", Role: \"Access\", DeviceType: \"Aruba\"},\n\n            {SwitchIP: \"192.168.2.70\", Building: \"Nexus Core 1 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\n            {SwitchIP: \"192.168.2.71\", Building: \"Nexus Core 2 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\n            {SwitchIP: \"192.168.2.72\", Building: \"Tech Core 3\", Role: \"Core\", DeviceType: \"Cisco\"},\n            {SwitchIP: \"192.168.2.73\", Building: \"Tech Core 4\", Role: \"Core\", DeviceType: \"Cisco\"},\n\n            {SwitchIP: \"192.168.2.171\", Building: \"Cosmetology\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.175\", Building: \"Student Living Center (SLC151)\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.178\", Building: \"Tech Building F / Hale Court\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.179\", Building: \"SLG Switch G\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.180\", Building: \"Tech Dorm H / Hale Court Building H\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.181\", Building: \"Tech Dorms J (SLJ)\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.182\", Building: \"Tech Dorm SLR\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.183\", Building: \"Student Living SLS\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.184\", Building: \"Student Living SLT\", Role: \"Access\", DeviceType: \"Aruba\"},\n\n            {SwitchIP: \"192.168.2.186\", Building: \"Tech B141\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.187\", Building: \"Tech D201\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.188\", Building: \"Tech TT103\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.189\", Building: \"Tech TA107\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.190\", Building: \"Tech T122 (mgmt)\", Role: \"Access\", DeviceType: \"Aruba\"},\n\n            {SwitchIP: \"192.168.2.195\", Building: \"Agriculture V201\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.196\", Building: \"B Building (Boiler Room)\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.197\", Building: \"Hobble Testing A161 (SWA-A161)\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.199\", Building: \"Hobble HR AA105\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.200\", Building: \"Student Union\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.201\", Building: \"Aruba 6300 A-144 1\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.202\", Building: \"Aruba 6300 A-144 2\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.203\", Building: \"Sharp Center\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.204\", Building: \"Softball Field\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.205\", Building: \"Maintenance\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.212\", Building: \"Student Health Center\", Role: \"Access\", DeviceType: \"Aruba\"},\n            {SwitchIP: \"192.168.2.216\", Building: \"Calvvin Allied Health\", Role: \"Access\", DeviceType: \"Aruba\"},\n\n            {SwitchIP: \"192.168.252.46\", Building: \"Student Union Gym 208 (SUGymCam)\", Role: \"Access\", DeviceType: \"Unknown\"}\n        ]\n    )\n    |> group(columns: [\"SwitchIP\"])\n\nlive =\n    from(bucket: \"telegraf\")\n        |> range(start: -10m)\n        |> filter(fn: (r) =>\n            r._measurement == \"snmp\" and\n            r._field == \"sysUpTime\"\n        )\n        |> group(columns: [\"source\"])\n        |> last()\n        |> map(fn: (r) => ({\n            SwitchIP: string(v: r.source),\n            LastSeen: r._time,\n            AgeSeconds: float(v: uint(v: now()) - uint(v: r._time)) / 1000000000.0\n        }))\n        |> group(columns: [\"SwitchIP\"])\n\njoined =\n    join.left(\n        left: expected,\n        right: live,\n        on: (l, r) => l.SwitchIP == r.SwitchIP,\n        as: (l, r) => ({\n            SwitchIP: l.SwitchIP,\n            Building: l.Building,\n            Role: l.Role,\n            DeviceType: l.DeviceType,\n            IsOnline:\n                if exists r.AgeSeconds then\n                    if r.AgeSeconds <= 300.0 then 1\n                    else 0\n                else 0\n        })\n    )\n\njoined\n    |> group(columns: [])\n    |> reduce(\n        identity: {Online: 0, Total: 0},\n        fn: (r, accumulator) => ({\n            Online: accumulator.Online + r.IsOnline,\n            Total: accumulator.Total + 1\n        })\n    )\n        |> map(fn: (r) => ({\n        Online: r.Online\n    }))",
           "queryType": "flux",
           "refId": "A"
         }
       ],
-      "title": "Current Campus Backbone Load",
-      "type": "stat",
-      "description": "Current aggregate load measured on the campus backbone."
+      "title": "# Reporting",
+      "type": "stat"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 14,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) =>\n    r._measurement == \"snmp\" and\n    r._field == \"fgSysMemUsage\"\n  )\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\",\"_value\",\"_field\"])\n  |> rename(columns: {_value: \"mem_usage_pct\"})\n",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "FGT Health",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "blue",
+                  "index": 0,
+                  "text": "Core Infrastructure Healthy"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 1,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "Core Infrastructure Affected"
+                },
+                "to": 99
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
+      "id": 39,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "import \"array\"\r\nimport \"join\"\r\n\r\nexpected_core =\r\n    array.from(\r\n        rows: [\r\n            {SwitchIP: \"192.168.1.1\"},\r\n            {SwitchIP: \"192.168.2.70\"},\r\n            {SwitchIP: \"192.168.2.71\"},\r\n            {SwitchIP: \"192.168.2.72\"},\r\n            {SwitchIP: \"192.168.2.73\"}\r\n        ]\r\n    )\r\n    |> group(columns: [\"SwitchIP\"])\r\n\r\nrecent_core =\r\n    from(bucket: \"telegraf\")\r\n        |> range(start: -15m)\r\n        |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\")\r\n        |> group(columns: [\"source\"])\r\n        |> last()\r\n        |> map(fn: (r) => ({\r\n            SwitchIP: string(v: r.source),\r\n            OnlineFlag: 1\r\n        }))\r\n        |> group(columns: [\"SwitchIP\"])\r\n\r\njoin.left(\r\n    left: expected_core,\r\n    right: recent_core,\r\n    on: (l, r) => l.SwitchIP == r.SwitchIP,\r\n    as: (l, r) => ({\r\n        SwitchIP: l.SwitchIP,\r\n        MissingCount: if exists r.OnlineFlag then 0 else 1\r\n    })\r\n)\r\n    |> group(columns: [])\r\n    |> reduce(\r\n        identity: {MissingCount: 0},\r\n        fn: (r, accumulator) => ({\r\n            MissingCount: accumulator.MissingCount + r.MissingCount\r\n        })\r\n    )",
+          "refId": "A"
+        }
+      ],
+      "title": "Infrastructure Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 28
+              },
+              {
+                "color": "yellow",
+                "value": 29
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 20,
+        "y": 6
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -30m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"sysUpTime\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()          // one row per device\r\n  |> group()         // ← collapse to ONE table\r\n  |> count()\r\n\r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Buildings Online",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AvgUptimeDays"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "#EAB839",
+                      "value": 7
+                    },
+                    {
+                      "color": "#6ED0E0",
+                      "value": 14
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 9,
+        "y": 8
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Count$/",
+          "values": true
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -30m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"sysUpTime\" and\r\n    (exists r.sysDescr or exists r.sysName)\r\n  )\r\n\r\n  // ONE ROW PER PHYSICAL DEVICE\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n\r\n  |> map(fn: (r) => ({\r\n    sysName: if exists r.sysName then string(v: r.sysName) else \"\",\r\n    sysDescr: if exists r.sysDescr then string(v: r.sysDescr) else \"\",\r\n    uptime_days: float(v: r._value) / 8640000.0\r\n  }))\r\n\r\n  // CLASSIFICATION (FortiGate by sysName, others by sysDescr)\r\n  |> map(fn: (r) => ({\r\n    Group:\r\n      if r.sysName =~ /FortiGate1-Sccc/ then \"FortiGate Firewall\"\r\n      else if r.sysDescr =~ /Cisco.*(Nexus|NX-OS)/ then \"Cisco Nexus\"\r\n      else if r.sysDescr =~ /Aruba/ then \"Access Switch\"\r\n      else \"Firewall\",\r\n    severity:\r\n      if r.uptime_days < 1.0 then 2\r\n      else if r.uptime_days < 7.0 then 1\r\n      else 0,\r\n    uptime_days: r.uptime_days\r\n  }))\r\n\r\n  |> group(columns: [\"Group\"])\r\n  |> reduce(\r\n    identity: { count: 0, max_sev: 0, sum_uptime: 0.0 },\r\n    fn: (r, accumulator) => ({\r\n      count: accumulator.count + 1,\r\n      max_sev:\r\n        if r.severity > accumulator.max_sev then r.severity else accumulator.max_sev,\r\n      sum_uptime: accumulator.sum_uptime + r.uptime_days\r\n    })\r\n  )\r\n\r\n  |> group(columns: [])\r\n  |> map(fn: (r) => ({\r\n    DeviceType: r.Group,\r\n    Count: r.count,\r\n    Status:\r\n      if r.max_sev == 2 then \"Red\"\r\n      else if r.max_sev == 1 then \"Yellow\"\r\n      else \"Green\",\r\n    AvgUptimeDays:\r\n      if r.count > 0 then r.sum_uptime / float(v: r.count) else 0.0\r\n  }))\r\n\r\n  |> keep(columns: [\"DeviceType\", \"Count\", \"Status\", \"AvgUptimeDays\"])\r\n  |> sort(columns: [\"DeviceType\"])\r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Network Appliance",
+      "type": "stat"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 3,
+        "x": 13,
+        "y": 8
+      },
+      "id": 13,
+      "options": {
+        "bucketOffset": 0,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\")\n  |> group(columns: [\"source\"])\n  |> last()\n  |> map(fn: (r) => ({ r with uptime_seconds: float(v: r._value) / 100.0, uptime_days: (float(v: r._value) / 100.0) / 86400.0 }))\n  |> keep(columns: [\"source\", \"sysName\", \"uptime_seconds\", \"uptime_days\"])\n  |> sort(columns: [\"sysName\", \"source\"], desc: false)",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "SNMP Device Uptime",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "UPS Reporting Online"
+                },
+                "8": {
+                  "color": "semi-dark-blue",
+                  "index": 0,
+                  "text": "UPS Reporting Online"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "from": 9,
+                "result": {
+                  "color": "light-red",
+                  "index": 1,
+                  "text": "UPS Failure "
+                },
+                "to": 30
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 12
+      },
+      "id": 38,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "import \"array\"\r\nimport \"join\"\r\n\r\nexpected_core =\r\n    array.from(\r\n        rows: [\r\n            {SwitchIP: \"192.168.1.1\"},\r\n            {SwitchIP: \"192.168.2.70\"},\r\n            {SwitchIP: \"192.168.2.71\"},\r\n            {SwitchIP: \"192.168.2.72\"},\r\n            {SwitchIP: \"192.168.2.73\"}\r\n        ]\r\n    )\r\n    |> group(columns: [\"SwitchIP\"])\r\n\r\nrecent_core =\r\n    from(bucket: \"telegraf\")\r\n        |> range(start: -15m)\r\n        |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\")\r\n        |> group(columns: [\"source\"])\r\n        |> last()\r\n        |> map(fn: (r) => ({\r\n            SwitchIP: string(v: r.source),\r\n            OnlineFlag: 1\r\n        }))\r\n        |> group(columns: [\"SwitchIP\"])\r\n\r\njoin.left(\r\n    left: expected_core,\r\n    right: recent_core,\r\n    on: (l, r) => l.SwitchIP == r.SwitchIP,\r\n    as: (l, r) => ({\r\n        SwitchIP: l.SwitchIP,\r\n        MissingCount: if exists r.OnlineFlag then 0 else 1\r\n    })\r\n)\r\n    |> group(columns: [])\r\n    |> reduce(\r\n        identity: {MissingCount: 0},\r\n        fn: (r, accumulator) => ({\r\n            MissingCount: accumulator.MissingCount + r.MissingCount\r\n        })\r\n    )",
+          "refId": "A"
+        }
+      ],
+      "title": "UPS Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 23
+              },
+              {
+                "color": "orange",
+                "value": 24
+              },
+              {
+                "color": "blue",
+                "value": 25
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 20,
+        "y": 12
+      },
+      "id": 35,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -24h)\r\n  |> filter(fn: (r) => r._measurement == \"ups\")\r\n  |> filter(fn: (r) => r._field == \"ups_up\")\r\n  |> group(columns: [\"building\", \"ups_name\"])\r\n  |> last()\r\n  |> group(columns: [])\r\n  |> filter(fn: (r) => r._value == 1)\r\n  |> count()",
+          "refId": "A"
+        }
+      ],
+      "title": "UPS Devices up ",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -435,16 +990,15 @@
               }
             ]
           },
-          "unit": "bps",
-          "displayName": "Nexus Core Throughput"
+          "unit": "decbits"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 18,
-        "y": 4,
-        "w": 6,
-        "h": 4
+        "h": 6,
+        "w": 4,
+        "x": 9,
+        "y": 14
       },
       "id": 33,
       "options": {
@@ -472,51 +1026,15 @@
           "refId": "A"
         }
       ],
-      "title": "Nexus Core Throughput",
-      "type": "gauge",
-      "description": "Current aggregate throughput across monitored Nexus core interfaces."
+      "title": "Nexus Memory Utilization",
+      "type": "gauge"
     },
     {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
+      "datasource": {},
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -529,440 +1047,41 @@
               {
                 "color": "red",
                 "value": 80
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 7
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"fortigate_healthcheck_v2\")\n  |> filter(fn: (r) => r._field == \"latency_ms\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({\n      r with\n      circuit: if r.ifName == \"port25\" then \"Ideatek\"\n        else if r.ifName == \"port9\" then \"United\"\n        else r.ifName\n  }))\n  |> keep(columns: [\"_time\", \"_value\", \"circuit\"])\n  |> group(columns: [\"circuit\"])\n  |> rename(columns: {_value: \"latency_ms\"})",
-          "queryType": "flux",
-          "refId": "A"
-        }
-      ],
-      "title": "Internet Latency Trend",
-      "type": "timeseries",
-      "description": "Internet round-trip latency over the selected time range."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
               },
               {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 7
-      },
-      "id": 42,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"fortigate_healthcheck_v2\")\n  |> filter(fn: (r) => r._field == \"packet_loss_pct\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({\n      r with\n      circuit: if r.ifName == \"port25\" then \"Ideatek\"\n        else if r.ifName == \"port9\" then \"United\"\n        else r.ifName\n  }))\n  |> keep(columns: [\"_time\", \"_value\", \"circuit\"])\n  |> group(columns: [\"circuit\"])\n  |> rename(columns: {_value: \"packet_loss_pct\"})",
-          "queryType": "flux",
-          "refId": "A"
-        }
-      ],
-      "title": "Internet Packet Loss Trend",
-      "type": "timeseries",
-      "description": "Internet packet loss over the selected time range."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
+                "color": "#EAB839",
+                "value": 90
               },
               {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "bps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 15,
-        "w": 12,
-        "h": 7
-      },
-      "id": 31,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"interface\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\" and\r\n    (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\r\n  )\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({\r\n    r with\r\n      _value: r._value * 8.0,\r\n      direction: if r._field == \"ifHCInOctets\"\r\n        then \"ingress_bps\"\r\n        else \"egress_bps\"\r\n  }))\r\n  |> group(columns: [\"_time\", \"direction\"])\r\n  |> sum(column: \"_value\")\r\n  |> group(columns: [\"direction\"])\r\n  |> sort(columns: [\"_time\"])\r\n  |> keep(columns: [\"_time\", \"_value\", \"direction\"])",
-          "refId": "A"
-        }
-      ],
-      "title": "Firewall WAN Traffic",
-      "type": "timeseries",
-      "description": "Ingress and egress WAN traffic through the FortiGate."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "always",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [
-            {
-              "options": {
-                "_value": {
-                  "index": 0
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "Mbits"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "_value"
-            },
-            "properties": [
-              {
-                "id": "displayName"
+                "color": "#6ED0E0",
+                "value": 100
               }
             ]
           }
-        ]
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 15,
-        "w": 12,
-        "h": 7
-      },
-      "id": 25,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"interface\")\r\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\r\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> map(fn: (r) => ({ \r\n      r with \r\n      _value: r._value * 8.0 / 1000000.0\r\n  }))\r\n  |> drop(columns: [\"_field\", \"_measurement\"])\r\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\r\n  |> group(columns: [\"ifName\", \"ifAlias\"])",
-          "refId": "A"
-        }
-      ],
-      "title": "Top Interface Throughput",
-      "transformations": [
-        {
-          "id": "concatenate",
-          "options": {
-            "frameNameLabel": "frame",
-            "frameNameMode": "field"
-          }
-        }
-      ],
-      "type": "timeseries",
-      "description": "Highest-traffic monitored interfaces, shown in megabits per second."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "unit": "percent",
-          "displayName": "FortiGate CPU Utilization"
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 0,
-        "y": 22,
-        "w": 6,
-        "h": 6
+        "h": 6,
+        "w": 3,
+        "x": 13,
+        "y": 16
       },
-      "id": 16,
+      "id": 22,
       "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "xTickLabelRotation": 90,
-        "xTickLabelSpacing": 100
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.2.2",
       "targets": [
@@ -971,106 +1090,12 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"fgSysCpuUsage\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\"         // e.g., Fortigate1-Sccc\r\n  )\r\n  |> map(fn: (r) => ({\r\n      r with _value:\r\n        if float(v: r._value) <= 1.0 then float(v: r._value) * 100.0 else float(v: r._value)\r\n  }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"cpu_percent\")\r\n\r\n",
+          "query": "names_base = from(bucket: \"telegraf\")\r\n  |> range(start: -1h)\r\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\r\n  |> group(columns: [\"source\"]) |> last()\r\n  |> map(fn: (r) => ({ r with name: if exists r.sysName then string(v: r.sysName) else r.source }))\r\n  |> keep(columns: [\"source\", \"name\"])\r\n\r\nadm_all = from(bucket: \"telegraf\")\r\n  |> range(start: -5m)\r\n  |> filter(fn: (r) => r._measurement == \"if_status_errors\" and r._field == \"ifAdminStatus\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\r\n  |> filter(fn: (r) => int(v: r._value) == 1)\r\n  |> group(columns: [\"source\"]) |> count()\r\n  |> rename(columns: {_value: \"admin_up\"})\r\n\r\nopr_all = from(bucket: \"telegraf\")\r\n  |> range(start: -5m)\r\n  |> filter(fn: (r) => r._measurement == \"if_status_errors\" and r._field == \"ifOperStatus\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\r\n  |> filter(fn: (r) => int(v: r._value) == 1)\r\n  |> group(columns: [\"source\"]) |> count()\r\n  |> rename(columns: {_value: \"oper_up\"})\r\n\r\nports = join(tables: {a: adm_all, b: opr_all}, on: [\"source\"])\r\n  |> map(fn: (r) => ({ r with down_ports: if float(v: r.admin_up) - float(v: r.oper_up) < 0.0 then 0.0 else float(v: r.admin_up) - float(v: r.oper_up) }))\r\n  |> keep(columns: [\"source\", \"admin_up\", \"oper_up\", \"down_ports\"])\r\n\r\nuptime = from(bucket: \"telegraf\")\r\n  |> range(start: -1h)\r\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\r\n  |> group(columns: [\"source\"]) |> last()\r\n  |> map(fn: (r) => ({ r with uptime_days: float(v: r._value) / 100.0 / 86400.0 }))\r\n  |> keep(columns: [\"source\", \"uptime_days\"])\r\n\r\nbase = join(tables: {a: names_base, b: uptime}, on: [\"source\"])\r\nfinal = join(tables: {a: base, b: ports}, on: [\"source\"])\r\n  |> map(fn: (r) => ({ r with ip: r.source, name: if r.name == \"\" then r.source else r.name, health_score: if r.down_ports > 0.0 then 1.0 else 0.0 }))\r\n  |> keep(columns: [\"ip\", \"name\", \"uptime_days\", \"admin_up\", \"oper_up\", \"down_ports\", \"health_score\"])\r\n  |> group()\r\n  |> sort(columns: [\"down_ports\", \"ip\"], desc: true)\r\n\r\nfinal",
           "refId": "A"
         }
       ],
-      "title": "FortiGate CPU Utilization",
-      "type": "barchart",
-      "description": "Current FortiGate CPU utilization."
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "x": 6,
-        "y": 22,
-        "w": 18,
-        "h": 6
-      },
-      "id": 17,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "bf0gpakqau6tcc"
-          },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"fgSysMemUsage\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\"\r\n  )\r\n  |> map(fn: (r) => ({\r\n      r with _value:\r\n        if float(v: r._value) <= 1.0 then float(v: r._value) * 100.0 else float(v: r._value)\r\n  }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mem_percent\")\r\n",
-          "refId": "A"
-        }
-      ],
-      "title": "FortiGate Memory Utilization",
-      "type": "timeseries",
-      "description": "FortiGate memory utilization over the selected time range."
+      "title": "Nexus 9000 Health",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1082,13 +1107,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "left",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1098,59 +1116,36 @@
                 "value": null
               },
               {
-                "color": "red",
+                "color": "blue",
                 "value": 80
               }
             ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Source"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 124
-              }
-            ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Building"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 249
-              }
-            ]
-          }
-        ]
+          "unit": "bps"
+        },
+        "overrides": []
       },
       "gridPos": {
+        "h": 4,
+        "w": 9,
         "x": 0,
-        "y": 28,
-        "w": 12,
-        "h": 7
+        "y": 18
       },
-      "id": 34,
+      "id": 40,
       "options": {
-        "cellHeight": "md",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "show": false
+          "fields": "",
+          "values": false
         },
-        "frameIndex": 1,
-        "showHeader": true,
-        "sortBy": []
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "10.2.2",
       "targets": [
@@ -1159,13 +1154,12 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "building =\r\nfrom(bucket: \"inventory\")\r\n  |> range(start: -1d)\r\n  |> filter(fn: (r) =>\r\n      r._measurement == \"device_inventory\" and\r\n      r._field == \"building\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n  |> map(fn: (r) => ({\r\n      source: r.source,\r\n      building: string(v: r._value),\r\n      hasSnmp: false\r\n  }))\r\n\r\nsnmp =\r\nfrom(bucket: \"telegraf\")\r\n  |> range(start: -2h)\r\n  |> filter(fn: (r) =>\r\n      r._measurement == \"snmp\" and\r\n      r._field == \"sysUpTime\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n  |> keep(columns: [\"source\"])\r\n  |> map(fn: (r) => ({\r\n      source: r.source,\r\n      building: \"\",\r\n      hasSnmp: true\r\n  }))\r\n\r\nunion(tables: [building, snmp])\r\n  |> group(columns: [\"source\"])\r\n  |> reduce(\r\n      identity: {\r\n        building: \"\",\r\n        hasSnmp: false\r\n      },\r\n      fn: (r, accumulator) => ({\r\n        building:\r\n          if accumulator.building != \"\" then accumulator.building else r.building,\r\n        hasSnmp: accumulator.hasSnmp or r.hasSnmp\r\n      })\r\n  )\r\n  |> filter(fn: (r) => r.hasSnmp == false)\r\n  |> map(fn: (r) => ({\r\n      Building: r.building,\r\n      Source: r.source\r\n  }))\r\n  |> group(columns: [])\r\n  |> sort(columns: [\"Building\"])",
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -15m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"interface\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\" and\r\n    (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\") and\r\n    (r.ifName == \"port25\" or r.ifName == \"port9\")\r\n  )\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> map(fn: (r) => ({\r\n      _time: r._time,\r\n      isp: if r.ifName == \"port25\" then \"IdeaTek\" else \"United\",\r\n      _value: r._value * 8.0\r\n  }))\r\n  |> group(columns: [\"_time\", \"isp\"])\r\n  |> sum(column: \"_value\")\r\n  |> group(columns: [\"isp\"])\r\n  |> yield(name: \"isp_total_bps_by_provider\")",
           "refId": "A"
         }
       ],
-      "title": "Buildings Not Reporting",
-      "type": "table",
-      "description": "Buildings with expected infrastructure that is not currently reporting."
+      "title": "Firewall Throughput",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1299,10 +1293,10 @@
         ]
       },
       "gridPos": {
-        "x": 12,
-        "y": 28,
-        "w": 12,
-        "h": 7
+        "h": 7,
+        "w": 5,
+        "x": 16,
+        "y": 18
       },
       "id": 23,
       "options": {
@@ -1329,9 +1323,391 @@
           "refId": "A"
         }
       ],
-      "title": "Infrastructure Inventory Summary",
-      "type": "table",
-      "description": "Monitored device counts and current reporting status by device type."
+      "title": "Panel Title",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 21,
+        "y": 18
+      },
+      "id": 41,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -10m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"interface_legacy\" and\r\n    (r._field == \"ifInOctets\" or r._field == \"ifOutOctets\") and\r\n    r.source == \"192.168.2.27\"\r\n  )\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> last()\r\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0 }))\r\n  |> group(columns: [])\r\n  |> sum(column: \"_value\")\r\n  |> yield(name: \"switch_current_total_bps\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Baseball",
+      "type": "stat"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 9,
+        "y": 20
+      },
+      "id": 8,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^uptime_days$/",
+          "values": true
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "names_base = from(bucket: \"telegraf\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\n  |> group(columns: [\"source\"]) |> last()\n  |> map(fn: (r) => ({ r with name: if exists r.sysName then string(v: r.sysName) else r.source }))\n  |> keep(columns: [\"source\", \"name\"])\n\nadm_all = from(bucket: \"telegraf\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"if_status_errors\" and r._field == \"ifAdminStatus\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\n  |> filter(fn: (r) => int(v: r._value) == 1)\n  |> group(columns: [\"source\"]) |> count()\n  |> rename(columns: {_value: \"admin_up\"})\n\nopr_all = from(bucket: \"telegraf\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"if_status_errors\" and r._field == \"ifOperStatus\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\n  |> filter(fn: (r) => int(v: r._value) == 1)\n  |> group(columns: [\"source\"]) |> count()\n  |> rename(columns: {_value: \"oper_up\"})\n\nports = join(tables: {a: adm_all, b: opr_all}, on: [\"source\"])\n  |> map(fn: (r) => ({ r with down_ports: if float(v: r.admin_up) - float(v: r.oper_up) < 0.0 then 0.0 else float(v: r.admin_up) - float(v: r.oper_up) }))\n  |> keep(columns: [\"source\", \"admin_up\", \"oper_up\", \"down_ports\"])\n\nuptime = from(bucket: \"telegraf\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"sysUpTime\" and (r.source == \"192.168.2.70\" or r.source == \"192.168.2.71\" or r.source == \"192.168.2.72\" or r.source == \"192.168.2.73\"))\n  |> group(columns: [\"source\"]) |> last()\n  |> map(fn: (r) => ({ r with uptime_days: float(v: r._value) / 100.0 / 86400.0 }))\n  |> keep(columns: [\"source\", \"uptime_days\"])\n\nbase = join(tables: {a: names_base, b: uptime}, on: [\"source\"])\nfinal = join(tables: {a: base, b: ports}, on: [\"source\"])\n  |> map(fn: (r) => ({ r with ip: r.source, name: if r.name == \"\" then r.source else r.name, health_score: if r.down_ports > 0.0 then 1.0 else 0.0, connected: true }))\n  |> keep(columns: [\"ip\", \"name\", \"uptime_days\", \"admin_up\", \"oper_up\", \"down_ports\", \"health_score\", \"connected\"])\n  |> group()\n  |> sort(columns: [\"down_ports\", \"ip\"], desc: true)\n\nfinal",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "Nexus 9000 Health",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 9,
+        "x": 0,
+        "y": 22
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"fortigate_healthcheck_v2\")\n  |> filter(fn: (r) => r._field == \"latency_ms\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({\n      r with\n      circuit: if r.ifName == \"port25\" then \"Ideatek\"\n        else if r.ifName == \"port9\" then \"United\"\n        else r.ifName\n  }))\n  |> keep(columns: [\"_time\", \"_value\", \"circuit\"])\n  |> group(columns: [\"circuit\"])\n  |> rename(columns: {_value: \"latency_ms\"})",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "Internet Latency (ms) - Timeseries",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 3,
+        "x": 13,
+        "y": 22
+      },
+      "id": 20,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.6,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 90,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"fgSysCpuUsage\" and r.sysName == \"FortigateA-Sccc.sccc.edu\")\r\n  |> map(fn: (r) => ({\r\n      r with _value: if float(v: r._value) <= 1.0 then float(v: r._value) * 100.0 else float(v: r._value)\r\n  }))\r\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "hide": false,
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"snmp\" and r._field == \"fgSysSesCount\" and r.sysName == \"Fortigate1-Sccc.sccc.edu\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "B"
+        }
+      ],
+      "title": "Fortigate Health",
+      "type": "barchart"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 21,
+        "y": 24
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"interface\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"ifHCInUcastPkts\" or r[\"_field\"] == \"ifHCInMulticastPkts\" or r[\"_field\"] == \"ifHCInBroadcastPkts\")\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> group(columns: [\"_field\"])\r\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Packet Type Distribution",
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -1344,7 +1720,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -1369,49 +1745,38 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "ups_name"
+              "options": "Source"
             },
             "properties": [
               {
                 "id": "custom.width",
-                "value": 98
+                "value": 124
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "status"
-            },
-            "properties": [
-              {
-                "id": "custom.width"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "building"
+              "options": "Building"
             },
             "properties": [
               {
                 "id": "custom.width",
-                "value": 262
+                "value": 249
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "x": 0,
-        "y": 35,
-        "w": 12,
-        "h": 8
+        "h": 6,
+        "w": 5,
+        "x": 16,
+        "y": 25
       },
-      "id": 28,
+      "id": 34,
       "options": {
-        "cellHeight": "sm",
+        "cellHeight": "md",
         "footer": {
           "countRows": false,
           "fields": "",
@@ -1420,7 +1785,7 @@
           ],
           "show": false
         },
-        "frameIndex": 2,
+        "frameIndex": 1,
         "showHeader": true,
         "sortBy": []
       },
@@ -1431,43 +1796,21 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -24h)\r\n  |> filter(fn: (r) => r._measurement == \"ups\")\r\n  |> filter(fn: (r) => r._field == \"ups_up\")\r\n  |> group(columns: [\"building\", \"ups_name\"])\r\n  |> last()\r\n  |> map(fn: (r) => ({\r\n      building: r.building,\r\n      ups_name: r.ups_name,\r\n      status: if r._value == 1 then \"UP\" else \"DOWN\"\r\n  }))\r\n  |> group(columns: [])\r\n  |> sort(columns: [\"building\"])",
+          "query": "building =\r\nfrom(bucket: \"inventory\")\r\n  |> range(start: -1d)\r\n  |> filter(fn: (r) =>\r\n      r._measurement == \"device_inventory\" and\r\n      r._field == \"building\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n  |> map(fn: (r) => ({\r\n      source: r.source,\r\n      building: string(v: r._value),\r\n      hasSnmp: false\r\n  }))\r\n\r\nsnmp =\r\nfrom(bucket: \"telegraf\")\r\n  |> range(start: -2h)\r\n  |> filter(fn: (r) =>\r\n      r._measurement == \"snmp\" and\r\n      r._field == \"sysUpTime\"\r\n  )\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n  |> keep(columns: [\"source\"])\r\n  |> map(fn: (r) => ({\r\n      source: r.source,\r\n      building: \"\",\r\n      hasSnmp: true\r\n  }))\r\n\r\nunion(tables: [building, snmp])\r\n  |> group(columns: [\"source\"])\r\n  |> reduce(\r\n      identity: {\r\n        building: \"\",\r\n        hasSnmp: false\r\n      },\r\n      fn: (r, accumulator) => ({\r\n        building:\r\n          if accumulator.building != \"\" then accumulator.building else r.building,\r\n        hasSnmp: accumulator.hasSnmp or r.hasSnmp\r\n      })\r\n  )\r\n  |> filter(fn: (r) => r.hasSnmp == false)\r\n  |> map(fn: (r) => ({\r\n      Building: r.building,\r\n      Source: r.source\r\n  }))\r\n  |> group(columns: [])\r\n  |> sort(columns: [\"Building\"])",
           "refId": "A"
         }
       ],
-      "title": "Power Status by Building",
-      "type": "table",
-      "description": "UPS and power-monitoring status grouped by building."
+      "title": "Buildings Not Reporting",
+      "type": "table"
     },
     {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "bf0gpakqau6tcc"
-      },
+      "datasource": {},
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "continuous-GrYlRd"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "match": "empty",
-                "result": {
-                  "color": "red",
-                  "index": 1
-                }
-              },
-              "type": "special"
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1482,97 +1825,38 @@
               {
                 "color": "#EAB839",
                 "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
               }
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Building"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 295
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 253
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "status"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 104
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "source"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 195
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "switchName"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 299
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "x": 12,
-        "y": 35,
-        "w": 12,
-        "h": 8
+        "h": 6,
+        "w": 4,
+        "x": 9,
+        "y": 26
       },
-      "id": 29,
+      "id": 2,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "displayMode": "lcd",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "show": false
+          "fields": "",
+          "values": false
         },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "Status"
-          }
-        ]
+        "showUnfilled": true,
+        "valueMode": "color"
       },
       "pluginVersion": "10.2.2",
       "targets": [
@@ -1581,13 +1865,912 @@
             "type": "influxdb",
             "uid": "bf0gpakqau6tcc"
           },
-          "query": "import \"array\"\r\nimport \"join\"\r\n\r\nexpected =\r\n    array.from(\r\n        rows: [\r\n            {SwitchIP: \"192.168.2.73\", Building: \"Tech T122 (SVI)\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.252.173\", Building: \"CIO Office AA151\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.1.1\", Building: \"Hobble Building (Server Room)\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.34.1\", Building: \"Hobble AA105 SVI\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.89.1\", Building: \"Humanities H128\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.80.33.1\", Building: \"Hobble Core SVI (AA-144)\", Role: \"Core SVI\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.1.1\", Building: \"FortiGate Firewall (Hobble AA-158)\", Role: \"Firewall\", DeviceType: \"FortiGate\"},\r\n            {SwitchIP: \"192.168.2.1\", Building: \"Hobble Core Access (AA-144)\", Role: \"Core Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.27\", Building: \"Baseball Field Pressbox\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.70\", Building: \"Nexus Core 1 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.71\", Building: \"Nexus Core 2 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.72\", Building: \"Tech Core 3\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.73\", Building: \"Tech Core 4\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n\r\n            {SwitchIP: \"192.168.2.171\", Building: \"Cosmetology\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.175\", Building: \"Student Living Center (SLC151)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.178\", Building: \"Tech Building F / Hale Court\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.179\", Building: \"SLG Switch G\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.180\", Building: \"Tech Dorm H / Hale Court Building H\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.181\", Building: \"Tech Dorms J (SLJ)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.182\", Building: \"Tech Dorm SLR\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.183\", Building: \"Student Living SLS\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.184\", Building: \"Student Living SLT\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.2.186\", Building: \"Tech B141\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.187\", Building: \"Tech D201\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.188\", Building: \"Tech TT103\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.189\", Building: \"Tech TA107\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.190\", Building: \"Tech T122 (mgmt)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.2.195\", Building: \"Agriculture V201\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.196\", Building: \"B Building (Boiler Room)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.197\", Building: \"Hobble Testing A161 (SWA-A161)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.199\", Building: \"Hobble HR AA105\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.200\", Building: \"Student Union\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.201\", Building: \"Aruba 6300 A-144 1\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.202\", Building: \"Aruba 6300 A-144 2\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.203\", Building: \"Sharp Center\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.204\", Building: \"Softball Field\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.205\", Building: \"Maintenance\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.212\", Building: \"Student Health Center\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.216\", Building: \"Allied Health\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.2\", Building: \"West Campus (SW-WestCampus-1)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.3\", Building: \"West Campus Truck Driving (SW-WestCampus-2)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.11\", Building: \"West ALC ALC-B\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.92\", Building: \"West Reception (SW-Reception)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n{SwitchIP: \"192.168.2.26\", Building: \"Student Union Cafeteria (SW-Cafe)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.50\", Building: \"Student Activities Gym Instant Replay\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.194\", Building: \"Student Activities (SW-SA208)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.200\", Building: \"Student Union (SWA-SU121)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.252.46\", Building: \"Student Union Gym 208 (SUGymCam)\", Role: \"Access\", DeviceType: \"Aruba\"}\r\n        ]\r\n    )\r\n    |> group(columns: [\"SwitchIP\"])\r\n\r\nlive =\r\n    from(bucket: \"telegraf\")\r\n        |> range(start: -30m)\r\n        |> filter(fn: (r) =>\r\n            r._measurement == \"snmp\" and\r\n            (\r\n                r._field == \"sysUpTime\" or\r\n                r._field == \"sysName\" or\r\n                r._field == \"sysDescr\"\r\n            )\r\n        )\r\n        |> pivot(\r\n            rowKey: [\"_time\", \"source\"],\r\n            columnKey: [\"_field\"],\r\n            valueColumn: \"_value\"\r\n        )\r\n        |> group(columns: [\"source\"])\r\n        |> sort(columns: [\"_time\"])\r\n        |> last(column: \"_time\")\r\n        |> map(fn: (r) => ({\r\n            SwitchIP: string(v: r.source),\r\n            LastSeen: r._time,\r\n            AgeSeconds: float(v: uint(v: now()) - uint(v: r._time)) / 1000000000.0,\r\n            SwitchName:\r\n                if exists r.sysName then\r\n                    string(v: r.sysName)\r\n                else\r\n                    \"\",\r\n            Description:\r\n                if exists r.sysDescr then\r\n                    string(v: r.sysDescr)\r\n                else\r\n                    \"\",\r\n            HasSysUpTime:\r\n                if exists r.sysUpTime then\r\n                    true\r\n                else\r\n                    false\r\n        }))\r\n        |> keep(\r\n            columns: [\r\n                \"SwitchIP\",\r\n                \"LastSeen\",\r\n                \"AgeSeconds\",\r\n                \"SwitchName\",\r\n                \"Description\",\r\n                \"HasSysUpTime\"\r\n            ]\r\n        )\r\n        |> group(columns: [\"SwitchIP\"])\r\n\r\njoined =\r\n    join.left(\r\n        left: expected,\r\n        right: live,\r\n        on: (l, r) => l.SwitchIP == r.SwitchIP,\r\n        as: (l, r) => ({\r\n            SwitchIP: l.SwitchIP,\r\n            Building: l.Building,\r\n            Role: l.Role,\r\n            DeviceType: l.DeviceType,\r\n            Status:\r\n                if exists r.HasSysUpTime and r.HasSysUpTime == true then\r\n                    \"Online\"\r\n                else\r\n                    \"Offline\",\r\n            SwitchName:\r\n                if exists r.SwitchName then\r\n                    r.SwitchName\r\n                else\r\n                    \"\",\r\n            Description:\r\n                if exists r.Description then\r\n                    r.Description\r\n                else\r\n                    \"\",\r\n            LastSeen:\r\n                if exists r.LastSeen then\r\n                    r.LastSeen\r\n                else\r\n                    time(v: 0),\r\n            Minutes:\r\n                if exists r.AgeSeconds then\r\n                    r.AgeSeconds / 60.0\r\n                else\r\n                    -1.0\r\n        })\r\n    )\r\n\r\njoined\r\n    |> group(columns: [])\r\n    |> map(fn: (r) => ({\r\n        Source: r.SwitchIP,\r\n        Status: r.Status,\r\n        SwitchName: r.SwitchName,\r\n        Description: r.Description,\r\n        Building: r.Building,\r\n        Role: r.Role,\r\n        DeviceType: r.DeviceType,\r\n        LastSeen: r.LastSeen,\r\n        Minutes: r.Minutes\r\n    }))\r\n    |> keep(\r\n        columns: [\r\n            \"Source\",\r\n            \"Status\",\r\n            \"SwitchName\",\r\n            \"Description\",\r\n            \"Building\"\r\n        ]\r\n    )\r\n    |> sort(columns: [\"Status\", \"Building\", \"Source\"])",
+          "query": "import \"math\"\n\nfrom(bucket: \"telegraf\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"fortigate_healthcheck_v2\")\n  |> filter(fn: (r) => r._field == \"packet_loss_pct\" or r._field == \"latency_ms\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group(columns: [\"hc_name\",\"ifName\",\"vdom\",\"_field\"])\n  |> last()\n  |> rename(columns: {hc_name:\"HealthCheck\", ifName:\"Interface\", vdom:\"VDOM\"})\n  |> map(fn: (r) => ({\n      r with _value:\n        if r._field == \"packet_loss_pct\"\n        then math.round(x: r._value * 100.0) / 100.0\n        else math.round(x: r._value)        // latency: nearest ms\n    }))\n  |> pivot(rowKey: [\"HealthCheck\",\"Interface\",\"VDOM\",\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> rename(columns: {packet_loss_pct:\"Packet Loss %\", latency_ms:\"Latency (ms)\"})\n  |> keep(columns: [\"_time\",\"HealthCheck\",\"Interface\",\"VDOM\",\"Packet Loss %\",\"Latency (ms)\"])\n",
+          "queryType": "flux",
           "refId": "A"
         }
       ],
-      "title": "Monitored Switches",
-      "type": "table",
-      "description": "Current monitored switch inventory and reporting state."
+      "title": "Internet Latency (ms)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 9,
+        "x": 0,
+        "y": 27
+      },
+      "id": 42,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"fortigate_healthcheck_v2\")\n  |> filter(fn: (r) => r._field == \"packet_loss_pct\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({\n      r with\n      circuit: if r.ifName == \"port25\" then \"Ideatek\"\n        else if r.ifName == \"port9\" then \"United\"\n        else r.ifName\n  }))\n  |> keep(columns: [\"_time\", \"_value\", \"circuit\"])\n  |> group(columns: [\"circuit\"])\n  |> rename(columns: {_value: \"packet_loss_pct\"})",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "Internet Latency (ms) - Timeseries",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "_value": {
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "MBs"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_value"
+            },
+            "properties": [
+              {
+                "id": "displayName"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 10,
+        "x": 13,
+        "y": 31
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"interface\")\r\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\r\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> map(fn: (r) => ({ \r\n      r with \r\n      _value: r._value * 8.0 / 1000000.0\r\n  }))\r\n  |> drop(columns: [\"_field\", \"_measurement\"])\r\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\r\n  |> group(columns: [\"ifName\", \"ifAlias\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Interface Throughput - Top Interfaces by traffic",
+      "transformations": [
+        {
+          "id": "concatenate",
+          "options": {
+            "frameNameLabel": "frame",
+            "frameNameMode": "field"
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 32
+      },
+      "id": 7,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 90,
+        "xTickLabelSpacing": 200
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\n  |> filter(fn: (r) => r._field == \"ifInOctets\" or r._field == \"ifOutOctets\" or r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0, dir: if r._field == \"ifInOctets\" or r._field == \"ifHCInOctets\" then \"download\" else \"upload\" }))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"wan_bps\")",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "FortiGate WAN Throughput (bps)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 5,
+        "x": 8,
+        "y": 32
+      },
+      "id": 5,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement =~ /^(interface|interface_legacy)$/)\n  |> filter(fn: (r) => r.sysName =~ /(?i)Fortigate1-Sccc/ or r.source == \"192.168.1.1\")\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifInOctets\")\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0 }))   // bps\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum(column: \"_value\")\n  |> yield(name: \"fortigate_in_bps\")",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "FGT WAN Download (bps)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 41
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"interface\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\" and\r\n    (r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\r\n  )\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({\r\n    r with\r\n      _value: r._value * 8.0,\r\n      direction: if r._field == \"ifHCInOctets\"\r\n        then \"ingress_bps\"\r\n        else \"egress_bps\"\r\n  }))\r\n  |> group(columns: [\"_time\", \"direction\"])\r\n  |> sum(column: \"_value\")\r\n  |> group(columns: [\"direction\"])\r\n  |> sort(columns: [\"_time\"])\r\n  |> keep(columns: [\"_time\", \"_value\", \"direction\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Firewall (Egress/Ingress)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {},
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 5,
+        "x": 8,
+        "y": 41
+      },
+      "id": 19,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 90,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"interface\")\r\n  |> filter(fn: (r) => r._field == \"ifHCInOctets\" or r._field == \"ifHCOutOctets\")\r\n  |> filter(fn: (r) => r.ifName =~ /(?i)(port25|port9)/)\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0, dir: if r._field == \"ifHCInOctets\" then \"in\" else \"out\" }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> keep(columns: [\"_time\",\"_value\",\"sysName\",\"ifName\",\"dir\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Fortigate WAN Throughput (BPS) ",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 13,
+        "y": 41
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"interface\")\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\n  |> filter(fn: (r) => r._field == \"ifOutOctets\" or r._field == \"ifHCOutOctets\")\n  |> derivative(unit: 1s, nonNegative: true)\n  |> map(fn: (r) => ({ r with _value: r._value * 8.0 }))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> last()",
+          "queryType": "flux",
+          "refId": "A"
+        }
+      ],
+      "title": "FGT WAN Upload (bps)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"fgSysMemUsage\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\"\r\n  )\r\n  |> map(fn: (r) => ({\r\n      r with _value:\r\n        if float(v: r._value) <= 1.0 then float(v: r._value) * 100.0 else float(v: r._value)\r\n  }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mem_percent\")\r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Fortigate Memory Utilisation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 8,
+        "y": 48
+      },
+      "id": 16,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 90,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"snmp\" and\r\n    r._field == \"fgSysCpuUsage\" and\r\n    r.sysName == \"FortigateA-Sccc.sccc.edu\"         // e.g., Fortigate1-Sccc\r\n  )\r\n  |> map(fn: (r) => ({\r\n      r with _value:\r\n        if float(v: r._value) <= 1.0 then float(v: r._value) * 100.0 else float(v: r._value)\r\n  }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"cpu_percent\")\r\n\r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Fortigate CPU Utilization",
+      "type": "barchart"
+    },
+    {
+      "datasource": {},
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 30
+              },
+              {
+                "color": "purple",
+                "value": 50
+              },
+              {
+                "color": "semi-dark-blue",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "Kbits"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 13,
+        "y": 48
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -5m)\r\n  |> filter(fn: (r) =>\r\n    r._measurement == \"interface\" and\r\n    r.source != \"192.168.1.1\" and\r\n    (r._field == \"ifHCInBroadcastPkts\" or r._field == \"ifHCOutBroadcastPkts\")\r\n  )\r\n  |> derivative(unit: 1m, nonNegative: true)\r\n  |> group(columns: [\"_time\", \"source\"])\r\n  |> sum(column: \"_value\")\r\n  |> group(columns: [\"source\"])\r\n  |> last()\r\n  |> keep(columns: [\"source\", \"_value\"])\r\n  |> rename(columns: {source: \"ip\", _value: \"\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Device Total Broadcast PPS",
+      "transparent": true,
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1825,10 +3008,10 @@
         ]
       },
       "gridPos": {
+        "h": 43,
+        "w": 14,
         "x": 0,
-        "y": 43,
-        "w": 24,
-        "h": 9
+        "y": 54
       },
       "id": 15,
       "options": {
@@ -1856,21 +3039,396 @@
           "refId": "A"
         }
       ],
-      "title": "Monitored Devices",
-      "type": "table",
-      "description": "Detailed expected-device inventory and current monitoring state."
+      "title": "Devices Monitored",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ups_name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 98
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.width"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "building"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 262
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 34,
+        "w": 7,
+        "x": 14,
+        "y": 54
+      },
+      "id": 28,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 2,
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: -24h)\r\n  |> filter(fn: (r) => r._measurement == \"ups\")\r\n  |> filter(fn: (r) => r._field == \"ups_up\")\r\n  |> group(columns: [\"building\", \"ups_name\"])\r\n  |> last()\r\n  |> map(fn: (r) => ({\r\n      building: r.building,\r\n      ups_name: r.ups_name,\r\n      status: if r._value == 1 then \"UP\" else \"DOWN\"\r\n  }))\r\n  |> group(columns: [])\r\n  |> sort(columns: [\"building\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Power Status By Building",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 20,
+        "y": 88
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement ==\"FortigateA-Sccc.sccc.edu\")\r\n  |> filter(fn: (r) => r._field == \"packet_loss_pct\")\r\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\r\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\r\n  |> group(columns: [\"hc_name\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Packet Loss Fortigage Health Check",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "empty",
+                "result": {
+                  "color": "red",
+                  "index": 1
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Building"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 295
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 253
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 104
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 195
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "switchName"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 299
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 47,
+        "w": 17,
+        "x": 0,
+        "y": 97
+      },
+      "id": 29,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Status"
+          }
+        ]
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "import \"array\"\r\nimport \"join\"\r\n\r\nexpected =\r\n    array.from(\r\n        rows: [\r\n            {SwitchIP: \"192.168.2.73\", Building: \"Tech T122 (SVI)\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.252.173\", Building: \"CIO Office AA151\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.1.1\", Building: \"Hobble Building (Server Room)\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.34.1\", Building: \"Hobble AA105 SVI\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.70.89.1\", Building: \"Humanities H128\", Role: \"SVI\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"10.80.33.1\", Building: \"Hobble Core SVI (AA-144)\", Role: \"Core SVI\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.1.1\", Building: \"FortiGate Firewall (Hobble AA-158)\", Role: \"Firewall\", DeviceType: \"FortiGate\"},\r\n            {SwitchIP: \"192.168.2.1\", Building: \"Hobble Core Access (AA-144)\", Role: \"Core Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.27\", Building: \"Baseball Field Pressbox\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.70\", Building: \"Nexus Core 1 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.71\", Building: \"Nexus Core 2 (Hobble AA-158)\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.72\", Building: \"Tech Core 3\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n            {SwitchIP: \"192.168.2.73\", Building: \"Tech Core 4\", Role: \"Core\", DeviceType: \"Cisco\"},\r\n\r\n            {SwitchIP: \"192.168.2.171\", Building: \"Cosmetology\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.175\", Building: \"Student Living Center (SLC151)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.178\", Building: \"Tech Building F / Hale Court\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.179\", Building: \"SLG Switch G\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.180\", Building: \"Tech Dorm H / Hale Court Building H\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.181\", Building: \"Tech Dorms J (SLJ)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.182\", Building: \"Tech Dorm SLR\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.183\", Building: \"Student Living SLS\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.184\", Building: \"Student Living SLT\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.2.186\", Building: \"Tech B141\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.187\", Building: \"Tech D201\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.188\", Building: \"Tech TT103\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.189\", Building: \"Tech TA107\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.190\", Building: \"Tech T122 (mgmt)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n            {SwitchIP: \"192.168.2.195\", Building: \"Agriculture V201\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.196\", Building: \"B Building (Boiler Room)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.197\", Building: \"Hobble Testing A161 (SWA-A161)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.199\", Building: \"Hobble HR AA105\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.200\", Building: \"Student Union\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.201\", Building: \"Aruba 6300 A-144 1\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.202\", Building: \"Aruba 6300 A-144 2\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.203\", Building: \"Sharp Center\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.204\", Building: \"Softball Field\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.205\", Building: \"Maintenance\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.212\", Building: \"Student Health Center\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n            {SwitchIP: \"192.168.2.216\", Building: \"Allied Health\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.2\", Building: \"West Campus (SW-WestCampus-1)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.3\", Building: \"West Campus Truck Driving (SW-WestCampus-2)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.11\", Building: \"West ALC ALC-B\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"172.25.0.92\", Building: \"West Reception (SW-Reception)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n\r\n{SwitchIP: \"192.168.2.26\", Building: \"Student Union Cafeteria (SW-Cafe)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.50\", Building: \"Student Activities Gym Instant Replay\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.194\", Building: \"Student Activities (SW-SA208)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.2.200\", Building: \"Student Union (SWA-SU121)\", Role: \"Access\", DeviceType: \"Aruba\"},\r\n{SwitchIP: \"192.168.252.46\", Building: \"Student Union Gym 208 (SUGymCam)\", Role: \"Access\", DeviceType: \"Aruba\"}\r\n        ]\r\n    )\r\n    |> group(columns: [\"SwitchIP\"])\r\n\r\nlive =\r\n    from(bucket: \"telegraf\")\r\n        |> range(start: -30m)\r\n        |> filter(fn: (r) =>\r\n            r._measurement == \"snmp\" and\r\n            (\r\n                r._field == \"sysUpTime\" or\r\n                r._field == \"sysName\" or\r\n                r._field == \"sysDescr\"\r\n            )\r\n        )\r\n        |> pivot(\r\n            rowKey: [\"_time\", \"source\"],\r\n            columnKey: [\"_field\"],\r\n            valueColumn: \"_value\"\r\n        )\r\n        |> group(columns: [\"source\"])\r\n        |> sort(columns: [\"_time\"])\r\n        |> last(column: \"_time\")\r\n        |> map(fn: (r) => ({\r\n            SwitchIP: string(v: r.source),\r\n            LastSeen: r._time,\r\n            AgeSeconds: float(v: uint(v: now()) - uint(v: r._time)) / 1000000000.0,\r\n            SwitchName:\r\n                if exists r.sysName then\r\n                    string(v: r.sysName)\r\n                else\r\n                    \"\",\r\n            Description:\r\n                if exists r.sysDescr then\r\n                    string(v: r.sysDescr)\r\n                else\r\n                    \"\",\r\n            HasSysUpTime:\r\n                if exists r.sysUpTime then\r\n                    true\r\n                else\r\n                    false\r\n        }))\r\n        |> keep(\r\n            columns: [\r\n                \"SwitchIP\",\r\n                \"LastSeen\",\r\n                \"AgeSeconds\",\r\n                \"SwitchName\",\r\n                \"Description\",\r\n                \"HasSysUpTime\"\r\n            ]\r\n        )\r\n        |> group(columns: [\"SwitchIP\"])\r\n\r\njoined =\r\n    join.left(\r\n        left: expected,\r\n        right: live,\r\n        on: (l, r) => l.SwitchIP == r.SwitchIP,\r\n        as: (l, r) => ({\r\n            SwitchIP: l.SwitchIP,\r\n            Building: l.Building,\r\n            Role: l.Role,\r\n            DeviceType: l.DeviceType,\r\n            Status:\r\n                if exists r.HasSysUpTime and r.HasSysUpTime == true then\r\n                    \"Online\"\r\n                else\r\n                    \"Offline\",\r\n            SwitchName:\r\n                if exists r.SwitchName then\r\n                    r.SwitchName\r\n                else\r\n                    \"\",\r\n            Description:\r\n                if exists r.Description then\r\n                    r.Description\r\n                else\r\n                    \"\",\r\n            LastSeen:\r\n                if exists r.LastSeen then\r\n                    r.LastSeen\r\n                else\r\n                    time(v: 0),\r\n            Minutes:\r\n                if exists r.AgeSeconds then\r\n                    r.AgeSeconds / 60.0\r\n                else\r\n                    -1.0\r\n        })\r\n    )\r\n\r\njoined\r\n    |> group(columns: [])\r\n    |> map(fn: (r) => ({\r\n        Source: r.SwitchIP,\r\n        Status: r.Status,\r\n        SwitchName: r.SwitchName,\r\n        Description: r.Description,\r\n        Building: r.Building,\r\n        Role: r.Role,\r\n        DeviceType: r.DeviceType,\r\n        LastSeen: r.LastSeen,\r\n        Minutes: r.Minutes\r\n    }))\r\n    |> keep(\r\n        columns: [\r\n            \"Source\",\r\n            \"Status\",\r\n            \"SwitchName\",\r\n            \"Description\",\r\n            \"Building\"\r\n        ]\r\n    )\r\n    |> sort(columns: [\"Status\", \"Building\", \"Source\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Monitored Switches",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bf0gpakqau6tcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 2,
+        "x": 8,
+        "y": 144
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.2.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "bf0gpakqau6tcc"
+          },
+          "query": "from(bucket: \"telegraf\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"FortigateA-Sccc.sccc.edu\")\r\n  |> filter(fn: (r) => r._field == \"latency_ms\")\r\n  |> filter(fn: (r) => r.sysName == \"FortigateA-Sccc.sccc.edu\")\r\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\r\n  |> group(columns: [\"hc_name\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Fortigate Latency",
+      "type": "stat"
     }
   ],
   "refresh": "1m",
   "schemaVersion": 38,
   "tags": [
-    "FortiGate",
     "LCARS",
     "Overview",
-    "SCCC",
-    "Switching",
-    "executive",
-    "network"
+    "FortiGate",
+    "Switching"
   ],
   "templating": {
     "list": [
@@ -1908,6 +3466,5 @@
   "title": "A - SCCC Network Overview",
   "uid": "e7633483-9f63-4a1f-9d8e-84a5164954837",
   "version": 112,
-  "weekStart": "",
-  "description": "Executive campus network overview. Values are live telemetry; missing data is left visible rather than converted into a healthy status."
+  "weekStart": ""
 }
