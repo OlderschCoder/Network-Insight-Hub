@@ -281,7 +281,7 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
             if field in ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps"):
                 query += ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")'
             query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
-            defaults["displayName"] = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
+            defaults["displayName"] = "${__field.labels.computer}"
         panels.append({"id": len(panels) + 1, "title": title, "type": "timeseries", "datasource": datasource,
                        "gridPos": {"x": (index % 2) * 12, "y": 4 + (index // 2) * 8, "w": 12, "h": 8},
                        "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
@@ -407,7 +407,7 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                  'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
                  '|> group(columns: ["building", "user", "computer", "adapter", "_field"])')
     pc_speed_series = ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")' + pc_identity_series
-    pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
+    pc_display = "${__field.labels.computer}"
     add_panel("PC download by building / user / computer", "timeseries",
               query("sccc_device_performance", ("download_mbps",), extra=pc_speed_series),
               0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)

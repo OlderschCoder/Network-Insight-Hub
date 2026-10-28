@@ -310,11 +310,15 @@ class MetricsTests(unittest.TestCase):
         for field in ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "link_mbps", "request_loss_percent", "dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"):
             self.assertIn(field, encoded_performance)
         self.assertNotIn("synthetic-token", json.dumps(value))
-        self.assertIn("labels.adapter", encoded_performance)
+        self.assertIn("labels.computer", encoded_performance)
         self.assertIn("Successful validated speed tests", encoded_performance)
         self.assertIn("Failed validated speed tests", encoded_performance)
         self.assertIn('r.type == \\"librespeed-v2\\"', encoded_performance)
         self.assertIn('r.method == \\"MultiStreamV2\\"', encoded_performance)
+        for panel in value["panels"]:
+            if panel["title"].startswith("Endpoint ") or panel["title"] == "Negotiated endpoint link speed":
+                self.assertEqual(panel["fieldConfig"]["defaults"].get("displayName"),
+                                 "${__field.labels.computer}")
 
         wireless = wireless_dashboard("telegraf")
         self.assertEqual(wireless["uid"], "sccc-wireless-overview")
@@ -332,7 +336,7 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("sccc_device_performance", encoded)
         self.assertIn("PC jitter by building / user / computer", encoded)
         self.assertIn("PC negotiated link speed", encoded)
-        self.assertIn("labels.adapter", encoded)
+        self.assertIn("labels.computer", encoded)
         self.assertIn('"unit": "bps"', encoded)
         self.assertIn('"value": "Download"', encoded)
         self.assertIn('"value": "Latency"', encoded)
@@ -356,6 +360,11 @@ class MetricsTests(unittest.TestCase):
                              "${__field.labels.building}")
         self.assertEqual(panels_by_title["AP availability by building"]["fieldConfig"]["defaults"]["displayName"],
                          "${__field.labels.building} \u00b7 ${__field.labels._field}")
+        for title in ("PC download by building / user / computer", "PC upload by building / user / computer",
+                      "PC latency by building / user / computer", "PC jitter by building / user / computer",
+                      "PC negotiated link speed"):
+            self.assertEqual(panels_by_title[title]["fieldConfig"]["defaults"]["displayName"],
+                             "${__field.labels.computer}")
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):
