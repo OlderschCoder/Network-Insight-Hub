@@ -1,6 +1,7 @@
 import { pool } from "@workspace/db";
 import { getBuildingSummaries } from "../routes/network_nodes";
 import { fresh } from "./building_diagnostics";
+import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
 import { DiagnosticsError, ensureDiagnosticsSchema, type Inventory } from "./building_diagnostics_store";
 
 export const MAX_BUILDING_ASSIGNMENTS = 1000;
@@ -20,7 +21,7 @@ export function normalizeAssignmentIds(ids: string[]) {
 
 export function canonicalAssignmentBuildings(summaries: unknown): string[] {
   if (!Array.isArray(summaries) || !summaries.length || summaries.some(row => typeof row?.name !== "string" || !row.name.trim() || row.name.trim().length > 120)) throw new DiagnosticsError(503, "The campus building catalog is unavailable");
-  return [...new Set<string>(summaries.map(row => row.name.trim()))].sort((a, b) => a.localeCompare(b));
+  return [...new Set<string>(summaries.map(row => diagnosticsBuildingName(row.name)).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b));
 }
 
 export function validateAssignmentDirectory(inv: Inventory | undefined, ids: string[], now = Date.now()) {

@@ -28,6 +28,14 @@ from pull_worker import API, FredClient, NoRedirect, atomic_write, read_json, ru
 DATASOURCE_UID = "bf0gpakqau6tcc"
 MAX_SAFE = 9007199254740991
 MAX_LINES_PER_WRITE = 500
+STAFF_ASSIGNMENTS = Path("/etc/sccc-building-diagnostics/staff-building-assignments.json")
+STAFF_BUILDINGS = {
+    "Agriculture", "Allied Health", "Baseball Field", "Cosmetology", "Hobble",
+    "Humanities", "Industrial Technology Campus", "Maintenance Building",
+    "Softball Field", "Student Activities", "Student Health Center",
+    "Student Union", "Tech Building A", "Tech Building B", "Tech Building D",
+    "Tech Building T", "West Campus",
+}
 
 
 def json_bytes(value) -> bytes:
@@ -44,6 +52,36 @@ def text(value, limit=255) -> str:
     if not isinstance(value, str) or not value or len(value) > limit or any(ord(c) < 32 for c in value):
         raise ValueError("Metric identity must be bounded text")
     return value
+
+
+def staff_assignments(path: Path | None, now: datetime | None = None) -> list[dict]:
+    """Load exact, private account-to-building joins; never infer from a PC name."""
+    if path is None or not path.exists():
+        return []
+    now = now or utc_now()
+    data = read_json(path, 512 * 1024)
+    if data.get("schema") != "sccc.staff-building-assignments.v1" or set(data) != {"schema", "generatedAt", "assignments"}:
+        raise ValueError("Unsupported staff building assignment file")
+    age = (now - timestamp(data["generatedAt"])).total_seconds()
+    rows = data["assignments"]
+    if age < -30 or age > 30 * 86400 or not isinstance(rows, list) or len(rows) > 2000:
+        raise ValueError("Staff building assignments must be current and bounded")
+    result, seen = [], {}
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"username", "building"}:
+            raise ValueError("Invalid staff building assignment row")
+        username = text(row["username"], 160)
+        building = text(row["building"], 120)
+        if not re.fullmatch(r"SCCC\\[A-Za-z0-9._-]+", username, re.I) or building not in STAFF_BUILDINGS:
+            raise ValueError("Staff assignment must use an exact SCCC account and physical building")
+        key = username.lower()
+        if key in seen and seen[key] != building:
+            raise ValueError("Conflicting staff building assignments")
+        seen[key] = building
+    for username, building in sorted(seen.items()):
+        result.append({"username": username, "building": building,
+                       "source": "assignment", "observedAt": data["generatedAt"]})
+    return result
 
 
 def time_ns(value: str) -> int:
@@ -547,9 +585,10 @@ def wifi_observations(path: Path | None, now=None) -> tuple[list, bool]:
     return result, not bool(result) or len(result) != len(rows)
 
 
-def cycle(client, influx, state_dir: Path, targets: list[dict], agent_path: Path, wifi_path: Path | None, bucket: str, collect=collect_targets) -> dict:
+def cycle(client, influx, state_dir: Path, targets: list[dict], agent_path: Path, wifi_path: Path | None, bucket: str, collect=collect_targets, staff_path: Path | None = None) -> dict:
     ad = client.request(API + "/ad-inventory")
     inventory = validate_inventory({"snapshotComplete": ad.get("snapshotComplete"), "adObservedAt": ad.get("adObservedAt"), "adComputers": ad.get("adComputers"), "observations": [], "userBuildingAssignments": []})
+    inventory["userBuildingAssignments"] = staff_assignments(staff_path)
     counters_path, results_path = state_dir / "counters.json", state_dir / "results.json"
     previous = read_json(counters_path) if counters_path.exists() else {}
     collected = collect(targets, agent_path, previous)
@@ -591,6 +630,7 @@ def main() -> int:
     parser.add_argument("--profiles", type=Path, default=Path("/etc/sccc-noc-probe-snmp/profiles.json"))
     parser.add_argument("--snmp-agent", type=Path, default=Path("/opt/sccc-noc-probe/noc_probe_agent.py"))
     parser.add_argument("--wifi", type=Path)
+    parser.add_argument("--staff-assignments", type=Path, default=STAFF_ASSIGNMENTS)
     args = parser.parse_args()
     try:
         if os.name != "posix" or os.geteuid() != 0:
@@ -609,7 +649,7 @@ def main() -> int:
             client = FredClient(os.environ.get("BUILDING_DIAGNOSTICS_FRED_ORIGIN", ""), os.environ.get("BUILDING_DIAGNOSTICS_WORKER_TOKEN", ""))
             influx = InfluxClient(os.environ.get("INFLUX_URL", ""), os.environ.get("INFLUX_TOKEN", ""), os.environ.get("INFLUX_ORG", ""), os.environ.get("INFLUX_BUCKET", ""))
             targets = load_targets(args.targets, explicit_profiles(args.profiles))
-            print(json.dumps(cycle(client, influx, args.state_dir, targets, args.snmp_agent, args.wifi, os.environ["INFLUX_BUCKET"])))
+            print(json.dumps(cycle(client, influx, args.state_dir, targets, args.snmp_agent, args.wifi, os.environ["INFLUX_BUCKET"], staff_path=args.staff_assignments)))
             signal.alarm(0)
         return 0
     except Exception as error:

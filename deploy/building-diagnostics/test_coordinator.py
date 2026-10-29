@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from coordinator_worker import (DATASOURCE_UID, InfluxClient, collector_points, cycle,
                                 dashboard, export_reports, presence_points, report_point, report_points, time_ns,
-                                wifi_observations, wireless_dashboard)
+                                staff_assignments, wifi_observations, wireless_dashboard)
 from private_snmp_collector import (BRIDGE_MAP, FDB_PORT, FDB_STATUS, IF_TABLE,
                                     IFX_TABLE, access_interfaces, collect_one,
                                     collect_targets, exclude_shared_port_observations,
@@ -57,6 +57,24 @@ def metadata_owner(owner=0):
         values[4] = owner
         return os.stat_result(values)
     return patch("private_snmp_collector.os.fstat", side_effect=synthetic_owner)
+
+
+class StaffAssignmentTests(unittest.TestCase):
+    def test_private_exact_accounts_are_loaded_without_hostname_inference(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "staff.json"
+            path.write_text(json.dumps({"schema": "sccc.staff-building-assignments.v1", "generatedAt": STAMP,
+                                        "assignments": [{"username": "SCCC\\person.one", "building": "Hobble"}]}))
+            self.assertEqual(staff_assignments(path, NOW), [{"username": "sccc\\person.one", "building": "Hobble", "source": "assignment", "observedAt": STAMP}])
+
+    def test_service_scope_and_conflicting_accounts_are_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "staff.json"
+            base = {"schema": "sccc.staff-building-assignments.v1", "generatedAt": STAMP}
+            path.write_text(json.dumps({**base, "assignments": [{"username": "SCCC\\person", "building": "Campus Wide"}]}))
+            with self.assertRaises(ValueError): staff_assignments(path, NOW)
+            path.write_text(json.dumps({**base, "assignments": [{"username": "SCCC\\person", "building": "Hobble"}, {"username": "sccc\\person", "building": "Humanities"}]}))
+            with self.assertRaises(ValueError): staff_assignments(path, NOW)
 
 
 class FakeAgent:

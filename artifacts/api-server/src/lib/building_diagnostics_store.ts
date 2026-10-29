@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
 import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB_MS, libreSpeedBucket, libreSpeedConfig, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, resolvePortTelemetry, schedulerSettings, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, MIN_ROTATION_MINUTES, MAX_ROTATION_MINUTES, type Assignment, type CollectorStatus, type Heartbeat, type JobType, type Observation, type QueueInput, type SchedulerInput } from "./building_diagnostics";
+import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
 type Client = Pick<typeof pool, "query">;
@@ -280,10 +281,13 @@ export const diagnosticsStore = {
     const jobs = (await pool.query(`SELECT j.*,d.computer_name FROM building_diagnostics_jobs j JOIN building_diagnostics_devices d ON d.id=j.device_id ORDER BY j.created_at DESC LIMIT 100`)).rows.map((j) => ({ id: j.id, deviceId: j.device_id, computerName: j.computer_name, building: j.building, status: j.status, type: j.type, automatic: j.automatic, targetOrigin: j.target_origin, downloadBytes: j.download_bytes, scheduledAt: iso(j.scheduled_at), createdAt: iso(j.created_at), expiresAt: iso(j.expires_at), requestedBy: j.requested_by }));
     // Buildings with no enrolled endpoint must remain visible as missing coverage.
     const catalog = (await pool.query("SELECT DISTINCT trim(building) AS building FROM net_nodes WHERE trim(building)<>''")).rows;
-    const allBuildings = new Set([...catalog.map((b) => String(b.building)), ...inv.observations.map((o) => o.building), ...inv.userBuildingAssignments.map((a) => a.building)]);
+    const allBuildings = new Set([...catalog.map((b) => String(b.building)), ...inv.observations.map((o) => o.building), ...inv.userBuildingAssignments.map((a) => a.building)]
+      .map(diagnosticsBuildingName).filter((building): building is string => !!building));
     const recent = (await pool.query("SELECT DISTINCT ON(building) building,id,recorded_at,data FROM building_diagnostics_reports WHERE building IS NOT NULL ORDER BY building,id DESC")).rows;
     const buildings = [...allBuildings].sort().map((building) => {
-      const members = devices.filter((d) => d.location.building === building), r = recent.find((r) => r.building === building);
+      const members = devices.filter((d) => diagnosticsBuildingName(d.location.building) === building);
+      const r = recent.filter((row) => diagnosticsBuildingName(row.building) === building)
+        .sort((a, b) => Number(b.id) - Number(a.id))[0];
       const interfaces = Array.isArray(r?.data?.libreSpeed?.measurements) ? r.data.libreSpeed.measurements : [];
       const representative = interfaces.find((item: any) => item.adapterKind === "ethernet") ?? interfaces[0];
       const lastResult = r ? { id: String(r.id), recordedAt: iso(r.recorded_at), ...r.data,

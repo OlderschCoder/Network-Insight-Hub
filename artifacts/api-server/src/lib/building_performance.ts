@@ -15,6 +15,7 @@ export interface BuildingPerformance {
   testType: string | null;
   targetLabel: string | null;
   error: string | null;
+  sampleCount: number;
   interfaces: Array<{
     adapterKind: "ethernet" | "wifi";
     downloadMbps: number;
@@ -79,10 +80,56 @@ export function buildLatestBuildingPerformance(
 ): Record<string, BuildingPerformance> {
   const authoritative = new Set<string>(DEFAULT_AUTHORITATIVE_BUILDINGS);
   const latest: Record<string, BuildingPerformance> = {};
+  const grouped = new Map<string, PerformanceRow[]>();
 
   for (const row of rows) {
     const building = String(row.building ?? "").trim();
-    if (!authoritative.has(building) || latest[building]) continue;
+    if (!authoritative.has(building)) continue;
+    const current = grouped.get(building) ?? [];
+    current.push(row);
+    grouped.set(building, current);
+  }
+
+  for (const [building, buildingRows] of grouped) {
+    const newestByComputer = new Map<string, PerformanceRow>();
+    for (const row of buildingRows) {
+      const computer = row.computer_name?.trim().toLowerCase() || `unknown-${newestByComputer.size}`;
+      if (!newestByComputer.has(computer)) newestByComputer.set(computer, row);
+    }
+    const recent = [...newestByComputer.values()].filter((row) => {
+      const at = new Date(row.recorded_at).getTime();
+      return Number.isFinite(at) && now - at <= 24 * 60 * 60_000;
+    });
+    const validated = recent.map((row) => ({ row, data: reportData(row.data) }))
+      .map((entry) => ({ ...entry, interfaces: verifiedInterfaces(entry.data) }))
+      .filter((entry) => entry.interfaces.length > 0 && !(typeof entry.data.error === "string" && entry.data.error.trim()));
+
+    if (validated.length) {
+      const averagedInterfaces = (["ethernet", "wifi"] as const).flatMap((adapterKind) => {
+        const samples = validated.flatMap((entry) => entry.interfaces.filter((item) => item.adapterKind === adapterKind));
+        if (!samples.length) return [];
+        const mean = (key: "downloadMbps" | "uploadMbps" | "pingMs" | "jitterMs") =>
+          samples.reduce((sum, sample) => sum + sample[key], 0) / samples.length;
+        return [{ adapterKind, downloadMbps: mean("downloadMbps"), uploadMbps: mean("uploadMbps"),
+          pingMs: mean("pingMs"), jitterMs: mean("jitterMs"), transferClosed: true as const }];
+      });
+      const representatives = validated.map((entry) =>
+        entry.interfaces.find((item) => item.adapterKind === "ethernet") ?? entry.interfaces[0]);
+      const mean = (key: "downloadMbps" | "uploadMbps" | "pingMs") =>
+        representatives.reduce((sum, sample) => sum + sample[key], 0) / representatives.length;
+      const newestAt = Math.max(...validated.map((entry) => new Date(entry.row.recorded_at).getTime()));
+      latest[building] = {
+        status: now - newestAt > 12 * 60 * 60_000 ? "stale" : "measured",
+        recordedAt: new Date(newestAt).toISOString(), computerName: null, user: null,
+        downloadMbps: mean("downloadMbps"), uploadMbps: mean("uploadMbps"), latencyMs: mean("pingMs"),
+        lossPercent: null, testType: "librespeed-v2", targetLabel: "Building average from latest validated endpoint results",
+        error: null, sampleCount: validated.length, interfaces: averagedInterfaces,
+      };
+      continue;
+    }
+
+    const row = buildingRows.reduce((newest, candidate) =>
+      new Date(candidate.recorded_at).getTime() > new Date(newest.recorded_at).getTime() ? candidate : newest);
 
     const recordedAt = new Date(row.recorded_at);
     if (Number.isNaN(recordedAt.getTime())) continue;
@@ -104,6 +151,7 @@ export function buildLatestBuildingPerformance(
       testType: typeof data.type === "string" ? data.type : null,
       targetLabel: typeof data.targetLabel === "string" ? data.targetLabel : null,
       error,
+      sampleCount: 1,
       interfaces,
     };
   }
@@ -114,7 +162,7 @@ export function buildLatestBuildingPerformance(
 export async function getLatestBuildingPerformance(): Promise<Record<string, BuildingPerformance>> {
   try {
     const rows = (await pool.query<PerformanceRow>(`
-      SELECT DISTINCT ON (r.building)
+      SELECT DISTINCT ON (r.building, r.device_id)
         r.building,
         r.recorded_at,
         r.data,
@@ -123,7 +171,8 @@ export async function getLatestBuildingPerformance(): Promise<Record<string, Bui
       FROM building_diagnostics_reports r
       JOIN building_diagnostics_devices d ON d.id = r.device_id
       WHERE r.building IS NOT NULL AND trim(r.building) <> ''
-      ORDER BY r.building, r.recorded_at DESC, r.id DESC
+        AND r.recorded_at > now() - interval '24 hours'
+      ORDER BY r.building, r.device_id, r.recorded_at DESC, r.id DESC
     `)).rows;
     return buildLatestBuildingPerformance(rows);
   } catch (error) {

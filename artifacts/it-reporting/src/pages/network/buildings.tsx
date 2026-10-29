@@ -45,6 +45,7 @@ interface BuildingPerformance {
   testType: string | null;
   targetLabel: string | null;
   error: string | null;
+  sampleCount: number;
   interfaces: Array<{
     adapterKind: "ethernet" | "wifi";
     downloadMbps: number;
@@ -832,7 +833,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Remote sites like Epworth stay in the building list and network views. West Campus is grouped into a movable off-campus marker on the far left side of the map.
+          Former Epworth inventory remains in topology history while endpoint reporting is consolidated under Industrial Technology Campus. West Campus is grouped into a movable off-campus marker on the far left side of the map.
         </p>
       </CardContent>
     </Card>
@@ -1411,7 +1412,7 @@ function BuildingDetailView({ name }: { name: string }) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Activity className="h-5 w-5 text-primary" />
-            Latest endpoint performance
+            Recent endpoint speed average
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1445,7 +1446,9 @@ function BuildingDetailView({ name }: { name: string }) {
               )}
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">Measured from</div>
-                <div className="mt-1 font-semibold">{detail.performance.computerName ?? "Unknown endpoint"}</div>
+                <div className="mt-1 font-semibold">{detail.performance.sampleCount > 1
+                  ? `${detail.performance.sampleCount} endpoints`
+                  : detail.performance.computerName ?? "One endpoint"}</div>
                 <div className="text-xs text-muted-foreground">
                   {performanceAge(detail.performance.recordedAt)}
                   {detail.performance.user ? ` · ${detail.performance.user}` : ""}

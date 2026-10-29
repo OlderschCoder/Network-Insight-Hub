@@ -12,6 +12,7 @@ import {
   normalizeBuildingKey,
 } from "../lib/building_assignment";
 import { getLatestBuildingPerformance } from "../lib/building_performance";
+import { diagnosticsBuildingName } from "../lib/building_diagnostics_catalog";
 
 export { getCanonicalBuildingName } from "../lib/building_assignment";
 
@@ -33,7 +34,6 @@ const BUILDING_MONITOR_IPS: Record<string, string[]> = {
   "Allied Health": ["192.168.2.44", "192.168.2.216"],
   "Baseball Field": ["192.168.2.27"],
   Cosmetology: ["192.168.2.171"],
-  "Epworth ALC": ["192.168.2.24"],
   Hobble: [
     "10.70.1.1",
     "10.70.34.1",
@@ -50,30 +50,30 @@ const BUILDING_MONITOR_IPS: Record<string, string[]> = {
   ],
   Humanities: ["10.70.89.1"],
   "Industrial Technology Campus": [
+    "192.168.2.24",
     "192.168.2.72",
     "192.168.2.73",
-    "192.168.2.178",
-    "192.168.2.186",
-    "192.168.2.187",
-    "192.168.2.188",
-    "192.168.2.189",
-    "192.168.2.190",
   ],
-  "Maintenance Building": ["192.168.2.205"],
+  "Maintenance Building": ["192.168.2.193", "192.168.2.205"],
+  Mansions: ["192.168.2.176", "192.168.2.177"],
   "Sharp Champion Center": ["192.168.2.203"],
   "Softball Field": ["192.168.2.204"],
   "Student Health Center": ["192.168.2.212"],
-  "Student Living Center": [
-    "192.168.2.175",
-    "192.168.2.179",
-    "192.168.2.180",
-    "192.168.2.181",
-    "192.168.2.182",
-    "192.168.2.183",
-    "192.168.2.184",
-  ],
-  "Student Union / Student Activities": ["192.168.2.194", "192.168.2.200", "192.168.252.46"],
-  "West Campus": ["172.25.0.2", "172.25.0.3"],
+  "Student Living Center": ["192.168.2.175"],
+  "Student Living F": ["192.168.2.178"],
+  "Student Living G": ["192.168.2.179"],
+  "Student Living H": ["192.168.2.180"],
+  "Student Living J": ["192.168.2.181"],
+  "Student Living R": ["192.168.2.182"],
+  "Student Living S": ["192.168.2.183"],
+  "Student Living T": ["192.168.2.184"],
+  "Student Activities": ["192.168.2.50", "192.168.2.194", "192.168.252.46"],
+  "Student Union": ["192.168.2.26", "192.168.2.200"],
+  "Tech Building A": ["192.168.2.189"],
+  "Tech Building B": ["192.168.2.186"],
+  "Tech Building D": ["192.168.2.187"],
+  "Tech Building T": ["192.168.2.188", "192.168.2.190"],
+  "West Campus": ["172.25.0.1", "172.25.0.2", "172.25.0.3", "172.25.0.11", "172.25.0.92"],
 };
 const CAMPUS_BACKBONE_INTERFACES = [
   { sysName: "sw-aa144-A24.sccc.edu", ifName: "Ethernet1/20" }, // SLC1151
@@ -390,7 +390,12 @@ export async function getBuildingSummaries() {
       .filter(isMonitorableHost),
   );
   const authoritativeBuildings = await listAuthoritativeBuildings();
-  const authoritativeBuildingSet = new Set(authoritativeBuildings);
+  const reportingBuildings = Array.from(new Set(
+    authoritativeBuildings
+      .map((name) => diagnosticsBuildingName(name))
+      .filter((name): name is string => !!name),
+  )).sort((a, b) => a.localeCompare(b));
+  const reportingBuildingSet = new Set(reportingBuildings);
 
   const nodeMap: Record<string, number> = {};
   const deviceMap: Record<string, number> = {};
@@ -399,8 +404,10 @@ export async function getBuildingSummaries() {
   const buildingStatuses: Record<string, LiveStatus[]> = {};
 
   for (const node of nodeRows) {
-    const canonical = getAssignedBuildingName(node.building, node.location, node.hostname);
-    if (!authoritativeBuildingSet.has(canonical)) continue;
+    const canonical = diagnosticsBuildingName(
+      getAssignedBuildingName(node.building, node.location, node.hostname),
+    );
+    if (!canonical || !reportingBuildingSet.has(canonical)) continue;
     const isNonSwitchEndpoint = ["svi", "patch_panel", "isp", "endpoint"].includes(node.nodeKind)
       || /\b(?:SVI|Boiler Room)\b/i.test(node.location ?? "");
     if (isNonSwitchEndpoint) {
@@ -415,8 +422,10 @@ export async function getBuildingSummaries() {
   // health comes only from the explicitly monitored switch inventory. A
   // topology-only node with no Influx target must not turn a building red.
   for (const node of switchRows) {
-    const canonical = getAssignedBuildingName(node.building, node.location, node.hostname);
-    if (!authoritativeBuildingSet.has(canonical)) continue;
+    const canonical = diagnosticsBuildingName(
+      getAssignedBuildingName(node.building, node.location, node.hostname),
+    );
+    if (!canonical || !reportingBuildingSet.has(canonical)) continue;
     if (!buildingStatuses[canonical]) buildingStatuses[canonical] = [];
     const liveStatus = node.mgmtIp
       ? liveStatuses[normalizeTelemetryKey(node.mgmtIp)]
@@ -428,12 +437,12 @@ export async function getBuildingSummaries() {
   }
 
   for (const vlan of vlanRows) {
-    const canonical = getCanonicalBuildingName(vlan.building);
-    if (!authoritativeBuildingSet.has(canonical)) continue;
+    const canonical = diagnosticsBuildingName(getCanonicalBuildingName(vlan.building));
+    if (!canonical || !reportingBuildingSet.has(canonical)) continue;
     vlanMap[canonical] = (vlanMap[canonical] ?? 0) + 1;
   }
 
-  return authoritativeBuildings.map((name) => {
+  return reportingBuildings.map((name) => {
     const classification = getBuildingClassification(name);
     const statuses = name === "Azure (Hybrid-VNet)"
       ? [azureHybridStatus]
@@ -1213,7 +1222,10 @@ router.delete("/buildings/:name", requireAuth, async (req, res) => {
 router.get("/buildings/:name", requireAuth, async (req, res) => {
   const name = decodeURIComponent(req.params.name).trim();
   const authoritativeBuildings = await listAuthoritativeBuildings();
-  const canonicalName = authoritativeBuildings.includes(name) ? name : getCanonicalBuildingName(name);
+  const canonicalName = diagnosticsBuildingName(
+    authoritativeBuildings.includes(name) ? name : getCanonicalBuildingName(name),
+  );
+  if (!canonicalName) return res.status(404).json({ error: "BUILDING_NOT_FOUND" });
 
   const [allNodes, allVlans, azureHybridStatus, buildingPerformance] = await Promise.all([
     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
@@ -1222,8 +1234,12 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     getLatestBuildingPerformance(),
   ]);
 
-  const nodes = allNodes.filter((node) => getAssignedBuildingName(node.building, node.location, node.hostname) === canonicalName);
-  const vlans = allVlans.filter((vlan) => getCanonicalBuildingName(vlan.building) === canonicalName);
+  const nodes = allNodes.filter((node) => diagnosticsBuildingName(
+    getAssignedBuildingName(node.building, node.location, node.hostname),
+  ) === canonicalName);
+  const vlans = allVlans.filter((vlan) => diagnosticsBuildingName(
+    getCanonicalBuildingName(vlan.building),
+  ) === canonicalName);
 
   // Links for all nodes in this building
   const nodeIds = nodes.map((n) => n.id);

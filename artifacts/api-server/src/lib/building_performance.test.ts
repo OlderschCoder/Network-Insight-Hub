@@ -29,6 +29,7 @@ describe("building performance summaries", () => {
       user: "SCCC\\mark.bojeun",
       downloadMbps: 842.4,
       uploadMbps: 611.2,
+      sampleCount: 1,
     });
   });
 
@@ -83,5 +84,17 @@ describe("building performance summaries", () => {
       { adapterKind: "ethernet", downloadMbps: 889.2, uploadMbps: 726.1, pingMs: 22.4, jitterMs: 1.2, transferClosed: true },
       { adapterKind: "wifi", downloadMbps: 399.4, uploadMbps: 420.3, pingMs: 28.1, jitterMs: 2.4, transferClosed: true },
     ]);
+  });
+
+  it("averages each endpoint's latest validated result for a building", () => {
+    const result = buildLatestBuildingPerformance([
+      { building: "Hobble", recorded_at: "2026-10-27T05:58:00.000Z", computer_name: "PC-1",
+        data: { libreSpeed: { measurements: [{ adapterKind: "ethernet", downloadMbps: 900, uploadMbps: 700, pingMs: 10, jitterMs: 2, transferClosed: true }] } } },
+      { building: "Hobble", recorded_at: "2026-10-27T05:57:00.000Z", computer_name: "PC-2",
+        data: { libreSpeed: { measurements: [{ adapterKind: "ethernet", downloadMbps: 700, uploadMbps: 500, pingMs: 14, jitterMs: 4, transferClosed: true }] } } },
+    ], now);
+    expect(result.Hobble).toMatchObject({ sampleCount: 2, computerName: null, user: null,
+      downloadMbps: 800, uploadMbps: 600, latencyMs: 12 });
+    expect(result.Hobble.interfaces[0]).toMatchObject({ adapterKind: "ethernet", downloadMbps: 800, uploadMbps: 600 });
   });
 });
