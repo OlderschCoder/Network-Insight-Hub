@@ -151,7 +151,7 @@ export function resolvePortTelemetry(heartbeat: Pick<Heartbeat, "interfaces" | "
 
 export function diagnosticsReadiness(input: {
   inventory?: { updatedAt: string | null; adObservedAt: string; observations: Observation[]; adComputers: unknown[]; collectorStatus?: CollectorStatus };
-  devices?: { enrolled: boolean; revoked: boolean; online: boolean; adVerified: boolean; location: Location }[];
+  devices?: { enrolled: boolean; revoked: boolean; online: boolean; adVerified: boolean; adEnabled?: boolean | null; capabilities?: string[]; location: Location }[];
   workerLastSeenAt?: string | null;
 } = {}, now = Date.now()) {
   const featureEnabled = process.env.BUILDING_DIAGNOSTICS_ENABLED === "true";
@@ -166,8 +166,12 @@ export function diagnosticsReadiness(input: {
       lastSeenAt: collector?.observedAt ?? null, status: collector?.status ?? null, switchesObserved: collector?.switchesObserved ?? null, portObservations: collector?.portObservations ?? null, wifiObservations: collector?.wifiObservations ?? null },
     counts: { inventory: inv?.adComputers.length ?? 0, enrolled: devices.filter((d) => d.enrolled && !d.revoked).length, revoked: devices.filter((d) => d.revoked).length,
       online: devices.filter((d) => d.online).length, adTrusted: devices.filter((d) => d.adVerified).length,
-      eligible: devices.filter((d) => d.online && d.adVerified && d.location.kind === "network-confirmed").length,
-      unlocated: devices.filter((d) => d.online && d.location.kind !== "network-confirmed").length },
+      // Eligibility is the administrative population: every currently enabled
+      // AD workstation. Installation, check-in and capability are readiness,
+      // not reasons to hide a computer from the performance program.
+      eligible: devices.filter((d) => d.adEnabled === true).length,
+      runnableNow: devices.filter((d) => d.adEnabled === true && d.enrolled && !d.revoked && d.online && d.adVerified && d.capabilities?.includes("librespeed-v2")).length,
+      unlocated: devices.filter((d) => d.adEnabled === true && !d.location.building).length },
   };
 }
 

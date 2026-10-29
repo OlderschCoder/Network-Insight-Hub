@@ -25,6 +25,18 @@ describe("operator readiness and scheduler gates", () => {
     expect(diagnosticsReadiness({ inventory: { ...inventory, collectorStatus: { observedAt, status: "degraded", switchesObserved: 2, portObservations: 1, wifiObservations: 0 } } }, now).collector).toMatchObject({ state: "degraded", status: "degraded", switchesObserved: 2 });
     expect(diagnosticsReadiness({ inventory: { ...inventory, collectorStatus: { observedAt: "2020-01-01T00:00:00Z", status: "ok", switchesObserved: 2, portObservations: 1, wifiObservations: 0 } } }, now).collector.state).toBe("stale");
   });
+  it("separates enabled-fleet eligibility from ready-now measurement state", () => {
+    vi.stubEnv("BUILDING_DIAGNOSTICS_ENABLED", "true");
+    const location = { building: "Science", kind: "assigned" as const, source: "manual", observedAt };
+    const enabled = { enrolled: true, revoked: false, online: true, adVerified: true, adEnabled: true, capabilities: ["librespeed-v2"], location };
+    const counts = diagnosticsReadiness({ devices: [
+      enabled,
+      { ...enabled, enrolled: false, online: false, capabilities: [] },
+      { ...enabled, adEnabled: false, online: false, capabilities: [] },
+      { ...enabled, online: false, capabilities: [], location: { building: null, kind: "unknown" as const, source: null, observedAt: null } },
+    ] }, now).counts;
+    expect(counts).toMatchObject({ eligible: 3, runnableNow: 1, unlocated: 1 });
+  });
 });
 
 describe("central port telemetry attribution", () => {

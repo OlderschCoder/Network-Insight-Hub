@@ -297,7 +297,8 @@ export const diagnosticsStore = {
       const validLibre = interfaces.length > 0 && interfaces.every((item: any) => item.transferClosed === true && Number.isFinite(item.downloadMbps) && Number.isFinite(item.uploadMbps));
       const validLegacy = !!r && r.data.downloadMbps !== null && (r.data.external || r.data.uploadMbps !== null);
       return { building, onlineDevices: members.filter((d) => d.online).length,
-        eligibleDevices: members.filter((d) => d.online && d.adVerified && !!d.location.building).length,
+        eligibleDevices: members.filter((d) => d.adEnabled === true).length,
+        readyDevices: members.filter((d) => d.adEnabled === true && d.enrolled && !d.revoked && d.online && d.adVerified && d.capabilities.includes("librespeed-v2")).length,
         lastResult, noCurrentMeasurement: !r || !!r.data.error || (!validLibre && !validLegacy) || !fresh(iso(r.recorded_at), Date.now(), 12 * 60 * 60_000) };
     });
     const { settings, workerLastSeenAt } = await readSettings();
