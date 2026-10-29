@@ -27,9 +27,11 @@ export const SUSTAINED_OBJECT_BYTES = 1024 * 1024 * 1024;
 export const LIBRESPEED_ORIGIN = "https://denspeed.sharktech.net";
 export const LIBRESPEED_SERVER_ID = 92;
 export const LIBRESPEED_METHOD = "MultiStreamV2";
-export const LIBRESPEED_INTERVAL_MINUTES = 180;
+export const LIBRESPEED_INTERVAL_MINUTES = 120;
 export const LIBRESPEED_BUCKET_MINUTES = 10;
 export const LIBRESPEED_TIMEOUT_SECONDS = 180;
+export const LIBRESPEED_DAYTIME_HOURS = [7, 9, 11, 13, 15, 17, 19] as const;
+export const LIBRESPEED_BUILDING_SAMPLE = 5;
 export type JobType = "fred" | "external-quick" | "external-sustained" | "librespeed-v2";
 export type QueueInput = { deviceIds?: string[]; building?: string; type?: JobType; maxBytes?: number; scheduledAt?: string; sustainedConfirmed?: boolean };
 export function libreSpeedConfig() {
@@ -47,6 +49,31 @@ export function libreSpeedBucket(deviceId: string, bucketCount = LIBRESPEED_INTE
   if (!Number.isInteger(bucketCount) || bucketCount < 1) throw new Error("Invalid LibreSpeed bucket count");
   const value = createHash("sha256").update(deviceId.toLowerCase()).digest().readUInt32BE(0);
   return value % bucketCount;
+}
+
+/** Current SCCC daytime test slot. A slot stays open until the next scheduled hour. */
+export function libreSpeedScheduleSlot(now = new Date(), timeZone = "America/Chicago") {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(now).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const hour = Number(parts.hour);
+  const slot = [...LIBRESPEED_DAYTIME_HOURS].reverse().find((candidate) => candidate <= hour);
+  if (slot === undefined || hour > 19) return null;
+  return `${parts.year}-${parts.month}-${parts.day}T${String(slot).padStart(2, "0")}:00@${timeZone}`;
+}
+
+/** Fair per-building sample, oldest measurement first, with a bounded building sample. */
+export function chooseLibreSpeedBuildingSample<T extends Candidate & { online: boolean; capabilities: string[] }>(devices: T[], perBuilding = LIBRESPEED_BUILDING_SAMPLE) {
+  if (!Number.isInteger(perBuilding) || perBuilding < 1 || perBuilding > 10) throw new Error("Invalid LibreSpeed building sample size");
+  const groups = new Map<string, T[]>();
+  for (const device of devices) {
+    const building = device.location.building?.trim();
+    if (!device.online || !device.adVerified || !building || !device.capabilities.includes("librespeed-v2")) continue;
+    groups.set(building, [...(groups.get(building) ?? []), device]);
+  }
+  return [...groups.keys()].sort().flatMap((building) => groups.get(building)!
+    .sort((a, b) => (Date.parse(a.lastTestAt ?? "") || 0) - (Date.parse(b.lastTestAt ?? "") || 0) || a.deviceId.localeCompare(b.deviceId))
+    .slice(0, perBuilding));
 }
 export function externalProbeConfig() {
   let origin: string | null = null;

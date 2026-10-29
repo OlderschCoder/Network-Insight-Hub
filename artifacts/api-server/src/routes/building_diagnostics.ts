@@ -157,7 +157,10 @@ export function createBuildingDiagnosticsRouter(store = diagnosticsStore) {
     const input = parse(checkInSchema, req.body), identity = req.diagnosticDevice;
     if (input.deviceId !== identity.deviceId || input.computerName.toLowerCase() !== identity.computerName.toLowerCase() || input.adDomain.toLowerCase() !== identity.domain.toLowerCase() || !input.adJoined) throw new DiagnosticsError(403, "Diagnostics identity does not match provisioned AD computer");
     const config = flags();
-    const job = await store.checkIn(input, { legacySchedulerEnabled: config.schedulerEnabled, libreSpeedSchedulerEnabled: config.libreSpeedEnabled });
+    const job = await store.checkIn(input, {
+      legacySchedulerEnabled: config.schedulerEnabled && process.env.BUILDING_DIAGNOSTICS_LEGACY_SCHEDULER_ENABLED === "true",
+      libreSpeedSchedulerEnabled: config.libreSpeedEnabled,
+    });
     return res.json({ ok: true, job: job ? { ...job, proof: jobProof(bearer(req), input.deviceId, job) } : null });
   });
   router.get("/agent/jobs/:jobId", async (req: any, res) => res.json(await store.jobStatus(req.diagnosticDevice.deviceId, parse(guid, req.params.jobId))));

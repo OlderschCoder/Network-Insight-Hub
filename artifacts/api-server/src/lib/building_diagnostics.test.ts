@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, jobProof, libreSpeedBucket, libreSpeedConfig, newToken, normalizeMac, resolveLocation, resolvePortTelemetry, schedulerSettings, secretsEqual, tokenHash, type Candidate, type Observation } from "./building_diagnostics";
+import { chooseCandidates, chooseLibreSpeedBuildingSample, diagnosticsReadiness, externalProbeConfig, fresh, jobProof, libreSpeedBucket, libreSpeedConfig, libreSpeedScheduleSlot, newToken, normalizeMac, resolveLocation, resolvePortTelemetry, schedulerSettings, secretsEqual, tokenHash, type Candidate, type Observation } from "./building_diagnostics";
 afterEach(() => vi.unstubAllEnvs());
 
 const now = Date.parse("2026-10-25T12:00:00Z"), observedAt = new Date(now - 60_000).toISOString();
@@ -61,7 +61,7 @@ describe("LibreSpeed V2 deployment guard", () => {
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED", "true");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "3");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "6");
-    expect(libreSpeedConfig()).toMatchObject({ enabled: true, maxConcurrent: 3, canaryMax: 6, intervalMinutes: 180, bucketMinutes: 10 });
+    expect(libreSpeedConfig()).toMatchObject({ enabled: true, maxConcurrent: 3, canaryMax: 6, intervalMinutes: 120, bucketMinutes: 10 });
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "600");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "0");
     expect(libreSpeedConfig()).toMatchObject({ maxConcurrent: 2, canaryMax: 4 });
@@ -72,7 +72,29 @@ describe("LibreSpeed V2 deployment guard", () => {
     const first = libreSpeedBucket("device-123");
     expect(first).toBe(libreSpeedBucket("DEVICE-123"));
     expect(first).toBeGreaterThanOrEqual(0);
-    expect(first).toBeLessThan(18);
+    expect(first).toBeLessThan(12);
+  });
+  it("opens only the seven daytime two-hour slots in Central time", () => {
+    expect(libreSpeedScheduleSlot(new Date("2026-10-29T12:00:00Z"))).toBe("2026-10-29T07:00@America/Chicago");
+    expect(libreSpeedScheduleSlot(new Date("2026-10-29T13:59:00Z"))).toBe("2026-10-29T07:00@America/Chicago");
+    expect(libreSpeedScheduleSlot(new Date("2026-10-29T14:00:00Z"))).toBe("2026-10-29T09:00@America/Chicago");
+    expect(libreSpeedScheduleSlot(new Date("2026-10-30T01:00:00Z"))).toBeNull();
+    expect(libreSpeedScheduleSlot(new Date("2026-10-29T11:59:00Z"))).toBeNull();
+  });
+  it("chooses up to five oldest capable online computers per named building", () => {
+    const location = (building: string) => ({ building, kind: "assigned" as const, source: "manual", observedAt });
+    const base = { adVerified: true, online: true, lastCheckIn: observedAt, lastTestAt: null, capabilities: ["librespeed-v2"] };
+    const devices = [
+      ...Array.from({ length: 7 }, (_, index) => ({ ...base, deviceId: `a-${index}`, location: location("Alpha"), lastTestAt: index === 0 ? observedAt : null })),
+      { ...base, deviceId: "b-1", location: location("Beta") },
+      { ...base, deviceId: "offline", online: false, location: location("Beta") },
+      { ...base, deviceId: "unknown", location: location("") },
+    ];
+    const selected = chooseLibreSpeedBuildingSample(devices);
+    expect(selected.filter((device) => device.location.building === "Alpha")).toHaveLength(5);
+    expect(selected.map((device) => device.deviceId)).toContain("b-1");
+    expect(selected.map((device) => device.deviceId)).not.toContain("offline");
+    expect(selected.map((device) => device.deviceId)).not.toContain("a-0");
   });
 });
 describe("building diagnostics location evidence", () => {

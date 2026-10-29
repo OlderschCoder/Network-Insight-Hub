@@ -12,3 +12,13 @@ Focused evidence: Linux API/frontend builds; 26 backend tests; five disposable r
 Deployment tooling uses exact content and ownership/mode drift guards, validated backups and bounded rollback read-back. The frontend polling follow-up preserves API artifacts/PID and existing downloads. Full repository typechecking retains unrelated baseline failures; targeted builds and feature/security tests above passed. Operator setup is in `Start-ReviewedBulkController.ps1`; its workstation/account, controller, prior-upgrade and payload hashes are deliberately pinned rather than generalized.
 
 Operational follow-up: through a fresh normal signed-in UI page, the seven failed cases confirmed to have `device_id=NULL` were selected once into request `60388620-b895-4ae9-b6b0-e4b3a4c9b417`, accepted with seven queued. The original 660-computer request continues and its failed history remains intact. No unknown credential delivery was replayed; fresh identity and signature checks remain required. Queued is not proof of installation or reporting.
+
+## LibreSpeed production schedule — October 29 CDT
+
+- Stopped the unintended per-heartbeat LibreSpeed queue and added a persisted slot fence so one daytime slot can be enqueued only once.
+- Armed the production LibreSpeed schedule for 07:00, 09:00, 11:00, 13:00, 15:00, 17:00 and 19:00 America/Chicago. Each slot selects up to five online, AD-verified, LibreSpeed-capable computers per named building, oldest measurement first. The legacy Fred transfer scheduler is separately gated and remains disabled.
+- Queued a one-time overnight baseline for the 24 computers that were online and LibreSpeed-capable: six each at 01:00, 02:00, 03:00 and 04:00, with the last lease ending before 05:00. This is a scheduled run, not completion evidence; results must be read back from reports.
+- A safeguard caught and cancelled seven unintended legacy jobs before they executed while the new gate was being enabled. Final read-back showed zero active automatic legacy jobs.
+- Production API health returned HTTP 200 after deployment. The targeted diagnostics suites passed 45 tests and the API production build completed. Full repository typechecking retains unrelated existing failures.
+- Live enrollment truth at activation: 676 AD inventory records, 309 enrolled devices, 356 enrollment items queued, 24 online and LibreSpeed-capable, and three capable but offline. The enrollment worker had not checked in since October 27, so queued enrollment is not installed-agent proof.
+- Rollback artifacts are preserved at `/home/scccadmin/sccc-scheduler-20261029-004555`; deployed API bundle SHA-256 is `8a268ba5f8dfa269e7f2fecf146a52eda212155529a26975505ae46c2b35c1e9`.

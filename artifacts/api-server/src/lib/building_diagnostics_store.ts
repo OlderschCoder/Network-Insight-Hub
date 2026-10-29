@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
-import { chooseCandidates, diagnosticsReadiness, externalProbeConfig, fresh, JOB_MS, libreSpeedBucket, libreSpeedConfig, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, resolvePortTelemetry, schedulerSettings, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, MIN_ROTATION_MINUTES, MAX_ROTATION_MINUTES, type Assignment, type CollectorStatus, type Heartbeat, type JobType, type Observation, type QueueInput, type SchedulerInput } from "./building_diagnostics";
+import { chooseCandidates, chooseLibreSpeedBuildingSample, diagnosticsReadiness, externalProbeConfig, fresh, JOB_MS, libreSpeedConfig, libreSpeedScheduleSlot, newToken, ONLINE_MS, PING_COUNT, QUICK_BYTES, resolveLocation, resolvePortTelemetry, schedulerSettings, SUSTAINED_OBJECT_BYTES, TARGET_LABEL, tokenHash, TRANSFER_BYTES, MIN_ROTATION_MINUTES, MAX_ROTATION_MINUTES, type Assignment, type CollectorStatus, type Heartbeat, type JobType, type Observation, type QueueInput, type SchedulerInput } from "./building_diagnostics";
 import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
 
 export class DiagnosticsError extends Error { constructor(public status: number, message: string) { super(message); } }
@@ -52,6 +52,7 @@ export function ensureDiagnosticsSchema() {
     ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS automatic boolean NOT NULL DEFAULT false;
     ALTER TABLE building_diagnostics_jobs ADD COLUMN IF NOT EXISTS scheduler_revision integer;
     ALTER TABLE building_diagnostics_inventory ADD COLUMN IF NOT EXISTS last_librespeed_scheduler_at timestamptz;
+    ALTER TABLE building_diagnostics_inventory ADD COLUMN IF NOT EXISTS last_librespeed_slot text;
     ALTER TABLE building_diagnostics_jobs DROP CONSTRAINT IF EXISTS building_diagnostics_jobs_status_check;
     ALTER TABLE building_diagnostics_jobs ADD CONSTRAINT building_diagnostics_jobs_status_check CHECK(status IN ('queued','running','complete','expired','cancelled'));
     CREATE INDEX IF NOT EXISTS building_diagnostics_jobs_device ON building_diagnostics_jobs(device_id,created_at DESC);
@@ -327,10 +328,13 @@ export const diagnosticsStore = {
       await expire(client);
       const { settings } = await readSettings(client);
       if (automatic) {
-        if (!libre && !settings.effectiveSchedulerEnabled) return { queued: 0, jobIds: [] };
-        if (!libre) await fenceAutomatic(client, settings);
-        const schedulerColumn = libre ? "last_librespeed_scheduler_at" : "last_scheduler_at";
-        const sweep = await client.query(`UPDATE building_diagnostics_inventory SET ${schedulerColumn}=now() WHERE id=1 AND (${schedulerColumn} IS NULL OR ${schedulerColumn}<now()-interval '1 minute') RETURNING id`);
+        if (!settings.effectiveSchedulerEnabled) return { queued: 0, jobIds: [] };
+        await fenceAutomatic(client, settings);
+        const slot = libre ? libreSpeedScheduleSlot() : null;
+        if (libre && !slot) return { queued: 0, jobIds: [] };
+        const sweep = libre
+          ? await client.query("UPDATE building_diagnostics_inventory SET last_librespeed_scheduler_at=now(),last_librespeed_slot=$1 WHERE id=1 AND last_librespeed_slot IS DISTINCT FROM $1 RETURNING id", [slot])
+          : await client.query("UPDATE building_diagnostics_inventory SET last_scheduler_at=now() WHERE id=1 AND (last_scheduler_at IS NULL OR last_scheduler_at<now()-interval '1 minute') RETURNING id");
         if (!sweep.rowCount) return { queued: 0, jobIds: [] };
       }
       const { devices } = await snapshot(client);
@@ -339,18 +343,18 @@ export const diagnosticsStore = {
       if (!automatic && input.deviceIds && (new Set(input.deviceIds).size !== input.deviceIds.length || input.deviceIds.some((id) => !enrolled.some((d) => d.deviceId === id && d.online && d.adVerified)))) throw new DiagnosticsError(409, "Every selected computer must be enrolled, online and AD verified");
       let selected = automatic
         ? libre
-          ? enrolled.filter((d) => d.online && d.adVerified && d.capabilities.includes("librespeed-v2") && libreSpeedBucket(d.deviceId) === Math.floor(Date.now() / (libreConfig.bucketMinutes * 60_000)) % (libreConfig.intervalMinutes / libreConfig.bucketMinutes))
+          ? chooseLibreSpeedBuildingSample(enrolled)
           : chooseCandidates(enrolled, new Map(recent.map((r) => [r.building, new Date(r.tested_at).getTime()])), Date.now(), settings.rotationIntervalMinutes * 60_000)
         : enrolled.filter((d) => (input.deviceIds?.includes(d.deviceId) || (input.building && d.location.kind === "network-confirmed" && d.location.building === input.building)) && d.online && d.adVerified);
       if (external && selected.some((d) => !d.capabilities.includes("external-probe-v2"))) throw new DiagnosticsError(409, "Selected computer does not support external probe jobs");
       if (libre && selected.some((d) => !d.capabilities.includes("librespeed-v2"))) throw new DiagnosticsError(409, "Selected computer does not support LibreSpeed V2 jobs");
       if (libre && selected.length) {
-        const recentLibre = (await client.query("SELECT DISTINCT device_id FROM building_diagnostics_jobs WHERE type='librespeed-v2' AND status IN ('queued','running','complete') AND created_at>now()-interval '170 minutes'")).rows;
+        const recentLibre = (await client.query("SELECT DISTINCT device_id FROM building_diagnostics_jobs WHERE type='librespeed-v2' AND status IN ('queued','running','complete') AND created_at>now()-interval '110 minutes'")).rows;
         const recentIds = new Set(recentLibre.map((row) => row.device_id));
         selected = selected.filter((d) => !recentIds.has(d.deviceId));
       }
       const pending = (await client.query("SELECT device_id,building FROM building_diagnostics_jobs WHERE status IN ('queued','running')")).rows;
-      selected = selected.filter((d) => !pending.some((p) => p.device_id === d.deviceId || (automatic && !libre && p.building === d.location.building))).slice(0, Math.max(0, 100 - pending.length));
+      selected = selected.filter((d) => !pending.some((p) => p.device_id === d.deviceId || (automatic && !libre && p.building === d.location.building))).slice(0, Math.max(0, (automatic && libre ? 250 : 100) - pending.length));
       if (external && selected.length) {
         // Reserve against the execution window, including cancellations. The
         // symmetric window is deliberately conservative for future schedules.
@@ -365,8 +369,9 @@ export const diagnosticsStore = {
         // Queue lifetime allows serial execution; each claim receives a new two-minute lease.
         const building = d.location.building ?? null;
         const targetOrigin = libre ? libreConfig.origin : external ? config.origin : null;
-        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at,automatic,scheduler_revision) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+interval '30 minutes',$6,$7,$8,$9,$10,$5,$11,$12)", [id, d.deviceId, building, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, targetOrigin, timeout, automatic, automatic && !libre ? settings.revision : null]);
-        await client.query("INSERT INTO building_diagnostics_audit(device_id,job_id,action,actor,reason,details) VALUES($1,$2,'queue-job',$3,$4,$5::jsonb)", [d.deviceId, id, actor, automatic ? (libre ? "Automatic three-hour LibreSpeed rotation" : "Automatic building rotation") : "Operator requested a bounded measurement", JSON.stringify({ type, automatic, building, downloadBytes: bytes, uploadBytes: external ? 0 : bytes, scheduledAt: scheduledAt.toISOString() })]);
+        const queueLifetimeMinutes = automatic && libre ? 110 : 30;
+        await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at,automatic,scheduler_revision) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+($13::text||' minutes')::interval,$6,$7,$8,$9,$10,$5,$11,$12)", [id, d.deviceId, building, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, targetOrigin, timeout, automatic, automatic ? settings.revision : null, queueLifetimeMinutes]);
+        await client.query("INSERT INTO building_diagnostics_audit(device_id,job_id,action,actor,reason,details) VALUES($1,$2,'queue-job',$3,$4,$5::jsonb)", [d.deviceId, id, actor, automatic ? (libre ? "Automatic daytime two-hour LibreSpeed rotation" : "Automatic building rotation") : "Operator requested a bounded measurement", JSON.stringify({ type, automatic, building, downloadBytes: bytes, uploadBytes: external ? 0 : bytes, scheduledAt: scheduledAt.toISOString() })]);
         ids.push(id);
       }
       return { queued: ids.length, jobIds: ids };
@@ -377,7 +382,7 @@ export const diagnosticsStore = {
     const legacySchedulerEnabled = typeof auto === "boolean" ? auto : auto.legacySchedulerEnabled;
     const libreSpeedSchedulerEnabled = typeof auto === "boolean" ? false : auto.libreSpeedSchedulerEnabled;
     if (legacySchedulerEnabled) await this.queue({}, "automatic building rotation", true);
-    if (libreSpeedSchedulerEnabled) await this.queue({ type: "librespeed-v2" }, "automatic three-hour LibreSpeed rotation", true);
+    if (libreSpeedSchedulerEnabled) await this.queue({ type: "librespeed-v2" }, "automatic daytime two-hour LibreSpeed rotation", true);
     return transaction(async (client) => {
       await expire(client);
       await fenceAutomatic(client, (await readSettings(client)).settings);
