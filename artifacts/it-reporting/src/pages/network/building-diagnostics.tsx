@@ -104,6 +104,7 @@ export default function BuildingDiagnostics() {
   const appliedEntry = useRef(false);
   const [schedulerArmed, setSchedulerArmed] = useState(false);
   const [rotationIntervalMinutes, setRotationIntervalMinutes] = useState(360);
+  const [pageView, setPageView] = useState<"performance" | "administration">("performance");
   const [credentialAction, setCredentialAction] = useState<{ device: Device; action: "enroll" | "rotate" | "revoke" } | null>(null);
   const [credentialReason, setCredentialReason] = useState("");
   const [measurementType, setMeasurementType] = useState("librespeed-v2");
@@ -336,6 +337,10 @@ export default function BuildingDiagnostics() {
         <Badge variant="outline">{uniqueDevices.filter(d => d.online).length} reporting online / {uniqueDevices.length} unique computers</Badge>
       </div>
       <p className="text-sm text-muted-foreground">Inventory updated {time(data.inventoryUpdatedAt)}. Online means a recent authenticated check-in; AD membership is verified centrally. LibreSpeed V2 measures each active Ethernet and Wi-Fi interface separately with a pinned 3-stream, 15-second-per-direction method. Endpoint hardware, Wi-Fi and the Internet path can limit the result; these measurements do not certify a 10 Gb campus link.</p>
+      <div className="flex flex-wrap gap-2" role="navigation" aria-label="Diagnostics views">
+        <Button variant={pageView === "performance" ? "default" : "outline"} onClick={() => setPageView("performance")}>Performance overview</Button>
+        <Button variant={pageView === "administration" ? "default" : "outline"} onClick={() => setPageView("administration")}>Administration & computers</Button>
+      </div>
       <Card><CardHeader><CardTitle>Reporting readiness</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
         {data.readiness ? <><div className="grid gap-3 md:grid-cols-3">
           <div><strong>AD inventory · {data.readiness.inventory.state}</strong><p>Directory observed {time(data.readiness.inventory.adObservedAt)}</p><p>Network evidence {time(data.readiness.inventory.networkObservedAt)}</p></div>
@@ -344,16 +349,15 @@ export default function BuildingDiagnostics() {
         </div><p>{data.readiness.counts.eligible} enabled AD computers eligible · {data.readiness.counts.enrolled} enrolled · {data.readiness.counts.online} online · {data.readiness.counts.runnableNow ?? 0} ready to test now · {data.readiness.counts.unlocated} still need a building.</p></> : <p>Detailed collector readiness has not been reported by this server.</p>}
         <p className="text-muted-foreground">SNMP credentials remain on the central collector. Switch counters and endpoint throughput are separate measurements. A worker request alone does not prove a successful switch collection.</p>
       </CardContent></Card>
-      {data.settings && <Card><CardHeader><CardTitle>Automatic building rotation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
-        <p>One eligible computer per building with current network evidence. The rotation measures the Fred HTTPS path; external and sustained downloads remain explicit requests.</p>
-        <label className="flex items-center gap-2"><input type="checkbox" aria-label="Enable automatic building rotation" checked={schedulerArmed} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setSchedulerArmed(event.target.checked)} />Enable automatic building rotation</label>
-        <label className="flex items-center gap-3">Rotation interval <select aria-label="Rotation interval" className="rounded-md border bg-background p-2" value={rotationIntervalMinutes} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setRotationIntervalMinutes(Number(event.target.value))}>{[60, 180, 360, 720, 1440].map(minutes => <option key={minutes} value={minutes}>{minutes / 60} hour{minutes > 60 ? "s" : ""}</option>)}</select></label>
-        {user?.role === "cio" ? <Button onClick={() => saveSettings.mutate()} disabled={!data.enabled || saveSettings.isPending}>Save rotation schedule</Button> : <p className="text-muted-foreground">The CIO controls automatic rotation. Network administrators can request measurements below.</p>}
-        <p>Effective state: {data.settings.effectiveSchedulerEnabled ? "running" : "paused"}. Deployment scheduler {data.settings.deploymentSchedulerEnabled ? "enabled" : "disabled"}. Saved {time(data.settings.updatedAt)}{data.settings.updatedBy ? ` by ${data.settings.updatedBy}` : ""}.</p>
-        {saveSettings.error && <p role="alert" className="text-destructive">{saveSettings.error.message}</p>}
-      </CardContent></Card>}
+      {pageView === "performance" && <>
+      {data.readiness && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Eligible computers</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{data.readiness.counts.eligible}</p><p className="text-xs text-muted-foreground">Enabled and trusted in AD</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Ready now</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{data.readiness.counts.runnableNow ?? 0}</p><p className="text-xs text-muted-foreground">Online with current test capability</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Need a building</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{data.readiness.counts.unlocated}</p><p className="text-xs text-muted-foreground">Cannot yet roll up by building</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Buildings measured</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{data.buildings.filter(item => !item.noCurrentMeasurement).length}<span className="text-base font-normal text-muted-foreground"> / {data.buildings.length}</span></p><p className="text-xs text-muted-foreground">With a current result</p></CardContent></Card>
+      </div>}
       <Card><CardHeader><CardTitle>Building measurements</CardTitle></CardHeader><CardContent>
-        <p className="mb-3 text-sm text-muted-foreground">Measurements retain the building label and time recorded when they ran. Current assignments do not relabel earlier results.</p>
+        <p className="mb-3 text-sm text-muted-foreground">Start here: compare Ethernet and Wi-Fi results by building. Use Administration & computers only when you need to enroll, assign, or test a specific computer.</p>
         {data.buildings.length === 0 ? <p>No building evidence has been imported yet.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Building</TableHead><TableHead>Eligible / online / ready now</TableHead><TableHead>Download</TableHead><TableHead>Upload</TableHead><TableHead>Latency / request loss</TableHead><TableHead>Measured</TableHead></TableRow></TableHeader><TableBody>
           {data.buildings.map(b => {
             const interfaces = b.lastResult?.libreSpeed?.measurements || [];
@@ -368,6 +372,16 @@ export default function BuildingDiagnostics() {
           })}
         </TableBody></Table></div>}
       </CardContent></Card>
+      </>}
+      {pageView === "administration" && <>
+      {data.settings && <Card><CardHeader><CardTitle>Automatic building rotation</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
+        <p>One eligible computer per building with current network evidence. The rotation measures the Fred HTTPS path; external and sustained downloads remain explicit requests.</p>
+        <label className="flex items-center gap-2"><input type="checkbox" aria-label="Enable automatic building rotation" checked={schedulerArmed} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setSchedulerArmed(event.target.checked)} />Enable automatic building rotation</label>
+        <label className="flex items-center gap-3">Rotation interval <select aria-label="Rotation interval" className="rounded-md border bg-background p-2" value={rotationIntervalMinutes} disabled={user?.role !== "cio" || saveSettings.isPending} onChange={event => setRotationIntervalMinutes(Number(event.target.value))}>{[60, 180, 360, 720, 1440].map(minutes => <option key={minutes} value={minutes}>{minutes / 60} hour{minutes > 60 ? "s" : ""}</option>)}</select></label>
+        {user?.role === "cio" ? <Button onClick={() => saveSettings.mutate()} disabled={!data.enabled || saveSettings.isPending}>Save rotation schedule</Button> : <p className="text-muted-foreground">The CIO controls automatic rotation. Network administrators can request measurements below.</p>}
+        <p>Effective state: {data.settings.effectiveSchedulerEnabled ? "running" : "paused"}. Deployment scheduler {data.settings.deploymentSchedulerEnabled ? "enabled" : "disabled"}. Saved {time(data.settings.updatedAt)}{data.settings.updatedBy ? ` by ${data.settings.updatedBy}` : ""}.</p>
+        {saveSettings.error && <p role="alert" className="text-destructive">{saveSettings.error.message}</p>}
+      </CardContent></Card>}
       <Card><CardHeader><CardTitle>Computer inventory</CardTitle></CardHeader><CardContent className="space-y-4">
         <div className="space-y-3 rounded-md border p-3">
           <label className="flex flex-wrap items-center gap-3 text-sm">Measurement
@@ -460,6 +474,7 @@ export default function BuildingDiagnostics() {
           <dl className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2"><div><dt className="text-muted-foreground">Target / HTTP status</dt><dd>{external.targetOrigin}{external.path} · {external.httpStatus ?? "No response"}</dd></div><div><dt className="text-muted-foreground">DNS answers / connected peer</dt><dd>{external.dnsAddresses?.join(", ") || "Not available"} / {external.remoteAddress || "Not connected"}</dd></div><div><dt className="text-muted-foreground">Received / elapsed</dt><dd>{external.bytesReceived.toLocaleString()} bytes / {metric(external.elapsedMs, "ms")}</dd></div><div><dt className="text-muted-foreground">DNS / TCP / TLS / first byte</dt><dd>{metric(external.dnsMs, "ms")} / {metric(external.tcpConnectMs, "ms")} / {metric(external.tlsMs, "ms")} / {metric(external.ttfbMs, "ms")}</dd></div><div><dt className="text-muted-foreground">Active interface</dt><dd>{adapter?.interfaceAlias || "Not available"} · {adapter?.kind || "unknown"} · {adapter?.localIp || "No address"}{adapter?.subnetPrefixLength !== undefined ? `/${adapter.subnetPrefixLength}` : ""} · gateway {adapter?.gateway || "Not available"}</dd></div>{adapter?.ssid && <div><dt className="text-muted-foreground">Wi-Fi</dt><dd>{adapter.ssid} · {adapter.bssid || "BSSID unavailable"}</dd></div>}</dl>
         </details>;
       })}</CardContent></Card>}
+      </>}
     </>}
   </div>;
 }
