@@ -47,3 +47,9 @@ Operational follow-up: through a fresh normal signed-in UI page, the seven faile
 - Post-deployment read-back showed 309 non-revoked enrolled identities, 266 recently online, 261 advertising `librespeed-v2`, 257 online and ready now, and zero queued or running measurement jobs. These operational counts are distinct from the full enabled-AD eligibility total shown by the page.
 - Verified HTTP 200 from the local static route, the app-server2 public route, `insights.sccc.edu/network/diagnostics`, and `/api/healthz`. The deployed page source SHA-256 is `11ac4baeb090ce4f711abbdf6b46adaad9baad274d53c6c7f5fb73d67833b16b`; the deployed bundle SHA-256 is `fa65b6f85c14cf3247a6e514b6c6657c284a19e039b8a024d9304ae3f84e3cb0`.
 - Rollback artifacts are preserved at `/home/scccadmin/fred-diagnostics-ui-release-maIMAim2`; the exact pre-change public bundle is `public.pre-ui-fix`.
+
+## Fleet LibreSpeed schedule restored — October 30 CDT
+
+- Live read-back separated the fleet population from runtime readiness: 675 AD inventory records, 664 enabled and administratively eligible, 309 active enrolled identities, 263 LibreSpeed-capable identities, and 258 online/capable at the initial check. The changing ready-now count is not a manually selected subset.
+- Restored the previously approved rolling LibreSpeed schedule in the authoritative database at revision 11: armed, every 120 minutes, with an explicit audit record. Every enabled AD computer remains in scope and becomes runnable when it is enrolled, not revoked, online, AD-verified, and advertising `librespeed-v2`.
+- The current 07:00–09:00 America/Chicago slot selected a bounded per-building sample rather than simultaneously testing the fleet. Read-back showed 52 queued and 2 running LibreSpeed jobs, 260 computers ready at that moment, 101 recorded LibreSpeed reports, and no legacy Fred-transfer jobs.
