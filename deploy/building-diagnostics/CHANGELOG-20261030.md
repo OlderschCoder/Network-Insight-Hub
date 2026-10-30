@@ -22,3 +22,10 @@
 - The private collector exported the completed reports on its normal five-minute cycle. An Influx read-back returned five fresh Wi-Fi rows with building, computer, download, upload, and latency fields; the Grafana dashboard refresh remains 30 seconds.
 - The live Grafana database had 24 panels but a blank automatic-refresh value. Backed up the Grafana database, changed only `SCCC Device Performance` refresh to `30s`, and read back dashboard version 14 with all 24 panels preserved.
 - Targeted scheduler verification passed 22 tests; the production API build and diff check passed. Full repository tests retained unrelated baseline failures.
+
+## Canonical switch telemetry recovery
+
+- Reconciled the live Telegraf SNMP target list with the existing 48-switch canonical catalog. Added the omitted reachable target `192.168.2.41` (`SW-AA148-Aruba`) and verified a fresh Influx `sysUpTime` point.
+- Enabled SNMPv3 on `192.168.2.54` (`SW-AA001.sccc.edu`) using the existing monitor credentials. Preserved switch flash backups (`pre-snmp-20261030-115454.cfg` and `pre-snmp-20261030-115520.cfg`), read back the SHA/AES user and privacy group, wrote startup configuration, added the target to Telegraf, and verified a fresh Influx point at `2026-10-30T16:59:03Z`.
+- The production count is now **45 of 48 canonical switches reporting via SNMP**. The remaining canonical targets are `192.168.2.193` (`swa-m201`), `192.168.2.40` (`swa-aa148`), and `192.168.2.5` (`sw-aa144`). All three fail ping and SNMP from the NOC and have no matching live ARP or LLDP entry on the upstream switch; they remain visible as missing rather than being removed from the denominator.
+- During the guarded Telegraf update, a staged file mode of `0600` caused a short container restart loop. Restored the required `0644` mode, restarted only Telegraf, and read back `running` with restart count zero before continuing. Final rollback backup: `/srv/sccc-ops/telegraf/telegraf.conf.pre-add-192.168.2.54-20261030-165829`.
