@@ -415,7 +415,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen className="h-svh min-h-0 overflow-hidden">
       <AppSidebar />
       <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
         <header className="sticky top-0 z-30 flex h-[52px] shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
