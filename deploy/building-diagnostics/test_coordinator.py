@@ -321,7 +321,7 @@ class MetricsTests(unittest.TestCase):
         InfluxClient("http://127.0.0.1:8086", "synthetic-token", "synthetic-org", "telegraf")
         value = dashboard("telegraf")
         self.assertEqual(value["uid"], "sccc-device-performance")
-        self.assertEqual(len(value["panels"]), 21)
+        self.assertEqual(len(value["panels"]), 22)
         self.assertEqual(value["refresh"], "30s")
         self.assertTrue(all(panel["datasource"]["uid"] == DATASOURCE_UID for panel in value["panels"]))
         encoded_performance = json.dumps(value)
@@ -334,6 +334,15 @@ class MetricsTests(unittest.TestCase):
         self.assertIn("Failed validated speed tests", encoded_performance)
         self.assertIn('r.type == \\"librespeed-v2\\"', encoded_performance)
         self.assertIn('r.method == \\"MultiStreamV2\\"', encoded_performance)
+        daily = next(panel for panel in value["panels"]
+                     if panel["title"] == "Daily validated speed measurements by adapter")
+        self.assertEqual(daily["id"], 24)
+        self.assertEqual(daily["type"], "timeseries")
+        self.assertEqual(daily["fieldConfig"]["defaults"]["custom"]["drawStyle"], "bars")
+        self.assertEqual(daily["fieldConfig"]["defaults"]["custom"]["stacking"]["mode"], "normal")
+        self.assertIn('group(columns: ["adapter"])', daily["targets"][0]["query"])
+        self.assertIn("aggregateWindow(every: 1d", daily["targets"][0]["query"])
+        self.assertIn("missing Wi-Fi series", daily["description"])
         for panel in value["panels"]:
             if panel["title"].startswith("Endpoint ") or panel["title"] == "Negotiated endpoint link speed":
                 self.assertEqual(panel["fieldConfig"]["defaults"].get("displayName"),

@@ -340,6 +340,40 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     query = f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence") |> map(fn: (r) => ({{r with user: if exists r.user and r.user != "" then r.user else "Unknown user"}})) |> group(columns: ["ad_guid", "user", "_field"]) |> last() |> group() |> pivot(rowKey: ["ad_guid", "computer", "building", "user", "_time"], columnKey: ["_field"], valueColumn: "_value") |> keep(columns: ["_time", "ad_guid", "computer", "building", "user", "online", "enrolled", "ad_verified", "ad_enabled", "ad_enabled_known"])'
     table_y = 4 + math.ceil((len(panels) - len(summary_panels)) / 2) * 8
     panels.append({"id": len(panels) + 1, "title": "Current device state (missing data is not healthy)", "type": "table", "datasource": datasource, "gridPos": {"x": 0, "y": table_y, "w": 24, "h": 10}, "targets": [{"refId": "A", "query": query}]})
+    daily_activity = (
+        f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) '
+        '|> filter(fn: (r) => r._measurement == "sccc_device_performance" and r.type == "librespeed-v2" '
+        'and r.method == "MultiStreamV2" and r._field == "measurement_ok" and r._value == true) '
+        '|> group(columns: ["report_id", "adapter"]) |> last() |> group(columns: ["adapter"]) '
+        '|> aggregateWindow(every: 1d, fn: count, createEmpty: false)'
+    )
+    panels.append({
+        "id": 24,
+        "title": "Daily validated speed measurements by adapter",
+        "type": "timeseries",
+        "description": ("Completed, validated MultiStreamV2 interface measurements per day, split by Ethernet and Wi-Fi. "
+                        "A missing Wi-Fi series means no eligible Wi-Fi interface was active, associated, addressed and "
+                        "routable during those tests; it is not a zero-speed result."),
+        "datasource": datasource,
+        "gridPos": {"x": 0, "y": table_y + 10, "w": 24, "h": 8},
+        "fieldConfig": {"defaults": {"unit": "short", "decimals": 0,
+                                      "displayName": "${__field.labels.adapter}",
+                                      "custom": {
+                                          "drawStyle": "bars", "lineInterpolation": "linear", "barAlignment": 0,
+                                          "lineWidth": 1, "fillOpacity": 75, "gradientMode": "none",
+                                          "showPoints": "never", "pointSize": 5,
+                                          "stacking": {"mode": "normal", "group": "daily-adapter"},
+                                          "axisPlacement": "auto", "axisLabel": "Validated measurements",
+                                          "axisColorMode": "text", "axisBorderShow": False,
+                                          "scaleDistribution": {"type": "linear"}, "axisCenteredZero": False,
+                                          "hideFrom": {"tooltip": False, "viz": False, "legend": False},
+                                          "thresholdsStyle": {"mode": "off"}, "spanNulls": False,
+                                          "insertNulls": False}}, "overrides": []},
+        "options": {"legend": {"showLegend": True, "displayMode": "list", "placement": "bottom",
+                                "calcs": ["sum"]},
+                    "tooltip": {"mode": "multi", "sort": "desc"}},
+        "targets": [{"refId": "A", "query": daily_activity}],
+    })
     return {"uid": "sccc-device-performance", "title": "SCCC Device Performance", "schemaVersion": 39, "version": 1, "editable": True, "refresh": "30s", "time": {"from": "now-24h", "to": "now"}, "tags": ["SCCC", "network"], "description": "Authenticated endpoint path measurements plus private SNMP access-port evidence. Current Fred HTTPS samples measure a bounded transfer path and identify the adapter as unknown; separately versioned MultiStreamV2 samples identify active Ethernet/Wi-Fi interfaces when that signed capability is deployed. Values are shown in Mbps or Gbps where appropriate. Neither method alone certifies campus uplink capacity. Missing data stays missing; current coverage and AD verification are shown in Fred.", "panels": panels}
 
 
