@@ -279,7 +279,7 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
         ("Computers online now", "Current authenticated endpoint presence within fifteen minutes. Missing or stale check-ins are not counted.",
          f'from(bucket: {bucket_literal}) |> range(start: -15m) |> filter(fn: (r) => r._measurement == "sccc_device_presence" and r._field == "online") |> group(columns: ["ad_guid"]) |> last() |> filter(fn: (r) => r._value == true) |> group() |> count()',
          "green", None),
-        ("Computers with validated speed tests", "Distinct computers with a validated MultiStreamV2 speed sample in the selected time range. Superseded bounded Fred path samples are excluded.",
+        ("Computers tested in selected time range", "Distinct computers with a validated MultiStreamV2 speed result in the dashboard time range. This is completed-test coverage, not the number enrolled or eligible. Superseded bounded Fred path samples are excluded.",
          f'from(bucket: {bucket_literal}) |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "sccc_device_performance" and r.type == "librespeed-v2" and r._field == "measurement_ok") |> group(columns: ["computer"]) |> last() |> group() |> count()',
          "blue", None),
         ("Successful validated speed tests", "Unique authenticated MultiStreamV2 endpoint tests that completed in the selected time range.",
@@ -303,11 +303,11 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                    ("Endpoint latency by building / computer", "sccc_device_performance", "latency_ms", "ms"),
                    ("Endpoint jitter by building / computer", "sccc_device_performance", "jitter_ms", "ms"),
                    ("Negotiated endpoint link speed", "sccc_device_performance", "link_mbps", "Mbits"),
-                   ("Endpoint request loss by building / computer", "sccc_device_performance", "request_loss_percent", "percent"),
-                   ("External DNS time by building / computer", "sccc_device_performance", "dns_ms", "ms"),
-                   ("External TCP connect time by building / computer", "sccc_device_performance", "tcp_connect_ms", "ms"),
-                   ("External TLS time by building / computer", "sccc_device_performance", "tls_ms", "ms"),
-                   ("External time to first byte by building / computer", "sccc_device_performance", "ttfb_ms", "ms"),
+                   ("Endpoint request loss (not collected by LibreSpeed V2)", "sccc_device_performance", "request_loss_percent", "percent"),
+                   ("External DNS time (external probe only)", "sccc_device_performance", "dns_ms", "ms"),
+                   ("External TCP connect time (external probe only)", "sccc_device_performance", "tcp_connect_ms", "ms"),
+                   ("External TLS time (external probe only)", "sccc_device_performance", "tls_ms", "ms"),
+                   ("External time to first byte (external probe only)", "sccc_device_performance", "ttfb_ms", "ms"),
                    ("Access-port received traffic (bps)", "sccc_device_performance_port", "in_bps", "bps"),
                    ("Access-port transmitted traffic (bps)", "sccc_device_performance_port", "out_bps", "bps"),
                    ("Actual access-port error counters", "sccc_device_performance_port", "in_errors", "short"),
@@ -320,7 +320,17 @@ def dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                 query += ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")'
             query += ' |> map(fn: (r) => ({r with user: if exists r.user and r.user != "" then r.user else "Unknown user", adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) |> group(columns: ["building", "user", "computer", "adapter", "_field"])'
             defaults["displayName"] = "${__field.labels.computer}"
+        description = ""
+        if field == "request_loss_percent":
+            description = ("The current recurring LibreSpeed V2 speed test does not emit request loss. "
+                           "This panel contains data only from a separately scheduled legacy or diagnostic probe; "
+                           "No data is unknown, not zero loss.")
+        elif field in ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"):
+            description = ("The current recurring LibreSpeed V2 speed test does not emit external DNS, TCP, TLS, "
+                           "or TTFB timing. This panel contains data only when the separate external-quick probe runs; "
+                           "No data means that probe did not run in the selected time range.")
         panels.append({"id": len(panels) + 1, "title": title, "type": "timeseries", "datasource": datasource,
+                       "description": description,
                        "gridPos": {"x": (index % 2) * 12, "y": 4 + (index // 2) * 8, "w": 12, "h": 8},
                        "fieldConfig": {"defaults": defaults}, "targets": [{"refId": "A", "query": query}]})
     for field, title in (("online", "Current online computers by building"), ("enrolled", "Current enrolled computers by building")):
@@ -445,13 +455,23 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
                  'adapter: if exists r.adapter and r.adapter != "" then r.adapter else "unknown"})) '
                  '|> group(columns: ["building", "user", "computer", "adapter", "_field"])')
     pc_speed_series = ' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2")' + pc_identity_series
-    pc_display = "${__field.labels.computer}"
-    add_panel("PC download by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("download_mbps",), extra=pc_speed_series),
-              0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
-    add_panel("PC upload by building / user / computer", "timeseries",
-              query("sccc_device_performance", ("upload_mbps",), extra=pc_speed_series),
-              12, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display)
+    pc_display = "${__field.labels.building} · ${__field.labels.user} · ${__field.labels.computer} · ${__field.labels.adapter}"
+    pc_bar_options = {
+        "orientation": "horizontal", "displayMode": "basic", "namePlacement": "top",
+        "valueMode": "text", "showUnfilled": False,
+        "sizing": "manual", "minVizHeight": 32, "maxVizHeight": 300, "minVizWidth": 0,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+        "legend": {"showLegend": False, "displayMode": "list", "placement": "bottom", "calcs": []},
+    }
+    pc_bar_series = pc_speed_series + ' |> last()'
+    add_panel("PC download by building / user / computer", "bargauge",
+              query("sccc_device_performance", ("download_mbps",), extra=pc_bar_series),
+              0, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display,
+              options=pc_bar_options)
+    add_panel("PC upload by building / user / computer", "bargauge",
+              query("sccc_device_performance", ("upload_mbps",), extra=pc_bar_series),
+              12, 38, 12, 8, unit="bps", description=pc_description, display_name=pc_display,
+              options=pc_bar_options)
     add_panel("PC latency by building / user / computer", "timeseries",
               query("sccc_device_performance", ("latency_ms",), extra=pc_speed_series),
               0, 46, 6, 8, unit="ms", description=pc_description, display_name=pc_display)
@@ -461,9 +481,11 @@ def wireless_dashboard(bucket: str, datasource_uid=DATASOURCE_UID) -> dict:
     add_panel("PC negotiated link speed", "timeseries",
               query("sccc_device_performance", ("link_mbps",), extra=pc_speed_series),
               12, 46, 6, 8, unit="Mbits", description="Endpoint adapter negotiation, not measured Internet throughput.", display_name=pc_display)
-    add_panel("PC external DNS / TCP / TLS / TTFB", "timeseries",
+    add_panel("PC external DNS / TCP / TLS / TTFB (external probe only)", "timeseries",
               query("sccc_device_performance", ("dns_ms", "tcp_connect_ms", "tls_ms", "ttfb_ms"), extra=pc_identity_series),
-              18, 46, 6, 8, unit="ms", description=pc_description,
+              18, 46, 6, 8, unit="ms",
+              description=("The recurring LibreSpeed V2 speed test does not emit these timings. Data appears only "
+                           "when the separate external-quick probe runs; No data means it did not run in the selected range."),
               display_name=pc_display + " · ${__field.labels._field}")
     building_speed = query("sccc_device_performance", ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms"),
                            extra=' |> filter(fn: (r) => r.type == "librespeed-v2" and r.method == "MultiStreamV2") '

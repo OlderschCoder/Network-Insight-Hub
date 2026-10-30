@@ -108,7 +108,7 @@ for _ in range(20):
         required = {'PC download by building / user / computer', 'PC upload by building / user / computer',
                     'PC latency by building / user / computer', 'PC jitter by building / user / computer',
                     'PC negotiated link speed',
-                    'PC external DNS / TCP / TLS / TTFB', 'Building PC speed summary',
+                    'PC external DNS / TCP / TLS / TTFB (external probe only)', 'Building PC speed summary',
                     'Latest PC performance results', 'ClearPass Overall Health',
                     'ClearPass Server Health'}
         if len(loaded.get('panels', [])) == 27 and required <= titles:

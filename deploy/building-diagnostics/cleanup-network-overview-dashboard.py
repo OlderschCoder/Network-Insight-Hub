@@ -34,7 +34,7 @@ BACKUP_DIR = Path(
 # Kept panels, ordered and placed on Grafana's 24-column grid.
 LAYOUT = {
     43: (0, 0, 12, 8),   # Campus map
-    30: (12, 0, 3, 4),  # Buildings online
+    30: (12, 0, 3, 4),  # Canonical switch inventory reporting via SNMP
     35: (15, 0, 3, 4),  # UPS devices online
     11: (18, 0, 3, 4),  # Packet loss
     37: (21, 0, 3, 4),  # Firewall throughput
@@ -56,7 +56,7 @@ LAYOUT = {
 
 PRESENTATION = {
     43: ("Live Campus Status Map", None, "Current building status and campus location context."),
-    30: ("Buildings Online", "short", "Buildings currently represented by reporting infrastructure."),
+    30: ("Switches reporting via SNMP (of 48)", "short", "Canonical inventory switches with fresh sysUpTime telemetry in the last 30 minutes. A powered or reachable switch without fresh SNMP is not counted."),
     35: ("UPS Devices Online", "short", "UPS devices currently reporting telemetry."),
     11: ("Internet Packet Loss", "percent", "Current measured internet packet loss."),
     37: ("Current Firewall Throughput", "bps", "Combined current ingress and egress traffic through the FortiGate."),
@@ -144,6 +144,16 @@ def clean_dashboard(source: dict) -> dict:
         panel["description"] = description
         panel["gridPos"] = {"x": x, "y": y, "w": w, "h": h}
         set_unit(panel, unit)
+
+        if panel_id == 30:
+            panel.setdefault("fieldConfig", {}).setdefault("defaults", {})["thresholds"] = {
+                "mode": "absolute",
+                "steps": [
+                    {"color": "red", "value": None},
+                    {"color": "yellow", "value": 47},
+                    {"color": "green", "value": 48},
+                ],
+            }
 
         # Suppress Flux implementation fields in executive-facing stat/gauge
         # labels while leaving time-series legends intact.

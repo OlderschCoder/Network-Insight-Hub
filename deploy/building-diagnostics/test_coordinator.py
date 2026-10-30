@@ -329,6 +329,7 @@ class MetricsTests(unittest.TestCase):
             self.assertIn(field, encoded_performance)
         self.assertNotIn("synthetic-token", json.dumps(value))
         self.assertIn("labels.computer", encoded_performance)
+        self.assertIn("Computers tested in selected time range", encoded_performance)
         self.assertIn("Successful validated speed tests", encoded_performance)
         self.assertIn("Failed validated speed tests", encoded_performance)
         self.assertIn('r.type == \\"librespeed-v2\\"', encoded_performance)
@@ -382,7 +383,12 @@ class MetricsTests(unittest.TestCase):
                       "PC latency by building / user / computer", "PC jitter by building / user / computer",
                       "PC negotiated link speed"):
             self.assertEqual(panels_by_title[title]["fieldConfig"]["defaults"]["displayName"],
-                             "${__field.labels.computer}")
+                             "${__field.labels.building} \u00b7 ${__field.labels.user} \u00b7 ${__field.labels.computer} \u00b7 ${__field.labels.adapter}")
+        for title in ("PC download by building / user / computer", "PC upload by building / user / computer"):
+            self.assertEqual(panels_by_title[title]["type"], "bargauge")
+            self.assertFalse(panels_by_title[title]["options"]["legend"]["showLegend"])
+            self.assertIn("|> last()", panels_by_title[title]["targets"][0]["query"])
+        self.assertIn("PC external DNS / TCP / TLS / TTFB (external probe only)", panels_by_title)
         self.assertNotIn("synthetic-token", encoded)
 
     def test_optional_wifi_missing_stale_conflicting_and_current_evidence_stay_explicit(self):
