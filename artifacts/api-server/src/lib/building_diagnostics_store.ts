@@ -350,7 +350,7 @@ export const diagnosticsStore = {
       if (external && selected.some((d) => !d.capabilities.includes("external-probe-v2"))) throw new DiagnosticsError(409, "Selected computer does not support external probe jobs");
       if (libre && selected.some((d) => !d.capabilities.includes("librespeed-v2"))) throw new DiagnosticsError(409, "Selected computer does not support LibreSpeed V2 jobs");
       if (libre && selected.length) {
-        const recentLibre = (await client.query("SELECT DISTINCT device_id FROM building_diagnostics_jobs WHERE type='librespeed-v2' AND status IN ('queued','running','complete') AND created_at>now()-interval '110 minutes'")).rows;
+        const recentLibre = (await client.query("SELECT DISTINCT device_id FROM building_diagnostics_jobs WHERE type='librespeed-v2' AND status IN ('queued','running','complete') AND created_at>now()-interval '50 minutes'")).rows;
         const recentIds = new Set(recentLibre.map((row) => row.device_id));
         selected = selected.filter((d) => !recentIds.has(d.deviceId));
       }
@@ -370,9 +370,9 @@ export const diagnosticsStore = {
         // Queue lifetime allows serial execution; each claim receives a new two-minute lease.
         const building = d.location.building ?? null;
         const targetOrigin = libre ? libreConfig.origin : external ? config.origin : null;
-        const queueLifetimeMinutes = automatic && libre ? 110 : 30;
+        const queueLifetimeMinutes = automatic && libre ? 50 : 30;
         await client.query("INSERT INTO building_diagnostics_jobs(id,device_id,building,status,requested_by,expires_at,download_bytes,upload_bytes,type,target_origin,timeout_seconds,scheduled_at,automatic,scheduler_revision) VALUES($1,$2,$3,'queued',$4,$5::timestamptz+($13::text||' minutes')::interval,$6,$7,$8,$9,$10,$5,$11,$12)", [id, d.deviceId, building, actor, scheduledAt.toISOString(), bytes, external ? 0 : bytes, type, targetOrigin, timeout, automatic, automatic ? settings.revision : null, queueLifetimeMinutes]);
-        await client.query("INSERT INTO building_diagnostics_audit(device_id,job_id,action,actor,reason,details) VALUES($1,$2,'queue-job',$3,$4,$5::jsonb)", [d.deviceId, id, actor, automatic ? (libre ? "Automatic daytime two-hour LibreSpeed rotation" : "Automatic building rotation") : "Operator requested a bounded measurement", JSON.stringify({ type, automatic, building, downloadBytes: bytes, uploadBytes: external ? 0 : bytes, scheduledAt: scheduledAt.toISOString() })]);
+        await client.query("INSERT INTO building_diagnostics_audit(device_id,job_id,action,actor,reason,details) VALUES($1,$2,'queue-job',$3,$4,$5::jsonb)", [d.deviceId, id, actor, automatic ? (libre ? "Automatic hourly Wi-Fi LibreSpeed cohort" : "Automatic building rotation") : "Operator requested a bounded measurement", JSON.stringify({ type, automatic, building, downloadBytes: bytes, uploadBytes: external ? 0 : bytes, scheduledAt: scheduledAt.toISOString() })]);
         ids.push(id);
       }
       return { queued: ids.length, jobIds: ids };
@@ -383,7 +383,7 @@ export const diagnosticsStore = {
     const legacySchedulerEnabled = typeof auto === "boolean" ? auto : auto.legacySchedulerEnabled;
     const libreSpeedSchedulerEnabled = typeof auto === "boolean" ? false : auto.libreSpeedSchedulerEnabled;
     if (legacySchedulerEnabled) await this.queue({}, "automatic building rotation", true);
-    if (libreSpeedSchedulerEnabled) await this.queue({ type: "librespeed-v2" }, "automatic daytime two-hour LibreSpeed rotation", true);
+    if (libreSpeedSchedulerEnabled) await this.queue({ type: "librespeed-v2" }, "automatic hourly Wi-Fi LibreSpeed cohort", true);
     return transaction(async (client) => {
       await expire(client);
       await fenceAutomatic(client, (await readSettings(client)).settings);

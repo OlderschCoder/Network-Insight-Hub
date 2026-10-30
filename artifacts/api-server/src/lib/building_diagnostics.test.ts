@@ -73,39 +73,44 @@ describe("LibreSpeed V2 deployment guard", () => {
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED", "true");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "3");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "6");
-    expect(libreSpeedConfig()).toMatchObject({ enabled: true, maxConcurrent: 3, canaryMax: 6, intervalMinutes: 120, bucketMinutes: 10 });
+    expect(libreSpeedConfig()).toMatchObject({ enabled: true, maxConcurrent: 3, canaryMax: 6, intervalMinutes: 60, bucketMinutes: 10 });
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_CANARY_MAX", "600");
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_MAX_CONCURRENT", "0");
     expect(libreSpeedConfig()).toMatchObject({ maxConcurrent: 2, canaryMax: 4 });
     vi.stubEnv("BUILDING_DIAGNOSTICS_LIBRESPEED_ENABLED", "false");
     expect(libreSpeedConfig().enabled).toBe(false);
   });
-  it("assigns a stable three-hour bucket without exposing device identity", () => {
+  it("assigns a stable one-hour bucket without exposing device identity", () => {
     const first = libreSpeedBucket("device-123");
     expect(first).toBe(libreSpeedBucket("DEVICE-123"));
     expect(first).toBeGreaterThanOrEqual(0);
-    expect(first).toBeLessThan(12);
+    expect(first).toBeLessThan(6);
   });
-  it("opens only the seven daytime two-hour slots in Central time", () => {
+  it("opens only the thirteen daytime hourly slots in Central time", () => {
     expect(libreSpeedScheduleSlot(new Date("2026-10-29T12:00:00Z"))).toBe("2026-10-29T07:00@America/Chicago");
-    expect(libreSpeedScheduleSlot(new Date("2026-10-29T13:59:00Z"))).toBe("2026-10-29T07:00@America/Chicago");
+    expect(libreSpeedScheduleSlot(new Date("2026-10-29T13:59:00Z"))).toBe("2026-10-29T08:00@America/Chicago");
     expect(libreSpeedScheduleSlot(new Date("2026-10-29T14:00:00Z"))).toBe("2026-10-29T09:00@America/Chicago");
     expect(libreSpeedScheduleSlot(new Date("2026-10-30T01:00:00Z"))).toBeNull();
     expect(libreSpeedScheduleSlot(new Date("2026-10-29T11:59:00Z"))).toBeNull();
   });
-  it("chooses up to five oldest capable online computers per named building", () => {
+  it("chooses up to three oldest Wi-Fi-ready computers per named building", () => {
     const location = (building: string) => ({ building, kind: "assigned" as const, source: "manual", observedAt });
-    const base = { adVerified: true, online: true, lastCheckIn: observedAt, lastTestAt: null, capabilities: ["librespeed-v2"] };
+    const wifi = { mac: "00:11:22:33:44:55", ipAddresses: ["10.11.1.20"], kind: "wifi" as const, bssid: "66:77:88:99:aa:bb", gateway: "10.11.0.1" };
+    const base = { adVerified: true, online: true, lastCheckIn: observedAt, lastTestAt: null, capabilities: ["librespeed-v2"], interfaces: [wifi] };
     const devices = [
       ...Array.from({ length: 7 }, (_, index) => ({ ...base, deviceId: `a-${index}`, location: location("Alpha"), lastTestAt: index === 0 ? observedAt : null })),
       { ...base, deviceId: "b-1", location: location("Beta") },
       { ...base, deviceId: "offline", online: false, location: location("Beta") },
+      { ...base, deviceId: "ethernet-only", interfaces: [{ ...wifi, kind: "ethernet" as const, bssid: undefined }], location: location("Beta") },
+      { ...base, deviceId: "apipa-wifi", interfaces: [{ ...wifi, ipAddresses: ["169.254.1.2"] }], location: location("Beta") },
       { ...base, deviceId: "unknown", location: location("") },
     ];
     const selected = chooseLibreSpeedBuildingSample(devices);
-    expect(selected.filter((device) => device.location.building === "Alpha")).toHaveLength(5);
+    expect(selected.filter((device) => device.location.building === "Alpha")).toHaveLength(3);
     expect(selected.map((device) => device.deviceId)).toContain("b-1");
     expect(selected.map((device) => device.deviceId)).not.toContain("offline");
+    expect(selected.map((device) => device.deviceId)).not.toContain("ethernet-only");
+    expect(selected.map((device) => device.deviceId)).not.toContain("apipa-wifi");
     expect(selected.map((device) => device.deviceId)).not.toContain("a-0");
   });
 });
