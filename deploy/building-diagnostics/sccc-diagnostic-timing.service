@@ -1,0 +1,19 @@
+[Unit]
+Description=SCCC bounded endpoint timing and HTTPS request-loss rotation
+After=network-online.target sccc-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=scccadmin
+WorkingDirectory=/home/scccadmin/apps/Network-Insight-Hub
+EnvironmentFile=/home/scccadmin/apps/Network-Insight-Hub/.env.production
+EnvironmentFile=/etc/sccc-building-diagnostics/api.env
+Environment=BUILDING_DIAGNOSTICS_TIMING_ENABLED=true
+ExecStart=/usr/bin/node /home/scccadmin/insights-timing-20261030/timing-rotation.cjs --apply
+TimeoutStartSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+UMask=0077

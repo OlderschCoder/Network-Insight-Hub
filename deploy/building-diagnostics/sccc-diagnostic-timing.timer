@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh bounded SCCC timing probe coverage during campus hours
+
+[Timer]
+OnCalendar=*-*-* 07..19:00/2:00 America/Chicago
+Persistent=false
+AccuracySec=15s
+Unit=sccc-diagnostic-timing.service
+
+[Install]
+WantedBy=timers.target
