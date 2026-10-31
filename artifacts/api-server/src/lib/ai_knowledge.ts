@@ -1,3 +1,5 @@
+import { isFredCodingRequest } from "./fred_coding_request";
+import { latestUserText } from "./fred_evidence_policy";
 import { FRED_DEVELOPMENT_TOOL, executeFredDevelopment } from "./fred_development";
 import type OpenAI from "openai";
 import {
@@ -4607,8 +4609,9 @@ export async function runChatWithMemory(
     pendingNetworkChanges,
   });
 
+  const codingRequested = isFredCodingRequest(latestUserText(opts.messages), userRole);
   let developmentUsed = false;
-  for (let round = 0; round < (developmentUsed ? 16 : 5); round++) {
+  for (let round = 0; round < (codingRequested || developmentUsed ? 32 : 5); round++) {
     const evidenceOnlyTools = tools.filter(
       (tool) =>
         tool.type === "function" && evidenceToolNames.has(tool.function.name),
@@ -4620,13 +4623,13 @@ export async function runChatWithMemory(
     );
     const completion = await openai.chat.completions.create({
       model: opts.model,
-      max_completion_tokens: opts.maxCompletionTokens,
+      max_completion_tokens: codingRequested || developmentUsed ? Math.max(8192, opts.maxCompletionTokens) : opts.maxCompletionTokens,
       ...(opts.model.startsWith("gpt-5.6-")
         ? { reasoning_effort: "none" as const }
         : {}),
       messages,
       tools: mustGatherEvidence ? evidenceOnlyTools : tools,
-      ...(mustGatherEvidence ? { tool_choice: "required" as const } : {}),
+      ...(mustGatherEvidence ? { tool_choice: "required" as const } : codingRequested && !developmentUsed ? { tool_choice: { type: "function" as const, function: { name: "develop_website" } } } : {}),
     });
 
     const msg = completion.choices[0]?.message;
@@ -5319,7 +5322,7 @@ export async function runChatWithMemory(
 
   const final = await openai.chat.completions.create({
     model: opts.model,
-    max_completion_tokens: opts.maxCompletionTokens,
+    max_completion_tokens: codingRequested || developmentUsed ? Math.max(8192, opts.maxCompletionTokens) : opts.maxCompletionTokens,
     ...(opts.model.startsWith("gpt-5.6-")
       ? { reasoning_effort: "none" as const }
       : {}),
@@ -5328,7 +5331,7 @@ export async function runChatWithMemory(
       {
         role: "system",
         content:
-          "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools.",
+          "This turn reached its tool-round limit; tools exist but further calls require another turn. Do not claim tools are unavailable. State exactly what was completed and what remains unvalidated. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools.",
       },
     ],
   });
