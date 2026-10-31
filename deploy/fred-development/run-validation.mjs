@@ -3,7 +3,7 @@ import { statSync } from 'node:fs';
 const root = '/var/lib/fred-development/workspace';
 const steps = [
   ['Sandbox boundaries', 'artifacts/api-server', ['/opt/fred-development/sandbox-check.mjs']],
-  ['API acceptance tests', 'artifacts/api-server', ['node_modules/vitest/vitest.mjs','run','--configLoader','runner','--no-cache','src/lib/fred_page_context.test.ts','src/lib/fred_app_catalog.test.ts','src/lib/fred_development.test.ts','src/lib/fred_coding_request.test.ts','src/lib/building_performance.test.ts','src/lib/building_service_evidence.test.ts']],
+  ['API acceptance tests', 'artifacts/api-server', ['node_modules/vitest/vitest.mjs','run','--configLoader','runner','--no-cache','src/lib/fred_page_context.test.ts','src/lib/fred_app_catalog.test.ts','src/lib/fred_development.test.ts','src/lib/fred_coding_request.test.ts','src/lib/building_performance.test.ts','src/lib/building_service_evidence.test.ts','src/lib/wallboard_performance.test.ts']],
   ['Frontend production build', 'artifacts/it-reporting', ['node_modules/vite/bin/vite.js','build','--config','vite.config.ts','--configLoader','runner']],
   ['Backend production build', 'artifacts/api-server', ['build.mjs']],
 ];

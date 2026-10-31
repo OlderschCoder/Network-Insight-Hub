@@ -18,7 +18,7 @@ These controls isolate execution before deployment. Approved application code ru
 
 ## Validation and release
 
-Protected validation runs sandbox-boundary checks, 36 tests for site-route coverage, page context, coding authorization/request routing and building service-evidence regressions, followed by frontend and backend production builds. The controller verifies the source is unchanged after the run. Source modifications invalidate the last validation. Two separate policy tests cover allowed application edits and rejected escapes/protected paths.
+Protected validation runs sandbox-boundary checks, 42 tests for site-route coverage, page context, coding authorization/request routing, building service-evidence regressions and wallboard performance evidence, followed by frontend and backend production builds. The controller verifies the source is unchanged after the run. Source modifications invalidate the last validation. Two separate policy tests cover allowed application edits and rejected escapes/protected paths.
 
 Publishing copies artifacts into a protected versioned release, saves previous artifacts and changed source, restarts `sccc-api`, and checks `/api/healthz`. Failed startup triggers artifact/source restoration. A release identifier cannot overwrite an existing release directory. The CIO can request rollback of the last successful Fred release. Database changes are excluded.
 
@@ -40,3 +40,9 @@ The acceptance suite is an initial baseline, not exhaustive regression or perfor
 - Unauthenticated access to the development endpoint returned HTTP 401. Protected tests reject non-CIO calls and model attempts to publish/rollback.
 
 The change diff is currently relative to the initial workspace baseline, so it can include already-deployed edits. Release IDs are immutable; publishing the same validation ID again is rejected. Request a fresh validation for a new release. Setup and recovery-check services are not enabled or scheduled.
+
+## Wallboard evidence, October 31, 2026
+
+Fred now exposes `query_wallboard_performance`, a read-only query of the existing InfluxDB source behind the SCCC IT Operations Wallboard. The dashboard is on port 3000, with UID `sccc-it-tv-wallboard`. Building speed results use the dashboard policy: latest LibreSpeed MultiStreamV2 value per building/computer/adapter, averaged across those samples over 24 hours by default. Results preserve actual sample ages and disclose the difference from the Buildings page aggregation policy. WAN results are inbound plus outbound interface traffic by ISP, not circuit capacity. Independent panel failures return partial results and named errors; missing data is not replaced with zero.
+
+Release `680e21fe-224a-4034-8732-916690605673` passed 42 protected tests, sandbox checks and both production builds, then deployed healthy through the CIO Development page. Live Fred chat verified West Campus 924.86 Mbps download / 710.26 Mbps upload from the Oct. 30 21:06 CDT sample, plus current IdeaTek and United traffic with observation timestamps.

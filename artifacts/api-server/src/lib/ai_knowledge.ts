@@ -1,3 +1,4 @@
+import { WALLBOARD_PERFORMANCE_TOOL, queryWallboardPerformance } from "./wallboard_performance";
 import { isFredCodingRequest } from "./fred_coding_request";
 import { latestUserText } from "./fred_evidence_policy";
 import { FRED_DEVELOPMENT_TOOL, executeFredDevelopment } from "./fred_development";
@@ -4569,6 +4570,7 @@ export async function runChatWithMemory(
     WEBEX_DEVICE_STATUS_TOOL,
     CISCO_CALLING_SUPPORT_TOOL,
     QUERY_INFLUX_LAST_SEEN_TOOL,
+    WALLBOARD_PERFORMANCE_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
     QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
     QUERY_FORMAL_ARCHITECTURE_TOOL,
@@ -4904,6 +4906,9 @@ export async function runChatWithMemory(
             resultText = "Error: Cisco Calling support query failed";
           }
         }
+      } else if (call.type === "function" && call.function.name === "query_wallboard_performance") {
+        try { resultText = boundedNetworkResult(await queryWallboardPerformance(call.function.arguments)); }
+        catch (err) { logger.error({ err }, "query_wallboard_performance failed"); resultText = "Wallboard performance unavailable; no measurements retrieved."; }
       } else if (
         call.type === "function" &&
         call.function.name === "query_influx_last_seen"
