@@ -1,0 +1,23 @@
+[Unit]
+Description=SCCC bounded overnight LibreSpeed sweep 2026-10-30
+After=network-online.target sccc-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scccadmin
+Group=scccadmin
+WorkingDirectory=/home/scccadmin/apps/Network-Insight-Hub
+EnvironmentFile=/home/scccadmin/apps/Network-Insight-Hub/.env.production
+EnvironmentFile=/etc/sccc-building-diagnostics/api.env
+EnvironmentFile=/etc/sccc-building-probes/api.env
+EnvironmentFile=/etc/sccc-api-secrets.env
+ExecStart=/usr/bin/node /home/scccadmin/apps/Network-Insight-Hub/deploy/building-diagnostics/overnight-librespeed-sweep.cjs --campaign overnight-librespeed-2026-10-30 --cutoff 2026-10-31T05:00:00-05:00 --report-dir /home/scccadmin/overnight-speed-20261030 --interval-seconds 60 --pending-target 12
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/scccadmin/overnight-speed-20261030
+
