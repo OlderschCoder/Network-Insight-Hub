@@ -31,5 +31,16 @@ export const FRED_DEVELOPMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool =
 export async function executeFredDevelopment(raw: string, actor: {id:number|null;role?:string|null;name?:string|null}) {
   const input = JSON.parse(raw);
   if (!FRED_DEVELOPMENT_ACTIONS.includes(input?.action)) throw new Error("Unsupported development tool action.");
-  return JSON.stringify(await developmentRequest(input,actor));
+  let result = await developmentRequest(input,actor);
+  // Keep the agent's tool turn alive long enough to inspect test failures and fix them.
+  if (input.action === "validate") {
+    const id = result.id;
+    const deadline = Date.now() + 120000;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const state = await developmentRequest({action:"status"},actor);
+      if (state.latest?.id === id && state.latest.status !== "running") { result=state.latest; break; }
+    }
+  }
+  return JSON.stringify(result);
 }
