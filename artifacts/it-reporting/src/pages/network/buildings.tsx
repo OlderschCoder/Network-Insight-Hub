@@ -160,28 +160,28 @@ export const BUILDING_HEALTH_LABELS = {
 
 const healthStyles: Record<string, { bg: string; border: string; ring: string; label: string; icon: ReactNode }> = {
   green: {
-    bg: "bg-green-50 hover:bg-green-100",
+    bg: "building-status-surface bg-green-50 hover:bg-green-100",
     border: "border-green-400",
     ring: "ring-green-300",
     label: BUILDING_HEALTH_LABELS.green,
     icon: <Wifi className="h-5 w-5 text-green-600" />,
   },
   amber: {
-    bg: "bg-amber-50 hover:bg-amber-100",
+    bg: "building-status-surface bg-amber-50 hover:bg-amber-100",
     border: "border-amber-400",
     ring: "ring-amber-300",
     label: BUILDING_HEALTH_LABELS.amber,
     icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
   },
   red: {
-    bg: "bg-red-50 hover:bg-red-100",
+    bg: "building-status-surface bg-red-50 hover:bg-red-100",
     border: "border-red-400",
     ring: "ring-red-300",
     label: BUILDING_HEALTH_LABELS.red,
     icon: <WifiOff className="h-5 w-5 text-red-600" />,
   },
   unknown: {
-    bg: "bg-gray-50 hover:bg-gray-100",
+    bg: "building-status-surface bg-gray-50 hover:bg-gray-100",
     border: "border-gray-300",
     ring: "ring-gray-200",
     label: BUILDING_HEALTH_LABELS.unknown,

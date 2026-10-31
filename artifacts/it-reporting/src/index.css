@@ -460,3 +460,14 @@
     inset: -1px;
   }
 }
+
+/* Status tiles deliberately use pale backgrounds in both themes. Keep the
+   complete semantic text palette local so dark-mode text cannot wash out
+   map markers, building names, performance values or supporting details. */
+.building-status-surface {
+  --foreground: 222 47% 11%;
+  --card-foreground: 222 47% 11%;
+  --muted-foreground: 215 25% 27%;
+  --primary: 140 40% 25%;
+  color: hsl(var(--foreground));
+}
