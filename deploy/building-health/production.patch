@@ -1,0 +1,431 @@
+--- a/artifacts/api-server/src/lib/building_performance.ts
++++ b/artifacts/api-server/src/lib/building_performance.ts
+@@ -1,8 +1,19 @@
+ import { pool } from "@workspace/db";
+ import { DEFAULT_AUTHORITATIVE_BUILDINGS } from "./building_assignment";
+ import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
++import { LIBRESPEED_METHOD, LIBRESPEED_ORIGIN, LIBRESPEED_SERVER_ID } from "./building_diagnostics";
++
++export const BUILDING_PERFORMANCE_FRESH_MS = 12 * 60 * 60_000;
+ 
+ export type BuildingPerformanceStatus = "measured" | "stale" | "failed";
++
++export interface BuildingPerformanceProvenance {
++  kind: "external-librespeed" | "external-https" | "local" | "unknown";
++  explicitExternal: boolean;
++  serverOrigin: string | null;
++  serverId: number | null;
++  method: string | null;
++}
+ 
+ export interface BuildingPerformance {
+   status: BuildingPerformanceStatus;
+@@ -15,6 +26,7 @@
+   lossPercent: number | null;
+   testType: string | null;
+   targetLabel: string | null;
++  provenance: BuildingPerformanceProvenance;
+   error: string | null;
+   sampleCount: number;
+   interfaces: Array<{
+@@ -25,6 +37,12 @@
+     jitterMs: number;
+     transferClosed: true;
+   }>;
++}
++
++export interface BuildingServiceEvidence {
++  internetUp: boolean;
++  reason: string;
++  observedAt: string | null;
+ }
+ 
+ interface PerformanceRow {
+@@ -70,6 +88,98 @@
+   });
+ }
+ 
++function isPublicHttpsOrigin(value: string | null): value is string {
++  if (!value) return false;
++  try {
++    const uri = new URL(value);
++    const host = uri.hostname.toLowerCase();
++    return uri.protocol === "https:" && !uri.port && !uri.username && !uri.password &&
++      !uri.search && !uri.hash && uri.pathname === "/" && uri.origin === value &&
++      !/^\d+\.\d+\.\d+\.\d+$/.test(host) &&
++      /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) && host.includes(".") &&
++      !/(?:^|\.)(?:localhost|local|internal|lan|home|invalid|test)$/.test(host);
++  } catch {
++    return false;
++  }
++}
++
++function successfulExternalHttps(data: Record<string, unknown>, external: Record<string, unknown> | null) {
++  const status = finiteNumber(external?.status ?? external?.statusCode ?? external?.httpStatus);
++  const bytes = finiteNumber(external?.completedBytes ?? external?.bytesReceived ?? external?.downloadBytes ?? data.completedBytes ?? data.downloadBytes);
++  const elapsed = finiteNumber(external?.elapsedMs ?? external?.durationMs ?? data.elapsedMs ?? data.durationMs);
++  const failed = data.failed === true || external?.failed === true ||
++    (typeof data.error === "string" && !!data.error.trim()) ||
++    (typeof external?.error === "string" && !!external.error.trim()) ||
++    (typeof external?.failure === "string" && !!external.failure.trim());
++  return !failed && (status === 200 || status === 206) &&
++    bytes !== null && bytes > 0 && elapsed !== null && elapsed > 0;
++}
++
++function performanceProvenance(data: Record<string, unknown>): BuildingPerformanceProvenance {
++  const type = typeof data.type === "string" ? data.type : null;
++  const libreSpeed = data.libreSpeed && typeof data.libreSpeed === "object"
++    ? data.libreSpeed as Record<string, unknown>
++    : null;
++  const serverOrigin = typeof libreSpeed?.serverOrigin === "string" ? libreSpeed.serverOrigin : null;
++  const serverId = finiteNumber(libreSpeed?.serverId);
++  const method = typeof libreSpeed?.method === "string" ? libreSpeed.method : null;
++  const explicitLibreSpeed = type === "librespeed-v2" && serverOrigin === LIBRESPEED_ORIGIN &&
++    serverId === LIBRESPEED_SERVER_ID && method === LIBRESPEED_METHOD;
++  const external = data.external && typeof data.external === "object"
++    ? data.external as Record<string, unknown>
++    : null;
++  const externalOrigin = typeof external?.targetOrigin === "string" ? external.targetOrigin : null;
++  const externalType = typeof external?.type === "string" ? external.type : null;
++  const explicitHttps = (type === "external-quick" || type === "external-sustained") &&
++    externalType === type && isPublicHttpsOrigin(externalOrigin) && successfulExternalHttps(data, external);
++  if (explicitLibreSpeed) {
++    return { kind: "external-librespeed", explicitExternal: true, serverOrigin, serverId, method };
++  }
++  if (explicitHttps) {
++    return { kind: "external-https", explicitExternal: true, serverOrigin: externalOrigin, serverId: null, method: "HTTPS" };
++  }
++  if (type === "fred") {
++    return { kind: "local", explicitExternal: false, serverOrigin: null, serverId: null, method: null };
++  }
++  return { kind: "unknown", explicitExternal: false, serverOrigin, serverId, method };
++}
++
++/** Pure decision helper: only fresh, successful, positive, explicitly external evidence asserts Internet up. */
++export function getBuildingServiceEvidence(
++  performance: BuildingPerformance | null | undefined,
++  now = Date.now(),
++  freshnessMs = BUILDING_PERFORMANCE_FRESH_MS,
++): BuildingServiceEvidence {
++  if (!performance) return { internetUp: false, reason: "No external Internet measurement", observedAt: null };
++  const observed = Date.parse(performance.recordedAt);
++  const observedAt = Number.isFinite(observed) ? new Date(observed).toISOString() : null;
++  if (!Number.isFinite(observed) || observed > now || now - observed > freshnessMs) {
++    return { internetUp: false, reason: "External Internet measurement is stale or invalid", observedAt };
++  }
++  if (performance.status !== "measured" || performance.error) {
++    return { internetUp: false, reason: "Latest external Internet measurement did not succeed", observedAt };
++  }
++  if (!performance.provenance.explicitExternal ||
++      (performance.provenance.kind !== "external-librespeed" && performance.provenance.kind !== "external-https")) {
++    return { internetUp: false, reason: "Latest measurement lacks explicit external provenance", observedAt };
++  }
++  const positiveInterface = performance.interfaces.some((measurement) =>
++    measurement.transferClosed && Number.isFinite(measurement.downloadMbps) && measurement.downloadMbps > 0 &&
++    Number.isFinite(measurement.uploadMbps) && measurement.uploadMbps > 0);
++  const positiveExternalHttps = performance.provenance.kind === "external-https" &&
++    performance.downloadMbps !== null && Number.isFinite(performance.downloadMbps) && performance.downloadMbps > 0;
++  if (!positiveInterface && !positiveExternalHttps) {
++    return { internetUp: false, reason: "External measurement has no positive completed throughput", observedAt };
++  }
++  return {
++    internetUp: true,
++    reason: performance.provenance.kind === "external-librespeed"
++      ? "Fresh positive external LibreSpeed throughput"
++      : "Fresh positive external HTTPS throughput",
++    observedAt,
++  };
++}
++
+ /**
+  * Endpoint results are grouped by the reporting catalog. Historical labels such
+  * as "Main Campus" and "Technical School" remain excluded because they cannot
+@@ -105,11 +215,14 @@
+     }
+     const recent = [...newestByComputer.values()].filter((row) => {
+       const at = new Date(row.recorded_at).getTime();
+-      return Number.isFinite(at) && now - at <= 24 * 60 * 60_000;
++      return Number.isFinite(at) && at <= now && now - at <= BUILDING_PERFORMANCE_FRESH_MS;
+     });
+     const validated = recent.map((row) => ({ row, data: reportData(row.data) }))
+-      .map((entry) => ({ ...entry, interfaces: verifiedInterfaces(entry.data) }))
+-      .filter((entry) => entry.interfaces.length > 0 && !(typeof entry.data.error === "string" && entry.data.error.trim()));
++      .map((entry) => ({ ...entry, interfaces: verifiedInterfaces(entry.data), provenance: performanceProvenance(entry.data) }))
++      .filter((entry) => entry.interfaces.some((measurement) => measurement.transferClosed &&
++          measurement.downloadMbps > 0 && measurement.uploadMbps > 0) &&
++        entry.provenance.explicitExternal &&
++        !(typeof entry.data.error === "string" && entry.data.error.trim()));
+ 
+     if (validated.length) {
+       const averagedInterfaces = (["ethernet", "wifi"] as const).flatMap((adapterKind) => {
+@@ -125,11 +238,13 @@
+       const mean = (key: "downloadMbps" | "uploadMbps" | "pingMs") =>
+         representatives.reduce((sum, sample) => sum + sample[key], 0) / representatives.length;
+       const newestAt = Math.max(...validated.map((entry) => new Date(entry.row.recorded_at).getTime()));
++      const newest = validated.sort((a, b) => new Date(b.row.recorded_at).getTime() - new Date(a.row.recorded_at).getTime())[0];
+       latest[building] = {
+-        status: now - newestAt > 12 * 60 * 60_000 ? "stale" : "measured",
++        status: now - newestAt > BUILDING_PERFORMANCE_FRESH_MS ? "stale" : "measured",
+         recordedAt: new Date(newestAt).toISOString(), computerName: null, user: null,
+         downloadMbps: mean("downloadMbps"), uploadMbps: mean("uploadMbps"), latencyMs: mean("pingMs"),
+-        lossPercent: null, testType: "librespeed-v2", targetLabel: "Building average from latest validated endpoint results",
++        lossPercent: null, testType: "librespeed-v2", targetLabel: "Building average from latest validated external endpoint results",
++        provenance: newest.provenance,
+         error: null, sampleCount: validated.length, interfaces: averagedInterfaces,
+       };
+       continue;
+@@ -147,7 +262,7 @@
+     const representative = interfaces.find((item) => item.adapterKind === "ethernet") ?? interfaces[0];
+ 
+     latest[building] = {
+-      status: error ? "failed" : ageMs > 12 * 60 * 60_000 ? "stale" : "measured",
++      status: error ? "failed" : ageMs < 0 || ageMs > BUILDING_PERFORMANCE_FRESH_MS ? "stale" : "measured",
+       recordedAt: recordedAt.toISOString(),
+       computerName: row.computer_name?.trim() || null,
+       user: row.logged_on_user?.trim() || null,
+@@ -157,6 +272,7 @@
+       lossPercent: finiteNumber(data.requestLossPercent),
+       testType: typeof data.type === "string" ? data.type : null,
+       targetLabel: typeof data.targetLabel === "string" ? data.targetLabel : null,
++      provenance: performanceProvenance(data),
+       error,
+       sampleCount: 1,
+       interfaces,
+--- a/artifacts/api-server/src/routes/network_nodes.ts
++++ b/artifacts/api-server/src/routes/network_nodes.ts
+@@ -11,7 +11,7 @@
+   getCanonicalBuildingName,
+   normalizeBuildingKey,
+ } from "../lib/building_assignment";
+-import { getLatestBuildingPerformance } from "../lib/building_performance";
++import { getBuildingServiceEvidence, getLatestBuildingPerformance, type BuildingServiceEvidence } from "../lib/building_performance";
+ import { diagnosticsBuildingName } from "../lib/building_diagnostics_catalog";
+ 
+ export { getCanonicalBuildingName } from "../lib/building_assignment";
+@@ -265,6 +265,19 @@
+   return "unknown";
+ }
+ 
++function buildingHealthFromEvidence(
++  deviceHealthColor: "green" | "amber" | "red" | "unknown",
++  serviceEvidence: BuildingServiceEvidence,
++): "green" | "amber" | "red" | "unknown" {
++  // A fresh successful external transfer proves the building has an Internet
++  // path. It does not clear device faults, which remain separately visible.
++  if (serviceEvidence.internetUp) return "green";
++  // A management-probe failure alone is device evidence, not proof that every
++  // service in the building is unavailable.
++  if (deviceHealthColor === "red") return "amber";
++  return deviceHealthColor;
++}
++
+ type BuildingCategory = "campus-building" | "remote-site" | "cloud" | "connectivity";
+ type MonitoringStrategy = "switch-probe" | "control-plane" | "none";
+ 
+@@ -447,7 +460,10 @@
+     const statuses = name === "Azure (Hybrid-VNet)"
+       ? [azureHybridStatus]
+       : (buildingStatuses[name] ?? []);
+-    const healthColor = healthColorFromStatuses(statuses);
++    const deviceHealthColor = healthColorFromStatuses(statuses);
++    const performance = buildingPerformance[name] ?? null;
++    const serviceEvidence = getBuildingServiceEvidence(performance);
++    const healthColor = buildingHealthFromEvidence(deviceHealthColor, serviceEvidence);
+ 
+     return {
+       name,
+@@ -456,10 +472,12 @@
+       connectivityObjectCount: connectivityObjectMap[name] ?? 0,
+       vlanCount: vlanMap[name] ?? 0,
+       healthColor,
++      deviceHealthColor,
++      serviceEvidence,
+       influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
+       category: classification.category,
+       monitoringStrategy: classification.monitoringStrategy,
+-      performance: buildingPerformance[name] ?? null,
++      performance,
+     };
+   });
+ }
+@@ -825,6 +843,8 @@
+       nodeCount: building.nodeCount,
+       vlanCount: building.vlanCount,
+       healthColor: building.healthColor,
++      deviceHealthColor: building.deviceHealthColor,
++      serviceEvidence: building.serviceEvidence,
+       category: building.category,
+       monitoringStrategy: building.monitoringStrategy,
+     })),
+@@ -1227,8 +1247,9 @@
+   );
+   if (!canonicalName) return res.status(404).json({ error: "BUILDING_NOT_FOUND" });
+ 
+-  const [allNodes, allVlans, azureHybridStatus, buildingPerformance] = await Promise.all([
++  const [allNodes, allSwitches, allVlans, azureHybridStatus, buildingPerformance] = await Promise.all([
+     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
++    db.select().from(networkSwitchesTable),
+     db.select().from(vlansTable).orderBy(vlansTable.building, vlansTable.vlanId),
+     getAzureHybridVmStatus(),
+     getLatestBuildingPerformance(),
+@@ -1252,11 +1273,15 @@
+       )
+     : [];
+ 
+-  // Live status
+-  const hosts = getBuildingMonitorHosts(
+-    canonicalName,
+-    nodes.map((n) => n.mgmtIp).filter(isMonitorableHost),
+-  );
++  // Use the same monitored-switch inventory grouping as the summary. Raw
++  // topology rows remain in nodesWithStatus for diagnostics and mapping.
++  const hosts = canonicalName === "Azure (Hybrid-VNet)"
++    ? []
++    : allSwitches.filter((node) => diagnosticsBuildingName(
++        getAssignedBuildingName(node.building, node.location, node.hostname),
++      ) === canonicalName)
++      .map((node) => node.ipAddress)
++      .filter(isMonitorableHost);
+   const classification = getBuildingClassification(canonicalName);
+   const liveStatuses = hosts.length ? await getDeviceStatus(hosts) : {};
+   const monitoredHosts = new Set(hosts.map(normalizeTelemetryKey));
+@@ -1272,7 +1297,10 @@
+   const statuses = canonicalName === "Azure (Hybrid-VNet)"
+     ? [azureHybridStatus]
+     : hosts.map((host) => liveStatuses[normalizeTelemetryKey(host)] ?? "unknown");
+-  const healthColor = healthColorFromStatuses(statuses);
++  const deviceHealthColor = healthColorFromStatuses(statuses);
++  const performance = buildingPerformance[canonicalName] ?? null;
++  const serviceEvidence = getBuildingServiceEvidence(performance);
++  const healthColor = buildingHealthFromEvidence(deviceHealthColor, serviceEvidence);
+ 
+   return res.json({
+     name: canonicalName,
+@@ -1281,10 +1309,12 @@
+     vlans,
+     links,
+     healthColor,
++    deviceHealthColor,
++    serviceEvidence,
+     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
+     category: classification.category,
+     monitoringStrategy: classification.monitoringStrategy,
+-    performance: buildingPerformance[canonicalName] ?? null,
++    performance,
+   });
+ });
+ 
+--- a/artifacts/it-reporting/src/pages/network/buildings.tsx
++++ b/artifacts/it-reporting/src/pages/network/buildings.tsx
+@@ -29,8 +29,16 @@
+   nodeCount: number;
+   vlanCount: number;
+   healthColor: "green" | "amber" | "red" | "unknown";
++  deviceHealthColor?: "green" | "amber" | "red" | "unknown";
++  serviceEvidence?: BuildingServiceEvidence;
+   influxConfigured: boolean;
+   performance: BuildingPerformance | null;
++}
++
++interface BuildingServiceEvidence {
++  internetUp: boolean;
++  reason: string;
++  observedAt: string | null;
+ }
+ 
+ interface BuildingPerformance {
+@@ -87,6 +95,8 @@
+   vlans: VlanSummary[];
+   links: any[];
+   healthColor: "green" | "amber" | "red" | "unknown";
++  deviceHealthColor?: "green" | "amber" | "red" | "unknown";
++  serviceEvidence?: BuildingServiceEvidence;
+   influxConfigured: boolean;
+   performance: BuildingPerformance | null;
+ }
+@@ -166,7 +176,7 @@
+     bg: "bg-green-50 hover:bg-green-100",
+     border: "border-green-400",
+     ring: "ring-green-300",
+-    label: "All systems up",
++    label: "Service path available",
+     icon: <Wifi className="h-5 w-5 text-green-600" />,
+   },
+   amber: {
+@@ -672,9 +682,9 @@
+       </CardHeader>
+       <CardContent className="space-y-4">
+         <div className="flex flex-wrap gap-4 text-sm">
+-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All mapped devices up</div>
+-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more mapped devices degraded</div>
+-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more mapped devices down</div>
++          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> Internet path observed or devices up</div>
++          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Device monitoring degraded</div>
++          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Device probes down with no fresh Internet evidence</div>
+           <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live building match yet</div>
+         </div>
+ 
+@@ -817,9 +827,14 @@
+                       {match?.name ?? overlay.buildingName}
+                     </div>
+                     <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
+-                    {match && (
++                    {match?.serviceEvidence?.internetUp && (
+                       <div className="mt-1 text-[9px] font-semibold leading-tight text-foreground">
+-                        {performanceHeadline(match.performance)}
++                        Internet measured {match.serviceEvidence.observedAt ? performanceAge(match.serviceEvidence.observedAt) : "recently"}
++                      </div>
++                    )}
++                    {match?.deviceHealthColor && match.deviceHealthColor !== "green" && (
++                      <div className="mt-0.5 text-[9px] leading-tight text-amber-800">
++                        Device monitoring needs review: {match.deviceHealthColor}
+                       </div>
+                     )}
+                   </div>}
+@@ -943,10 +958,10 @@
+ 
+       {/* Legend */}
+       <div className="flex flex-wrap gap-4 text-sm">
+-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All devices up</div>
+-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more degraded</div>
+-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more down</div>
+-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live data</div>
++        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> Internet path observed or devices up</div>
++        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> Device monitoring degraded</div>
++        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> Device probes down with no fresh Internet evidence</div>
++        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No current evidence</div>
+       </div>
+ 
+       {/* Search */}
+@@ -994,7 +1009,15 @@
+                       <div className="text-muted-foreground">{style.icon}</div>
+                       <div>
+                         <p className="font-semibold text-sm leading-tight">{b.name}</p>
+-                        <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
++                        <p className="text-xs text-muted-foreground mt-0.5">
++                          {b.serviceEvidence?.internetUp ? "Internet path measured" : style.label}
++                        </p>
++                        {b.serviceEvidence?.internetUp && b.serviceEvidence.observedAt && (
++                          <p className="text-[11px] text-muted-foreground">Measured {performanceAge(b.serviceEvidence.observedAt)} · phones not inferred</p>
++                        )}
++                        {b.deviceHealthColor && b.deviceHealthColor !== "green" && (
++                          <p className="text-[11px] font-medium text-amber-700">Device monitoring needs review: {b.deviceHealthColor}</p>
++                        )}
+                       </div>
+                       <div className="flex gap-2 mt-auto pt-1">
+                         <span className="text-xs text-muted-foreground">
+@@ -1360,7 +1383,13 @@
+             : detail.healthColor === "amber" ? "bg-amber-100 text-amber-700 border-amber-300"
+             : detail.healthColor === "red" ? "bg-red-100 text-red-700 border-red-300"
+             : "bg-gray-100 text-gray-600 border-gray-300"
+-          }`}>{style.label}</span>
++          }`}>{detail.serviceEvidence?.internetUp ? "Internet path measured" : style.label}</span>
++          {detail.serviceEvidence?.internetUp && detail.serviceEvidence.observedAt && (
++            <span className="text-xs text-muted-foreground">Measured {performanceAge(detail.serviceEvidence.observedAt)} · phones not verified by this measurement</span>
++          )}
++          {detail.deviceHealthColor && detail.deviceHealthColor !== "green" && (
++            <span className="text-xs font-medium text-amber-700">Device monitoring needs review: {detail.deviceHealthColor}</span>
++          )}
+         </div>
+         {canEdit && !editingName && (
+           <>

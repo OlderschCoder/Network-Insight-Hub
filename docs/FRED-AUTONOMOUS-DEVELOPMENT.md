@@ -1,6 +1,6 @@
 # Fred application development
 
-The live CIO assistant exposes `develop_website`: list/read application sources, write or replace exact text with a SHA-256 concurrency check, inspect changes, run independent validation, and prepare a release. Coding requests get up to 16 tool rounds. Validation waits up to two minutes within a tool turn and can be checked later through status.
+The live CIO assistant exposes `develop_website`: list/read application sources, write or replace exact text with a SHA-256 concurrency check, inspect changes, run independent validation, and prepare a release. CIO coding requests get up to 32 tool rounds, recognized from the current request before operational evidence gathering, with enough output budget for source edits. The first coding tool call is required after evidence gathering for explicit coding requests. Validation waits up to two minutes within a tool turn and can be checked later through status.
 
 The workspace is `/var/lib/fred-development/workspace` on app-server2. Production remains `/home/scccadmin/apps/Network-Insight-Hub`. The original Windows checkout was preserved; implementation is in the isolated `codex/fred-page-assistant` branch. Production contained additional changes absent from GitHub; those were retained in the deployed integration.
 
@@ -18,7 +18,7 @@ These controls isolate execution before deployment. Approved application code ru
 
 ## Validation and release
 
-Protected validation runs sandbox-boundary checks, 15 tests for site-route coverage, page context and coding authorization, followed by frontend and backend production builds. The controller verifies the source is unchanged after the run. Source modifications invalidate the last validation. Two separate policy tests cover allowed application edits and rejected escapes/protected paths.
+Protected validation runs sandbox-boundary checks, 36 tests for site-route coverage, page context, coding authorization/request routing and building service-evidence regressions, followed by frontend and backend production builds. The controller verifies the source is unchanged after the run. Source modifications invalidate the last validation. Two separate policy tests cover allowed application edits and rejected escapes/protected paths.
 
 Publishing copies artifacts into a protected versioned release, saves previous artifacts and changed source, restarts `sccc-api`, and checks `/api/healthz`. Failed startup triggers artifact/source restoration. A release identifier cannot overwrite an existing release directory. The CIO can request rollback of the last successful Fred release. Database changes are excluded.
 

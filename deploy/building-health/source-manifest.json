@@ -1,0 +1,17 @@
+[
+  {
+    "path": "artifacts/api-server/src/lib/building_performance.ts",
+    "beforeSha256": "94c9bc2567632f73f0f0b7309e903d64529edfea4b5c2b4356c0cd93b2f9e5b7",
+    "afterSha256": "90974e3ade3c4ac582dcb695bfe7346ff4411d0dcc07c2ba39347c5742b32309"
+  },
+  {
+    "path": "artifacts/api-server/src/routes/network_nodes.ts",
+    "beforeSha256": "c7527890407286bf7fbff26001556f8eecfba839478cbd79e581ad219326e23f",
+    "afterSha256": "0fa4cfcbe84aa0764f2f88cff239b28083e457cb0c659122e43fa6f6e70d6a48"
+  },
+  {
+    "path": "artifacts/it-reporting/src/pages/network/buildings.tsx",
+    "beforeSha256": "099d9ff3231eb855174460720accf96361df2049dc5a43d715a83f2ece4749d1",
+    "afterSha256": "01a1cd023006579c67129752bdf1b3fa5024d6d3f7263a2c950a53ccca5dcaa3"
+  }
+]
