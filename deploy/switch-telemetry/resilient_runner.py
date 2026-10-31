@@ -80,10 +80,13 @@ def main():
         try: _,report=audit(aggregate_path)
         except Exception as e: report={'passed':False,'issues':['Audit error: '+type(e).__name__]}
         report.update(failures=result['failures'],imports_applied=result['applied'],publication_complete=not result['failures'],generated_at=aggregate.get('generated_at'))
-        # Firewall collectors were not part of the recovered switch release; report that gap explicitly.
-        for r in csv.DictReader((app/'device-catalog.csv').open()):
-            if r.get('device_type','').lower()=='firewall' and r.get('monitoring_required','').lower()=='true':
-                result['failures'].append(failure({'switch_name':r['name'],'switch_ip':r['ip'],'building':r.get('building')},'firewall','Firewall freshness check unavailable in recovered switch collector; no firewall outage inferred'))
+        from firewall_telemetry import collect_firewalls
+        with (app/'device-catalog.csv').open() as handle:
+            firewall = collect_firewalls(list(csv.DictReader(handle)))
+        save(run/'firewall_telemetry.json',firewall)
+        result['failures'].extend(firewall['failures'])
+        report.update(firewalls=firewall['firewalls'],firewalls_ok=firewall['ok'],firewalls_failed=firewall['failed'])
+        status.update(firewalls=firewall['firewalls'],firewalls_ok=firewall['ok'],firewalls_failed=firewall['failed'],firewall_checked_at=firewall['checked_at'])
         save(run/'telemetry_audit.json',report)
         state='completed_with_warnings' if result['failures'] else 'completed'
         if not result['applied']: state='failed'
