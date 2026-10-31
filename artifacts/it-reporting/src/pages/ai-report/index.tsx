@@ -1,3 +1,4 @@
+import { DevelopmentTab } from "./development-tab";
 import { useState, useRef, useEffect } from "react";
 import { useSearch, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -2495,7 +2496,7 @@ export default function AIReport() {
   const fromPath = searchParams.get("from") ?? "";
   const prompt = searchParams.get("prompt") ?? "";
   const requestedTab = searchParams.get("tab");
-  const defaultTab = requestedTab === "memory"
+  const defaultTab = isCIO && requestedTab === "development" ? "development" : requestedTab === "memory"
     ? "memory"
     : isCIO && ["status", "architecture", "insights"].includes(requestedTab ?? "")
       ? requestedTab!
@@ -2517,6 +2518,7 @@ export default function AIReport() {
             {isCIO && <TabsTrigger value="status">Status Report</TabsTrigger>}
             {isCIO && <TabsTrigger value="architecture">Architecture</TabsTrigger>}
             <TabsTrigger value="chat">Ask Fred</TabsTrigger>
+            {isCIO && <TabsTrigger value="development">Development</TabsTrigger>}
             {isCIO && (
               <TabsTrigger value="insights">
                 <Flag className="h-4 w-4 mr-1.5" /> CIO Insights
@@ -2543,6 +2545,7 @@ export default function AIReport() {
         <TabsContent value="chat" className="mt-3 min-h-0 flex-1 data-[state=active]:flex">
           <ChatTab contextHint={contextHint} pagePath={fromPath || undefined} initialPrompt={prompt} />
         </TabsContent>
+        <TabsContent value="development" className="mt-3">{isCIO && <DevelopmentTab />}</TabsContent>
         <TabsContent value="memory" className="mt-3">
           <MemoryTab />
         </TabsContent>

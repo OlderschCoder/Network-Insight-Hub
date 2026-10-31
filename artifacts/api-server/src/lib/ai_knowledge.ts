@@ -1,3 +1,4 @@
+import { FRED_DEVELOPMENT_TOOL, executeFredDevelopment } from "./fred_development";
 import type OpenAI from "openai";
 import {
   db,
@@ -4548,6 +4549,7 @@ export async function runChatWithMemory(
   let scanUsed = false;
 
   const tools = [
+    ...(userRole === "cio" ? [FRED_DEVELOPMENT_TOOL] : []),
     SAVE_MEMORY_TOOL,
     ...(allowTaskCapture ? [CREATE_TASK_TOOL] : []),
     UPSERT_SWITCH_TOOL,
@@ -4605,7 +4607,8 @@ export async function runChatWithMemory(
     pendingNetworkChanges,
   });
 
-  for (let round = 0; round < 5; round++) {
+  let developmentUsed = false;
+  for (let round = 0; round < (developmentUsed ? 16 : 5); round++) {
     const evidenceOnlyTools = tools.filter(
       (tool) =>
         tool.type === "function" && evidenceToolNames.has(tool.function.name),
@@ -5298,6 +5301,12 @@ export async function runChatWithMemory(
           logger.error({ err }, "get_application_guidance tool failed");
           resultText = "Error: application guidance lookup failed";
         }
+      }
+
+      if (call.type === "function" && call.function.name === "develop_website") {
+        developmentUsed = true;
+        try { resultText = redactSecretLike(await executeFredDevelopment(call.function.arguments, {id:opts.userId, name:opts.userName, role:userRole})).text; }
+        catch (error) { resultText = JSON.stringify({error: error instanceof Error ? error.message : "Development operation failed"}); }
       }
 
       messages.push({

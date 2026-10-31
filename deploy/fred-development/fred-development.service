@@ -1,0 +1,25 @@
+[Unit]
+Description=Fred isolated application development controller
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/node /opt/fred-development/controller.mjs
+Restart=on-failure
+RuntimeDirectory=fred-development
+RuntimeDirectoryMode=0755
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/fred-development /run/fred-development
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

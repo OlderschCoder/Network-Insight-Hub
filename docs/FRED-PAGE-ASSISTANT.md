@@ -19,4 +19,4 @@ The home-page prompt handoff now preserves the question verbatim instead of rewr
 
 ## Release boundary
 
-Prepared in an isolated checkout on `codex/fred-page-assistant`. No production services, database records, permissions or deployment settings were changed. Before rollout, reconcile the deployed revision with GitHub main and run the normal release validation. The original working directory contains uncommitted work and was left intact.
+Implemented in an isolated checkout on `codex/fred-page-assistant` and deployed to app-server2 after merging with its newer production-only changes. Production health and the live page assistant were verified. The original working directory contains uncommitted work and was left intact. See FRED-AUTONOMOUS-DEVELOPMENT.md for the subsequent coding integration and release controls.

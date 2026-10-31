@@ -17,6 +17,26 @@ export type FredApplicationPage = {
  */
 export const FRED_APPLICATION_PAGES: FredApplicationPage[] = [
   {
+    name: "Building speed and computers",
+    routes: ["/network/diagnostics"],
+    menu: "Campus technology / Building speed and computers",
+    access: "Authenticated IT staff; enrollment and credential actions follow page permissions",
+    purpose: "Review building computers and run eligible diagnostic measurements.",
+    functions: ["Assign buildings", "Review AD computer inventory", "Select eligible computers for measurement", "Manage diagnostic enrollment through the guarded page controls"],
+    fredDirect: ["Explain the page and retrieve network evidence through available read tools"],
+    fredGuides: ["Guide enrollment and measurement in the page; do not claim diagnostic credentials are visible or directly editable in chat"],
+  },
+  {
+    name: "Building probes",
+    routes: ["/network/building-probes"],
+    menu: "Campus technology / Building probes",
+    access: "Authenticated IT staff; changes follow page permissions",
+    purpose: "Review building probe coverage and reporting status.",
+    functions: ["Review selected buildings and enrolled computers", "Inspect reporting, awaiting, and offline probes"],
+    fredDirect: ["Explain probe coverage and navigate to this page"],
+    fredGuides: ["Use this page for current probe status and its supported management actions"],
+  },
+  {
     name: "Design System",
     routes: ["/design-system"],
     menu: "Internal development route; not shown in normal navigation",

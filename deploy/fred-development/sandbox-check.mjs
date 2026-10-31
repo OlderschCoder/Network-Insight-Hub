@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import net from 'node:net';
+import assert from 'node:assert/strict';
+assert.notEqual(process.getuid(),0,'Builder must not run as root');
+assert.equal(process.env.DATABASE_URL,undefined);
+assert.equal(process.env.OPENAI_API_KEY,undefined);
+assert.throws(()=>fs.readFileSync('/home/scccadmin/apps/Network-Insight-Hub/.env.production'));
+assert.throws(()=>fs.readFileSync('/var/lib/fred-development/control/audit.jsonl'));
+assert.throws(()=>fs.openSync('/opt/fred-development/controller.mjs','r+'));
+assert.throws(()=>fs.openSync('/var/lib/fred-development/workspace/artifacts/api-server/src/routes/auth.ts','r+'));
+assert.throws(()=>fs.openSync('/var/lib/fred-development/workspace/artifacts/api-server/src/lib/fred_page_context.test.ts','r+'));
+await new Promise((resolve,reject)=>{const s=net.createConnection({host:'127.0.0.1',port:8080});s.once('connect',()=>{s.destroy();reject(new Error('Production network unexpectedly reachable'));});s.once('error',resolve);s.setTimeout(2000,()=>{s.destroy();reject(new Error('Network isolation did not reject promptly'));});});
+console.log('SANDBOX_BOUNDARIES_PASSED');

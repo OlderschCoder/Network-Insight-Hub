@@ -36,7 +36,7 @@ export function FredAssistant({ path, label }: { path: string; label: string }) 
       className={`${open ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full flex-col border-l bg-background text-foreground shadow-2xl sm:w-[min(38rem,90vw)]`}>
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
         <div><h2 className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Fred</h2>
-          <p className="text-xs text-muted-foreground">Answers and help while you work</p></div>
+          <p className="text-xs text-muted-foreground">Ask about this page, find information, or record an update</p></div>
         <div className="flex gap-1">
           <Button asChild variant="ghost" size="icon"><Link href={`/ai-report?from=${encodeURIComponent(path)}`} aria-label="Open Fred workspace"><Expand className="h-4 w-4" /></Link></Button>
           <Button ref={closeButton} type="button" variant="ghost" size="icon" onClick={close} aria-label="Close Fred"><X className="h-4 w-4" /></Button>
