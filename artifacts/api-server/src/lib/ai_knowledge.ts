@@ -4539,7 +4539,8 @@ export async function runChatWithMemory(
     pendingNetworkChanges,
   });
 
-  for (let round = 0; round < 5; round++) {
+  let developmentUsed = false;
+  for (let round = 0; round < (developmentUsed ? 16 : 5); round++) {
     const evidenceOnlyTools = tools.filter(
       (tool) =>
         tool.type === "function" && evidenceToolNames.has(tool.function.name),
@@ -5152,6 +5153,7 @@ export async function runChatWithMemory(
       }
 
       if (call.type === "function" && call.function.name === "develop_website") {
+        developmentUsed = true;
         try { resultText = redactSecretLike(await executeFredDevelopment(call.function.arguments, {id:opts.userId, name:opts.userName, role:userRole})).text; }
         catch (error) { resultText = JSON.stringify({error: error instanceof Error ? error.message : "Development operation failed"}); }
       }
