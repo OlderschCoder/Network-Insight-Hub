@@ -1,5 +1,6 @@
 import { pool } from "@workspace/db";
 import { DEFAULT_AUTHORITATIVE_BUILDINGS } from "./building_assignment";
+import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
 
 export type BuildingPerformanceStatus = "measured" | "stale" | "failed";
 
@@ -70,21 +71,24 @@ function verifiedInterfaces(data: Record<string, unknown>): BuildingPerformance[
 }
 
 /**
- * Only exact authoritative building names are accepted. Historical labels such
- * as "Main Campus" and "Technical School" are intentionally excluded because
- * they cannot support a trustworthy per-building baseline.
+ * Endpoint results are grouped by the reporting catalog. Historical labels such
+ * as "Main Campus" and "Technical School" remain excluded because they cannot
+ * support a trustworthy per-building baseline.
  */
 export function buildLatestBuildingPerformance(
   rows: PerformanceRow[],
   now = Date.now(),
 ): Record<string, BuildingPerformance> {
-  const authoritative = new Set<string>(DEFAULT_AUTHORITATIVE_BUILDINGS);
+  const authoritativeSourceNames = new Set<string>(DEFAULT_AUTHORITATIVE_BUILDINGS);
   const latest: Record<string, BuildingPerformance> = {};
   const grouped = new Map<string, PerformanceRow[]>();
 
   for (const row of rows) {
-    const building = String(row.building ?? "").trim();
-    if (!authoritative.has(building)) continue;
+    const sourceBuilding = String(row.building ?? "").trim();
+    const building = authoritativeSourceNames.has(sourceBuilding)
+      ? diagnosticsBuildingName(sourceBuilding)
+      : null;
+    if (!building) continue;
     const current = grouped.get(building) ?? [];
     current.push(row);
     grouped.set(building, current);
@@ -94,7 +98,10 @@ export function buildLatestBuildingPerformance(
     const newestByComputer = new Map<string, PerformanceRow>();
     for (const row of buildingRows) {
       const computer = row.computer_name?.trim().toLowerCase() || `unknown-${newestByComputer.size}`;
-      if (!newestByComputer.has(computer)) newestByComputer.set(computer, row);
+      const existing = newestByComputer.get(computer);
+      if (!existing || new Date(row.recorded_at).getTime() > new Date(existing.recorded_at).getTime()) {
+        newestByComputer.set(computer, row);
+      }
     }
     const recent = [...newestByComputer.values()].filter((row) => {
       const at = new Date(row.recorded_at).getTime();

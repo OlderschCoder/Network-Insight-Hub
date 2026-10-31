@@ -97,4 +97,16 @@ describe("building performance summaries", () => {
       downloadMbps: 800, uploadMbps: 600, latencyMs: 12 });
     expect(result.Hobble.interfaces[0]).toMatchObject({ adapterKind: "ethernet", downloadMbps: 800, uploadMbps: 600 });
   });
+
+  it("aggregates sub-building labels into one physical-building result", () => {
+    const result = buildLatestBuildingPerformance([
+      { building: "Student Living H", recorded_at: "2026-10-27T05:58:00.000Z", computer_name: "PC-H",
+        data: { libreSpeed: { measurements: [{ adapterKind: "ethernet", downloadMbps: 800, uploadMbps: 600, pingMs: 10, jitterMs: 2, transferClosed: true }] } } },
+      { building: "Student Living T", recorded_at: "2026-10-27T05:57:00.000Z", computer_name: "PC-T",
+        data: { libreSpeed: { measurements: [{ adapterKind: "ethernet", downloadMbps: 600, uploadMbps: 400, pingMs: 14, jitterMs: 4, transferClosed: true }] } } },
+    ], now);
+
+    expect(Object.keys(result)).toEqual(["Student Living Center"]);
+    expect(result["Student Living Center"]).toMatchObject({ sampleCount: 2, downloadMbps: 700, uploadMbps: 500, latencyMs: 12 });
+  });
 });

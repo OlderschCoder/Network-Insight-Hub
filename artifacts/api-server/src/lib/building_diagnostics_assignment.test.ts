@@ -25,7 +25,7 @@ describe("canonical manual building assignment metadata", () => {
     for (const invalid of [[], ["bad"], Array(1001).fill(id), null] as any[]) expect(() => code.normalizeAssignmentIds(invalid)).toThrow();
   });
   it("uses exact catalog names and does not infer a group-to-building crosswalk", () => {
-    expect(code.canonicalAssignmentBuildings([{ name: "Tech Building A" }, { name: "Hobble" }, { name: "Hobble" }])).toEqual(["Hobble", "Tech Building A"]);
+    expect(code.canonicalAssignmentBuildings([{ name: "Tech Building A" }, { name: "Hobble" }, { name: "Hobble" }])).toEqual(["Hobble", "Industrial Technology Campus"]);
     for (const invalid of [[], [{}], null]) expect(() => code.canonicalAssignmentBuildings(invalid)).toThrow();
   });
   it("requires every selected AD computer to be current and enabled, independent of heartbeat", () => {

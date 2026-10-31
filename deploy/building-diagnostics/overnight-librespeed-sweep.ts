@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { pool } from "@workspace/db";
 import { libreSpeedConfig } from "../../artifacts/api-server/src/lib/building_diagnostics";
+import { diagnosticsBuildingName } from "../../artifacts/api-server/src/lib/building_diagnostics_catalog";
 import { diagnosticsStore } from "../../artifacts/api-server/src/lib/building_diagnostics_store";
 
 type Args = {
@@ -63,6 +64,10 @@ function csv(value: unknown) {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+function reportingBuilding(value: unknown) {
+  return diagnosticsBuildingName(typeof value === "string" ? value : null) ?? "Unassigned";
+}
+
 async function campaignJobs(campaign: string) {
   const { rows } = await pool.query(`
     SELECT j.id,j.device_id,j.building,j.status,j.created_at,j.claimed_at,j.expires_at,
@@ -83,7 +88,7 @@ function summarizeMeasurements(rows: any[]) {
     const measurements = Array.isArray(data?.libreSpeed?.measurements) ? data.libreSpeed.measurements : [];
     if (data.error || (row.status === "complete" && measurements.length === 0)) reportErrors++;
     for (const measurement of measurements) {
-      interfaces.push({ ...measurement, building: row.building ?? "Unassigned", computerName: row.computer_name });
+      interfaces.push({ ...measurement, building: reportingBuilding(row.building), computerName: row.computer_name });
     }
   }
   const valid = interfaces.filter(item => item.transferClosed === true && Number.isFinite(item.downloadMbps) && Number.isFinite(item.uploadMbps));
@@ -141,7 +146,7 @@ async function writeReport(args: Args, final = false) {
     const valid = measurements.filter(item => item.transferClosed === true && Number.isFinite(item.downloadMbps) && Number.isFinite(item.uploadMbps));
     return {
       computer: row.computer_name,
-      building: row.building ?? "Unassigned",
+      building: reportingBuilding(row.building),
       status: row.status,
       recordedAt: row.recorded_at ? new Date(row.recorded_at).toISOString() : "",
       interfaces: valid.length,

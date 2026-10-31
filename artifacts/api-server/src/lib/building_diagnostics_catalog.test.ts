@@ -10,10 +10,14 @@ describe("endpoint diagnostics building catalog", () => {
     expect(diagnosticsBuildingName("Maintenance")).toBeNull();
   });
 
-  it("keeps real sites and consolidates the former Epworth location", () => {
+  it("keeps real sites and aggregates sub-buildings into their physical sites", () => {
     expect(diagnosticsBuildingName("Baseball Field")).toBe("Baseball Field");
     expect(diagnosticsBuildingName("Maintenance Building")).toBe("Maintenance Building");
     expect(diagnosticsBuildingName("Epworth ALC")).toBe("Industrial Technology Campus");
-    expect(diagnosticsBuildingName("Technology B")).toBe("Tech Building B");
+    expect(diagnosticsBuildingName("Technology B")).toBe("Industrial Technology Campus");
+    expect(diagnosticsBuildingName("Tech Building B")).toBe("Industrial Technology Campus");
+    expect(diagnosticsBuildingName("Student Living H")).toBe("Student Living Center");
+    expect(diagnosticsBuildingName("Student Union")).toBe("Student Union");
+    expect(diagnosticsBuildingName("Student Activities")).toBe("Student Activities");
   });
 });
