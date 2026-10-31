@@ -1,0 +1,500 @@
+import { FredAssistant } from "@/components/FredAssistant";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/context/AuthContext";
+import {
+  useLogout,
+  useListSwitches,
+  useAddSwitchMaintenanceLogEntry,
+} from "@workspace/api-client-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Logo, Signature } from "@/components/system";
+import QuickAddItemDialog from "@/components/QuickAddItemDialog";
+import { AppLauncher } from "@/components/AppLauncher";
+import { AppSidebar } from "@/components/AppSidebar";
+import { ZendeskAlerts } from "@/components/ZendeskAlerts";
+import { ZendeskChatWidget } from "@/components/ZendeskChatWidget";
+import { useEffect, useState } from "react";
+import { findActiveItem, getNavGroups } from "@/config/nav";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  ListChecks as ListChecksIcon,
+  ShieldAlert as ShieldAlertIcon,
+  Activity as ActivityIcon,
+  Network as NetworkIcon,
+} from "lucide-react";
+import { LogOut, Zap, Sparkles, Search, Moon, Sun } from "lucide-react";
+import { trackProductUsage } from "@/lib/usage-tracking";
+import {
+  Breadcrumb,
+  portalModeForPath,
+} from "@/components/portal-ui";
+
+function QuickAddMaintenanceDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { data: switches = [] } = useListSwitches({});
+  const [search, setSearch] = useState("");
+  const [switchId, setSwitchId] = useState<number | null>(null);
+  const [body, setBody] = useState("");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const createMutation = useAddSwitchMaintenanceLogEntry();
+
+  const filtered = switches.filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      s.hostname.toLowerCase().includes(q) ||
+      (s.building ?? "").toLowerCase().includes(q) ||
+      (s.location ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const reset = () => {
+    setSearch("");
+    setSwitchId(null);
+    setBody("");
+    setWindowStart("");
+    setWindowEnd("");
+  };
+
+  const submit = async () => {
+    if (!switchId || !body.trim()) {
+      toast({
+        title: "Pick a switch and enter a note",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        id: switchId,
+        data: {
+          body: body.trim(),
+          windowStart: windowStart || undefined,
+          windowEnd: windowEnd || undefined,
+        },
+      });
+      toast({ title: "Maintenance note added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/network/switches"] });
+      reset();
+      onOpenChange(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add note";
+      toast({
+        title: "Could not save note",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Maintenance Note</DialogTitle>
+          <DialogDescription>
+            Pick a switch, then describe the maintenance window or change.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Switch</Label>
+            <Input
+              placeholder="Search by hostname, building, or location"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="border rounded mt-1 max-h-40 overflow-auto">
+              {filtered.length === 0 ? (
+                <p className="text-xs text-muted-foreground p-2">
+                  No matching switches.
+                </p>
+              ) : (
+                filtered.slice(0, 50).map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => setSwitchId(s.id)}
+                    className={`w-full text-left text-xs px-2 py-1 hover:bg-muted ${
+                      switchId === s.id ? "bg-muted font-medium" : ""
+                    }`}
+                  >
+                    {s.hostname}
+                    {s.building ? ` · ${s.building}` : ""}
+                    {s.location ? ` · ${s.location}` : ""}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Window start (optional)</Label>
+              <Input
+                type="datetime-local"
+                value={windowStart}
+                onChange={(e) => setWindowStart(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Window end (optional)</Label>
+              <Input
+                type="datetime-local"
+                value={windowEnd}
+                onChange={(e) => setWindowEnd(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Note</Label>
+            <Textarea
+              rows={3}
+              placeholder="What changed, what was the impact, what should the team know?"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={!switchId || !body.trim() || createMutation.isPending}
+          >
+            {createMutation.isPending ? "Saving…" : "Add note"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QuickAddMenu({ iconOnly = false }: { iconOnly?: boolean }) {
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [maintOpen, setMaintOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size={iconOnly ? "icon" : "sm"}
+            title="Quick Add"
+          >
+            <Zap className="h-4 w-4" />
+            {!iconOnly && <span className="ml-2">Quick Add</span>}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setTaskOpen(true)}>
+            <ListChecksIcon className="h-4 w-4 mr-2" />
+            Log Completed Work
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/risks/new">
+              <ShieldAlertIcon className="h-4 w-4 mr-2" />
+              Add Risk / Issue
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/after-action/new">
+              <ActivityIcon className="h-4 w-4 mr-2" />
+              Start Post-Incident Review
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setMaintOpen(true)}>
+            <NetworkIcon className="h-4 w-4 mr-2" />
+            Add Maintenance Note
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <QuickAddItemDialog open={taskOpen} onOpenChange={setTaskOpen} />
+      <QuickAddMaintenanceDialog open={maintOpen} onOpenChange={setMaintOpen} />
+    </>
+  );
+}
+
+function AccountMenu({
+  name,
+  role,
+  jobTitle,
+  onLogout,
+}: {
+  name?: string;
+  role?: string;
+  jobTitle?: string | null;
+  onLogout: () => void;
+}) {
+  const initials = (name ?? "?")
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"
+          aria-label="Account menu"
+        >
+          {initials || "?"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="flex flex-col">
+          <span className="truncate">{name}</span>
+          {jobTitle && (
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {jobTitle}
+            </span>
+          )}
+          <span className="text-xs font-normal capitalize text-muted-foreground">
+            {role}
+          </span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  const { user, logout, isCIO } = useAuth();
+  const [location] = useLocation();
+  const logoutMutation = useLogout();
+  const [launcherOpen, setLauncherOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const stored = window.localStorage.getItem("it_hub_theme");
+    return stored
+      ? stored === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+  const canNetworkTools = ["cio", "network", "network_engineer"].includes(
+    user?.role ?? "",
+  );
+  const navGroups = getNavGroups(isCIO, canNetworkTools);
+  const activeItem = findActiveItem(navGroups, location);
+  const activeGroup = navGroups.find((group) =>
+    group.items.some((item) => activeItem?.href === item.href),
+  );
+  const portalMode = portalModeForPath(location);
+  const appLabel =
+    portalMode === "network"
+      ? "IT Tools & Network"
+      : portalMode === "apps"
+        ? "IT Apps"
+        : portalMode === "support"
+          ? "Troubleshooting"
+          : "Status & Reporting";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    window.localStorage.setItem("it_hub_theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (!user || !location) return;
+    trackProductUsage("page_view", location);
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === "visible")
+        trackProductUsage("heartbeat", location, 60);
+    }, 60_000);
+    return () => window.clearInterval(heartbeat);
+  }, [location, user?.id]);
+
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+    } finally {
+      logout();
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setLauncherOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (location === "/") {
+    return (
+      <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+        <header className="flex h-[60px] shrink-0 items-center gap-4 bg-[var(--portal-sidebar-bg)] px-5 text-white lg:px-10">
+          <Link href="/" className="flex items-center gap-3">
+            <Logo
+              variant="white"
+              className="h-7 w-24 object-contain object-left"
+            />
+            <span className="border-l border-white/15 pl-3 text-[10px] font-bold uppercase tracking-[0.12em] text-white/60">
+              IT Department Portal
+            </span>
+          </Link>
+          <div className="ml-auto flex items-center gap-3">
+            <FredAssistant path={location} label="Home command center" />
+            <span className="hidden text-xs text-white/55 sm:inline">
+              {new Date().toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDarkMode((value) => !value)}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
+              aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+            >
+              {darkMode ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+            <ZendeskAlerts />
+            <AccountMenu
+              name={user?.name}
+              role={user?.role}
+              jobTitle={user?.jobTitle}
+              onLogout={handleLogout}
+            />
+          </div>
+        </header>
+        <ZendeskChatWidget />
+        <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+        <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
+      </div>
+    );
+  }
+
+  return (
+    <SidebarProvider defaultOpen className="h-svh min-h-0 overflow-hidden">
+      <AppSidebar />
+      <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
+        <header className="sticky top-0 z-30 flex h-[52px] shrink-0 items-center gap-3 border-b border-sidebar-border/70 bg-sidebar px-4 text-sidebar-foreground">
+          <div className="flex min-w-0 items-center gap-3">
+            <Breadcrumb
+              app={appLabel}
+              page={
+                activeItem?.label ??
+                (location === "/support"
+                  ? "Support Center"
+                  : (activeGroup?.label ?? "Workspace"))
+              }
+            />
+          </div>
+
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLauncherOpen(true)}
+              className="hidden h-8 items-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 text-xs text-white/70 transition-colors hover:bg-white/15 sm:flex"
+              aria-label="Search pages"
+            >
+              <Search className="h-4 w-4" />
+              <span className="hidden lg:inline">Search</span>
+              <kbd className="hidden items-center gap-0.5 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80 lg:inline-flex">
+                ⌘K
+              </kbd>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLauncherOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+              aria-label="Search pages"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDarkMode((value) => !value)}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-white/10 text-white/75 hover:bg-white/15"
+              aria-label={darkMode ? "Use light theme" : "Use dark theme"}
+            >
+              {darkMode ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+
+            <FredAssistant path={location} label={activeItem?.label || location} />
+
+            <ZendeskAlerts />
+
+            <AccountMenu
+              name={user?.name}
+              role={user?.role}
+              jobTitle={user?.jobTitle}
+              onLogout={handleLogout}
+            />
+          </div>
+        </header>
+
+        <ZendeskChatWidget />
+
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4 md:px-6 md:py-5">
+            {children}
+          </div>
+          <footer className="border-t border-border px-6 py-4">
+            <Signature />
+          </footer>
+        </main>
+
+        <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

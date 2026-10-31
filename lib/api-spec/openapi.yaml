@@ -1,0 +1,4295 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: SCCC IT Department Reporting Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: entries
+    description: Daily log entries
+  - name: reports
+    description: Weekly reports
+  - name: risks
+    description: Risks and issues
+  - name: network
+    description: Network reference data
+  - name: after-action
+    description: After-action reports
+  - name: export
+    description: Export and integrations
+  - name: dashboard
+    description: Dashboard and aggregation
+  - name: projects
+    description: Project management
+  - name: strategic-objectives
+    description: Strategic objectives
+  - name: ai-knowledge
+    description: Persistent AI knowledge base (environment memory)
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/entra/status:
+    get:
+      operationId: entraStatus
+      tags: [auth]
+      summary: Whether Microsoft Entra SSO is configured
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntraStatus"
+  /auth/entra/exchange:
+    post:
+      operationId: entraExchange
+      tags: [auth]
+      summary: Redeem a one-time SSO code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntraExchangeBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request a password reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: OK (always 200 to avoid leaking account existence)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  emailConfigured:
+                    type: boolean
+                  resetUrl:
+                    type: string
+                    description: Only included when SMTP is not configured.
+                required: [ok]
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Set a new password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # USERS
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (CIO only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # DAILY ENTRIES
+  /entries:
+    get:
+      operationId: listEntries
+      tags: [entries]
+      summary: List entries (CIO sees all, others see own)
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: weekOf
+          in: query
+          schema:
+            type: string
+            description: ISO date of the week start (Monday)
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entry"
+    post:
+      operationId: createEntry
+      tags: [entries]
+      summary: Create a daily log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+  /entries/{id}:
+    get:
+      operationId: getEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+    put:
+      operationId: updateEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+    delete:
+      operationId: deleteEntry
+      tags: [entries]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # WEEKLY REPORTS
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List weekly reports
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, finalized]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Create/finalize a weekly report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    patch:
+      operationId: updateReport
+      tags: [reports]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReportBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete a weekly report (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /reports/{id}/tickets:
+    get:
+      operationId: listReportTickets
+      tags: [reports]
+      summary: Solved Zendesk tickets during this report's week
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTicketsResponse"
+  /reports/{id}/extras:
+    get:
+      operationId: getReportExtras
+      tags: [reports]
+      summary: Week-scoped extras (PIRs, maintenance, goal progress) for the report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportExtras"
+  /reports/{id}/email:
+    post:
+      operationId: emailReport
+      tags: [reports]
+      summary: Email the report (PDF/DOCX attached) to recipients (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailReportBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailReportResponse"
+        "503":
+          description: Email not configured
+  /reports/{id}/finalize:
+    post:
+      operationId: finalizeReport
+      tags: [reports]
+      summary: Finalize and aggregate a weekly report (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /reports/aggregate:
+    get:
+      operationId: getAggregateReport
+      tags: [reports]
+      summary: Get aggregated report data for a week
+      parameters:
+        - name: weekOf
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AggregateReport"
+
+  # RISKS AND ISSUES
+  /risks:
+    get:
+      operationId: listRisks
+      tags: [risks]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, mitigated, closed]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [risk, issue, suggestion]
+        - name: includeArchived
+          in: query
+          description: When set, archived items are returned alongside active ones.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Risk"
+    post:
+      operationId: createRisk
+      tags: [risks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRiskBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+  /risks/{id}:
+    get:
+      operationId: getRisk
+      tags: [risks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+    patch:
+      operationId: updateRisk
+      tags: [risks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiskBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+    delete:
+      operationId: deleteRisk
+      tags: [risks]
+      summary: Permanently delete a risk (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+  /risks/{id}/archive:
+    post:
+      operationId: archiveRisk
+      tags: [risks]
+      summary: Archive a risk (hides from default list)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+  /risks/{id}/unarchive:
+    post:
+      operationId: unarchiveRisk
+      tags: [risks]
+      summary: Restore an archived risk
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+
+  # PROCESSES (standard operating procedures library)
+  /processes:
+    get:
+      operationId: listProcesses
+      tags: [processes]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Process"
+    post:
+      operationId: createProcess
+      tags: [processes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProcessBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+  /processes/{id}:
+    get:
+      operationId: getProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+    patch:
+      operationId: updateProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProcessBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+    delete:
+      operationId: deleteProcess
+      tags: [processes]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # PROJECTS
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # STRATEGIC OBJECTIVES
+  /azure-vms:
+    get:
+      operationId: listAzureVms
+      tags: [azure-vms]
+      summary: List Azure VMs (with optional search)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: VMs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AzureVm"
+    post:
+      operationId: createAzureVm
+      tags: [azure-vms]
+      summary: Create an Azure VM record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AzureVmInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+  /azure-vms/{id}:
+    get:
+      operationId: getAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+    patch:
+      operationId: updateAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AzureVmInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AzureVm"
+    delete:
+      operationId: deleteAzureVm
+      tags: [azure-vms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+  /azure-vms/sync:
+    post:
+      operationId: syncAzureVms
+      tags: [azure-vms]
+      summary: Sync VM inventory from Azure (CIO only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer
+                  updated:
+                    type: integer
+                  removed:
+                    type: integer
+                  changed:
+                    type: integer
+                  total:
+                    type: integer
+                  syncedAt:
+                    type: string
+                    format: date-time
+                  diff:
+                    $ref: "#/components/schemas/AzureSyncDiff"
+                  newlyFlagged:
+                    type: integer
+                    description: >-
+                      Number of VMs that newly became high-severity in this sync.
+                      When > 0, a private CIO shadow note was auto-created.
+                required: [created, updated, removed, total, syncedAt]
+        "503":
+          description: Azure not configured
+        "502":
+          description: Azure sync failed
+  /azure-vms/sync-status:
+    get:
+      operationId: getAzureSyncStatus
+      tags: [azure-vms]
+      summary: Latest Azure sync run for VM and resource inventory
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Latest sync runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vm:
+                    $ref: "#/components/schemas/AzureSyncRun"
+                    nullable: true
+                  resource:
+                    $ref: "#/components/schemas/AzureSyncRun"
+                    nullable: true
+                required: [vm, resource]
+  /azure-vms/risks:
+    get:
+      operationId: getAzureVmRisks
+      tags: [azure-vms]
+      summary: Risk flags across current Azure VM inventory
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: VM risk flags and summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AzureVmRisk"
+                  summary:
+                    $ref: "#/components/schemas/AzureVmRiskSummary"
+                required: [items, summary]
+  /azure-resources:
+    get:
+      operationId: listAzureResources
+      tags: [azure-resources]
+      summary: List the full Azure inventory (all resource types)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AzureResource"
+  /azure-resources/sync:
+    post:
+      operationId: syncAzureResources
+      tags: [azure-resources]
+      summary: Sync the full Azure inventory from Azure (CIO only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer
+                  updated:
+                    type: integer
+                  removed:
+                    type: integer
+                  total:
+                    type: integer
+                  syncedAt:
+                    type: string
+                    format: date-time
+                required: [created, updated, removed, total, syncedAt]
+        "503":
+          description: Azure not configured
+        "502":
+          description: Azure sync failed
+  /strategic-objectives:
+    get:
+      operationId: listStrategicObjectives
+      tags: [strategic-objectives]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategicObjective"
+    post:
+      operationId: createStrategicObjective
+      tags: [strategic-objectives]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategicObjectiveBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+  /strategic-objectives/{id}:
+    get:
+      operationId: getStrategicObjective
+      tags: [strategic-objectives]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+    patch:
+      operationId: updateStrategicObjective
+      tags: [strategic-objectives]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategicObjectiveBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategicObjective"
+    delete:
+      operationId: deleteStrategicObjective
+      tags: [strategic-objectives]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # LOG ITEMS (standalone daily items that roll up into a weekly log)
+  /log-items:
+    get:
+      operationId: listLogItems
+      tags: [log-items]
+      parameters:
+        - name: weekOf
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogItem"
+    post:
+      operationId: createLogItem
+      tags: [log-items]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLogItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+  /log-items/{id}:
+    get:
+      operationId: getLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+    patch:
+      operationId: updateLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLogItemBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogItem"
+    delete:
+      operationId: deleteLogItem
+      tags: [log-items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # TEAM TO-DOS (outstanding assignments; separate from completed log items)
+  /todos:
+    get:
+      operationId: listTeamTodos
+      tags: [todos]
+      summary: List visible to-dos (Mark/Tracy see all; others see their own)
+      parameters:
+        - name: assigneeId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, completed]
+      responses:
+        "200":
+          description: Visible to-dos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamTodo"
+    post:
+      operationId: createTeamTodo
+      tags: [todos]
+      summary: Create a to-do for self or, for Mark/Tracy, any active user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamTodoBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamTodo"
+  /todos/assignees:
+    get:
+      operationId: listTodoAssignees
+      tags: [todos]
+      summary: List assignable users (team for managers; self for other users)
+      responses:
+        "200":
+          description: Assignable active users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoAssignee"
+  /todos/{id}:
+    patch:
+      operationId: updateTeamTodo
+      tags: [todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamTodoBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamTodo"
+    delete:
+      operationId: deleteTeamTodo
+      tags: [todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # NETWORK REFERENCE
+  /network/switches:
+    get:
+      operationId: listSwitches
+      tags: [network]
+      summary: List network switches with search
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search by name, building, or IP
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [online, offline, unknown]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetworkSwitch"
+    post:
+      operationId: createSwitch
+      tags: [network]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}:
+    get:
+      operationId: getSwitch
+      tags: [network]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+    patch:
+      operationId: updateSwitch
+      tags: [network]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSwitchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}/maintenance-log:
+    post:
+      operationId: addSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Append a maintenance-log entry to a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+  /network/switches/{id}/maintenance-log/{entryId}:
+    patch:
+      operationId: updateSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Edit a maintenance-log entry on a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteSwitchMaintenanceLogEntry
+      tags: [network]
+      summary: Soft-delete a maintenance-log entry on a switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkSwitch"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /network/layout:
+    get:
+      operationId: getNetworkLayout
+      tags: [network]
+      summary: Get saved positions for the network diagram
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetworkLayoutPosition"
+    put:
+      operationId: saveNetworkLayout
+      tags: [network]
+      summary: Upsert positions for one or more diagram nodes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveNetworkLayoutBody"
+      responses:
+        "200":
+          description: Number of positions saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved:
+                    type: integer
+    delete:
+      operationId: clearNetworkLayout
+      tags: [network]
+      summary: Clear saved positions (all, or a specific subset)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nodeIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+  /network/vlans:
+    get:
+      operationId: listVlans
+      tags: [network]
+      summary: List VLANs with search
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [data, voice, ospf, management, security, other]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vlan"
+    post:
+      operationId: createVlan
+      tags: [network]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVlanBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+  /network/vlans/{id}/maintenance-log:
+    post:
+      operationId: addVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Append a maintenance-log entry to a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+  /network/vlans/{id}/maintenance-log/{entryId}:
+    patch:
+      operationId: updateVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Edit a maintenance-log entry on a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaintenanceLogEntryBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteVlanMaintenanceLogEntry
+      tags: [network]
+      summary: Soft-delete a maintenance-log entry on a VLAN
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vlan"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /network/whitelist:
+    get:
+      operationId: getNetworkWhitelist
+      tags: [network]
+      summary: List FortiGate web-filter whitelist entries and config status
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FortiGateWhitelistStatus"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: FortiGate error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: whitelistWebsite
+      tags: [network]
+      summary: Whitelist a website on the FortiGate web filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhitelistWebsiteBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhitelistWebsiteResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: FortiGate not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: FortiGate error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # AFTER-ACTION REPORTS
+  /after-action:
+    get:
+      operationId: listAfterActionReports
+      tags: [after-action]
+      parameters:
+        - name: building
+          in: query
+          schema:
+            type: string
+        - name: deviceType
+          in: query
+          schema:
+            type: string
+        - name: zendeskTicketId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AfterActionReport"
+    post:
+      operationId: createAfterActionReport
+      tags: [after-action]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAfterActionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+  /after-action/{id}:
+    get:
+      operationId: getAfterActionReport
+      tags: [after-action]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+    patch:
+      operationId: updateAfterActionReport
+      tags: [after-action]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAfterActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AfterActionReport"
+
+  # EXPORT & INTEGRATIONS
+  /export/report/{id}/docx:
+    get:
+      operationId: exportReportDocx
+      tags: [export]
+      summary: Download report as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /export/report/{id}/xlsx:
+    get:
+      operationId: exportReportXlsx
+      tags: [export]
+      summary: Download report as Excel spreadsheet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: XLSX file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /export/process/{id}/pdf:
+    get:
+      operationId: exportProcessPdf
+      tags: [export]
+      summary: Download a Process Library entry as PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /export/process/{id}/docx:
+    get:
+      operationId: exportProcessDocx
+      tags: [export]
+      summary: Download a Process Library entry as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /export/project/{id}/pdf:
+    get:
+      operationId: exportProjectPdf
+      tags: [export]
+      summary: Download a project as PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /export/project/{id}/docx:
+    get:
+      operationId: exportProjectDocx
+      tags: [export]
+      summary: Download a project as Word document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DOCX file
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /export/report/{id}/zendesk:
+    post:
+      operationId: sendReportToZendesk
+      tags: [export]
+      summary: Create a Zendesk ticket from this report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZendeskTicketBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZendeskTicketResponse"
+  /export/entry/{id}/zendesk:
+    post:
+      operationId: sendEntryToZendesk
+      tags: [export]
+      summary: Create a Zendesk ticket from a specific entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZendeskTicketBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZendeskTicketResponse"
+
+  # DASHBOARD
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+  /dashboard/week-status:
+    get:
+      operationId: getWeekStatus
+      tags: [dashboard]
+      summary: Get current week submission status per user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeekStatus"
+
+  # ANALYTICS
+  /analytics/usage:
+    get:
+      operationId: getUsageAnalytics
+      tags: [analytics]
+      summary: CIO-only usage analytics — who is using which features and how much.
+      parameters:
+        - name: days
+          in: query
+          description: Look-back window in days (1-365). Default 30.
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAnalytics"
+
+  # AI KNOWLEDGE BASE
+  /ai-knowledge:
+    get:
+      operationId: listAiKnowledge
+      tags: [ai-knowledge]
+      summary: List all AI knowledge base entries (including inactive)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiKnowledge"
+    post:
+      operationId: createAiKnowledge
+      tags: [ai-knowledge]
+      summary: Add a knowledge entry to the AI's persistent memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAiKnowledgeBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiKnowledge"
+  /ai-knowledge/{id}:
+    patch:
+      operationId: updateAiKnowledge
+      tags: [ai-knowledge]
+      summary: Update a knowledge entry (content, category, or active state)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAiKnowledgeBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiKnowledge"
+    delete:
+      operationId: deleteAiKnowledge
+      tags: [ai-knowledge]
+      summary: Permanently delete a knowledge entry (CIO only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        breakGlass:
+          type: string
+          enum: [disabled, ok, failed]
+          description: >-
+            Status of the emergency break-glass login seeder. "failed" means the
+            feature is configured but the emergency CIO account could not be
+            created on boot, which forces the overall status to "degraded".
+      required: [status]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            [
+              cio,
+              helpdesk,
+              network,
+              security,
+              network_engineer,
+              security_engineer,
+              staff,
+            ]
+        department:
+          type: string
+        jobTitle:
+          type: string
+          nullable: true
+        canManageTodos:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, email, name, role]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required: [user, token]
+
+    EntraStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+      required: [configured]
+
+    EntraExchangeBody:
+      type: object
+      properties:
+        code:
+          type: string
+      required: [code]
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            [
+              cio,
+              helpdesk,
+              network,
+              security,
+              network_engineer,
+              security_engineer,
+              staff,
+            ]
+        department:
+          type: string
+        isActive:
+          type: boolean
+
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        category:
+          type: string
+          enum: [helpdesk, network, security, general]
+        title:
+          type: string
+        description:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        supportNeeded:
+          type: string
+        ticketCount:
+          type: integer
+        weekOf:
+          type: string
+          description: ISO date string of week start
+        entryDate:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+        isSubmitted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          userId,
+          category,
+          title,
+          description,
+          weekOf,
+          isSubmitted,
+          createdAt,
+        ]
+
+    CreateEntryBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [helpdesk, network, security, general]
+        title:
+          type: string
+        description:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        supportNeeded:
+          type: string
+        ticketCount:
+          type: integer
+        weekOf:
+          type: string
+        entryDate:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        isSubmitted:
+          type: boolean
+      required: [category, title, description, weekOf]
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        weekOf:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [draft, finalized]
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+        metrics:
+          type: object
+          additionalProperties: true
+        selectedItemIds:
+          type: array
+          items:
+            type: integer
+        selectedAfterActionIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        selectedMaintenanceIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        selectedRiskIds:
+          type: array
+          description: |
+            Open risk IDs explicitly included in this report. null = include all open risks
+            in the export (default behavior). Empty array = include none.
+          items:
+            type: integer
+          nullable: true
+        projectIds:
+          type: array
+          description: IDs of projects linked to this report.
+          items:
+            type: integer
+        includeGoalProgress:
+          type: boolean
+        includeOpenRisks:
+          type: boolean
+        includeCloudInventory:
+          type: boolean
+        emailRecipients:
+          type: array
+          items:
+            type: string
+        lastEmailedAt:
+          type: string
+          format: date-time
+          nullable: true
+        contributorCount:
+          type: integer
+        entryCount:
+          type: integer
+        createdBy:
+          type: integer
+        createdByName:
+          type: string
+        finalizedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, weekOf, status, createdAt]
+
+    CreateReportBody:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+      required: [weekOf]
+
+    UpdateReportBody:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        accomplishments:
+          type: string
+        challenges:
+          type: string
+        strategicProgress:
+          type: string
+        nextWeekPlans:
+          type: string
+        status:
+          type: string
+          enum: [draft, finalized]
+        selectedItemIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        selectedAfterActionIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        selectedMaintenanceIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        selectedRiskIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
+        includeGoalProgress:
+          type: boolean
+        includeOpenRisks:
+          type: boolean
+        includeCloudInventory:
+          type: boolean
+        emailRecipients:
+          type: array
+          items:
+            type: string
+            format: email
+
+    ReportExtras:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        weekStart:
+          type: string
+        weekEnd:
+          type: string
+        afterActionReports:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        maintenance:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        goalProgress:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        cloudInventory:
+          $ref: "#/components/schemas/CloudInventorySnapshot"
+      required: [weekOf, afterActionReports, maintenance, goalProgress]
+
+    EmailReportBody:
+      type: object
+      properties:
+        recipients:
+          type: array
+          items:
+            type: string
+            format: email
+        subject:
+          type: string
+        message:
+          type: string
+        format:
+          type: string
+          enum: [pdf, docx]
+      required: [recipients]
+
+    EmailReportResponse:
+      type: object
+      properties:
+        sent:
+          type: boolean
+        recipients:
+          type: array
+          items:
+            type: string
+        filename:
+          type: string
+
+    ReportTicket:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+        assigneeName:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+        url:
+          type: string
+      required: [id, subject, status, url]
+
+    ReportTicketsResponse:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        count:
+          type: integer
+        configured:
+          type: boolean
+        tickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportTicket"
+      required: [weekOf, count, tickets]
+
+    AggregateReport:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        totalEntries:
+          type: integer
+        contributorCount:
+          type: integer
+        byRole:
+          type: object
+          additionalProperties:
+            type: integer
+        byCategory:
+          type: object
+          additionalProperties:
+            type: integer
+        totalTickets:
+          type: integer
+        openRisks:
+          type: integer
+        entrySummaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+      required: [weekOf, totalEntries, contributorCount]
+
+    Risk:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
+        status:
+          type: string
+          enum: [open, mitigated, closed]
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+        projectId:
+          type: integer
+          nullable: true
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [id, userId, type, severity, status, title, description, createdAt]
+
+    CreateRiskBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+      required: [type, severity, title, description]
+
+    UpdateRiskBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [risk, issue, suggestion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        probability:
+          type: string
+          enum: [low, medium, high, critical]
+        category:
+          type: string
+        status:
+          type: string
+          enum: [open, mitigated, closed]
+        title:
+          type: string
+        description:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+        relatedBuilding:
+          type: string
+        relatedDevice:
+          type: string
+        sharedWith:
+          type: array
+          items:
+            type: string
+
+    Process:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: integer
+        createdByName:
+          type: string
+          nullable: true
+        updatedBy:
+          type: integer
+          nullable: true
+        updatedByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [id, title, slug, category, content, createdBy, createdAt, updatedAt]
+
+    CreateProcessBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        slug:
+          type: string
+      required: [title]
+
+    UpdateProcessBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        slug:
+          type: string
+
+    ProjectAttachment:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        addedAt:
+          type: string
+      required: [name, url]
+
+    ProjectAssignee:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+        role:
+          type: string
+
+    StrategicObjective:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived]
+        createdBy:
+          type: integer
+          nullable: true
+        createdByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status]
+
+    StrategicObjectiveBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived]
+      required: [title]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [planning, in_progress, on_hold, completed, cancelled]
+        progress:
+          type: integer
+        targetDate:
+          type: string
+          nullable: true
+        newEstimatedDate:
+          type: string
+          nullable: true
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAttachment"
+        progressLog:
+          type: array
+          description: History of progress changes for week-scoped delta calculations.
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              value:
+                type: integer
+            required: [date, value]
+        strategicObjectiveIds:
+          type: array
+          items:
+            type: integer
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAssignee"
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+        createdBy:
+          type: integer
+          nullable: true
+        createdByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status, progress]
+
+    ProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [planning, in_progress, on_hold, completed, cancelled]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        targetDate:
+          type: string
+          nullable: true
+        newEstimatedDate:
+          type: string
+          nullable: true
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAttachment"
+        strategicObjectiveIds:
+          type: array
+          items:
+            type: integer
+        assigneeIds:
+          type: array
+          items:
+            type: integer
+      required: [title]
+
+    LogItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userRole:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        itemDate:
+          type: string
+        weekOf:
+          type: string
+        weeklyEntryId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, title, itemDate, weekOf, createdAt]
+
+    CreateLogItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+        itemDate:
+          type: string
+      required: [title]
+
+    UpdateLogItemBody:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        itemDate:
+          type: string
+
+    TodoAssignee:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+      required: [id, name, role]
+
+    TeamTodo:
+      type: object
+      properties:
+        id:
+          type: integer
+        assigneeId:
+          type: integer
+        assigneeName:
+          type: string
+        createdById:
+          type: integer
+        createdByName:
+          type: string
+        title:
+          type: string
+        details:
+          type: string
+          nullable: true
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [open, in_progress, completed]
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          assigneeId,
+          assigneeName,
+          createdById,
+          createdByName,
+          title,
+          priority,
+          status,
+          createdAt,
+          updatedAt,
+        ]
+
+    CreateTeamTodoBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        details:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+      required: [title]
+
+    UpdateTeamTodoBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        details:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+        dueDate:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [open, in_progress, completed]
+
+    FortiGateWhitelistEntry:
+      type: object
+      required: [id, url, type, action, status]
+      properties:
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+        url:
+          type: string
+        type:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+
+    FortiGateWhitelistStatus:
+      type: object
+      required: [configured, entries]
+      properties:
+        configured:
+          type: boolean
+        host:
+          type: string
+          nullable: true
+        profile:
+          type: string
+          nullable: true
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FortiGateWhitelistEntry"
+
+    WhitelistWebsiteBody:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: URL or domain to whitelist (scheme optional; bare domains are wildcarded).
+        action:
+          type: string
+          enum: [exempt, allow, monitor]
+          description: Web-filter action for the entry. Defaults to exempt.
+
+    WhitelistWebsiteResult:
+      type: object
+      required: [url, action, tableId, tableName, added]
+      properties:
+        url:
+          type: string
+        action:
+          type: string
+        tableId:
+          type: integer
+        tableName:
+          type: string
+        added:
+          type: boolean
+          description: True if a new entry was created; false if it already existed.
+
+    NetworkSwitch:
+      type: object
+      properties:
+        id:
+          type: integer
+        hostname:
+          type: string
+        building:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, unknown]
+        configFile:
+          type: string
+        notes:
+          type: string
+        maintenanceLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceLogEntry"
+        location:
+          type: string
+        lastSeen:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, hostname, building, ipAddress, status, maintenanceLog]
+
+    MaintenanceLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        authorId:
+          type: integer
+          nullable: true
+        authorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+        editedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, body, authorName, createdAt]
+
+    UpdateMaintenanceLogEntryBody:
+      type: object
+      properties:
+        body:
+          type: string
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+      required: [body]
+
+    CreateMaintenanceLogEntryBody:
+      type: object
+      properties:
+        body:
+          type: string
+        windowStart:
+          type: string
+          format: date-time
+          nullable: true
+        windowEnd:
+          type: string
+          format: date-time
+          nullable: true
+      required: [body]
+
+    CreateSwitchBody:
+      type: object
+      properties:
+        hostname:
+          type: string
+        building:
+          type: string
+        ipAddress:
+          type: string
+        model:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, unknown]
+        configFile:
+          type: string
+        notes:
+          type: string
+        location:
+          type: string
+      required: [hostname, building, ipAddress]
+
+    NetworkLayoutPosition:
+      type: object
+      properties:
+        nodeId:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+          nullable: true
+        height:
+          type: number
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required: [nodeId, x, y]
+
+    SaveNetworkLayoutBody:
+      type: object
+      properties:
+        positions:
+          type: array
+          items:
+            type: object
+            properties:
+              nodeId:
+                type: string
+              x:
+                type: number
+              y:
+                type: number
+              width:
+                type: number
+                nullable: true
+              height:
+                type: number
+                nullable: true
+            required: [nodeId, x, y]
+      required: [positions]
+
+    AzureVm:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        subscription:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        os:
+          type: string
+          nullable: true
+        privateIp:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        vnet:
+          type: string
+          nullable: true
+        subnet:
+          type: string
+          nullable: true
+        status:
+          type: string
+        purpose:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+        azureResourceId:
+          type: string
+          nullable: true
+        source:
+          type: string
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, status, createdAt, updatedAt]
+
+    AzureVmInput:
+      type: object
+      properties:
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        subscription:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        os:
+          type: string
+          nullable: true
+        privateIp:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        vnet:
+          type: string
+          nullable: true
+        subnet:
+          type: string
+          nullable: true
+        status:
+          type: string
+        purpose:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+      required: [name]
+
+    AzureResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        azureResourceId:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        kind:
+          type: string
+          nullable: true
+        sku:
+          type: string
+          nullable: true
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+        subscription:
+          type: string
+          nullable: true
+        status:
+          type: string
+        source:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [id, azureResourceId, name, type, status, source, createdAt, updatedAt]
+
+    AzureSyncFieldChange:
+      type: object
+      properties:
+        field:
+          type: string
+        from:
+          type: string
+          nullable: true
+        to:
+          type: string
+          nullable: true
+      required: [field, from, to]
+
+    AzureSyncDiff:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              resourceGroup:
+                type: string
+                nullable: true
+              status:
+                type: string
+                nullable: true
+              publicIp:
+                type: string
+                nullable: true
+        removed:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              resourceGroup:
+                type: string
+                nullable: true
+        changed:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              changes:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AzureSyncFieldChange"
+      required: [added, removed, changed]
+
+    AzureSyncRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [vm, resource]
+        status:
+          type: string
+          enum: [success, failed]
+        error:
+          type: string
+          nullable: true
+        createdCount:
+          type: integer
+        updatedCount:
+          type: integer
+        removedCount:
+          type: integer
+        changedCount:
+          type: integer
+        totalCount:
+          type: integer
+        diff:
+          $ref: "#/components/schemas/AzureSyncDiff"
+        actorId:
+          type: integer
+          nullable: true
+        actorName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, kind, status, createdAt]
+
+    AzureVmRiskFlag:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [public_ip, unhealthy, retiring_size]
+        severity:
+          type: string
+          enum: [high, medium, low]
+        label:
+          type: string
+        detail:
+          type: string
+      required: [code, severity, label, detail]
+
+    AzureVmRisk:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        resourceGroup:
+          type: string
+          nullable: true
+        status:
+          type: string
+        size:
+          type: string
+          nullable: true
+        publicIp:
+          type: string
+          nullable: true
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AzureVmRiskFlag"
+      required: [id, name, flags]
+
+    AzureVmRiskSummary:
+      type: object
+      properties:
+        publicIp:
+          type: integer
+        unhealthy:
+          type: integer
+        retiringSize:
+          type: integer
+        flaggedVms:
+          type: integer
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+      required:
+        [publicIp, unhealthy, retiringSize, flaggedVms, high, medium, low]
+
+    CloudInventorySnapshot:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        total:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+        risk:
+          $ref: "#/components/schemas/AzureVmRiskSummary"
+        lastSync:
+          nullable: true
+          type: object
+          properties:
+            status:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            createdCount:
+              type: integer
+            updatedCount:
+              type: integer
+            removedCount:
+              type: integer
+            changedCount:
+              type: integer
+            totalCount:
+              type: integer
+            error:
+              type: string
+              nullable: true
+            actorName:
+              type: string
+              nullable: true
+      required: [configured, total, byStatus, risk, lastSync]
+
+    Vlan:
+      type: object
+      properties:
+        id:
+          type: integer
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        building:
+          type: string
+        type:
+          type: string
+          enum: [data, voice, ospf, management, security, other]
+        subnet:
+          type: string
+        gateway:
+          type: string
+        notes:
+          type: string
+        maintenanceLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceLogEntry"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, vlanId, name, building, type, maintenanceLog]
+
+    CreateVlanBody:
+      type: object
+      properties:
+        vlanId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        building:
+          type: string
+        type:
+          type: string
+          enum: [data, voice, ospf, management, security, other]
+        subnet:
+          type: string
+        gateway:
+          type: string
+        notes:
+          type: string
+      required: [vlanId, name, building, type]
+
+    AfterActionReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        title:
+          type: string
+        incident:
+          type: string
+        building:
+          type: string
+        deviceType:
+          type: string
+        affectedSystems:
+          type: string
+        timeline:
+          type: string
+        rootCause:
+          type: string
+        resolution:
+          type: string
+        lessonsLearned:
+          type: string
+        preventionMeasures:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        zendeskTicketId:
+          type: integer
+          nullable: true
+        zendeskTicketUrl:
+          type: string
+          nullable: true
+        incidentDate:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, title, incident, status, severity, createdAt]
+
+    CreateAfterActionBody:
+      type: object
+      properties:
+        title:
+          type: string
+        incident:
+          type: string
+        building:
+          type: string
+        deviceType:
+          type: string
+        affectedSystems:
+          type: string
+        timeline:
+          type: string
+        rootCause:
+          type: string
+        resolution:
+          type: string
+        lessonsLearned:
+          type: string
+        preventionMeasures:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        zendeskTicketId:
+          type: integer
+          nullable: true
+        incidentDate:
+          type: string
+          format: date-time
+      required: [title, incident, status, severity]
+
+    ZendeskTicketBody:
+      type: object
+      properties:
+        subject:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        requesterEmail:
+          type: string
+        additionalNotes:
+          type: string
+      required: [subject, priority]
+
+    ZendeskTicketResponse:
+      type: object
+      properties:
+        ticketId:
+          type: integer
+        ticketUrl:
+          type: string
+        status:
+          type: string
+      required: [ticketId, status]
+
+    DashboardSummary:
+      type: object
+      properties:
+        thisWeekEntries:
+          type: integer
+        thisWeekContributors:
+          type: integer
+        openRisks:
+          type: integer
+        criticalRisks:
+          type: integer
+        openAfterActions:
+          type: integer
+        totalSwitches:
+          type: integer
+        onlineSwitches:
+          type: integer
+        offlineSwitches:
+          type: integer
+        totalReports:
+          type: integer
+        pendingSubmissions:
+          type: integer
+        totalTickets:
+          type: integer
+      required:
+        [thisWeekEntries, thisWeekContributors, openRisks, totalSwitches]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [entry, report, risk, after-action]
+        action:
+          type: string
+        title:
+          type: string
+        userName:
+          type: string
+        userRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        entityId:
+          type: integer
+      required: [id, type, action, title, userName, createdAt]
+
+    WeekStatus:
+      type: object
+      properties:
+        weekOf:
+          type: string
+        deadline:
+          type: string
+          format: date-time
+        isFinalized:
+          type: boolean
+        submissions:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              userName:
+                type: string
+              userRole:
+                type: string
+              entryCount:
+                type: integer
+              isSubmitted:
+                type: boolean
+            required: [userId, userName, userRole, entryCount, isSubmitted]
+      required: [weekOf, isFinalized, submissions]
+
+    UsageFeatureCounts:
+      type: object
+      properties:
+        entries:
+          type: integer
+        risks:
+          type: integer
+        processes:
+          type: integer
+        projects:
+          type: integer
+        reports:
+          type: integer
+        afterActions:
+          type: integer
+        items:
+          type: integer
+        azureVms:
+          type: integer
+        objectives:
+          type: integer
+      required:
+        [
+          entries,
+          risks,
+          processes,
+          projects,
+          reports,
+          afterActions,
+          items,
+          azureVms,
+          objectives,
+        ]
+
+    UsagePerUser:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        isActive:
+          type: boolean
+        counts:
+          $ref: "#/components/schemas/UsageFeatureCounts"
+        total:
+          type: integer
+      required: [userId, name, email, role, isActive, counts, total]
+
+    UsageRoleBreakdown:
+      type: object
+      properties:
+        role:
+          type: string
+        users:
+          type: integer
+        total:
+          type: integer
+      required: [role, users, total]
+
+    UsageDailyPoint:
+      type: object
+      properties:
+        day:
+          type: string
+        count:
+          type: integer
+      required: [day, count]
+
+    UsageAnalytics:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            days:
+              type: integer
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+          required: [days, start, end]
+        summary:
+          type: object
+          properties:
+            totalContributions:
+              type: integer
+            activeContributors:
+              type: integer
+            totalUsers:
+              type: integer
+          required: [totalContributions, activeContributors, totalUsers]
+        perUser:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsagePerUser"
+        featureTotals:
+          $ref: "#/components/schemas/UsageFeatureCounts"
+        roleBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageRoleBreakdown"
+        dailyActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageDailyPoint"
+      required:
+        [range, summary, perUser, featureTotals, roleBreakdown, dailyActivity]
+
+    AiKnowledge:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          enum: [seed, manual, ai]
+        isActive:
+          type: boolean
+        updatedBy:
+          type: integer
+          nullable: true
+        updatedByName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, category, title, content, source, isActive]
+
+    CreateAiKnowledgeBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+            [
+              organization,
+              environment,
+              network,
+              wireless,
+              azure,
+              identity,
+              applications,
+              endpoints,
+              monitoring,
+              security,
+              helpdesk,
+              general,
+            ]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          minLength: 1
+          maxLength: 20000
+      required: [title, content]
+
+    UpdateAiKnowledgeBody:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+            [
+              organization,
+              environment,
+              network,
+              wireless,
+              azure,
+              identity,
+              applications,
+              endpoints,
+              monitoring,
+              security,
+              helpdesk,
+              general,
+            ]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        isActive:
+          type: boolean

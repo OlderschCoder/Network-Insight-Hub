@@ -1,0 +1,76 @@
+import app from "./app";
+import { logger } from "./lib/logger";
+import { ensureSchema } from "./lib/ensure_schema";
+import { seedAppUsageKnowledge } from "./lib/seed_app_usage";
+import { seedBreakGlassAccount, stripNonBreakGlassPasswords } from "./lib/seed_breakglass";
+import { startSessionCleanup } from "./routes/auth";
+import { startWebexCallHistorySync } from "./routes/dashboard";
+
+const rawPort = process.env["PORT"];
+
+if (!rawPort) {
+  throw new Error(
+    "PORT environment variable is required but was not provided.",
+  );
+}
+
+const port = Number(rawPort);
+
+if (Number.isNaN(port) || port <= 0) {
+  throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+// Production must have exactly one API owner: the systemd service. A manually
+// launched copy can otherwise outlive its SSH session, keep port 8080 open, and
+// force the managed service into an endless EADDRINUSE restart loop. systemd
+// always supplies INVOCATION_ID; the explicit override is reserved for a
+// deliberate recovery test and should never be placed in production env files.
+if (
+  process.env["NODE_ENV"] === "production" &&
+  !process.env["INVOCATION_ID"] &&
+  process.env["SCCC_ALLOW_STANDALONE_API"] !== "true"
+) {
+  throw new Error(
+    "Refusing to start the production API outside systemd. Use: systemctl restart sccc-api",
+  );
+}
+
+async function main(): Promise<void> {
+  // Reconcile known schema drift on self-hosted databases (sessions table,
+  // nullable users.password_hash) BEFORE accepting traffic or seeding. Both the
+  // first login (session insert) and stripNonBreakGlassPasswords() depend on the
+  // reconciled schema, so this must complete first to avoid a boot-time race.
+  // ensureSchema() never throws (failures are logged), so boot always proceeds.
+  await ensureSchema();
+
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+
+    logger.info({ port }, "Server listening");
+
+    void seedAppUsageKnowledge();
+    // Seed the break-glass account first (flags it), then strip local passwords
+    // from every other account so legacy credentials can't bypass Entra SSO.
+    // A failed break-glass seed does NOT crash the server (degraded-but-flagged:
+    // Entra SSO may still work); it is surfaced via a FATAL log banner and a
+    // "degraded" /api/healthz response. See seed_breakglass.ts for rationale.
+    void seedBreakGlassAccount().then((state) => {
+      if (state === "failed") {
+        logger.fatal(
+          "Break-glass emergency login is NOT available — see the banner above and /api/healthz",
+        );
+      }
+      return stripNonBreakGlassPasswords();
+    });
+    // Periodically purge expired persistent sessions.
+    startSessionCleanup();
+    // Maintain the rolling 90-day IT hunt-group history without waiting for a
+    // user to open the report.
+    startWebexCallHistorySync();
+  });
+}
+
+void main();

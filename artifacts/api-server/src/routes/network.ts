@@ -1,0 +1,1401 @@
+import { Router } from "express";
+import {
+  db,
+  networkSwitchesTable,
+  vlansTable,
+  networkLayoutPositionsTable,
+} from "@workspace/db";
+import type { MaintenanceLogEntry } from "@workspace/db";
+import { eq, and, or, ilike, desc, inArray, sql } from "drizzle-orm";
+import { requireAuth, requireCIO, requireNetworkAdmin } from "./auth";
+import {
+  getFortiGateConfig,
+  whitelistUrl,
+  listWhitelistEntries,
+  normalizeUrlPattern,
+  FortiGateError,
+} from "../lib/fortigate";
+import { z } from "zod";
+import crypto from "crypto";
+import type OpenAI from "openai";
+import { getOpenAI, isAIConfigured } from "../lib/openai";
+import { getKnowledgeContext, runChatWithMemory, messageRequestsCapture, getActiveRoster } from "../lib/ai_knowledge";
+import {
+  upsertSwitchByHostname,
+  upsertVlanByVlanId,
+  listInventoryAudit,
+  rollbackInventoryChange,
+  recordInventoryAudit,
+  diffFields,
+  SWITCH_AUDIT_FIELDS,
+  VLAN_AUDIT_FIELDS,
+  canonicalBuildingName,
+  type InventoryActor,
+} from "../lib/inventory";
+import { buildInventoryHealth } from "../lib/inventory_health";
+import {
+  getLockStatus,
+  acquireLock,
+  releaseLock,
+  resetLayout,
+  listLayoutEvents,
+  restoreLayout,
+} from "../lib/layout_governance";
+import { getBuildingSummaries, getCanonicalBuildingName } from "./network_nodes";
+import { findSwitchByIdentity, saveSwitchByIdentity } from "../lib/network_identity";
+import fs from "fs";
+import path from "path";
+
+const router = Router();
+
+function reqActor(req: any): InventoryActor {
+  return { id: req.user?.id ?? null, name: req.user?.name ?? null };
+}
+
+const MAINTENANCE_EDIT_ROLES = new Set(["cio", "network", "network_engineer"]);
+
+function visibleMaintenanceLog(log: unknown): MaintenanceLogEntry[] {
+  if (!Array.isArray(log)) return [];
+  return (log as MaintenanceLogEntry[]).filter((e) => !e?.deletedAt);
+}
+
+function withVisibleMaintenanceLog<T extends { maintenanceLog?: unknown }>(row: T): T {
+  return { ...row, maintenanceLog: visibleMaintenanceLog(row.maintenanceLog) };
+}
+
+function withCanonicalSwitchBuilding<T extends { building?: string | null }>(row: T): T {
+  return {
+    ...row,
+    building: getCanonicalBuildingName(row.building || "Unknown Building"),
+  };
+}
+
+function canEditMaintenanceEntry(user: any, entry: MaintenanceLogEntry): boolean {
+  if (!user) return false;
+  if (entry.authorId != null && entry.authorId === user.id) return true;
+  return MAINTENANCE_EDIT_ROLES.has(user.role);
+}
+
+let cachedMapDataUrl: string | null = null;
+function getCampusMapDataUrl(): string | null {
+  if (cachedMapDataUrl) return cachedMapDataUrl;
+  const candidates = [
+    path.resolve(process.cwd(), "attached_assets/image_1776715156641.png"),
+    path.resolve(process.cwd(), "../../attached_assets/image_1776715156641.png"),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const buf = fs.readFileSync(p);
+        cachedMapDataUrl = `data:image/png;base64,${buf.toString("base64")}`;
+        return cachedMapDataUrl;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+const WEBEX_CONTROL_HUB_OVERVIEW_URL = "https://admin.webex.com/overview";
+const WEBEX_DEVELOPER_DEVICES_URL = "https://developer.webex.com/docs/api/v1/devices";
+const WEBEX_DEVELOPER_SERVICE_APPS_URL = "https://developer.webex.com/create/docs/service-apps";
+const WEBEX_DEVELOPER_AUDIT_EVENTS_URL = "https://developer.webex.com/admin/docs/api/v1/admin-audit-events";
+const WEBEX_EMERGENCY_CALLING_GUIDE_URL = "https://help.webex.com/en-us/article/av6oo3/Enhanced-Emergency-Calling-for-Webex-Calling";
+const WEBEX_E911_VLAN_MIN = 301;
+const WEBEX_E911_VLAN_MAX = 323;
+
+let webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+
+async function refreshWebexSupportAccessToken(): Promise<boolean> {
+  const refreshToken = process.env.WEBEX_REFRESH_TOKEN;
+  const clientId = process.env.WEBEX_CLIENT_ID;
+  const clientSecret = process.env.WEBEX_CLIENT_SECRET;
+  if (!refreshToken || !clientId || !clientSecret) return false;
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  });
+  const response = await fetch("https://webexapis.com/v1/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) return false;
+  const tokens = await response.json() as { access_token?: string; refresh_token?: string };
+  if (!tokens.access_token) return false;
+  webexSupportAccessToken = tokens.access_token;
+  if (tokens.refresh_token) process.env.WEBEX_REFRESH_TOKEN = tokens.refresh_token;
+  return true;
+}
+
+async function webexSupportFetch(pathname: string, retry = true): Promise<Response> {
+  if (!webexSupportAccessToken) webexSupportAccessToken = process.env.WEBEX_ACCESS_TOKEN || "";
+  if (!webexSupportAccessToken && !(await refreshWebexSupportAccessToken())) {
+    throw new Error("Webex is not configured");
+  }
+  const requestUrl = pathname.startsWith("https://webexapis.com/v1/")
+    ? pathname
+    : `https://webexapis.com/v1${pathname}`;
+  const response = await fetch(requestUrl, {
+    headers: {
+      Authorization: `Bearer ${webexSupportAccessToken}`,
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (response.status === 401 && retry && await refreshWebexSupportAccessToken()) {
+    return webexSupportFetch(pathname, false);
+  }
+  return response;
+}
+
+type CallingPerson = {
+  id: string;
+  name: string;
+  ownerType: "PEOPLE" | "PLACE";
+  phoneNumber: string | null;
+  extension: string | null;
+  webexLocation: string | null;
+  building: string | null;
+  buildingAssigned: boolean;
+};
+
+type CallingPersonBase = Omit<CallingPerson, "building" | "buildingAssigned">;
+
+let cachedCallingPeople: { expiresAt: number; people: CallingPersonBase[] } | null = null;
+
+function nextWebexPage(response: Response): string | null {
+  const link = response.headers.get("link");
+  if (!link) return null;
+  const nextPart = link.split(",").find((part) => /rel="?next"?/i.test(part));
+  const candidate = nextPart?.match(/<([^>]+)>/)?.[1];
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    return url.origin === "https://webexapis.com" && url.pathname.startsWith("/v1/")
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function resultRows<T>(result: any): T[] {
+  if (Array.isArray(result)) return result as T[];
+  return (result?.rows ?? []) as T[];
+}
+
+async function getPhoneBuildingAssignments(): Promise<Map<string, string>> {
+  const result = await db.execute(sql`
+    SELECT "webex_person_id", "building"
+      FROM "phone_building_assignments"
+  `);
+  return new Map(
+    resultRows<{ webex_person_id: string; building: string }>(result)
+      .map((row) => [row.webex_person_id, row.building]),
+  );
+}
+
+async function getWebexCallingPeople(assignments?: Map<string, string>): Promise<CallingPerson[]> {
+  let basePeople = cachedCallingPeople?.expiresAt && cachedCallingPeople.expiresAt > Date.now()
+    ? cachedCallingPeople.people
+    : null;
+
+  if (!basePeople) {
+    const people = new Map<string, CallingPersonBase>();
+    let nextUrl: string | null = "/telephony/config/numbers?max=1000";
+    let pageCount = 0;
+
+    while (nextUrl && pageCount < 20) {
+      const response = await webexSupportFetch(nextUrl);
+      if (!response.ok) {
+        throw new Error(`Webex phone directory query failed (${response.status}).`);
+      }
+
+      const data = await response.json() as { phoneNumbers?: Array<Record<string, any>> };
+      for (const number of data.phoneNumbers ?? []) {
+        const owner = number.owner as Record<string, unknown> | undefined;
+        const ownerType = String(owner?.type || "").toUpperCase();
+        if (!owner || !["PEOPLE", "PLACE"].includes(ownerType) || !owner.id) continue;
+
+        const id = String(owner.id);
+        const firstName = String(owner.firstName || "").trim();
+        const lastName = String(owner.lastName || "").trim();
+        const ownerName = String(owner.displayName || owner.name || "").trim();
+        const name = `${firstName} ${lastName}`.trim()
+          || ownerName
+          || (ownerType === "PLACE" ? "Unnamed shared phone" : "Unnamed person");
+        const phoneNumber = String(number.phoneNumber || "").trim() || null;
+        const extension = String(number.extension || "").trim() || null;
+        const webexLocation = String(number.location?.name || "").trim() || null;
+        const existing = people.get(id);
+
+        if (!existing) {
+          people.set(id, {
+            id,
+            name,
+            ownerType: ownerType as "PEOPLE" | "PLACE",
+            phoneNumber,
+            extension,
+            webexLocation,
+          });
+          continue;
+        }
+
+        // Prefer a direct number when one record has only an extension, while
+        // preserving the first extension/location returned for the person.
+        if (!existing.phoneNumber && phoneNumber) existing.phoneNumber = phoneNumber;
+        if (!existing.extension && extension) existing.extension = extension;
+        if (!existing.webexLocation && webexLocation) existing.webexLocation = webexLocation;
+      }
+
+      nextUrl = nextWebexPage(response);
+      pageCount += 1;
+    }
+
+    if (nextUrl) throw new Error("Webex phone directory exceeded the 20-page safety limit.");
+    basePeople = Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name));
+    cachedCallingPeople = { people: basePeople, expiresAt: Date.now() + 5 * 60 * 1000 };
+  }
+
+  return basePeople.map((person) => {
+    const building = assignments?.get(person.id) ?? null;
+    return { ...person, building, buildingAssigned: !!building };
+  });
+}
+
+function looksLikeVoiceOrE911Vlan(vlan: {
+  vlanId: number;
+  type?: string | null;
+  name?: string | null;
+  description?: string | null;
+  notes?: string | null;
+}) {
+  if (vlan.vlanId >= WEBEX_E911_VLAN_MIN && vlan.vlanId <= WEBEX_E911_VLAN_MAX) return true;
+  const haystack = `${vlan.type ?? ""} ${vlan.name ?? ""} ${vlan.description ?? ""} ${vlan.notes ?? ""}`.toLowerCase();
+  return haystack.includes("voice") || haystack.includes("voip") || haystack.includes("e911") || haystack.includes("911");
+}
+
+router.get("/calling/support", requireAuth, async (_req: any, res) => {
+  try {
+    res.setHeader("Cache-Control", "no-store");
+    const [buildingSummaries, switches, vlans] = await Promise.all([
+      getBuildingSummaries(),
+      db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building, networkSwitchesTable.hostname),
+      db.select().from(vlansTable).orderBy(vlansTable.vlanId),
+    ]);
+
+    const webexConfigured = !!(
+      process.env.WEBEX_ACCESS_TOKEN ||
+      (process.env.WEBEX_REFRESH_TOKEN && process.env.WEBEX_CLIENT_ID && process.env.WEBEX_CLIENT_SECRET)
+    );
+
+    let webexQueryError: string | null = null;
+    let phoneDirectoryQueryError: string | null = null;
+    let webexDevices: Array<{
+      id: string;
+      name: string;
+      product: string;
+      status: "online" | "offline" | "unknown";
+      personId: string | null;
+      workspaceId: string | null;
+    }> = [];
+    let callingPeople: CallingPerson[] = [];
+
+    if (webexConfigured) {
+      try {
+        const response = await webexSupportFetch("/devices?max=1000");
+        if (!response.ok) {
+          webexQueryError = `Webex device query failed (${response.status}).`;
+        } else {
+          const data = await response.json() as { items?: Array<Record<string, unknown>> };
+          webexDevices = (data.items ?? [])
+            .map((device) => {
+              const rawStatus = String(device.connectionStatus || device.status || "unknown").toLowerCase();
+              const status: "online" | "offline" | "unknown" =
+                rawStatus === "connected"
+                  ? "online"
+                  : rawStatus === "disconnected"
+                    ? "offline"
+                    : "unknown";
+              return {
+                id: String(device.id || ""),
+                name: String(device.displayName || device.name || "Unnamed device"),
+                product: String(device.product || device.type || "Unknown"),
+                status,
+                personId: String(device.personId || "").trim() || null,
+                workspaceId: String(device.workspaceId || "").trim() || null,
+              };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+      } catch (err: any) {
+        webexQueryError = err?.message === "Webex is not configured" ? null : (err?.message || "Webex device query failed.");
+      }
+
+      try {
+        const assignments = await getPhoneBuildingAssignments();
+        callingPeople = await getWebexCallingPeople(assignments);
+      } catch (err: any) {
+        phoneDirectoryQueryError = err?.message === "Webex is not configured"
+          ? null
+          : (err?.message || "Webex phone directory query failed.");
+      }
+    }
+
+    const switchesByBuilding = new Map<string, typeof switches>();
+    for (const sw of switches) {
+      if (/\b(?:SVI|Boiler Room)\b/i.test(sw.location ?? "")) continue;
+      const building = getCanonicalBuildingName(sw.building || "Unknown Building");
+      if (!switchesByBuilding.has(building)) switchesByBuilding.set(building, []);
+      switchesByBuilding.get(building)!.push(sw);
+    }
+
+    const voiceVlans = vlans.filter(looksLikeVoiceOrE911Vlan);
+    const voiceVlansByBuilding = new Map<string, typeof voiceVlans>();
+    for (const vlan of voiceVlans) {
+      const building = getCanonicalBuildingName(vlan.building || "Unknown Building");
+      if (!voiceVlansByBuilding.has(building)) voiceVlansByBuilding.set(building, []);
+      voiceVlansByBuilding.get(building)!.push(vlan);
+    }
+
+    const presentE911VlanIds = Array.from(
+      new Set(
+        voiceVlans
+          .map((vlan) => vlan.vlanId)
+          .filter((vlanId) => vlanId >= WEBEX_E911_VLAN_MIN && vlanId <= WEBEX_E911_VLAN_MAX),
+      ),
+    ).sort((a, b) => a - b);
+
+    const missingE911VlanIds = Array.from(
+      { length: WEBEX_E911_VLAN_MAX - WEBEX_E911_VLAN_MIN + 1 },
+      (_, offset) => WEBEX_E911_VLAN_MIN + offset,
+    ).filter((vlanId) => !presentE911VlanIds.includes(vlanId));
+
+    const buildings = buildingSummaries
+      .map((summary) => {
+        const buildingSwitches = switchesByBuilding.get(summary.name) ?? [];
+        const buildingVoiceVlans = (voiceVlansByBuilding.get(summary.name) ?? []).sort((a, b) => a.vlanId - b.vlanId);
+        return {
+          name: summary.name,
+          healthColor: summary.healthColor,
+          monitoringStrategy: summary.monitoringStrategy,
+          nodeCount: summary.nodeCount,
+          switchCount: buildingSwitches.length,
+          onlineSwitchCount: buildingSwitches.filter((sw) => String(sw.status).toLowerCase() === "online").length,
+          offlineSwitchCount: buildingSwitches.filter((sw) => String(sw.status).toLowerCase() === "offline").length,
+          e911Vlans: buildingVoiceVlans.map((vlan) => ({
+            id: vlan.id,
+            vlanId: vlan.vlanId,
+            name: vlan.name,
+            description: vlan.description,
+            subnet: vlan.subnet,
+            gateway: vlan.gateway,
+          })),
+        };
+      })
+      .filter((building) => building.e911Vlans.length > 0 || building.switchCount > 0);
+
+    const healthyBuildings = buildings.filter((building) => building.healthColor === "green").length;
+    const attentionBuildings = buildings.filter((building) => building.healthColor === "amber" || building.healthColor === "red").length;
+    const unknownBuildings = buildings.filter((building) => building.healthColor === "unknown").length;
+    const onlineDevices = webexDevices.filter((device) => device.status === "online").length;
+    const offlineDevices = webexDevices.filter((device) => device.status === "offline").length;
+    const unknownDevices = webexDevices.filter((device) => device.status === "unknown").length;
+
+    return res.json({
+      configured: webexConfigured,
+      queryError: webexQueryError,
+      phoneDirectoryQueryError,
+      links: {
+        controlHubOverview: WEBEX_CONTROL_HUB_OVERVIEW_URL,
+        devicesReference: WEBEX_DEVELOPER_DEVICES_URL,
+        serviceAppsGuide: WEBEX_DEVELOPER_SERVICE_APPS_URL,
+        auditEventsReference: WEBEX_DEVELOPER_AUDIT_EVENTS_URL,
+        emergencyCallingGuide: WEBEX_EMERGENCY_CALLING_GUIDE_URL,
+      },
+      e911Range: {
+        start: WEBEX_E911_VLAN_MIN,
+        end: WEBEX_E911_VLAN_MAX,
+        present: presentE911VlanIds,
+        missing: missingE911VlanIds,
+      },
+      summary: {
+        totalWebexDevices: webexDevices.length,
+        onlineWebexDevices: onlineDevices,
+        offlineWebexDevices: offlineDevices,
+        unknownWebexDevices: unknownDevices,
+        totalCallingPeople: callingPeople.length,
+        assignedCallingPeople: callingPeople.filter((person) => person.buildingAssigned).length,
+        unassignedCallingPeople: callingPeople.filter((person) => !person.buildingAssigned).length,
+        totalCallingBuildings: buildings.length,
+        healthyCallingBuildings: healthyBuildings,
+        attentionCallingBuildings: attentionBuildings,
+        unknownCallingBuildings: unknownBuildings,
+      },
+      buildingOptions: buildingSummaries
+        .map((summary) => summary.name)
+        .filter((name) => name && name !== "Unknown Building")
+        .sort((a, b) => a.localeCompare(b)),
+      buildings,
+      people: callingPeople,
+      devices: webexDevices,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || "Failed to build Cisco Calling support view" });
+  }
+});
+
+router.patch("/calling/people/:personId/building", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const personId = String(req.params.personId || "").trim();
+  if (!personId || personId.length > 500) return res.status(400).json({ error: "Invalid person identifier" });
+
+  const parsed = z.object({
+    building: z.string().trim().max(120).nullable(),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  try {
+    const summaries = await getBuildingSummaries();
+    const requested = parsed.data.building?.trim() || null;
+    const selectedBuilding = requested
+      ? summaries.find((summary) => summary.name.toLowerCase() === requested.toLowerCase())?.name ?? null
+      : null;
+    if (requested && !selectedBuilding) {
+      return res.status(400).json({ error: "Select a recognized campus building" });
+    }
+
+    // Re-read the authoritative directory so a browser cannot create a local
+    // assignment for an arbitrary or stale Webex identifier.
+    const callingPeople = await getWebexCallingPeople();
+    const person = callingPeople.find((candidate) => candidate.id === personId);
+    if (!person) return res.status(404).json({ error: "Calling person not found" });
+
+    const beforeResult = await db.execute(sql`
+      SELECT "building"
+        FROM "phone_building_assignments"
+       WHERE "webex_person_id" = ${personId}
+    `);
+    const previousBuilding = resultRows<{ building: string }>(beforeResult)[0]?.building ?? null;
+
+    if (selectedBuilding) {
+      await db.execute(sql`
+        INSERT INTO "phone_building_assignments"
+          ("webex_person_id", "building", "updated_by_id", "updated_by_name")
+        VALUES
+          (${personId}, ${selectedBuilding}, ${req.user?.id ?? null}, ${req.user?.name ?? req.user?.email ?? "Unknown"})
+        ON CONFLICT ("webex_person_id") DO UPDATE
+          SET "building" = EXCLUDED."building",
+              "updated_by_id" = EXCLUDED."updated_by_id",
+              "updated_by_name" = EXCLUDED."updated_by_name",
+              "updated_at" = now()
+      `);
+    } else {
+      await db.execute(sql`
+        DELETE FROM "phone_building_assignments"
+         WHERE "webex_person_id" = ${personId}
+      `);
+    }
+
+    if (previousBuilding !== selectedBuilding) {
+      await db.execute(sql`
+        INSERT INTO "phone_building_assignment_events"
+          ("webex_person_id", "person_name", "phone_number", "previous_building", "new_building", "actor_id", "actor_name")
+        VALUES
+          (${personId}, ${person.name}, ${person.phoneNumber ?? person.extension}, ${previousBuilding}, ${selectedBuilding},
+           ${req.user?.id ?? null}, ${req.user?.name ?? req.user?.email ?? "Unknown"})
+      `);
+    }
+
+    return res.json({
+      personId,
+      building: selectedBuilding,
+      buildingAssigned: !!selectedBuilding,
+    });
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || "Could not update the phone building assignment" });
+  }
+});
+
+router.get("/switches", requireAuth, async (req: any, res) => {
+  const { q, building, status } = req.query;
+  let switches;
+  if (q) {
+    switches = await db.select().from(networkSwitchesTable).where(
+      or(
+        ilike(networkSwitchesTable.hostname, `%${q}%`),
+        ilike(networkSwitchesTable.building, `%${q}%`),
+        ilike(networkSwitchesTable.ipAddress, `%${q}%`),
+        ilike(networkSwitchesTable.model, `%${q}%`)
+      )
+    ).orderBy(networkSwitchesTable.building);
+  } else {
+    const conditions: any[] = [];
+    if (building) conditions.push(ilike(networkSwitchesTable.building, `%${building}%`));
+    if (status) conditions.push(eq(networkSwitchesTable.status, status as string));
+    switches = conditions.length > 0
+      ? await db.select().from(networkSwitchesTable).where(and(...conditions)).orderBy(networkSwitchesTable.building)
+      : await db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building);
+  }
+  return res.json(switches.map(withVisibleMaintenanceLog).map(withCanonicalSwitchBuilding));
+});
+
+router.post("/switches", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    hostname: z.string().min(1),
+    building: z.string().min(1),
+    ipAddress: z.string().min(1),
+    model: z.string().optional(),
+    status: z.enum(["online", "offline", "unknown"]).optional(),
+    configFile: z.string().optional(),
+    notes: z.string().optional(),
+    location: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const before = await findSwitchByIdentity({ hostname: parsed.data.hostname, ipAddress: parsed.data.ipAddress });
+  const result = await saveSwitchByIdentity(parsed.data);
+  const sw = result.row;
+  await recordInventoryAudit({
+    entityType: "switch",
+    entityId: sw.id,
+    entityLabel: sw.hostname,
+    action: result.action === "created" ? "create" : "update",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
+  });
+  return res.status(result.action === "created" ? 201 : 200).json(withCanonicalSwitchBuilding(sw));
+});
+
+router.get("/switches/:id", requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id);
+  const [sw] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!sw) return res.status(404).json({ error: "Not found" });
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
+});
+
+router.patch("/switches/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const schema = z.object({
+    hostname: z.string().optional(),
+    building: z.string().optional(),
+    ipAddress: z.string().optional(),
+    model: z.string().optional(),
+    status: z.enum(["online", "offline", "unknown"]).optional(),
+    configFile: z.string().optional(),
+    notes: z.string().optional(),
+    location: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const [before] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!before) return res.status(404).json({ error: "Not found" });
+  const result = await saveSwitchByIdentity({
+    hostname: parsed.data.hostname ?? before.hostname,
+    building: parsed.data.building ?? before.building,
+    ipAddress: parsed.data.ipAddress ?? before.ipAddress,
+    model: parsed.data.model ?? before.model,
+    status: parsed.data.status ?? before.status,
+    configFile: parsed.data.configFile ?? before.configFile,
+    notes: parsed.data.notes ?? before.notes,
+    location: parsed.data.location ?? before.location,
+  }, id);
+  const sw = result.row;
+  await recordInventoryAudit({
+    entityType: "switch",
+    entityId: sw.id,
+    entityLabel: sw.hostname,
+    action: "update",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(before, sw, SWITCH_AUDIT_FIELDS),
+  });
+  return res.json(withCanonicalSwitchBuilding(sw));
+});
+
+router.post("/switches/:id/maintenance-log", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const entry: MaintenanceLogEntry = {
+    id: crypto.randomUUID(),
+    body: parsed.data.body,
+    authorId: req.user?.id ?? null,
+    authorName: req.user?.name ?? req.user?.email ?? "Unknown",
+    createdAt: new Date().toISOString(),
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+  };
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const nextLog = [entry, ...log];
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
+});
+
+router.patch("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to edit this entry" });
+  }
+
+  const updated: MaintenanceLogEntry = {
+    ...log[idx],
+    body: parsed.data.body,
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+    editedAt: new Date().toISOString(),
+  };
+  const nextLog = log.slice();
+  nextLog[idx] = updated;
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
+});
+
+router.delete("/switches/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+
+  const [existing] = await db.select().from(networkSwitchesTable).where(eq(networkSwitchesTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to delete this entry" });
+  }
+
+  const nextLog = log.slice();
+  nextLog[idx] = { ...log[idx], deletedAt: new Date().toISOString() };
+
+  const [sw] = await db.update(networkSwitchesTable)
+    .set({ maintenanceLog: nextLog, updatedAt: new Date() })
+    .where(eq(networkSwitchesTable.id, id))
+    .returning();
+  return res.json(withCanonicalSwitchBuilding(withVisibleMaintenanceLog(sw)));
+});
+
+router.get("/vlans", requireAuth, async (req: any, res) => {
+  const { q, building, type } = req.query;
+  let vlans;
+  if (q) {
+    vlans = await db.select().from(vlansTable).where(
+      or(
+        ilike(vlansTable.name, `%${q}%`),
+        ilike(vlansTable.building, `%${q}%`),
+        ilike(vlansTable.description, `%${q}%`),
+        ilike(vlansTable.subnet, `%${q}%`)
+      )
+    ).orderBy(vlansTable.vlanId);
+  } else {
+    const conditions: any[] = [];
+    if (building) conditions.push(ilike(vlansTable.building, `%${building}%`));
+    if (type) conditions.push(eq(vlansTable.type, type as string));
+    vlans = conditions.length > 0
+      ? await db.select().from(vlansTable).where(and(...conditions)).orderBy(vlansTable.vlanId)
+      : await db.select().from(vlansTable).orderBy(vlansTable.vlanId);
+  }
+  return res.json(vlans.map(withVisibleMaintenanceLog));
+});
+
+router.post("/vlans", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    vlanId: z.number().int(),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    building: z.string().min(1),
+    type: z.enum(["data", "voice", "ospf", "management", "security", "other"]),
+    subnet: z.string().optional(),
+    gateway: z.string().optional(),
+    notes: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const values = {
+    ...parsed.data,
+    building: canonicalBuildingName(parsed.data.building),
+  };
+  const [vlan] = await db.insert(vlansTable).values(values).returning();
+  await recordInventoryAudit({
+    entityType: "vlan",
+    entityId: vlan.id,
+    entityLabel: `VLAN ${vlan.vlanId} ${vlan.name}`,
+    action: "create",
+    source: "manual",
+    actor: reqActor(req),
+    changes: diffFields(null, vlan, VLAN_AUDIT_FIELDS),
+  });
+  return res.status(201).json(withVisibleMaintenanceLog(vlan));
+});
+
+router.patch("/vlans/:id", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    vlanId: z.number().int().min(1).max(4094).optional(),
+    name: z.string().trim().min(1).max(255).optional(),
+    description: z.string().trim().max(4000).nullable().optional(),
+    building: z.string().trim().min(1).max(255).optional(),
+    type: z.enum(["data", "voice", "ospf", "management", "security", "other"]).optional(),
+    subnet: z.string().trim().max(100).nullable().optional(),
+    gateway: z.string().trim().max(50).nullable().optional(),
+    notes: z.string().trim().max(4000).nullable().optional(),
+  }).refine((value) => Object.keys(value).length > 0, { message: "No changes supplied" });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "VLAN not found" });
+  const values = {
+    ...parsed.data,
+    ...(parsed.data.building
+      ? { building: canonicalBuildingName(parsed.data.building) }
+      : {}),
+  };
+  const [vlan] = await db.update(vlansTable).set(values).where(eq(vlansTable.id, id)).returning();
+  await recordInventoryAudit({ entityType: "vlan", entityId: vlan.id, entityLabel: `VLAN ${vlan.vlanId} ${vlan.name}`, action: "update", source: "manual", actor: reqActor(req), changes: diffFields(existing, vlan, VLAN_AUDIT_FIELDS) });
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+router.post("/vlans/:id/maintenance-log", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const entry: MaintenanceLogEntry = {
+    id: crypto.randomUUID(),
+    body: parsed.data.body,
+    authorId: req.user?.id ?? null,
+    authorName: req.user?.name ?? req.user?.email ?? "Unknown",
+    createdAt: new Date().toISOString(),
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+  };
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const nextLog = [entry, ...log];
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+router.patch("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+  const schema = z.object({
+    body: z.string().min(1).max(4000),
+    windowStart: z.string().datetime().optional().nullable(),
+    windowEnd: z.string().datetime().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to edit this entry" });
+  }
+
+  const updated: MaintenanceLogEntry = {
+    ...log[idx],
+    body: parsed.data.body,
+    windowStart: parsed.data.windowStart ?? null,
+    windowEnd: parsed.data.windowEnd ?? null,
+    editedAt: new Date().toISOString(),
+  };
+  const nextLog = log.slice();
+  nextLog[idx] = updated;
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+router.delete("/vlans/:id/maintenance-log/:entryId", requireAuth, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  const entryId = req.params.entryId;
+  if (Number.isNaN(id) || !entryId) return res.status(400).json({ error: "Invalid id" });
+
+  const [existing] = await db.select().from(vlansTable).where(eq(vlansTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const log = Array.isArray(existing.maintenanceLog) ? existing.maintenanceLog : [];
+  const idx = log.findIndex((e) => e?.id === entryId);
+  if (idx === -1 || log[idx]?.deletedAt) return res.status(404).json({ error: "Entry not found" });
+
+  if (!canEditMaintenanceEntry(req.user, log[idx])) {
+    return res.status(403).json({ error: "Not allowed to delete this entry" });
+  }
+
+  const nextLog = log.slice();
+  nextLog[idx] = { ...log[idx], deletedAt: new Date().toISOString() };
+
+  const [vlan] = await db.update(vlansTable)
+    .set({ maintenanceLog: nextLog })
+    .where(eq(vlansTable.id, id))
+    .returning();
+  return res.json(withVisibleMaintenanceLog(vlan));
+});
+
+// ----- FortiGate website whitelist (Network Tool) -----
+
+router.get("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const cfg = getFortiGateConfig();
+  if (!cfg) {
+    return res.json({ configured: false, host: null, profile: null, entries: [] });
+  }
+  try {
+    const entries = await listWhitelistEntries(cfg);
+    return res.json({ configured: true, host: cfg.host, profile: cfg.profile, entries });
+  } catch (err: any) {
+    req.log.error({ err }, "FortiGate whitelist fetch failed");
+    return res.status(502).json({
+      error: "FORTIGATE_ERROR",
+      message: err instanceof FortiGateError ? err.message : "Failed to read whitelist from FortiGate.",
+    });
+  }
+});
+
+router.post("/whitelist", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    url: z.string().min(1).max(500),
+    action: z.enum(["exempt", "allow", "monitor"]).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  const cfg = getFortiGateConfig();
+  if (!cfg) {
+    return res.status(503).json({
+      error: "FORTIGATE_NOT_CONFIGURED",
+      message:
+        "FortiGate is not configured. Set FORTIGATE_HOST and FORTIGATE_API_TOKEN (optionally FORTIGATE_VDOM, FORTIGATE_WEBFILTER_PROFILE) to enable this tool.",
+    });
+  }
+
+  let pattern: string;
+  try {
+    pattern = normalizeUrlPattern(parsed.data.url);
+  } catch (err: any) {
+    return res.status(400).json({ error: "INVALID_URL", message: err?.message ?? "Invalid URL." });
+  }
+
+  const action = parsed.data.action ?? "exempt";
+  try {
+    const result = await whitelistUrl(cfg, pattern, action);
+    req.log.info(
+      { url: pattern, action, tableId: result.tableId, added: result.added, by: req.user?.email },
+      "FortiGate whitelist add",
+    );
+    return res.json({
+      url: pattern,
+      action,
+      tableId: result.tableId,
+      tableName: result.tableName,
+      added: result.added,
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "FortiGate whitelist add failed");
+    return res.status(502).json({
+      error: "FORTIGATE_ERROR",
+      message: err instanceof FortiGateError ? err.message : "Failed to update FortiGate.",
+    });
+  }
+});
+
+// ----- Inventory audit trail & AI change application -----
+
+// Read the audit history for switch/VLAN inventory changes.
+router.get("/inventory/audit", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const entityTypeRaw = typeof req.query.entityType === "string" ? req.query.entityType : undefined;
+  const entityType = entityTypeRaw === "switch" || entityTypeRaw === "vlan" ? entityTypeRaw : undefined;
+  const entityIdRaw = typeof req.query.entityId === "string" ? parseInt(req.query.entityId) : NaN;
+  const entityId = Number.isNaN(entityIdRaw) ? undefined : entityIdRaw;
+  const limitRaw = typeof req.query.limit === "string" ? parseInt(req.query.limit) : NaN;
+  const limit = Number.isNaN(limitRaw) ? 100 : Math.min(Math.max(limitRaw, 1), 500);
+  try {
+    const rows = await listInventoryAudit({ entityType, entityId, limit });
+    return res.json(rows);
+  } catch (err: any) {
+    console.error("[inventory audit list]", err);
+    return res.status(500).json({ error: err?.message || "Failed to load audit history" });
+  }
+});
+
+// Roll back a prior inventory change to its recorded "from" values.
+router.post("/inventory/audit/:id/rollback", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  try {
+    const result = await rollbackInventoryChange(id, reqActor(req));
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    return res.json({ ok: true, result: result.result, update: result.update });
+  } catch (err: any) {
+    console.error("[inventory rollback]", err);
+    return res.status(500).json({ error: err?.message || "Rollback failed" });
+  }
+});
+
+// Apply a pending AI-proposed inventory change (from a preview chat turn).
+router.post("/inventory/apply", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const schema = z.object({
+    kind: z.enum(["switch", "vlan"]),
+    payload: z.record(z.string(), z.any()),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid apply payload" });
+  const actor = reqActor(req);
+  try {
+    if (parsed.data.kind === "switch") {
+      const result = await upsertSwitchByHostname(parsed.data.payload as any, { actor, source: "chat_ai" });
+      if (!result.ok) return res.status(400).json({ error: result.error });
+      return res.json({ ok: true, result: result.result, update: result.update });
+    }
+    const result = await upsertVlanByVlanId(parsed.data.payload as any, { actor, source: "chat_ai" });
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    return res.json({ ok: true, result: result.result, update: result.update });
+  } catch (err: any) {
+    console.error("[inventory apply]", err);
+    return res.status(500).json({ error: err?.message || "Failed to apply change" });
+  }
+});
+
+// ----- AI Network Engineer chat -----
+
+router.post("/ai-chat", requireAuth, async (req: any, res) => {
+  const schema = z.object({
+    messages: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string().min(1).max(8000),
+    })).min(1).max(40),
+    previewInventory: z.boolean().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid messages payload" });
+  }
+
+  if (!isAIConfigured()) {
+    return res.status(503).json({ error: "AI service is not configured." });
+  }
+
+  try {
+    const [switches, vlans, buildingSummaries] = await Promise.all([
+      db.select().from(networkSwitchesTable).orderBy(networkSwitchesTable.building),
+      db.select().from(vlansTable).orderBy(vlansTable.vlanId),
+      getBuildingSummaries(),
+    ]);
+
+    const switchesByBuilding = new Map<string, typeof switches>();
+    for (const s of switches) {
+      const b = getCanonicalBuildingName(s.building || "Unassigned");
+      if (!switchesByBuilding.has(b)) switchesByBuilding.set(b, []);
+      switchesByBuilding.get(b)!.push(s);
+    }
+    const vlansByBuilding = new Map<string, typeof vlans>();
+    for (const v of vlans) {
+      const b = getCanonicalBuildingName(v.building || "Unassigned");
+      if (!vlansByBuilding.has(b)) vlansByBuilding.set(b, []);
+      vlansByBuilding.get(b)!.push(v);
+    }
+
+    let inventoryText = "";
+    for (const summary of buildingSummaries) {
+      const name = summary.name;
+      const sws = switchesByBuilding.get(name) ?? [];
+      const vls = vlansByBuilding.get(name) ?? [];
+      if (!sws.length && !vls.length) continue;
+      inventoryText += `\n## ${name}\n`;
+      if (sws.length) {
+        inventoryText += "Switches:\n";
+        for (const s of sws) {
+          inventoryText += `  - ${s.hostname} (${s.ipAddress})${s.model ? ` [${s.model}]` : ""}${s.status ? ` status=${s.status}` : ""}${s.location ? ` loc=${s.location}` : ""}${s.notes ? ` — ${s.notes}` : ""}\n`;
+        }
+      }
+      if (vls.length) {
+        inventoryText += "VLANs:\n";
+        for (const v of vls) {
+          inventoryText += `  - VLAN ${v.vlanId} ${v.name} [${v.type}]${v.subnet ? ` ${v.subnet}` : ""}${v.gateway ? ` gw=${v.gateway}` : ""}${v.description ? ` — ${v.description}` : ""}\n`;
+        }
+      }
+    }
+    if (!inventoryText.trim()) {
+      inventoryText = "(No switches or VLANs have been entered yet.)";
+    }
+
+    const RECENT_PER_DEVICE = 3;
+    const formatRecentEntries = (log: unknown): string => {
+      const entries = visibleMaintenanceLog(log)
+        .slice()
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+        .slice(0, RECENT_PER_DEVICE);
+      return entries
+        .map((e) => {
+          const when = e.createdAt ? e.createdAt.slice(0, 10) : "unknown date";
+          const who = e.authorName || "unknown";
+          const body = (e.body || "").replace(/\s+/g, " ").trim().slice(0, 280);
+          return `    • [${when}] ${who}: ${body}`;
+        })
+        .join("\n");
+    };
+
+    let maintenanceText = "";
+    for (const s of switches) {
+      const recent = formatRecentEntries(s.maintenanceLog);
+      if (recent) {
+        maintenanceText += `  ${s.hostname} (${s.ipAddress}):\n${recent}\n`;
+      }
+    }
+    for (const v of vlans) {
+      const recent = formatRecentEntries(v.maintenanceLog);
+      if (recent) {
+        maintenanceText += `  VLAN ${v.vlanId} ${v.name}:\n${recent}\n`;
+      }
+    }
+    if (!maintenanceText.trim()) {
+      maintenanceText = "(No maintenance log entries recorded yet.)";
+    }
+
+    const knowledgeContext = await getKnowledgeContext();
+    const teamRoster = await getActiveRoster();
+    const rosterText = teamRoster.length
+      ? teamRoster.map((m) => `- ${m.name} (${m.email}) — ${m.role}`).join("\n")
+      : "(no active team members on file)";
+
+    const authUser = (req as any).user;
+    const identityLine = authUser
+      ? `\n\nYou are advising ${authUser.name || authUser.email}${authUser.email ? ` (${authUser.email})` : ""} — role "${authUser.role}"${authUser.jobTitle ? `, ${authUser.jobTitle}` : ""}. You already know who they are; address them by name when natural and attribute their reports to them.`
+      : "";
+
+    const systemPrompt = `You are an expert enterprise network engineer with deep experience in campus network design, OSPF, VLAN segmentation, Cisco Nexus, Aruba, FortiGate, and wireless deployments. You work as the network advisor for **Seward County Community College (SCCC)**.${identityLine}
+
+You have direct knowledge of the SCCC campus map (provided as an image in the first user turn). Key context:
+- Main campus is laid out around Circle Drive. The Hobble Academic Building (codes A and AA) houses IT and the network core.
+- Other main-campus buildings: Humanities (H), Student Union complex (SU/SA/SW), Calvin Allied Health (CAH), Cosmetology (COS), Student Life Center (SLC), Agriculture (V), Industrial Technology campus (T/TA/TB/TD/TT) to the northwest, Sharp Family Champion Center (SFCC), Student Health Center (SHC), Mansions, plus athletic fields (French/softball, Brent Gould/baseball, tennis).
+- The network core lives in Hobble: Nexus pair sw-aa144-a48 (192.168.2.70) and sw-aa144-a24 (192.168.2.71), VPC peer-linked. They distribute via OSPF /30 transit links (VLAN 611–628) to building access switches. VLAN 611 reaches the legacy 6509 core; 612 reaches the Industrial Tech Nexus; the rest land at building edge switches.
+- Edge platforms are mostly Aruba (CX 6100/6300 family) with a FortiGate handling internet edge (ports 35/36 on the Nexus pair to IDEATEK and United ISP). Two Aruba 7205 wireless controllers terminate on a48 ports 43/44.
+- Remote sites (NOT on the campus map): **Epworth** (VLAN 773, 192.168.2.24, fiber/OSPF) and **West** (172.25.x, FortiGate West_FGT, VLAN 910).
+
+Below is the **live network reference data** currently entered in this app (single source of truth — prefer this over your prior knowledge when they conflict):
+${inventoryText}
+
+Below is the **recent maintenance log** — the most recent ${RECENT_PER_DEVICE} entries per switch and VLAN (oldest entries omitted). Use this to answer questions about recent changes, who worked on a device, and incident triage:
+${maintenanceText}
+
+You also have a persistent memory: the SCCC Environment Knowledge Base below contains institutional and environment-specific knowledge (network design guidance, FortiGate, wireless, Azure, identity, monitoring, procedures). Prefer it over generic IT advice. When the user tells you a durable new fact about the environment (a device, configuration, procedure, contact, or policy) or explicitly asks you to remember something, call the save_memory tool to persist it. Never save secrets or passwords.
+${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n` : ""}
+You can keep the live network inventory current as you talk. When a network administrator reports a real change to a switch (added, replaced, moved to a different building/location, went online/offline, or an IP/model change) or a VLAN (a new VLAN, or a changed subnet/gateway/name/type), call upsert_switch or upsert_vlan so the switch and VLAN reference data stays accurate — match a switch by its hostname and a VLAN by its numeric id, and only send the fields that changed. Only do this for concrete changes the user actually states; never invent inventory. If the user lacks a network-admin role the update will be refused — tell them plainly. After a successful change, confirm what you updated.
+
+You can capture and delegate work as tasks. When the user describes concrete work they did or need to do, call create_task to add it to their "My Tasks" for the week. When they assign or hand work to a teammate — e.g. "have Cecil check the SFP", "assign this to Jane" — call create_task with "assignee" set to that person's name or email so it lands in that teammate's list (stamped with who assigned it). Use the team roster below to resolve names; if a name is ambiguous or not on the roster, ask which teammate they mean rather than guessing. Use critical thinking — assign each task to whoever is actually going to do the work, not automatically to the person you're chatting with.
+
+Treat the Network Diagnostic Bridge as a native extension of your own capabilities. Use scan_network, ping_host, test_net_connection, query_influx_last_seen, snmp_get, and http_check directly from App-Server2 at 10.0.0.44. The bridge also has a registered NOC vantage point at 10.0.0.22: use probe_via_noc for restricted ping or TCP checks whenever the user asks to test from the NOC, from .22, or wants a second perspective. State which vantage point produced each result and corroborate failures when possible. Use only the typed, bounded tools; never expose general shell execution. If an integration is not configured, state that plainly and continue with available diagnostics. Treat Webex Control Hub as another native read-only source: use webex_device_status for room-device inventory, connection state, offline-device lists, and device-name searches, then correlate with network evidence where helpful. It cannot modify devices or execute RoomOS commands.
+
+When something is down, don't assume the person you're helping is standing in front of the gear — the team travels and works remotely, so whoever reports an outage may be hundreds of miles away. Work out where they are (ask if it's unclear) and adapt:
+- If they are REMOTE: first size up the blast radius from the inventory and memory below — which building, uplinks, VLANs, and dependent devices that switch/segment feeds, and what is likely affected. Run a live on-prem sweep with scan_network (optionally scoped to the affected building) to see exactly which switches are UP vs DOWN right now, and probe specific hosts with ping_host / test_net_connection; cross-check live results against the recorded status to spot what actually changed. Then help them act at a distance: what they can verify from where they are (monitoring, other reachable switches, the FortiGate, upstream), and — when hands-on work is unavoidable — identify who is onsite or nearest and delegate it with create_task (assignee = that teammate), spelling out the exact checks and commands to run, so the outage gets worked even though the reporter can't touch the device.
+- If they are ONSITE: be a hands-on partner and walk them through it one concrete step at a time: exact commands to run on their machine or the device console (Windows: \`ipconfig /all\`, \`ping <host>\`, \`tracert <host>\`, \`nslookup <host>\`, \`Test-NetConnection -ComputerName <host> -Port <port>\`; Cisco/Nexus: \`show interface status\`, \`show ip interface brief\`, \`show mac address-table\`, \`show cdp neighbors\`, \`show logging\`) plus physical checks (link/activity lights, cable seating, correct port and VLAN, power, SFP fully seated). Ask them to paste the output back, interpret it, and give the next step.
+Either way: pull in how a teammate solved the same symptom before if it's in memory, and give one clear action at a time, not a wall of commands.
+
+Active team members (for task assignment):
+${rosterText}
+
+Guidelines for your answers:
+- Be concise, technical, and direct — you are talking to other IT staff.
+- When asked about a building, look it up in the inventory above and identify the building's switches, VLANs, and likely uplink path back to the AA144 Nexus pair.
+- When the user asks about the map, refer to the building codes (e.g. "AA144 in Hobble", "TA107 in the Industrial Tech campus").
+- When you make assumptions, call them out so the user can correct the underlying data.
+- If the data doesn't contain what's needed, say so plainly and suggest what to add to the network reference.
+- Use Markdown for structure (headings, bullet lists, fenced code blocks for IPs/CLI).`;
+
+    const userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    const mapUrl = getCampusMapDataUrl();
+    if (mapUrl) {
+      userMessages.push({
+        role: "user",
+        content: [
+          { type: "text", text: "For reference throughout this conversation, here is the SCCC main-campus map. Use it to orient any building question." },
+          { type: "image_url", image_url: { url: mapUrl } },
+        ],
+      });
+      userMessages.push({
+        role: "assistant",
+        content: "Got it — I have the SCCC campus map and the live network inventory loaded. Ask me anything about the network.",
+      });
+    }
+    for (const m of parsed.data.messages) {
+      userMessages.push({ role: m.role, content: m.content });
+    }
+
+    // The CIO's chat does not auto-capture work into their task list unless they
+    // explicitly ask; ordinary staff always auto-capture.
+    const lastUserMsg = [...parsed.data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const authRole = req.user?.role ?? null;
+    const allowTaskCapture = authRole !== "cio" || messageRequestsCapture(lastUserMsg);
+
+    const { reply: rawReply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges } =
+      await runChatWithMemory(getOpenAI(), {
+        model: "gpt-5.2",
+        maxCompletionTokens: 2048,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...userMessages,
+        ],
+        userId: req.user?.id ?? null,
+        userRole: authRole,
+        userName: req.user?.name ?? null,
+        allowTaskCapture,
+        previewInventory: parsed.data.previewInventory === true,
+      });
+
+    const reply = rawReply.trim() || "(no response)";
+    return res.json({ reply, savedMemories, createdTasks, networkUpdates, savedShadowNotes, pendingNetworkChanges });
+  } catch (err: any) {
+    console.error("[network ai-chat]", err);
+    return res.status(500).json({ error: err?.message || "AI request failed" });
+  }
+});
+
+// ---- Network diagram layout (shared across team) --------------------------
+// Stores the dragged x/y of each React Flow node id so the network visualizer
+// remembers manual positioning between visits / users.
+
+router.get("/layout", requireAuth, async (_req, res) => {
+  const rows = await db.select().from(networkLayoutPositionsTable);
+  return res.json(
+    rows.map((r) => ({
+      nodeId: r.nodeId,
+      x: r.x,
+      y: r.y,
+      width: r.width ?? null,
+      height: r.height ?? null,
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+  );
+});
+
+const layoutPutSchema = z.object({
+  positions: z
+    .array(
+      z.object({
+        nodeId: z.string().min(1).max(255),
+        x: z.number().finite(),
+        y: z.number().finite(),
+        width: z.number().finite().optional().nullable(),
+        height: z.number().finite().optional().nullable(),
+      }),
+    )
+    .min(1)
+    .max(2000),
+});
+
+router.put("/layout", requireAuth, async (req: any, res) => {
+  const parsed = layoutPutSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+  const userId = req.user?.id ?? null;
+  const now = new Date();
+
+  // Honor the advisory edit lock server-side: if another user is actively
+  // editing the shared diagram, reject the write so their arrangement isn't
+  // clobbered. The client acquires the lock on drag; a stale poll can't slip
+  // a conflicting save past this check.
+  const lock = await getLockStatus(userId, now);
+  if (lock.locked && !lock.heldByMe) {
+    return res.status(409).json({
+      error: "LAYOUT_LOCKED",
+      message: `${lock.lockedByName ?? "Another user"} is currently editing the diagram layout.`,
+      lock,
+    });
+  }
+
+  const values = parsed.data.positions.map((p) => ({
+    nodeId: p.nodeId,
+    x: p.x,
+    y: p.y,
+    width: p.width ?? null,
+    height: p.height ?? null,
+    updatedAt: now,
+    updatedBy: userId,
+  }));
+
+  await db
+    .insert(networkLayoutPositionsTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: networkLayoutPositionsTable.nodeId,
+      set: {
+        x: sql`excluded.x`,
+        y: sql`excluded.y`,
+        width: sql`excluded.width`,
+        height: sql`excluded.height`,
+        updatedAt: sql`excluded.updated_at`,
+        updatedBy: sql`excluded.updated_by`,
+      },
+    });
+  return res.json({ saved: values.length });
+});
+
+const layoutDeleteSchema = z.object({
+  nodeIds: z.array(z.string().min(1)).optional(),
+});
+
+router.delete("/layout", requireAuth, requireCIO, async (req: any, res) => {
+  const parsed = layoutDeleteSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: "Validation error" });
+
+  // Don't let a delete land on top of another user's active arrangement.
+  const lock = await getLockStatus(req.user?.id ?? null);
+  if (lock.locked && !lock.heldByMe) {
+    return res.status(409).json({
+      error: "LAYOUT_LOCKED",
+      message: `${lock.lockedByName ?? "Another user"} is currently editing the diagram layout.`,
+      lock,
+    });
+  }
+
+  if (parsed.data.nodeIds && parsed.data.nodeIds.length > 0) {
+    // Targeted removal of specific nodes (not a full wipe).
+    await db
+      .delete(networkLayoutPositionsTable)
+      .where(inArray(networkLayoutPositionsTable.nodeId, parsed.data.nodeIds));
+    return res.json({ ok: true });
+  }
+
+  // Full wipe must go through the governed reset path so it is snapshotted,
+  // recorded in the change log, and performed transactionally — never a raw
+  // unrecoverable delete.
+  const result = await resetLayout(reqActor(req));
+  return res.json({ ok: true, removed: result.removed, eventId: result.eventId });
+});
+
+// ---- Inventory health / data-quality report -------------------------------
+
+const DEFAULT_STALE_DAYS = (() => {
+  const raw = parseInt(process.env.INVENTORY_STALE_DAYS ?? "", 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 30;
+})();
+
+router.get("/inventory/health", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const q = parseInt(String(req.query.staleDays ?? ""), 10);
+  const staleDays = Number.isFinite(q) && q > 0 && q <= 3650 ? q : DEFAULT_STALE_DAYS;
+  try {
+    const switches = await db.select().from(networkSwitchesTable);
+    const vlans = await db.select().from(vlansTable);
+    const report = buildInventoryHealth(switches, vlans, { staleDays });
+    return res.json(report);
+  } catch (err: any) {
+    req.log?.error({ err }, "inventory health failed");
+    return res.status(500).json({ error: err?.message || "Failed to build inventory health report" });
+  }
+});
+
+// ---- Shared-layout governance: advisory edit lock + reset change log -------
+
+router.get("/layout/lock", requireAuth, async (req: any, res) => {
+  const status = await getLockStatus(req.user?.id ?? null);
+  return res.json(status);
+});
+
+router.post("/layout/lock", requireAuth, async (req: any, res) => {
+  const result = await acquireLock(reqActor(req));
+  if (!result.ok) return res.status(409).json(result.status);
+  return res.json(result.status);
+});
+
+router.delete("/layout/lock", requireAuth, async (req: any, res) => {
+  await releaseLock(reqActor(req));
+  return res.json({ ok: true });
+});
+
+router.get("/layout/events", requireAuth, requireNetworkAdmin, async (req: any, res) => {
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "50"), 10) || 50, 1), 200);
+  const rows = await listLayoutEvents(limit);
+  return res.json(
+    rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      actorId: r.actorId,
+      actorName: r.actorName,
+      nodeCount: r.nodeCount,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  );
+});
+
+const layoutResetSchema = z.object({ confirm: z.literal(true) });
+
+router.post("/layout/reset", requireAuth, requireCIO, async (req: any, res) => {
+  const parsed = layoutResetSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Reset must be explicitly confirmed." });
+  }
+  const result = await resetLayout(reqActor(req));
+  return res.json({ ok: true, ...result });
+});
+
+router.post("/layout/events/:id/restore", requireAuth, requireCIO, async (req: any, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const result = await restoreLayout(id, reqActor(req));
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  return res.json({ ok: true, restored: result.restored });
+});
+
+export default router;
