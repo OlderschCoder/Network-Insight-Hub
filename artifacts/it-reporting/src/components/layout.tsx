@@ -1,3 +1,4 @@
+import { FredAssistant } from "@/components/FredAssistant";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -44,7 +45,7 @@ import {
 } from "lucide-react";
 import { LogOut, Zap, Sparkles, Search, Moon, Sun } from "lucide-react";
 import { trackProductUsage } from "@/lib/usage-tracking";
-import { Breadcrumb, FredChip } from "@/components/portal-ui";
+import { Breadcrumb } from "@/components/portal-ui";
 
 function QuickAddMaintenanceDialog({
   open,
@@ -370,6 +371,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <TopNav />
           </div>
           <div className="ml-auto flex items-center gap-3">
+            <FredAssistant path={location} label="Home command center" />
             <span className="hidden text-xs text-white/55 sm:inline">
               {new Date().toLocaleDateString(undefined, {
                 month: "short",
@@ -400,6 +402,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
         <ZendeskChatWidget />
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+        <AppLauncher open={launcherOpen} onOpenChange={setLauncherOpen} />
       </div>
     );
   }
@@ -452,7 +455,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
           </button>
 
-          <FredChip from={location} />
+          <FredAssistant path={location} label={activeItem?.label || location} />
 
           <ZendeskAlerts />
 

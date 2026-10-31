@@ -1,3 +1,4 @@
+import { buildFredPageContext } from "../lib/fred_page_context";
 import { Router, type Request, type Response } from "express";
 import {
   db,
@@ -744,6 +745,7 @@ router.post("/chat", requireAuth, async (req: Request, res: Response) => {
     const {
       messages: chatMessages = [],
       conversationCheckpoint = "",
+      pagePath = null,
       lookbackDays: rawLookback = 90,
       previewInventory = false,
       uploadedFileIds = [],
@@ -1148,6 +1150,7 @@ ${knowledgeContext ? `\n# SCCC Environment Knowledge Base\n${knowledgeContext}\n
 ${fredFileContext ? `\n# Fred File Library Context\n${fredFileContext}\n` : ""}
 ${conversationCheckpoint ? `\n# Compact conversation checkpoint\nThis is a bounded working-memory summary of older turns. Use it for continuity, but treat newer messages and live evidence as authoritative. Do not repeat it back unless relevant.\n${conversationCheckpoint}\n` : ""}
 ${activeIncidentState ? `\n# Protected active incident state\nThese are user-reported temporary operating changes extracted from the conversation, in chronological order. Treat the newest applicable statement as authoritative over stored topology until the user reports restoration or replacement. Do not turn these temporary facts into permanent memory.\n${activeIncidentState}\n` : ""}
+${buildFredPageContext(pagePath)}
 Current context (last ${lookbackDays} days):
 ${JSON.stringify(context, null, 2)}`;
 

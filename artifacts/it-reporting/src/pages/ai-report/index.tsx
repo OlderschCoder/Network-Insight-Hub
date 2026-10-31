@@ -559,11 +559,17 @@ function pageHintFromPath(path: string): string | null {
   return null;
 }
 
-function ChatTab({
+export function ChatTab({
   contextHint,
+  pagePath,
+  initialPrompt,
+  compact = false,
   mobileFieldMode = false,
 }: {
   contextHint?: string | null;
+  pagePath?: string;
+  initialPrompt?: string;
+  compact?: boolean;
   mobileFieldMode?: boolean;
 }) {
   const { toast } = useToast();
@@ -753,11 +759,8 @@ function ChatTab({
   }, [storageKey]);
 
   useEffect(() => {
-    if (contextHint && !input && !mobileFieldMode) {
-      setInput(`About ${contextHint}: `);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contextHint, mobileFieldMode]);
+    if (initialPrompt && !mobileFieldMode) setInput(current => current || initialPrompt);
+  }, [initialPrompt, mobileFieldMode]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -1069,6 +1072,7 @@ function ChatTab({
         body: JSON.stringify({
           messages: boundMessagesForAI(compacted.recentMessages),
           conversationCheckpoint: compacted.checkpoint,
+          pagePath,
           lookbackDays,
           previewInventory: isNetworkAdmin,
           uploadedFileIds: selectedFredFileIds,
@@ -1159,6 +1163,7 @@ function ChatTab({
         body: JSON.stringify({
           messages: boundMessagesForAI(compacted.recentMessages),
           conversationCheckpoint: compacted.checkpoint,
+          pagePath,
           lookbackDays,
           previewInventory: isNetworkAdmin,
           uploadedFileIds: selectedFredFileIds,
@@ -1307,7 +1312,7 @@ function ChatTab({
       const res = await fetch(`${API_BASE}/status-report/chat`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ messages: liveMessages, lookbackDays, previewInventory: false, uploadedFileIds: [] }),
+        body: JSON.stringify({ messages: liveMessages, pagePath, lookbackDays, previewInventory: false, uploadedFileIds: [] }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1421,7 +1426,11 @@ function ChatTab({
     setInstallDialogOpen(true);
   };
 
-  const examples = [
+  const examples = pagePath ? [
+    "Explain this page and what I can do here.",
+    "Find the current information for this page.",
+    "Help me add or update information here.",
+  ] : [
     "Summarize the top 3 risks right now.",
     "Draft a 'Recent Wins' section for an executive report.",
     "What's our biggest network challenge in the last 90 days?",
@@ -1534,8 +1543,8 @@ function ChatTab({
   }, [mobileFieldMode, nearLiveEnabled, cameraOpen, lookbackDays]);
 
   return (
-    <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : "h-full min-h-[32rem] w-full flex-1"}`}>
-      <CardHeader className={`shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : "px-4 py-2"}`}>
+    <Card className={`flex min-h-0 flex-col overflow-hidden ${mobileFieldMode ? "h-full max-h-full border-border/80 bg-white/95 shadow-xl" : compact ? "h-full w-full flex-1 border-0 rounded-none" : "h-full min-h-[32rem] w-full flex-1"}`}>
+      <CardHeader className={`${compact ? "hidden" : ""} shrink-0 border-b ${mobileFieldMode ? "px-3 pb-2 pt-3" : "px-4 py-2"}`}>
         <div className={`gap-3 ${mobileFieldMode ? "flex flex-col" : "flex items-center justify-between"}`}>
           <div className={mobileFieldMode ? "flex flex-col" : "flex min-w-0 flex-1 items-center gap-2"}>
             <CardTitle className={mobileFieldMode ? "text-xl leading-tight" : "sr-only"}>
@@ -2126,6 +2135,20 @@ function ChatTab({
           </div>
         </div>
       </CardHeader>
+      {pagePath && (
+        <div className="shrink-0 space-y-2 border-b bg-primary/5 p-3">
+          <p className="truncate text-xs text-muted-foreground">Working with {contextHint || pagePath}</p>
+          <div className="flex flex-wrap gap-2">
+            {examples.map((question, index) => (
+              <Button key={question} type="button" size="sm" variant="outline" disabled={loading}
+                onClick={() => setInput(question)}>
+                {["Explain this page", "Find information", "Add or update"][index]}
+              </Button>
+            ))}
+            {compact && <Button type="button" size="sm" variant="ghost" disabled={loading} onClick={() => void handleClear()}>New conversation</Button>}
+          </div>
+        </div>
+      )}
       <CardContent
         ref={scrollRef}
         className={`flex-1 min-h-0 overflow-y-scroll overscroll-contain py-4 pr-2 space-y-3 [scrollbar-gutter:stable] ${mobileFieldMode ? "bg-[linear-gradient(180deg,#f9fcf9_0%,#f3f7f3_100%)] px-3" : ""}`}
@@ -2133,18 +2156,18 @@ function ChatTab({
         {messages.length === 0 && (
           <div className="space-y-3 py-6">
             <p className={`text-center text-muted-foreground ${mobileFieldMode ? "text-base leading-6" : "text-sm"}`}>
-              Start by asking a question, or try one of these:
+              Ask a question, find a page, or describe what you want to record.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {examples.map((q) => (
-                <Badge
+                <button
+                  type="button"
                   key={q}
-                  variant="outline"
-                  className={`cursor-pointer hover:bg-accent font-normal ${mobileFieldMode ? "px-3 py-2.5 text-sm leading-5 whitespace-normal" : "py-2 px-3"}`}
+                  className={`rounded-md border cursor-pointer hover:bg-accent font-normal ${mobileFieldMode ? "px-3 py-2.5 text-sm leading-5 whitespace-normal" : "py-2 px-3"}`}
                   onClick={() => setInput(q)}
                 >
                   {q}
-                </Badge>
+                </button>
               ))}
             </div>
           </div>
@@ -2173,7 +2196,7 @@ function ChatTab({
                     )
                 : <MarkdownMessage content={typeof m.content === "string" ? m.content : JSON.stringify(m.content)} />}
             </div>
-            {!mobileFieldMode && m.role === "assistant" && m.content.trim() && (
+            {!mobileFieldMode && m.role === "assistant" && typeof m.content === "string" && m.content.trim() && (
               <div className="mt-1 flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -2189,7 +2212,7 @@ function ChatTab({
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 text-xs text-muted-foreground"
-                onClick={() => setCapture({ open: true, text: m.content })}
+                onClick={() => setCapture({ open: true, text: messageText(m) })}
                 title="Capture this into a Task, Risk, or Post-Incident Review"
               >
                 <BookmarkPlus className="h-3.5 w-3.5 mr-1" /> Capture
@@ -2229,9 +2252,9 @@ function ChatTab({
         )}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-4 py-2 text-sm">
+            <div role="status" aria-live="polite" className="bg-muted rounded-lg px-4 py-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-              Thinking...
+              Working on your request…
             </div>
           </div>
         )}
@@ -2323,13 +2346,14 @@ function ChatTab({
                 handleSend();
               }
             }}
-            placeholder={mobileFieldMode ? "Ask Fred what you need from the field..." : "Ask about entries, risks, AARs, network inventory — or attach a config/log/screenshot..."}
+            placeholder={mobileFieldMode ? "Ask Fred what you need from the field..." : "Ask a question or tell Fred what to add or update…"}
             rows={mobileFieldMode ? 2 : 2}
             className={`resize-none ${mobileFieldMode ? "min-h-[3.75rem] rounded-[1.4rem] border-border/80 bg-white text-base leading-6 shadow-sm" : ""}`}
             disabled={loading}
           />
           <Button
             onClick={handleSend}
+            aria-label="Send message to Fred"
             disabled={loading || (!input.trim() && !attachedFile && selectedFredFiles.length === 0)}
             className={mobileFieldMode ? "h-12 w-12 rounded-2xl px-0" : undefined}
           >
@@ -2476,7 +2500,7 @@ export default function AIReport() {
     : isCIO && ["status", "architecture", "insights"].includes(requestedTab ?? "")
       ? requestedTab!
       : "chat";
-  const contextHint = prompt || pageHintFromPath(fromPath);
+  const contextHint = pageHintFromPath(fromPath);
 
   return (
     <div className="flex h-full min-h-[calc(100svh-11rem)] min-w-0 flex-1 flex-col">
@@ -2517,7 +2541,7 @@ export default function AIReport() {
           </TabsContent>
         )}
         <TabsContent value="chat" className="mt-3 min-h-0 flex-1 data-[state=active]:flex">
-          <ChatTab contextHint={contextHint} />
+          <ChatTab contextHint={contextHint} pagePath={fromPath || undefined} initialPrompt={prompt} />
         </TabsContent>
         <TabsContent value="memory" className="mt-3">
           <MemoryTab />
