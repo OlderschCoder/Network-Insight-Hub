@@ -1,0 +1,23 @@
+[Unit]
+Description=SCCC bounded daytime LibreSpeed building rotation
+After=network-online.target sccc-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scccadmin
+Group=scccadmin
+WorkingDirectory=/home/scccadmin/apps/Network-Insight-Hub
+EnvironmentFile=/home/scccadmin/apps/Network-Insight-Hub/.env.production
+EnvironmentFile=/etc/sccc-building-diagnostics/api.env
+EnvironmentFile=/etc/sccc-building-probes/api.env
+EnvironmentFile=/etc/sccc-api-secrets.env
+ExecStart=/home/scccadmin/apps/Network-Insight-Hub/deploy/building-diagnostics/run-daytime-librespeed.sh
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/scccadmin/daytime-speed
+

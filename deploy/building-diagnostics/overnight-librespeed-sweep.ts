@@ -12,6 +12,7 @@ type Args = {
   reportDir: string;
   intervalSeconds: number;
   pendingTarget: number;
+  perBuilding: number;
   once: boolean;
   dryRun: boolean;
 };
@@ -39,9 +40,11 @@ function parseArgs(): Args {
   if (!reportDir) throw new Error("--report-dir is required");
   const intervalSeconds = Number(arg("--interval-seconds") ?? "60");
   const pendingTarget = Number(arg("--pending-target") ?? "12");
+  const perBuilding = Number(arg("--per-building") ?? "0");
   if (!Number.isInteger(intervalSeconds) || intervalSeconds < 30 || intervalSeconds > 600) throw new Error("invalid --interval-seconds");
   if (!Number.isInteger(pendingTarget) || pendingTarget < 1 || pendingTarget > 40) throw new Error("invalid --pending-target");
-  return { campaign, cutoff, reportDir, intervalSeconds, pendingTarget, once: process.argv.includes("--once"), dryRun: process.argv.includes("--dry-run") };
+  if (!Number.isInteger(perBuilding) || perBuilding < 0 || perBuilding > 20) throw new Error("invalid --per-building");
+  return { campaign, cutoff, reportDir, intervalSeconds, pendingTarget, perBuilding, once: process.argv.includes("--once"), dryRun: process.argv.includes("--dry-run") };
 }
 
 function ready(device: any) {
@@ -191,8 +194,34 @@ async function queueCycle(args: Args) {
   const targeted = new Set(jobs.map(row => String(row.device_id)));
   const pending = jobs.filter(row => row.status === "queued" || row.status === "running").length;
   const capacity = Math.max(0, args.pendingTarget - pending);
-  const candidates = overview.devices.filter(ready).filter((device: any) => !targeted.has(device.deviceId))
-    .sort((a: any, b: any) => String(a.location?.building ?? "~").localeCompare(String(b.location?.building ?? "~")) || String(a.lastTestAt ?? "").localeCompare(String(b.lastTestAt ?? "")));
+  let candidates = overview.devices.filter(ready).filter((device: any) => !targeted.has(device.deviceId))
+    .sort((a: any, b: any) => String(a.lastTestAt ?? "").localeCompare(String(b.lastTestAt ?? "")) || String(a.computerName ?? "").localeCompare(String(b.computerName ?? "")));
+  if (args.perBuilding > 0) {
+    const targetedByBuilding = new Map<string, number>();
+    for (const job of jobs) {
+      const building = reportingBuilding(job.building);
+      targetedByBuilding.set(building, (targetedByBuilding.get(building) ?? 0) + 1);
+    }
+    const byBuilding = new Map<string, any[]>();
+    for (const device of candidates) {
+      const building = reportingBuilding(device.location?.building);
+      if ((targetedByBuilding.get(building) ?? 0) >= args.perBuilding) continue;
+      byBuilding.set(building, [...(byBuilding.get(building) ?? []), device]);
+    }
+    const fair: any[] = [];
+    const buildings = [...byBuilding.keys()].sort();
+    for (let round = 0; round < args.perBuilding; round++) {
+      for (const building of buildings) {
+        const remaining = args.perBuilding - (targetedByBuilding.get(building) ?? 0);
+        if (round >= remaining) continue;
+        const device = byBuilding.get(building)?.[round];
+        if (device) fair.push(device);
+      }
+    }
+    candidates = fair;
+  } else {
+    candidates.sort((a: any, b: any) => reportingBuilding(a.location?.building).localeCompare(reportingBuilding(b.location?.building)) || String(a.lastTestAt ?? "").localeCompare(String(b.lastTestAt ?? "")));
+  }
   if (args.dryRun || capacity === 0 || candidates.length === 0) {
     console.log(JSON.stringify({ event: args.dryRun ? "dry-run" : "cycle", ready: overview.devices.filter(ready).length, targeted: targeted.size, pending, candidates: candidates.length, queued: 0 }));
     return 0;

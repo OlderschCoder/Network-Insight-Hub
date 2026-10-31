@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SCCC building LibreSpeed rotation every two hours during campus hours
+
+[Timer]
+OnCalendar=*-*-* 07,09,11,13,15,17,19:00:00 America/Chicago
+Persistent=false
+AccuracySec=15s
+Unit=sccc-daytime-librespeed.service
+
+[Install]
+WantedBy=timers.target
