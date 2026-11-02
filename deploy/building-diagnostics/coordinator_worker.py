@@ -654,6 +654,11 @@ def cycle(client, influx, state_dir: Path, targets: list[dict], agent_path: Path
         # Optional controller evidence must fail closed without discarding the
         # successful private switch sample or refreshing invalid Wi-Fi rows.
         wifi, wifi_degraded = [], True
+    # AD can advance while the bounded SNMP scan runs. Preserve the latest
+    # authoritative roster before publishing; do not weaken Fred's stale guard.
+    ad = client.request(API + "/ad-inventory")
+    inventory.update(validate_inventory({"snapshotComplete": ad.get("snapshotComplete"), "adObservedAt": ad.get("adObservedAt"), "adComputers": ad.get("adComputers"), "observations": [], "userBuildingAssignments": []}))
+    inventory["userBuildingAssignments"] = staff_assignments(staff_path)
     observed_at = utc_now().isoformat()
     inventory["observations"] = (collected["observations"] + wifi)[:60000]
     inventory["collectorStatus"] = {"observedAt": observed_at, "status": "degraded" if collected["degraded"] or wifi_degraded else "ok", "switchesObserved": collected["switchesObserved"], "portObservations": len(collected["observations"]), "wifiObservations": len(wifi)}

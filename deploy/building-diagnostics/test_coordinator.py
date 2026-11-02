@@ -451,6 +451,46 @@ class CoordinatorTests(unittest.TestCase):
             self.assertEqual(read_json(root / "presence.json")["observedAt"], STAMP)
             self.assertTrue(any("sccc_device_presence," in line for line in influx.lines))
 
+    def test_roster_advance_during_scan_preserves_current_ad_state_and_evidence_time(self):
+        old_time = (NOW - timedelta(minutes=10)).isoformat()
+        evidence_time = (NOW - timedelta(minutes=2)).isoformat()
+        computer = {"adObjectGuid": "7393b75e-8173-4e96-b87a-5165fa12e6f1", "computerName": "SYNTHETIC", "domain": "example.invalid", "enabled": True}
+        observation = {"source": "snmp", "edge": True, "observedAt": evidence_time}
+
+        class Client:
+            def __init__(self):
+                self.reads, self.uploads = 0, []
+
+            def request(self, path, payload=None):
+                if path.endswith("/ad-inventory"):
+                    self.reads += 1
+                    return {"snapshotComplete": True, "adObservedAt": old_time if self.reads == 1 else STAMP,
+                            "adComputers": [{**computer, "enabled": self.reads == 1}]}
+                if path.endswith("/inventory"):
+                    if payload["adObservedAt"] != STAMP:
+                        raise RuntimeError("Fred rejected stale AD inventory")
+                    self.uploads.append(copy.deepcopy(payload))
+                    return {"ok": True}
+                if path.endswith("/reporting-snapshot"):
+                    return {"observedAt": STAMP, "updatedAt": STAMP, "devices": []}
+                if "/reports?" in path:
+                    return {"reports": [], "nextCursor": "0"}
+                raise AssertionError(path)
+
+        def collect(*_args):
+            return {"observations": [observation], "ports": [], "counters": {},
+                    "switchesObserved": 1, "targetsExpected": 1, "degraded": False}
+
+        with tempfile.TemporaryDirectory() as folder:
+            client = Client()
+            root = Path(folder)
+            cycle(client, FakeInflux(), root, [TARGET], Path("/never-loaded"), None, "telegraf", collect)
+            self.assertGreaterEqual(len(client.uploads), 1)
+            for upload in client.uploads:
+                self.assertFalse(upload["adComputers"][0]["enabled"])
+                self.assertEqual(upload["observations"][0]["observedAt"], evidence_time)
+            self.assertEqual(read_json(root / "inventory.json")["adObservedAt"], STAMP)
+
     def test_collector_status_survives_worker_validation_without_reclocking(self):
         value = {"snapshotComplete": True, "adObservedAt": STAMP, "adComputers": [{}], "observations": [], "userBuildingAssignments": [], "collectorStatus": {"observedAt": STAMP, "status": "degraded", "switchesObserved": 0, "portObservations": 0, "wifiObservations": 0}}
         self.assertEqual(validate_inventory(value, NOW)["collectorStatus"], value["collectorStatus"])
