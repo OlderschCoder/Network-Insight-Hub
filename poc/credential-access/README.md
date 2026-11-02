@@ -33,6 +33,11 @@ Hub session and is not a team-access HTTP endpoint. Default invocation is
 plan-only; `--apply` applies only the supplied initial password, leaving it in
 place for Mark's manual login test. It does not check out access or generate the
 post-use replacement. Normal team checkouts still require Hub SSO.
+For an explicitly authorized owner-selected replacement on the already enrolled
+pilot, add `--reset-current --apply`. It reads the replacement through a hidden
+console prompt, refuses active checkouts/recovery-review states, stages it
+encrypted, and uses the same save/fresh-login/recovery workflow. It does not change
+the initial-enrollment password-length rule or any device password policy.
 
 ## Lifecycle and failure behavior
 

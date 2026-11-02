@@ -37,3 +37,14 @@
 - Initial-change notification remains durably pending. SMTP rejected authentication
   with code 535. The POC's SMTP settings match the running Hub's effective settings;
   no email credentials, tenant settings, or authentication protections were changed.
+
+## Owner-requested operational password reset
+
+- At Mark's explicit request, reset only AA151-CIO's existing admin account to
+  his specified operational password. Entered through a hidden console prompt;
+  the value is absent from source, shell arguments, reports, and this change log.
+- Configuration save and fresh privileged login succeeded at 12:25:05 UTC.
+- Independently encrypted recovery package verified and protected local safe-kit
+  copy refreshed to version 10. No other device/account was changed.
+- Reset notification remains queued alongside the initial-change notification
+  because the existing SMTP authentication issue is unresolved.
