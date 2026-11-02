@@ -1,0 +1,7 @@
+runtime/
+*.dpapi
+*.pem
+*.vault
+*.recovery.json
+*.lock
+__pycache__/

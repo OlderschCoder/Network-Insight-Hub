@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fred — Credential access pilot</title>
+<style>
+body{font:17px system-ui,sans-serif;background:#10202a;color:#eef5f7;margin:0;padding:3rem 1.5rem}main{max-width:850px;margin:auto}h1{font-size:2rem}p{line-height:1.6;color:#c4d6df}.card{background:#1a303e;border:1px solid #355569;border-radius:12px;padding:1.5rem;margin:1.5rem 0}button,a{font:inherit}button{background:#a8e4d5;color:#132a2b;border:0;border-radius:6px;padding:.8rem 1rem;margin:.35rem .35rem .35rem 0;cursor:pointer}button:disabled{opacity:.45;cursor:wait}.secondary{background:#d0dce4}input{box-sizing:border-box;width:100%;font:1.1rem monospace;padding:.8rem;background:#10202a;color:white;border:1px solid #6b8a9e;border-radius:5px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px ui-monospace,monospace}a{color:#a8e4d5}#message{min-height:1.5em;font-weight:600}small{display:block;color:#b8cbd5;line-height:1.5}
+</style>
+<main><a href="/">← Reporting Hub</a><h1>Fred credential access pilot</h1>
+<p>One approved device: <strong>AA151-CIO · 192.168.252.173 · admin</strong>.<br>Your existing Microsoft SSO session identifies you. This pilot does not change other devices or remove accounts.</p>
+<div class="card"><h2>1. Establish the test credential</h2><p>Apply the test password Mark supplied privately, then verify a fresh administrator login and saved configuration.</p><button data-action="enroll">Apply supplied test password</button></div>
+<div class="card"><h2>2. Check out access</h2><p>Record who received access and queue an email to Mark. The credential is revealed only on this page, outside Fred chat.</p><button data-action="reveal">Check out and reveal password</button><input id="password" readonly type="password" aria-label="Checked-out administrator password" autocomplete="off" hidden><button id="hide" class="secondary" hidden>Hide password</button><small>The reveal clears after 45 seconds. Closing this page does not return the checkout.</small></div>
+<div class="card"><h2>3. Return access</h2><p>Generate a unique replacement, store it encrypted before applying it, verify the saved password from a fresh session, and update the recovery package.</p><button data-action="finish">Return access and reset password</button><button class="secondary" data-action="verify-recovery">Test offline recovery package</button></div>
+<p id="message" role="status"></p><div class="card"><h2>Owner status and audit</h2><button class="secondary" id="refresh">Refresh status</button><button class="secondary" data-action="retry-notifications">Retry pending emails</button><pre id="status">Loading…</pre><small>Email acceptance is reported by the sender transport; receipt in Mark’s inbox must be checked separately. A USB in the office safe needs a physical refresh after password changes.</small></div>
+</main><script>
+const endpoint='/api/fred-credentials-poc/',target='192.168.252.173';
+const field=document.querySelector('#password'),message=document.querySelector('#message');let timer;
+function hide(){field.value='';field.hidden=true;document.querySelector('#hide').hidden=true;clearTimeout(timer)}
+async function request(action,method='POST'){
+ const token=localStorage.getItem('auth_token');if(!token)throw Error('Sign in through Microsoft SSO in the Reporting Hub, then return to this page.');
+ const response=await fetch(endpoint+action,{method,cache:'no-store',headers:{Authorization:'Bearer '+token,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify({target})}:{})});
+ const body=await response.json();if(!response.ok)throw Error(body.error||'Request failed');return body;
+}
+async function refresh(){document.querySelector('#status').textContent=JSON.stringify(await request('status','GET'),null,2)}
+document.querySelector('#refresh').onclick=()=>refresh().catch(e=>message.textContent=e.message);
+document.querySelector('#hide').onclick=hide;
+for(const button of document.querySelectorAll('[data-action]'))button.onclick=async()=>{
+ hide();for(const b of document.querySelectorAll('button'))b.disabled=true;message.textContent='Working on AA151-CIO…';
+ try{const result=await request(button.dataset.action);if(result.password){field.value=result.password;field.type='text';field.hidden=false;document.querySelector('#hide').hidden=false;timer=setTimeout(hide,45000);delete result.password;message.textContent='Access issued. The audit and notification obligation were saved.'}else message.textContent=JSON.stringify(result);await refresh()}
+ catch(error){message.textContent=error.message;await refresh().catch(()=>{})}
+ finally{for(const b of document.querySelectorAll('button'))b.disabled=false}
+};
+window.addEventListener('pagehide',hide);document.addEventListener('visibilitychange',()=>{if(document.hidden)hide()});
+refresh().catch(e=>{message.textContent=e.message;document.querySelector('#status').textContent='Sign-in or authorized owner access is required.'});
+</script></html>
