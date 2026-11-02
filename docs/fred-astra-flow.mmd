@@ -1,0 +1,9 @@
+flowchart LR
+  Chat[Existing Fred chat and evidence loop] --> Router[Model profile router]
+  Router -->|gpt-6-astra| Adapter[Responses adapter: low reasoning, store false]
+  Router -->|Other profiles| Existing[Existing provider API]
+  Adapter --> API[OpenAI Responses]
+  API --> Results[Text and function calls]
+  Results --> Chat
+  Chat --> Handlers[Existing authorized tool handlers]
+  Handlers -->|Tool results and retained reasoning| Adapter

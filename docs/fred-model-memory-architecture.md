@@ -9,7 +9,7 @@ Fred uses explicit workload profiles rather than one model for every request.
 
 | Profile | Default model   | Purpose                                                                      |
 | ------- | --------------- | ---------------------------------------------------------------------------- |
-| routine | `gpt-5.6-terra` | Concise staff chat, evidence tools, and memory capture through direct OpenAI |
+| routine | `gpt-6-astra` | Staff chat, evidence tools, and memory capture through direct OpenAI Responses |
 | deep    | `gpt-5.6-sol`   | Enterprise architecture and long-form synthesis through direct OpenAI        |
 | verify  | `gpt-5.6-terra` | Independent acceptance review through direct OpenAI                          |
 
@@ -24,6 +24,15 @@ OpenAI model IDs, including IDs written with an optional `openai/` prefix, are
 always sent directly to `api.openai.com` with `OPENAI_API_KEY`. OpenRouter is
 used only for explicitly configured non-OpenAI model IDs such as
 `anthropic/claude-opus-5` or `google/...`.
+
+Fred's Astra profile uses the Responses API through `fred_responses.ts`, with
+low reasoning effort and `store: false`. The adapter preserves existing tool
+handlers, role restrictions, forced evidence collection, multiple tool calls,
+and the final answer at the round limit. Encrypted reasoning is retained only
+in process for the current tool loop; it is not included in saved chat messages.
+Responses receive at least 8,192 output tokens because that budget includes
+reasoning. Incomplete responses fail before tool execution. Sampling parameters
+are omitted. Other profiles retain their existing API behavior.
 
 GPT-5.6 function-tool calls through Chat Completions explicitly use
 `reasoning_effort: none`, as required by the direct OpenAI endpoint. Fred's
@@ -184,3 +193,47 @@ does not clear the existing report while a refresh is running.
 
 After changing model variables or credentials, restart `sccc-api.service`. Verify
 the API service is active and run API/frontend builds plus focused Fred tests.
+
+### Astra upgrade, 2026-11-02
+
+Set `FRED_ROUTINE_MODEL=gpt-6-astra`; environment overrides take precedence over
+the source default. Keep existing deep, formal, and verification model choices.
+No key rotation is needed. Official compatibility reference:
+https://developers.openai.com/api/docs/guides/latest-model#update-api-and-model-parameters
+
+Reconciliation found the local and production `openai.ts` identical after line
+ending normalization. The deployed `ai_knowledge.ts` additionally has development
+and wallboard tools; deployed `status_report.ts` adds page context and development
+authority. Local versions contain separate safety, Zendesk, and task workflow
+changes. Those files are intentionally not replaced by this release. Both source
+variants call the same routed client, so the adapter supports both without
+merging unrelated features or removing live capabilities.
+
+Deploy only `openai.ts` and `fred_responses.ts`, after backing up the current
+source, API dist directory, and model override. Build against the deployed
+source tree; do not publish a bundle built from the divergent local tree.
+Run a synthetic two-round function-call check through the adapter using the
+existing service credential, then restart and verify service/HTTP health and
+the effective model. Rollback restores the saved files, dist, and override,
+followed by a service restart. See [Astra flow](fred-astra-flow.mmd).
+
+Deployment record: the main chat model is now `gpt-6-astra`, selected by
+`/etc/sccc-fred-astra.env` through the service drop-in
+`/etc/systemd/system/sccc-api.service.d/90-fred-astra.conf`. The drop-in adds
+`EnvironmentFile=/etc/sccc-fred-astra.env`; that file contains only
+`FRED_ROUTINE_MODEL=gpt-6-astra`. The previous live source and bundle are preserved
+under `/var/backups/fred-astra-20261102/`. Rollback restores `src/lib/openai.ts`
+and `dist/` from that backup, moves the new adapter and override files out of
+their active paths, runs `systemctl daemon-reload`, and restarts `sccc-api`.
+
+Validation: six focused tests passed; both changed runtime modules passed
+isolated strict TypeScript checking; the production-source build and bundle
+syntax check passed; the Mermaid source parsed successfully. A synthetic
+forced function call and follow-up answer passed through the deployed model
+router with the restarted service's environment. `/api/healthz` returned 200
+with status `ok`; Insights and IT homepage checks returned 200. Production
+`ai_knowledge.ts` and `status_report.ts` hashes were unchanged. Full local
+repository typechecking is not clean: it reports missing workspace declaration
+builds and unrelated existing errors, including `isPublic` used before its
+declaration in the local Zendesk handler. No claim of a clean full-suite check
+or an authenticated browser chat test is made.
