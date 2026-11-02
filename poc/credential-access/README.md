@@ -25,6 +25,15 @@ account. All other devices—including firewalls, Nexus, DNS and DHCP—remain o
 this live pilot. No personal account, port, VLAN, routing, SNMP, or firmware change
 is made. Management SSH host keys must already be trusted.
 
+For the CIO's explicitly requested operator-assisted first run, `apply_pilot.py`
+uses the existing administrator SSH key, resolves the actual CIO identity from
+the Hub, records that separate authorization channel, and invokes the same
+encrypted staging/verification workflow. It does not create or impersonate a
+Hub session and is not a team-access HTTP endpoint. Default invocation is
+plan-only; `--apply` applies only the supplied initial password, leaving it in
+place for Mark's manual login test. It does not check out access or generate the
+post-use replacement. Normal team checkouts still require Hub SSO.
+
 ## Lifecycle and failure behavior
 
 1. Verify old administrator login; stage old and initial passwords encrypted.
