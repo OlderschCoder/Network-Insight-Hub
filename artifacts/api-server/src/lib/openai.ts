@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { withFredResponses } from "./fred_responses";
 
 export function isAIConfigured(): boolean {
   return Boolean(
@@ -10,11 +11,12 @@ export function isAIConfigured(): boolean {
 
 let cached: OpenAI | null = null;
 let cachedOpenRouter: OpenAI | null = null;
+let cachedFred: OpenAI | null = null;
 
 export type FredModelProfile = "routine" | "deep" | "formal" | "verify";
 
 const FRED_MODELS: Record<FredModelProfile, string> = {
-  routine: process.env.FRED_ROUTINE_MODEL || "gpt-5.6-terra",
+  routine: process.env.FRED_ROUTINE_MODEL || "gpt-6-astra",
   // Claude Opus 5 is the preferred cross-provider deep model, but OpenRouter
   // currently exposes no ZDR-compatible endpoint for this account. Keep SCCC
   // data private by default; operators can switch once a ZDR endpoint exists.
@@ -36,7 +38,7 @@ export function getFredAI(profile: FredModelProfile = "routine"): { client: Open
   const isOpenAIModel = !configuredModel.includes("/") || configuredModel.startsWith("openai/");
   if (isOpenAIModel) {
     return {
-      client: getOpenAI(),
+      client: cachedFred ??= withFredResponses(getOpenAI()),
       model: configuredModel.replace(/^openai\//, ""),
       provider: "direct",
     };

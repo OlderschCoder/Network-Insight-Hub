@@ -1,7 +1,7 @@
 import http from "node:http";
 import type OpenAI from "openai";
 
-export const FRED_DEVELOPMENT_ACTIONS = ["status", "list", "read", "write", "replace", "diff", "validate", "prepare_release"] as const;
+export const FRED_DEVELOPMENT_ACTIONS = ["status", "list", "read", "write", "replace", "diff", "validate", "prepare_release", "publish"] as const;
 export function developmentRequest(input: Record<string, unknown>, actor: { id: number | null; role?: string | null; name?: string | null }): Promise<any> {
   if (actor.role !== "cio" || actor.id == null) return Promise.reject(new Error("CIO access required."));
   return new Promise((resolve, reject) => {
@@ -20,17 +20,19 @@ export function developmentRequest(input: Record<string, unknown>, actor: { id: 
 export const FRED_DEVELOPMENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: "function", function: {
     name: "develop_website",
-    description: "CIO-authorized autonomous coding workspace for this website, including Fred's own application code and prompts. List/read files, make exact edits, inspect diff, run sandboxed builds and independent acceptance tests, and prepare a reviewable release. Work proactively on the requested change; do not merely describe code. Read before replacing and supply the returned sha256. Validation is asynchronous: call status later. Source edits do not change production. Credentials, auth/security, deployment machinery and baseline acceptance tests are protected. A CIO approves deployment separately in Fred's Development tab; this tool cannot publish, roll back, or authorize itself. Never invent a successful build or deployment.",
+    description: "CIO-authorized autonomous coding workspace for this website, including Fred's own application code and prompts. List/read files, make exact edits, inspect diff, run sandboxed builds and independent acceptance tests, prepare a release, then publish the exact validated revision for the CIO's requested change. Read before replacing and supply the returned sha256. Validation is asynchronous: call status later. Publish requires the current passed revision hash and retains backups, independent health checks and automatic rollback. Publish must be the final action in a turn, without parallel writes. Credentials, auth/security, deployment machinery, model/spending controls and baseline acceptance tests are protected. This tool cannot bypass validation, change its own authority or request rollback. Never invent a successful build or deployment.",
     parameters: { type: "object", properties: {
       action: {type:"string",enum:[...FRED_DEVELOPMENT_ACTIONS]}, path:{type:"string",description:"Repository-relative path; list accepts a prefix."},
       startLine:{type:"integer"},endLine:{type:"integer"},expectedSha256:{type:"string"},content:{type:"string",description:"Complete file content for write; omit expectedSha256 only for a new file."},
       find:{type:"string",description:"Exact unique old text for replace."},replacement:{type:"string"},summary:{type:"string",description:"What changed and measured validation results for the release."},
+      revision:{type:"string",pattern:"^[a-f0-9]{64}$",description:"Required for publish: exact current revision from passed independent validation."},
     },required:["action"] },
   },
 };
 export async function executeFredDevelopment(raw: string, actor: {id:number|null;role?:string|null;name?:string|null}) {
   const input = JSON.parse(raw);
   if (!FRED_DEVELOPMENT_ACTIONS.includes(input?.action)) throw new Error("Unsupported development tool action.");
+  if (input.action === "publish" && !/^[a-f0-9]{64}$/.test(input.revision || "")) throw new Error("Exact validated revision required for publish.");
   let result = await developmentRequest(input,actor);
   // Keep the agent's tool turn alive long enough to inspect test failures and fix them.
   if (input.action === "validate") {

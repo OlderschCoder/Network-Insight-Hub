@@ -18,7 +18,7 @@ describe("Fred model routing", () => {
     const route = getFredAI("routine");
 
     expect(route.provider).toBe("direct");
-    expect(route.model).toBe("gpt-5.6-terra");
+    expect(route.model).toBe("gpt-6-astra");
   });
 
   it("uses OpenRouter only for an explicitly configured non-OpenAI model", async () => {
