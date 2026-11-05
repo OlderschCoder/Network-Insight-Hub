@@ -267,3 +267,25 @@ conversation was not replayed, and an authenticated browser chat remains
 unverified. The Windows runner lacked its Rollup native binary; Linux staging
 used the current repository test files because production's saved routing test
 still expected its pre-Astra default.
+
+### High reasoning and reproduced follow-up failure, 2026-11-05
+
+The retry alone did not resolve the real conversation. An isolated replay of
+the saved chat and full production context reproduced `max_messages` after
+the first successful evidence tool: low reasoning generated 100 reasoning
+items and no usable call or answer. The low-effort retry failed the same way.
+The identical tool-result request completed with medium reasoning. Mark then
+specified high reasoning for Fred, so the Astra adapter now sends
+`reasoning.effort: high` on initial calls, tool follow-ups, and the bounded
+retry. Tool selection and the existing credential remain unchanged.
+
+Validation uses the real saved-chat route in isolated staging, with mutating
+tools blocked before execution, in addition to the nine adapter/router tests,
+isolated strict TypeScript checking, and a production-source bundle build.
+The previous adapter and API bundle are backed up under
+`/var/backups/fred-high-reasoning-20261105/`; restore both and restart
+`sccc-api` to roll back this setting.
+
+The reproduced conversation completed all three API rounds at high reasoning
+and returned HTTP 200 with a final reply. The tools executed during this replay
+were read-only; no saved conversation or operational records were modified.

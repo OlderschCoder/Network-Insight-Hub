@@ -96,7 +96,9 @@ export function withFredResponses(client: OpenAI): OpenAI {
       input: params.messages.flatMap(convert),
       store: false,
       include: ["reasoning.encrypted_content"],
-      reasoning: { effort: "low" },
+      // High reasoning is Fred's configured operating preference, including
+      // initial routing and synthesis of large operational tool results.
+      reasoning: { effort: "high" },
       // Responses budgets include reasoning as well as the visible answer.
       max_output_tokens: Math.max(8192, params.max_completion_tokens ?? 0),
       ...(tools ? { tools } : {}),

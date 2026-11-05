@@ -79,12 +79,13 @@ describe("Fred Astra adapter", () => {
     expect(final.choices[0].message.content).toBe("Verified synthetic probes.");
     expect(responses.mock.calls[0][0]).toMatchObject({
       store: false,
-      reasoning: { effort: "low" },
+      reasoning: { effort: "high" },
       max_output_tokens: 8192,
       tool_choice: { type: "function", name: "probe" },
       tools: [{ strict: false }],
     });
     expect(responses.mock.calls[1][0].input).toContainEqual(reasoning);
+    expect(responses.mock.calls[1][0].reasoning).toEqual({ effort: "high" });
     expect(responses.mock.calls[1][0].input).toContainEqual({
       type: "function_call_output",
       call_id: "b",
@@ -170,7 +171,7 @@ describe("Fred Astra adapter", () => {
       parallel_tool_calls: false,
       tool_choice: { type: "function", name: "probe" },
       tools: firstRequest.tools,
-      reasoning: firstRequest.reasoning,
+      reasoning: { effort: "high" },
       max_output_tokens: firstRequest.max_output_tokens,
     });
     expect(retry.input.slice(0, -1)).toEqual(firstRequest.input);

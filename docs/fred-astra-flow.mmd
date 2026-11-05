@@ -1,6 +1,6 @@
 flowchart LR
   Chat[Existing Fred chat and evidence loop] --> Router[Model profile router]
-  Router -->|gpt-6-astra| Adapter[Responses adapter: low reasoning, store false]
+  Router -->|gpt-6-astra| Adapter[Responses adapter: high reasoning, store false]
   Router -->|Other profiles| Existing[Existing provider API]
   Adapter --> API[OpenAI Responses]
   API -->|incomplete: max_messages only| Retry[Discard interrupted output; retry once with serial calls]
