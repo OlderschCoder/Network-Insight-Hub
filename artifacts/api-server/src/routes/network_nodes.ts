@@ -11,7 +11,8 @@ import {
   getCanonicalBuildingName,
   normalizeBuildingKey,
 } from "../lib/building_assignment";
-import { getLatestBuildingPerformance } from "../lib/building_performance";
+import { getBuildingServiceEvidence, getLatestBuildingPerformance, type BuildingServiceEvidence } from "../lib/building_performance";
+import { assessBuildingHealth } from "../lib/building_health";
 import { diagnosticsBuildingName } from "../lib/building_diagnostics_catalog";
 
 export { getCanonicalBuildingName } from "../lib/building_assignment";
@@ -265,6 +266,19 @@ function healthColorFromStatuses(
   return "unknown";
 }
 
+function buildingHealthFromEvidence(
+  deviceHealthColor: "green" | "amber" | "red" | "unknown",
+  serviceEvidence: BuildingServiceEvidence,
+): "green" | "amber" | "red" | "unknown" {
+  // A fresh successful external transfer proves the building has an Internet
+  // path. It does not clear device faults, which remain separately visible.
+  if (serviceEvidence.internetUp) return "green";
+  // A management-probe failure alone is device evidence, not proof that every
+  // service in the building is unavailable.
+  if (deviceHealthColor === "red") return "amber";
+  return deviceHealthColor;
+}
+
 type BuildingCategory = "campus-building" | "remote-site" | "cloud" | "connectivity";
 type MonitoringStrategy = "switch-probe" | "control-plane" | "none";
 
@@ -447,7 +461,11 @@ export async function getBuildingSummaries() {
     const statuses = name === "Azure (Hybrid-VNet)"
       ? [azureHybridStatus]
       : (buildingStatuses[name] ?? []);
-    const healthColor = healthColorFromStatuses(statuses);
+    const deviceHealthColor = healthColorFromStatuses(statuses);
+    const performance = buildingPerformance[name] ?? null;
+    const serviceEvidence = getBuildingServiceEvidence(performance);
+    const healthAssessment = assessBuildingHealth(serviceEvidence);
+    const healthColor = healthAssessment.healthColor;
 
     return {
       name,
@@ -456,10 +474,13 @@ export async function getBuildingSummaries() {
       connectivityObjectCount: connectivityObjectMap[name] ?? 0,
       vlanCount: vlanMap[name] ?? 0,
       healthColor,
+      deviceHealthColor,
+      serviceEvidence,
+      healthAssessment,
       influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
       category: classification.category,
       monitoringStrategy: classification.monitoringStrategy,
-      performance: buildingPerformance[name] ?? null,
+      performance,
     };
   });
 }
@@ -825,6 +846,9 @@ export async function getMonitoringSnapshot(publicMode = false) {
       nodeCount: building.nodeCount,
       vlanCount: building.vlanCount,
       healthColor: building.healthColor,
+      deviceHealthColor: building.deviceHealthColor,
+      serviceEvidence: building.serviceEvidence,
+      healthAssessment: building.healthAssessment,
       category: building.category,
       monitoringStrategy: building.monitoringStrategy,
     })),
@@ -1227,8 +1251,9 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   );
   if (!canonicalName) return res.status(404).json({ error: "BUILDING_NOT_FOUND" });
 
-  const [allNodes, allVlans, azureHybridStatus, buildingPerformance] = await Promise.all([
+  const [allNodes, allSwitches, allVlans, azureHybridStatus, buildingPerformance] = await Promise.all([
     db.select().from(netNodesTable).orderBy(netNodesTable.building, netNodesTable.role, netNodesTable.hostname),
+    db.select().from(networkSwitchesTable),
     db.select().from(vlansTable).orderBy(vlansTable.building, vlansTable.vlanId),
     getAzureHybridVmStatus(),
     getLatestBuildingPerformance(),
@@ -1252,11 +1277,15 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
       )
     : [];
 
-  // Live status
-  const hosts = getBuildingMonitorHosts(
-    canonicalName,
-    nodes.map((n) => n.mgmtIp).filter(isMonitorableHost),
-  );
+  // Use the same monitored-switch inventory grouping as the summary. Raw
+  // topology rows remain in nodesWithStatus for diagnostics and mapping.
+  const hosts = canonicalName === "Azure (Hybrid-VNet)"
+    ? []
+    : allSwitches.filter((node) => diagnosticsBuildingName(
+        getAssignedBuildingName(node.building, node.location, node.hostname),
+      ) === canonicalName)
+      .map((node) => node.ipAddress)
+      .filter(isMonitorableHost);
   const classification = getBuildingClassification(canonicalName);
   const liveStatuses = hosts.length ? await getDeviceStatus(hosts) : {};
   const monitoredHosts = new Set(hosts.map(normalizeTelemetryKey));
@@ -1272,7 +1301,11 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
   const statuses = canonicalName === "Azure (Hybrid-VNet)"
     ? [azureHybridStatus]
     : hosts.map((host) => liveStatuses[normalizeTelemetryKey(host)] ?? "unknown");
-  const healthColor = healthColorFromStatuses(statuses);
+  const deviceHealthColor = healthColorFromStatuses(statuses);
+  const performance = buildingPerformance[canonicalName] ?? null;
+  const serviceEvidence = getBuildingServiceEvidence(performance);
+  const healthAssessment = assessBuildingHealth(serviceEvidence);
+  const healthColor = healthAssessment.healthColor;
 
   return res.json({
     name: canonicalName,
@@ -1281,10 +1314,13 @@ router.get("/buildings/:name", requireAuth, async (req, res) => {
     vlans,
     links,
     healthColor,
+    deviceHealthColor,
+    serviceEvidence,
+    healthAssessment,
     influxConfigured: !!(INFLUX_URL && INFLUX_TOKEN),
     category: classification.category,
     monitoringStrategy: classification.monitoringStrategy,
-    performance: buildingPerformance[canonicalName] ?? null,
+    performance,
   });
 });
 

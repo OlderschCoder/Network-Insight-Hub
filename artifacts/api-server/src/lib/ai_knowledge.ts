@@ -1,3 +1,7 @@
+import { WALLBOARD_PERFORMANCE_TOOL, queryWallboardPerformance } from "./wallboard_performance";
+import { isFredCodingRequest } from "./fred_coding_request";
+import { latestUserText } from "./fred_evidence_policy";
+import { assessBuildingHealth, BUILDING_HEALTH_GUIDANCE } from "./building_health";
 import { FRED_DEVELOPMENT_TOOL, executeFredDevelopment } from "./fred_development";
 import type OpenAI from "openai";
 import {
@@ -2648,6 +2652,7 @@ function normalizedText(value: unknown): string {
 }
 
 type CallingBuildingEvidence = {
+  observedAt?: string | null;
   configured: boolean;
   building: string;
   assignedPhoneOwners: number;
@@ -2766,6 +2771,7 @@ async function getCallingBuildingEvidence(
   }
   const devices = Array.from(byOwner.values()).flat();
   return {
+    observedAt: new Date().toISOString(),
     configured: true,
     building: canonicalBuilding,
     assignedPhoneOwners: owners.size,
@@ -3608,19 +3614,15 @@ export async function executeQueryBuildingNetwork(
   };
   if (selected.length === 1) {
     const calling = await getCallingBuildingEvidence(selected[0].name, true);
-    const phonesProveService = calling.onlinePhoneOwners > 0;
+    const healthAssessment = assessBuildingHealth(selected[0].serviceEvidence, calling);
+    result.buildings = [{ ...selected[0], healthColor: healthAssessment.healthColor, healthAssessment }];
     result.callingEvidence = calling;
-    result.operationalAssessment = phonesProveService
-      ? selected[0].healthColor === "green"
-        ? "operational"
-        : "operational_with_network_attention"
-      : selected[0].healthColor === "red"
-        ? "down_or_unverified"
-        : "no_online_phone_evidence";
-    result.assessmentNote =
-      phonesProveService && selected[0].healthColor !== "green"
-        ? "Online assigned phones prove the building service path is operating, while failed switch/heartbeat evidence still requires attention. Report the building as operational but degraded, not fully down."
-        : null;
+    result.operationalAssessment = healthAssessment.status;
+    result.assessmentNote = healthAssessment.reason;
+    result.deviceMonitoring = {
+      healthColor: selected[0].deviceHealthColor,
+      affectsBuildingServiceStatus: false,
+    };
   }
   if (includeDevices) {
     result.devices = selectedNodes.slice(0, limit).map((node) => ({
@@ -4451,7 +4453,10 @@ export async function runChatWithMemory(
   savedShadowNotes: SavedShadowNote[];
   pendingNetworkChanges: PendingNetworkChange[];
 }> {
-  const messages = [...opts.messages];
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    ...opts.messages,
+    { role: "system", content: BUILDING_HEALTH_GUIDANCE },
+  ];
   const savedMemories: SavedMemory[] = [];
   const createdTasks: CreatedTask[] = [];
   const networkUpdates: NetworkUpdate[] = [];
@@ -4499,6 +4504,7 @@ export async function runChatWithMemory(
     WEBEX_DEVICE_STATUS_TOOL,
     CISCO_CALLING_SUPPORT_TOOL,
     QUERY_INFLUX_LAST_SEEN_TOOL,
+    WALLBOARD_PERFORMANCE_TOOL,
     GRAFANA_PANEL_LINK_TOOL,
     QUERY_ARCHITECTURE_SNAPSHOT_TOOL,
     QUERY_FORMAL_ARCHITECTURE_TOOL,
@@ -4539,8 +4545,9 @@ export async function runChatWithMemory(
     pendingNetworkChanges,
   });
 
+  const codingRequested = isFredCodingRequest(latestUserText(opts.messages), userRole);
   let developmentUsed = false;
-  for (let round = 0; round < (developmentUsed ? 16 : 5); round++) {
+  for (let round = 0; round < (codingRequested || developmentUsed ? 32 : 5); round++) {
     const evidenceOnlyTools = tools.filter(
       (tool) =>
         tool.type === "function" && evidenceToolNames.has(tool.function.name),
@@ -4552,13 +4559,13 @@ export async function runChatWithMemory(
     );
     const completion = await openai.chat.completions.create({
       model: opts.model,
-      max_completion_tokens: opts.maxCompletionTokens,
+      max_completion_tokens: codingRequested || developmentUsed ? Math.max(8192, opts.maxCompletionTokens) : opts.maxCompletionTokens,
       ...(opts.model.startsWith("gpt-5.6-")
         ? { reasoning_effort: "none" as const }
         : {}),
       messages,
       tools: mustGatherEvidence ? evidenceOnlyTools : tools,
-      ...(mustGatherEvidence ? { tool_choice: "required" as const } : {}),
+      ...(mustGatherEvidence ? { tool_choice: "required" as const } : codingRequested && !developmentUsed ? { tool_choice: { type: "function" as const, function: { name: "develop_website" } } } : {}),
     });
 
     const msg = completion.choices[0]?.message;
@@ -4813,6 +4820,9 @@ export async function runChatWithMemory(
           logger.error({ err }, "cisco_calling_support tool failed");
           resultText = "Error: Cisco Calling support query failed";
         }
+      } else if (call.type === "function" && call.function.name === "query_wallboard_performance") {
+        try { resultText = boundedNetworkResult(await queryWallboardPerformance(call.function.arguments)); }
+        catch (err) { logger.error({ err }, "query_wallboard_performance failed"); resultText = "Wallboard performance unavailable; no measurements retrieved."; }
       } else if (
         call.type === "function" &&
         call.function.name === "query_influx_last_seen"
@@ -5154,7 +5164,15 @@ export async function runChatWithMemory(
 
       if (call.type === "function" && call.function.name === "develop_website") {
         developmentUsed = true;
-        try { resultText = redactSecretLike(await executeFredDevelopment(call.function.arguments, {id:opts.userId, name:opts.userName, role:userRole})).text; }
+        try {
+          const outcome = await executeFredDevelopment(call.function.arguments, {id:opts.userId, name:opts.userName, role:userRole});
+          resultText = redactSecretLike(outcome).text;
+          const input = JSON.parse(call.function.arguments);
+          const deployment = input.action === "publish" ? JSON.parse(outcome) : null;
+          if (deployment?.status === "deploying") {
+            return done(`Started deployment of validated revision ${deployment.revision}. The independent controller will check health and automatically roll back a failed release. The service may reconnect during restart; final deployment status is recorded in Development.`);
+          }
+        }
         catch (error) { resultText = JSON.stringify({error: error instanceof Error ? error.message : "Development operation failed"}); }
       }
 
@@ -5168,7 +5186,7 @@ export async function runChatWithMemory(
 
   const final = await openai.chat.completions.create({
     model: opts.model,
-    max_completion_tokens: opts.maxCompletionTokens,
+    max_completion_tokens: codingRequested || developmentUsed ? Math.max(8192, opts.maxCompletionTokens) : opts.maxCompletionTokens,
     ...(opts.model.startsWith("gpt-5.6-")
       ? { reasoning_effort: "none" as const }
       : {}),
@@ -5177,7 +5195,7 @@ export async function runChatWithMemory(
       {
         role: "system",
         content:
-          "Tool collection is complete. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools.",
+          "This turn reached its tool-round limit; tools exist but further calls require another turn. Do not claim tools are unavailable. State exactly what was completed and what remains unvalidated. Give the user the operational conclusion now. Lead with deltas and mismatches, recommend the fix, include validation and rollback when relevant, and ask only for evidence unavailable through your tools.",
       },
     ],
   });

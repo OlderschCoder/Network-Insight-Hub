@@ -32,7 +32,8 @@ type Schedule = { enabled: boolean; targetReady: boolean; capacityEnabled: boole
   profiles: { quick: Profile; hourly: Profile; capacity: Profile }; timeZone: string;
   capacityWindows: string[]; staggerWindowSeconds: number; capacityStartDeadlineMinutes?: number; capacityHardEndMinutes?: number;
   quickConcurrency?: number; hourlyConcurrency?: number; capacityConcurrency?: number };
-type Overview = { enabled: boolean; probes: Probe[]; buildings?: Building[]; schedule?: Schedule };
+type Rollout = { source: "building-diagnostics"; buildings: number; computers: number; reporting: number; awaitingOrOffline: number };
+type Overview = { enabled: boolean; probes: Probe[]; buildings?: Building[]; schedule?: Schedule; rollout?: Rollout };
 type ProbeGroup = { key: string; current: Probe | null; history: Probe[]; conflicted: boolean };
 const normalizedComputer = (value: string) => value.trim().toUpperCase();
 const uniqueIds = <T extends { id: string }>(values: T[]) => [...new Map(values.map(value => [value.id, value])).values()];
@@ -147,7 +148,7 @@ export default function BuildingProbes() {
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-sm font-medium text-primary">SCCC Key &amp; Alert · GPO monitor</p>
         <h1 className="text-3xl font-bold tracking-tight mt-1">Building probes</h1>
-        <p className="text-muted-foreground mt-2">Select one or two low-use computers per canonical building for recurring performance reports. Enrollment and alert reception remain separate.</p></div>
+        <p className="text-muted-foreground mt-2">Campus rollout totals come from the completed building-diagnostics deployment. The table below manages the smaller recurring-test selection.</p></div>
       <Button variant="outline" onClick={() => void refresh()} disabled={query.isFetching}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
     </div>
     {(error || query.error) && <p role="alert" className="rounded-lg border border-destructive p-4 text-destructive">{error || query.error?.message}</p>}
@@ -157,10 +158,10 @@ export default function BuildingProbes() {
     {data && !enabled && <Card><CardHeader><CardTitle>Monitoring is not enabled yet</CardTitle></CardHeader>
       <CardContent>The probe service and server must be configured before computers can enroll. Installing the package alone does not activate monitoring.</CardContent></Card>}
     <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {[{ title: "Selected buildings", value: selectedBuildings, Icon: Building2 },
-        { title: "Selected / enrolled computers", value: `${selected.length} / ${probes.filter(p => !!p.deviceId).length}`, Icon: Laptop },
-        { title: "Reporting now", value: probes.filter(p => p.state === "reporting").length, Icon: Activity },
-        { title: "Awaiting / offline probes", value: probes.filter(p => p.state !== "reporting").length, Icon: Laptop }]
+      {[{ title: "Rollout buildings", value: data?.rollout?.buildings ?? selectedBuildings, Icon: Building2 },
+        { title: "Enrolled computers", value: data?.rollout?.computers ?? probes.filter(p => !!p.deviceId).length, Icon: Laptop },
+        { title: "Reporting now", value: data?.rollout?.reporting ?? probes.filter(p => p.state === "reporting").length, Icon: Activity },
+        { title: "Awaiting / offline computers", value: data?.rollout?.awaitingOrOffline ?? probes.filter(p => p.state !== "reporting").length, Icon: Laptop }]
         .map(({ title, value, Icon }) => <Card key={title} data-testid={`summary-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}><CardContent className="pt-6 flex justify-between items-center gap-3"><div><p className="text-sm text-muted-foreground">{title}</p><p className="text-3xl font-semibold">{value}</p></div><Icon className="h-7 w-7 shrink-0 text-muted-foreground" /></CardContent></Card>)}
     </div>
     {canView && <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>Measurement schedule</CardTitle><Badge variant={schedule?.enabled && schedule.targetReady ? "default" : "secondary"}>{schedule?.enabled && schedule.targetReady ? "Active" : "Pilot paused"}</Badge></div></CardHeader><CardContent className="space-y-3 text-sm">

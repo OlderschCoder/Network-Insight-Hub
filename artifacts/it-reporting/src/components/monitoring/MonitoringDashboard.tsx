@@ -44,6 +44,8 @@ interface MonitoringBuildingSummary {
   nodeCount: number;
   vlanCount: number;
   healthColor: HealthColor;
+  deviceHealthColor?: HealthColor;
+  serviceEvidence?: { internetUp: boolean; reason: string; observedAt: string | null };
   category?: string;
   monitoringStrategy?: string;
 }

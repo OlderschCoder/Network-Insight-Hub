@@ -29,8 +29,16 @@ interface BuildingSummary {
   nodeCount: number;
   vlanCount: number;
   healthColor: "green" | "amber" | "red" | "unknown";
+  deviceHealthColor?: "green" | "amber" | "red" | "unknown";
+  serviceEvidence?: BuildingServiceEvidence;
   influxConfigured: boolean;
   performance: BuildingPerformance | null;
+}
+
+interface BuildingServiceEvidence {
+  internetUp: boolean;
+  reason: string;
+  observedAt: string | null;
 }
 
 interface BuildingPerformance {
@@ -87,6 +95,8 @@ interface BuildingDetail {
   vlans: VlanSummary[];
   links: any[];
   healthColor: "green" | "amber" | "red" | "unknown";
+  deviceHealthColor?: "green" | "amber" | "red" | "unknown";
+  serviceEvidence?: BuildingServiceEvidence;
   influxConfigured: boolean;
   performance: BuildingPerformance | null;
 }
@@ -163,32 +173,32 @@ export type CampusMapBuildingHealth = {
 
 const healthStyles: Record<string, { bg: string; border: string; ring: string; label: string; icon: ReactNode }> = {
   green: {
-    bg: "bg-green-50 hover:bg-green-100",
+    bg: "building-status-surface bg-green-50 hover:bg-green-100",
     border: "border-green-400",
     ring: "ring-green-300",
-    label: "All systems up",
-    icon: <Wifi className="h-5 w-5 text-green-600" />,
+    label: "Campus building",
+    icon: <Building2 className="h-5 w-5 text-green-600" />,
   },
   amber: {
-    bg: "bg-amber-50 hover:bg-amber-100",
-    border: "border-amber-400",
-    ring: "ring-amber-300",
-    label: "Degraded",
-    icon: <AlertTriangle className="h-5 w-5 text-amber-500" />,
+    bg: "building-status-surface bg-green-50 hover:bg-green-100",
+    border: "border-green-400",
+    ring: "ring-green-300",
+    label: "Campus building",
+    icon: <Building2 className="h-5 w-5 text-green-600" />,
   },
   red: {
-    bg: "bg-red-50 hover:bg-red-100",
+    bg: "building-status-surface bg-red-50 hover:bg-red-100",
     border: "border-red-400",
     ring: "ring-red-300",
-    label: "One or more devices down",
+    label: "Confirmed building service outage",
     icon: <WifiOff className="h-5 w-5 text-red-600" />,
   },
   unknown: {
-    bg: "bg-gray-50 hover:bg-gray-100",
-    border: "border-gray-300",
-    ring: "ring-gray-200",
-    label: "Status unknown",
-    icon: <Activity className="h-5 w-5 text-gray-400" />,
+    bg: "building-status-surface bg-green-50 hover:bg-green-100",
+    border: "border-green-400",
+    ring: "ring-green-300",
+    label: "Campus building",
+    icon: <Building2 className="h-5 w-5 text-green-600" />,
   },
 };
 
@@ -313,17 +323,8 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function lineColorForHealth(healthColor: BuildingSummary["healthColor"] | undefined): string {
-  switch (healthColor) {
-    case "green":
-      return "#22c55e";
-    case "amber":
-      return "#f59e0b";
-    case "red":
-      return "#ef4444";
-    default:
-      return "#9ca3af";
-  }
+function lineColorForHealth(_healthColor: BuildingSummary["healthColor"] | undefined): string {
+  return "#22c55e";
 }
 
 function formatThroughput(mbps: number | null): string | null {
@@ -662,7 +663,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Building codes are matched to the campus map and colored by current building health.
+          Building codes are matched to the campus map. Operational exceptions and stale evidence are reported in the separate review visualization below, not on this diagram.
         </p>
         {editMode && (
           <p className="text-xs text-muted-foreground">
@@ -672,10 +673,8 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All mapped devices up</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more mapped devices degraded</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more mapped devices down</div>
-          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live building match yet</div>
+          <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> Campus building</div>
+          <div className="text-muted-foreground">Diagram colors do not encode monitoring freshness or device condition.</div>
         </div>
 
         <div ref={mapRef} className="relative overflow-hidden rounded-2xl border bg-[#dfe8d8]">
@@ -714,9 +713,8 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             />
             {(() => {
               const westCampus = overlays.find((overlay) => overlay.code === "WEST");
-              const westHealth = buildingByCode.get("WEST")?.healthColor ?? "unknown";
-              const westColor = lineColorForHealth(westHealth);
-              const westLive = westHealth === "green";
+              const westColor = lineColorForHealth(buildingByCode.get("WEST")?.healthColor);
+              const westLive = true;
               if (!westCampus) return null;
               return (
                 <g>
@@ -743,7 +741,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
             })()}
             {fiberLines.map((line) => {
               const color = lineColorForHealth(line.healthColor);
-              const isLive = line.healthColor === "green";
+              const isLive = true;
               const controlX = (line.x + HOBBLE_FIBER_HUB.x) / 2;
               const controlY = Math.min(line.y, HOBBLE_FIBER_HUB.y) - 3.5;
               return (
@@ -773,7 +771,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
 
           {visibleOverlays.map((overlay) => {
             const match = buildingByCode.get(overlay.code);
-            const style = healthStyles[match?.healthColor ?? "unknown"];
+            const style = healthStyles.green;
             const href = match ? `/network/buildings/${encodeURIComponent(match.name)}` : undefined;
             const labelDx = overlay.labelDx ?? 10;
             const labelDy = overlay.labelDy ?? -10;
@@ -792,15 +790,7 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                     <div className="flex items-center gap-1.5">
                       <span className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "text-[9px]" : "text-[11px]"} font-bold tracking-[0.08em] text-foreground`}>{overlay.displayCode ?? overlay.code}</span>
                       <span
-                        className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "h-2 w-2" : "h-2.5 w-2.5"} rounded-full ${
-                          match?.healthColor === "green"
-                            ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.55)]"
-                            : match?.healthColor === "amber"
-                              ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.45)]"
-                              : match?.healthColor === "red"
-                                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.45)]"
-                              : "bg-gray-300"
-                        }`}
+                        className={`${overlay.code.startsWith("SL") && overlay.code !== "SLC" ? "h-2 w-2" : "h-2.5 w-2.5"} rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.55)]`}
                       />
                     </div>
                   </div>
@@ -817,11 +807,6 @@ export function CampusStatusMap({ buildings, publicMode = false }: CampusStatusM
                       {match?.name ?? overlay.buildingName}
                     </div>
                     <div className="mt-0.5 text-[9px] leading-tight text-muted-foreground">{style.label}</div>
-                    {match && (
-                      <div className="mt-1 text-[9px] font-semibold leading-tight text-foreground">
-                        {performanceHeadline(match.performance)}
-                      </div>
-                    )}
                   </div>}
                 </div>
               </div>
@@ -890,6 +875,18 @@ function BuildingsGrid() {
   const offlineWebexDevices = (callingSupport?.devices ?? []).filter((device) => device.status === "offline");
   const missingE911Vlans = callingSupport?.e911Range.missing ?? [];
   const coveredE911Vlans = callingSupport?.e911Range.present ?? [];
+  const evidenceReview = buildings
+    .filter((building) =>
+      building.deviceHealthColor !== "green"
+      || building.performance?.status === "stale"
+      || building.performance?.status === "failed"
+      || !building.performance,
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const deviceReviewCount = buildings.filter((building) => building.deviceHealthColor !== "green").length;
+  const staleEvidenceCount = buildings.filter((building) => building.performance?.status === "stale").length;
+  const failedEvidenceCount = buildings.filter((building) => building.performance?.status === "failed").length;
+  const missingEvidenceCount = buildings.filter((building) => !building.performance).length;
 
 
   if (loading) {
@@ -941,13 +938,49 @@ function BuildingsGrid() {
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-green-500" /> All devices up</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-amber-400" /> One or more degraded</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-red-500" /> One or more down</div>
-        <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-gray-300" /> No live data</div>
-      </div>
+      <CampusStatusMap buildings={buildings} />
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Activity className="h-5 w-5 text-primary" /> Monitoring freshness &amp; device review
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Monitoring quality is intentionally separate from the campus diagram. These statistics identify stale, failed, missing, or device-level evidence that needs review; they do not declare a building outage.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold">{deviceReviewCount}</div><div className="text-xs text-muted-foreground">Device states needing review</div></div>
+            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold">{staleEvidenceCount}</div><div className="text-xs text-muted-foreground">Stale endpoint samples</div></div>
+            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold">{failedEvidenceCount}</div><div className="text-xs text-muted-foreground">Failed endpoint samples</div></div>
+            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold">{missingEvidenceCount}</div><div className="text-xs text-muted-foreground">Buildings without endpoint samples</div></div>
+          </div>
+          {evidenceReview.length > 0 ? (
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {evidenceReview.map((building) => (
+                <div key={building.name} className="rounded-lg border bg-muted/20 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium">{building.name}</div>
+                    <Badge variant="outline">{building.performance?.status ?? "missing"}</Badge>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {building.deviceHealthColor !== "green" && <div>Device evidence: {building.deviceHealthColor ?? "unknown"}</div>}
+                    {building.performance ? (
+                      <div>Endpoint sample: {performanceAge(building.performance.recordedAt)} · {building.performance.computerName ?? "unidentified endpoint"}</div>
+                    ) : (
+                      <div>No endpoint performance sample</div>
+                    )}
+                    <div>{building.serviceEvidence?.reason ?? "No service-evidence explanation"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No stale, failed, missing, or device-review evidence is currently reported.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Search */}
       <div className="relative max-w-xs">
@@ -956,9 +989,7 @@ function BuildingsGrid() {
           onChange={e => setSearch(e.target.value)} />
       </div>
 
-      <CampusStatusMap buildings={buildings} />
-
-      {/* Building cards immediately follow the campus map for drill-down. */}
+      {/* Building cards follow the separate monitoring review for drill-down. */}
       <section aria-labelledby="building-status-heading" className="space-y-3">
         <div>
           <h2 id="building-status-heading" className="text-xl font-semibold">Start with a building</h2>
@@ -994,7 +1025,15 @@ function BuildingsGrid() {
                       <div className="text-muted-foreground">{style.icon}</div>
                       <div>
                         <p className="font-semibold text-sm leading-tight">{b.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{style.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {b.healthColor === "red" ? style.label : b.serviceEvidence?.internetUp ? "Internet path measured" : "No confirmed building outage"}
+                        </p>
+                        {b.serviceEvidence?.internetUp && b.serviceEvidence.observedAt && (
+                          <p className="text-[11px] text-muted-foreground">Measured {performanceAge(b.serviceEvidence.observedAt)} · phones not inferred</p>
+                        )}
+                        {b.deviceHealthColor && b.deviceHealthColor !== "green" && (
+                          <p className="text-[11px] font-medium text-amber-700">Device monitoring needs review: {b.deviceHealthColor}</p>
+                        )}
                       </div>
                       <div className="flex gap-2 mt-auto pt-1">
                         <span className="text-xs text-muted-foreground">
@@ -1360,7 +1399,13 @@ function BuildingDetailView({ name }: { name: string }) {
             : detail.healthColor === "amber" ? "bg-amber-100 text-amber-700 border-amber-300"
             : detail.healthColor === "red" ? "bg-red-100 text-red-700 border-red-300"
             : "bg-gray-100 text-gray-600 border-gray-300"
-          }`}>{style.label}</span>
+          }`}>{detail.healthColor === "red" ? style.label : detail.serviceEvidence?.internetUp ? "Internet path measured" : "No confirmed building outage"}</span>
+          {detail.serviceEvidence?.internetUp && detail.serviceEvidence.observedAt && (
+            <span className="text-xs text-muted-foreground">Measured {performanceAge(detail.serviceEvidence.observedAt)} · phones not verified by this measurement</span>
+          )}
+          {detail.deviceHealthColor && detail.deviceHealthColor !== "green" && (
+            <span className="text-xs font-medium text-amber-700">Device monitoring needs review: {detail.deviceHealthColor}</span>
+          )}
         </div>
         {canEdit && !editingName && (
           <>

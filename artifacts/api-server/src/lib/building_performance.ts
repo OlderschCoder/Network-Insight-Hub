@@ -1,8 +1,19 @@
 import { pool } from "@workspace/db";
 import { DEFAULT_AUTHORITATIVE_BUILDINGS } from "./building_assignment";
 import { diagnosticsBuildingName } from "./building_diagnostics_catalog";
+import { LIBRESPEED_METHOD, LIBRESPEED_ORIGIN, LIBRESPEED_SERVER_ID } from "./building_diagnostics";
+
+export const BUILDING_PERFORMANCE_FRESH_MS = 12 * 60 * 60_000;
 
 export type BuildingPerformanceStatus = "measured" | "stale" | "failed";
+
+export interface BuildingPerformanceProvenance {
+  kind: "external-librespeed" | "external-https" | "local" | "unknown";
+  explicitExternal: boolean;
+  serverOrigin: string | null;
+  serverId: number | null;
+  method: string | null;
+}
 
 export interface BuildingPerformance {
   status: BuildingPerformanceStatus;
@@ -15,6 +26,7 @@ export interface BuildingPerformance {
   lossPercent: number | null;
   testType: string | null;
   targetLabel: string | null;
+  provenance: BuildingPerformanceProvenance;
   error: string | null;
   sampleCount: number;
   interfaces: Array<{
@@ -25,6 +37,12 @@ export interface BuildingPerformance {
     jitterMs: number;
     transferClosed: true;
   }>;
+}
+
+export interface BuildingServiceEvidence {
+  internetUp: boolean;
+  reason: string;
+  observedAt: string | null;
 }
 
 interface PerformanceRow {
@@ -70,6 +88,98 @@ function verifiedInterfaces(data: Record<string, unknown>): BuildingPerformance[
   });
 }
 
+function isPublicHttpsOrigin(value: string | null): value is string {
+  if (!value) return false;
+  try {
+    const uri = new URL(value);
+    const host = uri.hostname.toLowerCase();
+    return uri.protocol === "https:" && !uri.port && !uri.username && !uri.password &&
+      !uri.search && !uri.hash && uri.pathname === "/" && uri.origin === value &&
+      !/^\d+\.\d+\.\d+\.\d+$/.test(host) &&
+      /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) && host.includes(".") &&
+      !/(?:^|\.)(?:localhost|local|internal|lan|home|invalid|test)$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
+function successfulExternalHttps(data: Record<string, unknown>, external: Record<string, unknown> | null) {
+  const status = finiteNumber(external?.status ?? external?.statusCode ?? external?.httpStatus);
+  const bytes = finiteNumber(external?.completedBytes ?? external?.bytesReceived ?? external?.downloadBytes ?? data.completedBytes ?? data.downloadBytes);
+  const elapsed = finiteNumber(external?.elapsedMs ?? external?.durationMs ?? data.elapsedMs ?? data.durationMs);
+  const failed = data.failed === true || external?.failed === true ||
+    (typeof data.error === "string" && !!data.error.trim()) ||
+    (typeof external?.error === "string" && !!external.error.trim()) ||
+    (typeof external?.failure === "string" && !!external.failure.trim());
+  return !failed && (status === 200 || status === 206) &&
+    bytes !== null && bytes > 0 && elapsed !== null && elapsed > 0;
+}
+
+function performanceProvenance(data: Record<string, unknown>): BuildingPerformanceProvenance {
+  const type = typeof data.type === "string" ? data.type : null;
+  const libreSpeed = data.libreSpeed && typeof data.libreSpeed === "object"
+    ? data.libreSpeed as Record<string, unknown>
+    : null;
+  const serverOrigin = typeof libreSpeed?.serverOrigin === "string" ? libreSpeed.serverOrigin : null;
+  const serverId = finiteNumber(libreSpeed?.serverId);
+  const method = typeof libreSpeed?.method === "string" ? libreSpeed.method : null;
+  const explicitLibreSpeed = type === "librespeed-v2" && serverOrigin === LIBRESPEED_ORIGIN &&
+    serverId === LIBRESPEED_SERVER_ID && method === LIBRESPEED_METHOD;
+  const external = data.external && typeof data.external === "object"
+    ? data.external as Record<string, unknown>
+    : null;
+  const externalOrigin = typeof external?.targetOrigin === "string" ? external.targetOrigin : null;
+  const externalType = typeof external?.type === "string" ? external.type : null;
+  const explicitHttps = (type === "external-quick" || type === "external-sustained") &&
+    externalType === type && isPublicHttpsOrigin(externalOrigin) && successfulExternalHttps(data, external);
+  if (explicitLibreSpeed) {
+    return { kind: "external-librespeed", explicitExternal: true, serverOrigin, serverId, method };
+  }
+  if (explicitHttps) {
+    return { kind: "external-https", explicitExternal: true, serverOrigin: externalOrigin, serverId: null, method: "HTTPS" };
+  }
+  if (type === "fred") {
+    return { kind: "local", explicitExternal: false, serverOrigin: null, serverId: null, method: null };
+  }
+  return { kind: "unknown", explicitExternal: false, serverOrigin, serverId, method };
+}
+
+/** Pure decision helper: only fresh, successful, positive, explicitly external evidence asserts Internet up. */
+export function getBuildingServiceEvidence(
+  performance: BuildingPerformance | null | undefined,
+  now = Date.now(),
+  freshnessMs = BUILDING_PERFORMANCE_FRESH_MS,
+): BuildingServiceEvidence {
+  if (!performance) return { internetUp: false, reason: "No external Internet measurement", observedAt: null };
+  const observed = Date.parse(performance.recordedAt);
+  const observedAt = Number.isFinite(observed) ? new Date(observed).toISOString() : null;
+  if (!Number.isFinite(observed) || observed > now || now - observed > freshnessMs) {
+    return { internetUp: false, reason: "External Internet measurement is stale or invalid", observedAt };
+  }
+  if (performance.status !== "measured" || performance.error) {
+    return { internetUp: false, reason: "Latest external Internet measurement did not succeed", observedAt };
+  }
+  if (!performance.provenance.explicitExternal ||
+      (performance.provenance.kind !== "external-librespeed" && performance.provenance.kind !== "external-https")) {
+    return { internetUp: false, reason: "Latest measurement lacks explicit external provenance", observedAt };
+  }
+  const positiveInterface = performance.interfaces.some((measurement) =>
+    measurement.transferClosed && Number.isFinite(measurement.downloadMbps) && measurement.downloadMbps > 0 &&
+    Number.isFinite(measurement.uploadMbps) && measurement.uploadMbps > 0);
+  const positiveExternalHttps = performance.provenance.kind === "external-https" &&
+    performance.downloadMbps !== null && Number.isFinite(performance.downloadMbps) && performance.downloadMbps > 0;
+  if (!positiveInterface && !positiveExternalHttps) {
+    return { internetUp: false, reason: "External measurement has no positive completed throughput", observedAt };
+  }
+  return {
+    internetUp: true,
+    reason: performance.provenance.kind === "external-librespeed"
+      ? "Fresh positive external LibreSpeed throughput"
+      : "Fresh positive external HTTPS throughput",
+    observedAt,
+  };
+}
+
 /**
  * Endpoint results are grouped by the reporting catalog. Historical labels such
  * as "Main Campus" and "Technical School" remain excluded because they cannot
@@ -105,11 +215,14 @@ export function buildLatestBuildingPerformance(
     }
     const recent = [...newestByComputer.values()].filter((row) => {
       const at = new Date(row.recorded_at).getTime();
-      return Number.isFinite(at) && now - at <= 24 * 60 * 60_000;
+      return Number.isFinite(at) && at <= now && now - at <= BUILDING_PERFORMANCE_FRESH_MS;
     });
     const validated = recent.map((row) => ({ row, data: reportData(row.data) }))
-      .map((entry) => ({ ...entry, interfaces: verifiedInterfaces(entry.data) }))
-      .filter((entry) => entry.interfaces.length > 0 && !(typeof entry.data.error === "string" && entry.data.error.trim()));
+      .map((entry) => ({ ...entry, interfaces: verifiedInterfaces(entry.data), provenance: performanceProvenance(entry.data) }))
+      .filter((entry) => entry.interfaces.some((measurement) => measurement.transferClosed &&
+          measurement.downloadMbps > 0 && measurement.uploadMbps > 0) &&
+        entry.provenance.explicitExternal &&
+        !(typeof entry.data.error === "string" && entry.data.error.trim()));
 
     if (validated.length) {
       const averagedInterfaces = (["ethernet", "wifi"] as const).flatMap((adapterKind) => {
@@ -125,11 +238,13 @@ export function buildLatestBuildingPerformance(
       const mean = (key: "downloadMbps" | "uploadMbps" | "pingMs") =>
         representatives.reduce((sum, sample) => sum + sample[key], 0) / representatives.length;
       const newestAt = Math.max(...validated.map((entry) => new Date(entry.row.recorded_at).getTime()));
+      const newest = validated.sort((a, b) => new Date(b.row.recorded_at).getTime() - new Date(a.row.recorded_at).getTime())[0];
       latest[building] = {
-        status: now - newestAt > 12 * 60 * 60_000 ? "stale" : "measured",
+        status: now - newestAt > BUILDING_PERFORMANCE_FRESH_MS ? "stale" : "measured",
         recordedAt: new Date(newestAt).toISOString(), computerName: null, user: null,
         downloadMbps: mean("downloadMbps"), uploadMbps: mean("uploadMbps"), latencyMs: mean("pingMs"),
-        lossPercent: null, testType: "librespeed-v2", targetLabel: "Building average from latest validated endpoint results",
+        lossPercent: null, testType: "librespeed-v2", targetLabel: "Building average from latest validated external endpoint results",
+        provenance: newest.provenance,
         error: null, sampleCount: validated.length, interfaces: averagedInterfaces,
       };
       continue;
@@ -147,7 +262,7 @@ export function buildLatestBuildingPerformance(
     const representative = interfaces.find((item) => item.adapterKind === "ethernet") ?? interfaces[0];
 
     latest[building] = {
-      status: error ? "failed" : ageMs > 12 * 60 * 60_000 ? "stale" : "measured",
+      status: error ? "failed" : ageMs < 0 || ageMs > BUILDING_PERFORMANCE_FRESH_MS ? "stale" : "measured",
       recordedAt: recordedAt.toISOString(),
       computerName: row.computer_name?.trim() || null,
       user: row.logged_on_user?.trim() || null,
@@ -157,6 +272,7 @@ export function buildLatestBuildingPerformance(
       lossPercent: finiteNumber(data.requestLossPercent),
       testType: typeof data.type === "string" ? data.type : null,
       targetLabel: typeof data.targetLabel === "string" ? data.targetLabel : null,
+      provenance: performanceProvenance(data),
       error,
       sampleCount: 1,
       interfaces,

@@ -8,6 +8,7 @@ import { BuildingProbeStore } from "../lib/building_probe_store";
 import { assignmentInput, enrollmentInput, heartbeatInput, computerName, token, JobSigner,
   probeState, ProbeError, PAGING, THROUGHPUT_PROFILES, matches } from "../lib/building_probe_protocol";
 import { PROBE_TIME_ZONE, STAGGER_SECONDS } from "../lib/building_probe_scheduler";
+import { diagnosticsStore } from "../lib/building_diagnostics_store";
 
 type Store = Pick<BuildingProbeStore, "list" | "buildings" | "createBuilding" | "assign" | "select" | "revoke" | "enroll" | "authenticate" | "heartbeat" | "enqueue" | "exportResults">;
 interface Dependencies {
@@ -55,8 +56,16 @@ export function createBuildingProbesRouter(deps: Dependencies) {
   router.get("/", deps.authenticate, deps.view, run(async (_req, res) => {
     if (!deps.enabled()) { res.json({ enabled: false, probes: [], buildings: [], schedule: schedule(), paging: PAGING }); return; }
     const probes = await deps.store.list();
+    const diagnostics = await diagnosticsStore.overview();
     res.setHeader("Cache-Control", "no-store");
     res.json({ enabled: true, paging: PAGING, buildings: await deps.store.buildings(), schedule: schedule(),
+      rollout: {
+        source: "building-diagnostics",
+        buildings: diagnostics.buildings.length,
+        computers: diagnostics.devices.filter((device: any) => device.enrolled && !device.revoked).length,
+        reporting: diagnostics.devices.filter((device: any) => device.enrolled && !device.revoked && device.online).length,
+        awaitingOrOffline: diagnostics.devices.filter((device: any) => device.enrolled && !device.revoked && !device.online).length,
+      },
       probes: probes.map((p: any) => ({ ...p, state: probeState(p.lastSeen, p.enabled) })) });
   }));
   router.get("/history",deps.authenticate,deps.view,run(async (_req,res)=>{
