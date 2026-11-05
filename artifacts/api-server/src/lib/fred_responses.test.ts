@@ -120,15 +120,8 @@ describe("Fred Astra adapter", () => {
     expect(responses).toHaveBeenCalledTimes(1);
   });
 
-  it("retries max_messages once with the original evidence and only returns completed calls", async () => {
-    const completeCall = {
-      type: "function_call",
-      call_id: "complete",
-      name: "probe",
-      arguments: '{"host":"test"}',
-      status: "completed",
-    };
-    const { client, responses } = setup([[completeCall]]);
+  it("stops max_messages without retrying or exposing interrupted tool arguments", async () => {
+    const { client, responses } = setup([]);
     responses.mockResolvedValueOnce({
       status: "incomplete",
       incomplete_details: { reason: "max_messages" },
@@ -141,60 +134,157 @@ describe("Fred Astra adapter", () => {
         },
       ],
     });
+    const params = {
+      model: "gpt-6-astra",
+      messages: [
+        { role: "system" as const, content: "Use evidence." },
+        { role: "user" as const, content: "Check test." },
+      ],
+    };
+    const result = await client.chat.completions.create(params, {
+      timeout: 1234,
+      maxRetries: 5,
+    });
+    expect(result.choices[0].message.tool_calls).toBeUndefined();
+    expect(result.choices[0].message.content).toContain("no automatic retry");
+    expect(result.choices[0].finish_reason).toBe("stop");
+    await client.chat.completions.create({
+      ...params,
+      messages: [...params.messages],
+    });
+    expect(responses).toHaveBeenCalledTimes(1);
+    expect(responses.mock.calls[0][1]).toEqual({
+      timeout: 1234,
+      maxRetries: 0,
+    });
+    expect(responses.mock.calls[0][0].reasoning).toEqual({ effort: "high" });
+    await client.chat.completions.create({
+      ...params,
+      messages: [{ role: "user", content: "New independent turn." }],
+    });
+    expect(responses).toHaveBeenCalledTimes(2);
+  });
+
+  function history(
+    results: string[],
+    args: string[] = [],
+  ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: "system", content: "Use evidence." },
       { role: "user", content: "Check test." },
     ];
-    const result = await client.chat.completions.create(
-      {
-        model: "gpt-6-astra",
-        messages,
-        tools: [
+    results.forEach((output, index) => {
+      messages.push({
+        role: "assistant",
+        tool_calls: [
           {
             type: "function",
+            id: `call-${index}`,
             function: {
               name: "probe",
-              parameters: { type: "object", properties: {} },
+              arguments: args[index] ?? '{"host":"test"}',
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "probe" } },
-      },
-      { timeout: 1234 },
-    );
-    expect(responses).toHaveBeenCalledTimes(2);
-    const firstRequest = responses.mock.calls[0][0];
-    const retry = responses.mock.calls[1][0];
-    expect(retry).toMatchObject({
-      model: "gpt-6-astra",
-      store: false,
-      parallel_tool_calls: false,
-      tool_choice: { type: "function", name: "probe" },
-      tools: firstRequest.tools,
-      reasoning: { effort: "high" },
-      max_output_tokens: firstRequest.max_output_tokens,
+      });
+      messages.push({
+        role: "tool",
+        tool_call_id: `call-${index}`,
+        content: output,
+      });
     });
-    expect(retry.input.slice(0, -1)).toEqual(firstRequest.input);
-    expect(JSON.stringify(retry)).not.toContain('"partial"');
-    expect(responses.mock.calls[1][1]).toEqual({ timeout: 1234 });
-    expect(messages).toHaveLength(2);
-    expect(
-      result.choices[0].message.tool_calls?.map((call) => call.id),
-    ).toEqual(["complete"]);
-    expect(result.choices[0].finish_reason).toBe("tool_calls");
+    return messages;
+  }
+
+  it("stops three identical completed tool rounds before another paid request", async () => {
+    const { client, responses } = setup([]);
+    const result = await client.chat.completions.create({
+      model: "gpt-6-astra",
+      messages: history(['{"a":1,"b":2}', '{"b":2,"a":1}', '{"a":1,"b":2}']),
+    });
+    expect(result.choices[0].message.content).toContain(
+      "three consecutive tool rounds",
+    );
+    expect(result.choices[0].message.tool_calls).toBeUndefined();
+    expect(responses).not.toHaveBeenCalled();
   });
 
-  it("bounds max_messages recovery and still refuses a second incomplete response", async () => {
+  it("allows repeated tools when their arguments or returned evidence change", async () => {
+    for (const messages of [
+      history(["running", "running", "finished"]),
+      history(
+        ["up", "up", "up"],
+        ['{"host":"a"}', '{"host":"b"}', '{"host":"c"}'],
+      ),
+      history(["unchanged", "unchanged"]),
+      [
+        ...history(["unchanged", "unchanged", "unchanged"]),
+        { role: "user" as const, content: "Check again now." },
+      ],
+    ]) {
+      const { client, responses } = setup([]);
+      await client.chat.completions.create({ model: "gpt-6-astra", messages });
+      expect(responses).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("keeps independent turns separate and enforces the per-call output ceiling", async () => {
     const { client, responses } = setup([]);
-    responses.mockResolvedValue({
-      status: "incomplete",
-      incomplete_details: { reason: "max_messages" },
-      output: [],
+    await client.chat.completions.create({
+      model: "gpt-6-astra",
+      messages: history(["same", "same", "same"]),
     });
-    await expect(
-      client.chat.completions.create({ model: "gpt-6-astra", messages: [] }),
-    ).rejects.toThrow("max_messages");
-    expect(responses).toHaveBeenCalledTimes(2);
+    await client.chat.completions.create({
+      model: "gpt-6-astra",
+      messages: [{ role: "user", content: "Independent request." }],
+      max_completion_tokens: 50000,
+    });
+    expect(responses).toHaveBeenCalledTimes(1);
+    expect(responses.mock.calls[0][0].max_output_tokens).toBe(8192);
+  });
+
+  it("reports usage including reasoning without logging conversation content", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const { client, responses } = setup([]);
+      responses.mockResolvedValueOnce({
+        id: "response-usage",
+        created_at: 1,
+        model: "gpt-6-astra",
+        status: "completed",
+        output: [],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 20,
+          total_tokens: 120,
+          input_tokens_details: { cached_tokens: 40 },
+          output_tokens_details: { reasoning_tokens: 15 },
+        },
+      });
+      const result = await client.chat.completions.create({
+        model: "gpt-6-astra",
+        messages: [{ role: "user", content: "PRIVATE_SENTINEL" }],
+      });
+      expect(result.usage).toMatchObject({
+        prompt_tokens: 100,
+        completion_tokens: 20,
+        completion_tokens_details: { reasoning_tokens: 15 },
+      });
+      const log = info.mock.calls
+        .map(([line]) => JSON.parse(line))
+        .find((item) => item.event === "fred_ai_usage");
+      expect(log).toMatchObject({
+        event: "fred_ai_usage",
+        reasoning: "high",
+        inputTokens: 100,
+        outputTokens: 20,
+        cachedInputTokens: 40,
+        reasoningTokens: 15,
+      });
+      expect(JSON.stringify(info.mock.calls)).not.toContain("PRIVATE_SENTINEL");
+    } finally {
+      info.mockRestore();
+    }
   });
 
   it("does not retry content filtering or other failed responses", async () => {

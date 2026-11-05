@@ -289,3 +289,52 @@ The previous adapter and API bundle are backed up under
 The reproduced conversation completed all three API rounds at high reasoning
 and returned HTTP 200 with a final reply. The tools executed during this replay
 were read-only; no saved conversation or operational records were modified.
+
+### Stop wasted loops and report usage, 2026-11-05
+
+Mark requested protection from unnecessary loops while retaining extensive
+normal use, and explicitly declined a daily spending cutoff. High reasoning
+remains enabled. The latest completed live chat before this change took
+260 seconds and returned HTTP 200; prior logs did not record model-round or
+token counts, so that duration alone cannot establish whether it looped.
+
+The Astra adapter now stops before another paid call when three consecutive
+completed tool rounds have identical tool names, arguments, and returned
+results. Call IDs and JSON object-key order do not affect comparison. Changed
+arguments or results are allowed. A stop returns a plain explanation, preserves
+earlier completed actions, and does not claim that the task is finished.
+The stop remains latched for the in-flight turn. No partial tool call executes.
+
+`max_messages` now stops immediately rather than retrying. SDK automatic
+retries are also disabled for Fred Astra requests. Each generation has a hard
+8,192-output-token ceiling, including reasoning. The existing outer limits of
+five normal tool rounds or 32 development rounds, plus final synthesis, remain
+unchanged; there is no new daily cutoff or smaller round allowance. This is
+loop protection, not a dollar spending cap or a guarantee that every repeated
+operation will be detected.
+
+Structured `fred_ai_request`, `fred_ai_usage`, `fred_ai_error`, and `fred_ai_stop`
+events record a random turn ID, request count, reasoning setting, timings,
+input/output/reasoning/cache tokens, and stop reason. They do not record prompts,
+tool arguments/results, or credentials. Missing provider usage is reported as
+unknown; timing out or losing a response is not proof that no billing occurred.
+Usage returned by the provider is also preserved in the Chat-compatible result.
+
+Deployment record: these controls shipped with the reconciled prepared
+building-health release `5313093c07702ffa50cdc9c3d82f0450e31f7328c23bd87f09d1bcfbae163b7e`,
+release ID `01079443-0aa8-4e39-b66c-db155d2dcb24`. Independent validation passed
+57 tests plus sandbox and both production builds. The release controller
+reported `DEPLOYED_HEALTHY`; `/ai-report` and `/api/healthz` returned HTTP 200.
+A small live model check reported input/output/reasoning usage and high reasoning.
+Non-CIO publication and malformed revision requests were rejected. A synthetic
+stale runtime-control manifest was rejected before backup, copying, or restart.
+
+The CIO also authorized Fred to publish future CIO-requested exact validated
+revisions. Validation, protected auth/credentials/model controls, backups, health
+checks and automatic rollback remain mandatory. Publication ends the chat turn
+before service restart; final state is recorded by the independent controller.
+The complete reconciled application and operator modules are stored on GitHub
+branch `codex/fred-validated-self-deploy-20261105`, with operational details in
+`docs/fred-validated-self-deployment.md`. The operator/bootstrap backup is
+`/var/backups/fred-self-deploy-20261105/`; the previous application source and
+bundles are in the release controller's `releases/<release ID>/before/` directory.

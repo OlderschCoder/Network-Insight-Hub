@@ -2,11 +2,21 @@ flowchart LR
   Chat[Existing Fred chat and evidence loop] --> Router[Model profile router]
   Router -->|gpt-6-astra| Adapter[Responses adapter: high reasoning, store false]
   Router -->|Other profiles| Existing[Existing provider API]
-  Adapter --> API[OpenAI Responses]
-  API -->|incomplete: max_messages only| Retry[Discard interrupted output; retry once with serial calls]
-  Retry --> API
-  API -->|Still incomplete or failed| Error[Return error; never execute partial tool calls]
+  Adapter --> Guard[Check for three identical tool rounds]
+  Guard -->|No progress| Stop[Return clear stop; preserve earlier results]
+  Guard --> API[OpenAI Responses: 8192 output tokens; no automatic retries]
+  API -->|incomplete: max_messages| Stop
+  API -->|Other incomplete or failed| Error[Return error; never execute partial tool calls]
+  API --> Usage[Log tokens, reasoning, cache and duration per turn]
   API --> Results[Text and function calls]
   Results --> Chat
   Chat --> Handlers[Existing authorized tool handlers]
   Handlers -->|Tool results and retained reasoning| Adapter
+  Chat -->|CIO requested change| Workspace[Editable development workspace]
+  Workspace --> Validate[Independent sandbox tests and builds]
+  Validate -->|Exact passed revision| Publish[Protected release controller]
+  Publish --> Drift[Compare live model and loop-control hashes]
+  Drift --> Backup[Back up source and bundles]
+  Backup --> Deploy[Deploy and restart]
+  Deploy --> Health[Independent health checks]
+  Health -->|Failure| Rollback[Restore previous release]
