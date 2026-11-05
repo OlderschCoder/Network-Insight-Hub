@@ -237,3 +237,33 @@ repository typechecking is not clean: it reports missing workspace declaration
 builds and unrelated existing errors, including `isPublic` used before its
 declaration in the local Zendesk handler. No claim of a clean full-suite check
 or an authenticated browser chat test is made.
+
+### Astra message-limit recovery, 2026-11-05
+
+Production logged three `Fred Astra response incomplete: max_messages` errors.
+The adapter now discards that interrupted output and retries once on the same
+model with the original conversation/evidence, serial function calls, and a
+request to omit progress commentary. No interrupted function call reaches a
+handler. Other incomplete reasons and failed responses still fail closed;
+a second `max_messages` response also returns an error. Both attempts keep
+`store: false` and the existing tool selection, reasoning budget, and request
+options. This is bounded recovery, not a guarantee against a repeated API limit.
+
+Deploy only `src/lib/fred_responses.ts` and the API bundle built from a staged
+copy of production source. Back up that source file and the complete API `dist/`
+under `/var/backups/fred-max-messages-20261105/` before restarting `sccc-api`.
+Rollback restores both from that directory and restarts the service. See the
+updated [Astra flow](fred-astra-flow.mmd).
+
+Deployed and verified: nine focused adapter/router tests passed in Linux
+staging, isolated strict TypeScript checking passed, and the production-source
+bundle built and passed Node syntax checking. Live synthetic tool round trips
+passed normally and with an injected `max_messages` interruption, before and
+after restart; interrupted arguments were not returned. The running bundle
+contains the retry, `sccc-api` is active, and both the Insights homepage and
+`/api/healthz` returned HTTP 200. The deployed `openai.ts`, `ai_knowledge.ts`,
+and `status_report.ts` hashes remained unchanged. The original failing user
+conversation was not replayed, and an authenticated browser chat remains
+unverified. The Windows runner lacked its Rollup native binary; Linux staging
+used the current repository test files because production's saved routing test
+still expected its pre-Astra default.

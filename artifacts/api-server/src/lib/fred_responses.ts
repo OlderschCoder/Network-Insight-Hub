@@ -91,20 +91,41 @@ export function withFredResponses(client: OpenAI): OpenAI {
           ? { type: "function" as const, name: choice.function.name }
           : undefined
         : choice;
-    const response = await client.responses.create(
-      {
-        model: params.model,
-        input: params.messages.flatMap(convert),
-        store: false,
-        include: ["reasoning.encrypted_content"],
-        reasoning: { effort: "low" },
-        // Responses budgets include reasoning as well as the visible answer.
-        max_output_tokens: Math.max(8192, params.max_completion_tokens ?? 0),
-        ...(tools ? { tools } : {}),
-        ...(toolChoice ? { tool_choice: toolChoice } : {}),
-      },
-      options,
-    );
+    const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
+      model: params.model,
+      input: params.messages.flatMap(convert),
+      store: false,
+      include: ["reasoning.encrypted_content"],
+      reasoning: { effort: "low" },
+      // Responses budgets include reasoning as well as the visible answer.
+      max_output_tokens: Math.max(8192, params.max_completion_tokens ?? 0),
+      ...(tools ? { tools } : {}),
+      ...(toolChoice ? { tool_choice: toolChoice } : {}),
+    };
+    let response = await client.responses.create(request, options);
+    // A message-limit stop is retryable, but its output may contain unfinished
+    // function arguments. Discard it and regenerate before any handler runs.
+    // Bound the retry and serialize calls to avoid another multi-message burst.
+    if (
+      response.status === "incomplete" &&
+      String(response.incomplete_details?.reason) === "max_messages"
+    ) {
+      response = await client.responses.create(
+        {
+          ...request,
+          parallel_tool_calls: false,
+          input: [
+            ...(request.input as Input[]),
+            {
+              role: "developer",
+              content:
+                "Return the next required function call or the final answer directly. Omit progress commentary. Do not repeat earlier messages.",
+            },
+          ],
+        },
+        options,
+      );
+    }
     if (response.status !== "completed") {
       throw new Error(
         `Fred Astra response ${response.status}: ${response.incomplete_details?.reason ?? response.error?.code ?? "unknown"}`,

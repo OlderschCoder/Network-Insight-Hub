@@ -116,6 +116,101 @@ describe("Fred Astra adapter", () => {
     await expect(
       client.chat.completions.create({ model: "gpt-6-astra", messages: [] }),
     ).rejects.toThrow("max_output_tokens");
+    expect(responses).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries max_messages once with the original evidence and only returns completed calls", async () => {
+    const completeCall = {
+      type: "function_call",
+      call_id: "complete",
+      name: "probe",
+      arguments: '{"host":"test"}',
+      status: "completed",
+    };
+    const { client, responses } = setup([[completeCall]]);
+    responses.mockResolvedValueOnce({
+      status: "incomplete",
+      incomplete_details: { reason: "max_messages" },
+      output: [
+        {
+          type: "function_call",
+          call_id: "partial",
+          name: "probe",
+          arguments: '{"host":',
+        },
+      ],
+    });
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: "system", content: "Use evidence." },
+      { role: "user", content: "Check test." },
+    ];
+    const result = await client.chat.completions.create(
+      {
+        model: "gpt-6-astra",
+        messages,
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "probe",
+              parameters: { type: "object", properties: {} },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "probe" } },
+      },
+      { timeout: 1234 },
+    );
+    expect(responses).toHaveBeenCalledTimes(2);
+    const firstRequest = responses.mock.calls[0][0];
+    const retry = responses.mock.calls[1][0];
+    expect(retry).toMatchObject({
+      model: "gpt-6-astra",
+      store: false,
+      parallel_tool_calls: false,
+      tool_choice: { type: "function", name: "probe" },
+      tools: firstRequest.tools,
+      reasoning: firstRequest.reasoning,
+      max_output_tokens: firstRequest.max_output_tokens,
+    });
+    expect(retry.input.slice(0, -1)).toEqual(firstRequest.input);
+    expect(JSON.stringify(retry)).not.toContain('"partial"');
+    expect(responses.mock.calls[1][1]).toEqual({ timeout: 1234 });
+    expect(messages).toHaveLength(2);
+    expect(
+      result.choices[0].message.tool_calls?.map((call) => call.id),
+    ).toEqual(["complete"]);
+    expect(result.choices[0].finish_reason).toBe("tool_calls");
+  });
+
+  it("bounds max_messages recovery and still refuses a second incomplete response", async () => {
+    const { client, responses } = setup([]);
+    responses.mockResolvedValue({
+      status: "incomplete",
+      incomplete_details: { reason: "max_messages" },
+      output: [],
+    });
+    await expect(
+      client.chat.completions.create({ model: "gpt-6-astra", messages: [] }),
+    ).rejects.toThrow("max_messages");
+    expect(responses).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry content filtering or other failed responses", async () => {
+    for (const response of [
+      {
+        status: "incomplete",
+        incomplete_details: { reason: "content_filter" },
+      },
+      { status: "failed", error: { code: "server_error" } },
+    ]) {
+      const { client, responses } = setup([]);
+      responses.mockResolvedValueOnce(response);
+      await expect(
+        client.chat.completions.create({ model: "gpt-6-astra", messages: [] }),
+      ).rejects.toThrow("Fred Astra response");
+      expect(responses).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("preserves image input and does not send sampling parameters", async () => {

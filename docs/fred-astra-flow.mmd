@@ -3,6 +3,9 @@ flowchart LR
   Router -->|gpt-6-astra| Adapter[Responses adapter: low reasoning, store false]
   Router -->|Other profiles| Existing[Existing provider API]
   Adapter --> API[OpenAI Responses]
+  API -->|incomplete: max_messages only| Retry[Discard interrupted output; retry once with serial calls]
+  Retry --> API
+  API -->|Still incomplete or failed| Error[Return error; never execute partial tool calls]
   API --> Results[Text and function calls]
   Results --> Chat
   Chat --> Handlers[Existing authorized tool handlers]
